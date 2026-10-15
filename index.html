@@ -1,77 +1,1162 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BinderHunt – swipe to find the cards your binder is missing</title>
 <meta name="description" content="BinderHunt: swipe through real Pokémon TCG cards and build a wishlist for your binder. No packs, no gambling, just hunting the cards you want.">
-<meta property="og:title" content="BinderHunt"><meta property="og:description" content="Swipe to find the cards your binder is missing."><meta property="og:type" content="website"><meta property="og:url" content="https://kyrohmotz.github.io/binderhunt/"><meta name="twitter:card" content="summary">
+<meta property="og:title" content="BinderHunt">
+<meta property="og:description" content="Swipe to find the cards your binder is missing.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://kyrohmotz.github.io/binderhunt/">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#0d0b1f">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔎</text></svg>">
 <style>
-*{box-sizing:border-box;margin:0}body{font-family:system-ui,sans-serif;background:radial-gradient(circle at top,#3b1d6e,#0d0b1f 70%);color:#fff;min-height:100vh;overflow:hidden;touch-action:none}
-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px}
-h1{font-size:24px;background:linear-gradient(90deg,#ffcb05,#ff5e8a);-webkit-background-clip:text;color:transparent}
-.tab{background:#ffffff1a;border:0;color:#fff;padding:8px 14px;border-radius:20px;font-weight:600}
-#deck{position:relative;width:min(88vw,360px);height:min(62vh,500px);margin:6px auto}
-.card{position:absolute;inset:0;border-radius:18px;background:#1c1838;box-shadow:0 10px 30px #0008;display:flex;flex-direction:column;overflow:hidden;cursor:grab;user-select:none}
-.card img{flex:1;min-height:0;object-fit:contain;padding:10px;pointer-events:none}
-.info{padding:10px 14px;background:#0006}.info b{font-size:18px}.info small{display:block;opacity:.75}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{font-family:system-ui,sans-serif;background:radial-gradient(circle at top,#3b1d6e,#0d0b1f 70%);color:#fff;height:100dvh;overflow:hidden;display:flex;flex-direction:column}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:#ffcb05}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;flex:none}
+h1{font-size:22px;background:linear-gradient(90deg,#ffcb05,#ff5e8a);-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font-size:18px;margin:16px 0 8px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.tab{background:#ffffff1a;border:0;color:#fff;padding:8px 12px;border-radius:20px;font-weight:600}
+.tab:focus-visible,button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #ffcb05;outline-offset:2px}
+#chips{display:flex;gap:6px;overflow:auto;padding:0 14px 6px;flex:none}
+#chips:empty{display:none}
+.chip{border:0;background:#ffffff18;color:#fff;border-radius:999px;padding:5px 10px;font-size:12px;white-space:nowrap}
+#hint{text-align:center;font-size:12px;opacity:.7;padding:0 12px 4px;flex:none}
+#deck{position:relative;width:min(92vw,380px);flex:1;min-height:220px;margin:0 auto;touch-action:none}
+.card{position:absolute;inset:0;border-radius:18px;background:#1c1838;box-shadow:0 10px 30px #0008;display:flex;flex-direction:column;overflow:hidden;cursor:grab;user-select:none;touch-action:none;will-change:transform}
+.card img.art{flex:1;min-height:0;width:100%;object-fit:contain;padding:8px 8px 0;pointer-events:none;background:#120e28}
+.info{padding:8px 12px 10px;background:#0006}
+.info b{font-size:17px}
+.info small{display:block;opacity:.75;margin-top:2px}
 .price{float:right;color:#5cf2a0;font-weight:700}
-.stamp{position:absolute;top:24px;padding:4px 12px;border:4px solid;border-radius:8px;font-size:28px;font-weight:900;opacity:0}
-.like{left:20px;color:#5cf2a0;transform:rotate(-15deg)}.nope{right:20px;color:#ff5e8a;transform:rotate(15deg)}
-.btns{display:flex;justify-content:center;gap:40px;margin:10px}
-.btns button{width:64px;height:64px;border-radius:50%;border:0;font-size:28px;background:#fff;box-shadow:0 4px 14px #0007}
-.ad{margin:8px auto;width:min(88vw,360px);border:1px dashed #ffcb05;border-radius:10px;padding:8px;text-align:center;font-size:13px;color:#ffcb05}
-#wish{position:fixed;inset:0;background:#0d0b1f;overflow:auto;padding:16px;display:none}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:10px}
-.w{background:#1c1838;border-radius:10px;padding:6px;font-size:12px;position:relative}.w img{width:100%}
-.w button{position:absolute;top:4px;right:4px;border:0;border-radius:50%;width:24px;height:24px;background:#ff5e8a;color:#fff}
-#loading{text-align:center;padding-top:40%;opacity:.7}
-</style></head><body>
-<header><h1>BinderHunt</h1><button class="tab" id="openWish">♥ Wishlist (<span id="cnt">0</span>)</button></header>
-<div id="deck"><div id="loading">Shuffling cards…</div></div>
-<div class="btns"><button id="no">✖</button><button id="yes">♥</button></div>
+.buy{display:flex;flex-wrap:wrap;gap:8px 10px;margin-top:6px;font-size:12px}
+.buy a{pointer-events:auto}
+.stamp{position:absolute;top:24px;padding:4px 12px;border:4px solid;border-radius:8px;font-size:28px;font-weight:900;opacity:0;pointer-events:none}
+.like{left:20px;color:#5cf2a0;transform:rotate(-15deg)}
+.nope{right:20px;color:#ff5e8a;transform:rotate(15deg)}
+.btns{display:flex;justify-content:center;gap:28px;margin:8px;flex:none}
+.btns button{width:60px;height:60px;border-radius:50%;border:0;font-size:26px;background:#fff;color:#1c1838;box-shadow:0 4px 14px #0007}
+.ad{margin:0 auto 8px;width:min(92vw,380px);border:1px dashed #ffcb05;border-radius:10px;padding:6px 8px;text-align:center;font-size:12px;color:#ffcb05;flex:none}
+.sheet{position:fixed;inset:0;background:#0d0b1f;z-index:30;overflow:auto;padding:14px 14px 32px;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+.sheet[hidden]{display:none !important}
+.sheetbar{display:flex;justify-content:space-between;align-items:center;gap:8px;position:sticky;top:-14px;background:#0d0b1f;padding:8px 0 10px;z-index:2}
+.field{display:flex;flex-direction:column;gap:4px;margin:10px 0;font-size:14px}
+.field input,.field select{background:#1c1838;border:1px solid #ffffff2a;border-radius:10px;padding:10px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.help{font-size:12px;opacity:.7;line-height:1.4}
+.check{display:flex;gap:8px;align-items:flex-start;margin:12px 0}
+.form-actions{display:flex;gap:8px;margin-top:12px}
+.hero{width:min(100%,420px);max-height:54vh;object-fit:contain;display:block;margin:0 auto;background:#120e28;border-radius:16px}
+.headline{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-top:12px}
+.headline .amt{color:#5cf2a0;font-size:22px;font-weight:800}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.fact{background:#1c1838;border-radius:12px;padding:8px 10px}
+.fact span{display:block;opacity:.6;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.atk,.ability{background:#1c1838;border-radius:12px;padding:10px;margin-top:8px}
+.atk .top,.ability .top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.pip{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;margin-right:3px;font-size:10px;font-style:normal;font-weight:800;color:#111}
+.pips{display:inline-flex;align-items:center}
+.table-wrap{overflow-x:auto;margin-top:8px}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:340px}
+th,td{text-align:left;padding:6px 4px;border-bottom:1px solid #ffffff18;vertical-align:top}
+.chart{width:100%;height:auto;background:#1c1838;border-radius:12px;margin-top:8px}
+.soon{margin-top:10px;border:1px dashed #ffffff3a;border-radius:12px;padding:12px;background:#ffffff0a}
+.soon h2{margin-top:0}
+.soon p{font-size:14px;line-height:1.45;opacity:.85}
+.fine{font-size:12px;opacity:.7;line-height:1.4;margin-top:6px}
+.links,.wish-links{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.links a,.wish-links a,.buy a{background:#ffffff14;border-radius:999px;padding:6px 10px;text-decoration:none;font-weight:700;font-size:12px;line-height:1.2}
+.wish-links{flex-direction:column;align-items:stretch}
+.wish-links a{text-align:center}
+#profileBody{max-width:640px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px}
+.w{background:#1c1838;border-radius:12px;padding:8px;font-size:12px;position:relative}
+.w img{width:100%;border-radius:8px;background:#120e28}
+.w .x{position:absolute;top:12px;right:12px;border:0;border-radius:50%;width:26px;height:26px;background:#ff5e8a;color:#fff}
+.empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;padding:20px}
+.err{color:#ffb4c8}
+.flavor{margin-top:10px;font-style:italic;opacity:.85}
+@media (max-width:380px){
+  h1{font-size:18px}
+  .tab{padding:7px 10px;font-size:13px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>BinderHunt</h1>
+  <div class="actions">
+    <button class="tab" id="openFilters" type="button">Filters</button>
+    <button class="tab" id="openWish" type="button">♥ Wishlist (<span id="cnt">0</span>)</button>
+  </div>
+</header>
+<div id="chips"></div>
+<p id="hint">Tap a card for its profile. Swipe right to wishlist, left to pass.</p>
+<div id="deck"></div>
+<div class="btns"><button id="no" type="button" aria-label="Pass">✖</button><button id="yes" type="button" aria-label="Wishlist">♥</button></div>
 <div class="ad"><b>SPONSORED · EXAMPLE PLACEMENT</b><br>Your shop or brand here — reach collectors mid-swipe.</div>
-<div id="wish"><header><h1>Wishlist</h1><button class="tab" id="closeWish">← Back</button></header>
-<p>Total estimated value: <b id="total" style="color:#5cf2a0">$0.00</b></p><div class="grid" id="grid"></div></div>
+
+<div id="filters" class="sheet" hidden>
+  <form id="filterForm">
+    <div class="sheetbar">
+      <h2 style="margin:0">Filters</h2>
+      <button class="tab" id="closeFilters" type="button">Close</button>
+    </div>
+    <p class="help">These filters choose which cards the swipe stack keeps dealing.</p>
+    <label class="field">Pokémon name
+      <input id="fName" name="name" autocomplete="off" placeholder="e.g. Pikachu">
+    </label>
+    <label class="field">Type
+      <select id="fType" name="type"><option value="">Any type</option></select>
+    </label>
+    <label class="field">Set
+      <input id="fSetSearch" type="search" placeholder="Find a set" autocomplete="off">
+      <select id="fSet" name="set"><option value="">Any set</option></select>
+    </label>
+    <label class="field">Rarity
+      <select id="fRarity" name="rarity"><option value="">Any rarity</option></select>
+    </label>
+    <div class="row2">
+      <label class="field">Min price (USD)
+        <input id="fMin" name="min" inputmode="decimal" placeholder="0">
+      </label>
+      <label class="field">Max price (USD)
+        <input id="fMax" name="max" inputmode="decimal" placeholder="Any">
+      </label>
+    </div>
+    <p class="help">Price range uses the TCGplayer market price in USD. Cards with no US price are skipped while a range or chase mode is on.</p>
+    <label class="check">
+      <input id="fChase" name="chase" type="checkbox">
+      <span><b>Chase cards</b><br><span class="help">High-value hunt. Keeps cards whose TCGplayer market price is at least $25. If you leave rarity on Any, the stack is illustration rares, special illustration rares, hyper rares, secrets, and similar chase rarities.</span></span>
+    </label>
+    <p id="filterWarn" class="err" hidden></p>
+    <div class="form-actions">
+      <button class="tab" type="submit">Apply</button>
+      <button class="tab" id="resetFilters" type="button">Reset</button>
+    </div>
+  </form>
+</div>
+
+<div id="wish" class="sheet" hidden>
+  <div class="sheetbar">
+    <h2 style="margin:0">Wishlist</h2>
+    <button class="tab" id="closeWish" type="button">← Back</button>
+  </div>
+  <p>Total estimated value: <b id="total" style="color:#5cf2a0">$0.00</b></p>
+  <p class="fine">Sum of TCGplayer market prices in USD. Cards without a US price are not included.</p>
+  <div class="grid" id="grid"></div>
+</div>
+
+<div id="profile" class="sheet" hidden>
+  <div class="sheetbar">
+    <button class="tab" id="closeProfile" type="button">Close</button>
+    <button class="tab" id="profileWish" type="button">♥ Wishlist</button>
+  </div>
+  <div id="profileBody"></div>
+</div>
+
 <script>
-const deck=document.getElementById('deck');let queue=[],loading=false,seen=new Set();
-let wish=JSON.parse(localStorage.binderhuntWish||'[]');
-const save=()=>{localStorage.binderhuntWish=JSON.stringify(wish);cnt.textContent=wish.length};save();
-function price(c){const p=c.tcgplayer&&c.tcgplayer.prices;if(!p)return null;for(const k in p){const v=p[k].market||p[k].mid;if(v)return v}return null}
-async function fromPTCG(){const page=1+Math.floor(Math.random()*900);
- const ctl=new AbortController();setTimeout(()=>ctl.abort(),8000);
- const r=await fetch(`https://api.pokemontcg.io/v2/cards?pageSize=20&page=${page}&select=id,name,images,set,rarity,tcgplayer`,{signal:ctl.signal});
- const j=await r.json();if(!j.data||!j.data.length)throw 0;
- return j.data.map(c=>({id:c.id,name:c.name,img:c.images.large,set:c.set.name,rarity:c.rarity||'—',price:price(c),url:c.tcgplayer&&c.tcgplayer.url}))}
-let dexList=null;
-async function fromDex(){if(!dexList)dexList=(await (await fetch('https://api.tcgdex.net/v2/en/cards')).json()).filter(c=>c.image);
- const out=[];for(let i=0;i<10;i++){const c=dexList[Math.floor(Math.random()*dexList.length)];
-  try{const d=await (await fetch('https://api.tcgdex.net/v2/en/cards/'+c.id)).json();
-  const tp=d.pricing&&d.pricing.tcgplayer;let pr=null;if(tp)for(const k in tp){if(tp[k]&&tp[k].marketPrice){pr=tp[k].marketPrice;break}}
-  out.push({id:d.id,name:d.name,img:d.image+'/high.webp',set:d.set.name,rarity:d.rarity||'—',price:pr})}catch(e){}}return out}
-async function refill(){if(loading)return;loading=true;let cards;
- try{cards=await fromPTCG()}catch(e){try{cards=await fromDex()}catch(e2){cards=[]}}
- cards.sort(()=>Math.random()-.5).forEach(c=>{if(!seen.has(c.id)){seen.add(c.id);queue.push(c);new Image().src=c.img}});
- loading=false;render()}
-function render(){const l=document.getElementById('loading');if(l&&queue.length)l.remove();
- while(deck.querySelectorAll('.card').length<Math.min(3,queue.length)){const n=deck.querySelectorAll('.card').length;mk(queue[n])}
- if(queue.length<8)refill()}
-function mk(c){const el=document.createElement('div');el.className='card';el.c=c;
- el.innerHTML=`<span class="stamp like">WANT</span><span class="stamp nope">PASS</span><img src="${c.img}" alt=""><div class="info"><span class="price">${c.price?'$'+c.price.toFixed(2):'n/a'}</span><b>${c.name}</b><small>${c.set} · ${c.rarity}</small></div>`;
- deck.prepend(el);drag(el)}
-function topCard(){const a=deck.querySelectorAll('.card');return a[a.length-1]}
-function fly(dir){const el=topCard();if(!el)return;el.style.transition='transform .35s ease';
- el.style.transform=`translate(${dir*600}px,-40px) rotate(${dir*30}deg)`;
- if(dir>0&&!wish.find(w=>w.id===el.c.id)){wish.push(el.c);save()}
- queue.shift();setTimeout(()=>{el.remove();render()},300)}
-function drag(el){let x0,y0,dx=0,dy=0,on=false;
- el.onpointerdown=e=>{if(el!==topCard())return;on=true;x0=e.clientX;y0=e.clientY;el.setPointerCapture(e.pointerId);el.style.transition='none'};
- el.onpointermove=e=>{if(!on)return;dx=e.clientX-x0;dy=e.clientY-y0;el.style.transform=`translate(${dx}px,${dy}px) rotate(${dx/15}deg)`;
-  el.querySelector('.like').style.opacity=Math.max(0,dx/100);el.querySelector('.nope').style.opacity=Math.max(0,-dx/100)};
- el.onpointerup=()=>{if(!on)return;on=false;if(Math.abs(dx)>100)fly(Math.sign(dx));else{el.style.transition='transform .25s';el.style.transform='';el.querySelectorAll('.stamp').forEach(s=>s.style.opacity=0)}dx=dy=0}}
-yes.onclick=()=>fly(1);no.onclick=()=>fly(-1);
-onkeydown=e=>{if(e.key==='ArrowRight')fly(1);if(e.key==='ArrowLeft')fly(-1)};
-function showWish(){grid.innerHTML='';let t=0;wish.forEach((c,i)=>{t+=c.price||0;const d=document.createElement('div');d.className='w';
- d.innerHTML=`<button>×</button><img src="${c.img}"><b>${c.name}</b><br>${c.price?'$'+c.price.toFixed(2):'n/a'}`;
- d.querySelector('button').onclick=()=>{wish.splice(i,1);save();showWish()};grid.append(d)});
- total.textContent='$'+t.toFixed(2);wish_el.style.display='block'}
-const wish_el=document.getElementById('wish');openWish.onclick=showWish;closeWish.onclick=()=>wish_el.style.display='none';
-refill();
-</script></body></html>
+/* Buy-link affiliate params live only here. Empty values are omitted.
+   Later you can set, for example:
+     tcgplayer: { params: { utm_campaign: "binderhunt" } }
+     ebay: { params: { campid: "YOUR_EPN_ID" } }
+     cardmarket: { params: { utm_campaign: "binderhunt" } }
+*/
+const AFFILIATE = {
+  tcgplayer: { params: {} },
+  ebay: { params: {} },
+  cardmarket: { params: {} }
+};
+
+const CHASE_MIN = 25;
+const CHASE_RARITIES = [
+  "Special illustration rare",
+  "Illustration rare",
+  "Hyper rare",
+  "Mega Hyper Rare",
+  "Secret Rare",
+  "Shiny Ultra Rare",
+  "Shiny rare VMAX",
+  "Holo Rare VMAX",
+  "Holo Rare VSTAR",
+  "Radiant Rare",
+  "Amazing Rare"
+];
+const PAGE_SIZE = 30;
+const TYPE_COLOR = {
+  Fire:"#ee6b2f", Water:"#4f9dff", Grass:"#5cba5c", Lightning:"#f4d23c",
+  Psychic:"#b06ad6", Fighting:"#c4653a", Darkness:"#5c5878", Metal:"#9aa8b5",
+  Dragon:"#c7a008", Fairy:"#e89ac7", Colorless:"#d9d3c5"
+};
+const AVG_ORDER = ["30-day avg", "7-day avg", "1-day avg"];
+const TCGDEX = "https://api.tcgdex.net/v2/en";
+
+const deck = document.getElementById("deck");
+const chipsEl = document.getElementById("chips");
+const grid = document.getElementById("grid");
+const filtersEl = document.getElementById("filters");
+const wishEl = document.getElementById("wish");
+const profileEl = document.getElementById("profile");
+const profileBody = document.getElementById("profileBody");
+const filterWarn = document.getElementById("filterWarn");
+
+const DEFAULTS = { name:"", type:"", set:"", rarity:"", min:null, max:null, chase:false };
+let filters = loadFilters();
+let wish = loadWish();
+let queue = [];
+let briefs = [];
+let seen = new Set();
+let generation = 0;
+let loading = false;
+let paused = false;
+let streamDone = false;
+let pumpError = "";
+let page = null;
+let startPage = 1;
+let rewound = false;
+let queryExhausted = false;
+let setOrder = [];
+let setCursor = 0;
+let drySets = 0;
+let profileCard = null;
+const cardCache = new Map();
+const setCache = new Map();
+const meta = { sets:[], types:[], rarities:[], ready:false };
+
+function num(v){ return typeof v === "number" && Number.isFinite(v) ? v : null; }
+function numOrNull(v){
+  if (v === "" || v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+function esc(s){
+  return String(s ?? "").replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]));
+}
+function safeImg(url){
+  if (typeof url !== "string") return "";
+  if (url.startsWith("https://assets.tcgdex.net/") || url.startsWith("https://images.pokemontcg.io/")) return url;
+  return "";
+}
+function shuffle(list){
+  const a = list.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function money(n, currency){
+  if (typeof n !== "number") return "—";
+  return new Intl.NumberFormat("en-US", { style:"currency", currency: currency || "USD" }).format(n);
+}
+function fmtDate(s){
+  if (!s) return "";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return String(s).slice(0, 10);
+  return d.toLocaleDateString("en-US", { year:"numeric", month:"short", day:"numeric" });
+}
+function variantLabel(key){
+  return String(key).replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+function sheetOpen(){
+  return !filtersEl.hidden || !wishEl.hidden || !profileEl.hidden;
+}
+function bounds(){
+  let min = filters.min;
+  const max = filters.max;
+  if (filters.chase) min = min == null ? CHASE_MIN : Math.max(min, CHASE_MIN);
+  return { min, max };
+}
+function priceActive(){
+  const b = bounds();
+  return b.min != null || b.max != null;
+}
+function impossibleRange(){
+  const b = bounds();
+  return b.min != null && b.max != null && b.min > b.max;
+}
+function useQuery(){
+  return !!(filters.name || filters.type || filters.rarity || filters.set || filters.chase);
+}
+function avgPoints(avg30, avg7, avg1){
+  return [
+    ["30-day avg", avg30],
+    ["7-day avg", avg7],
+    ["1-day avg", avg1]
+  ].filter(([, v]) => typeof v === "number").map(([label, value]) => ({ label, value }));
+}
+
+function loadWish(){
+  try {
+    const raw = JSON.parse(localStorage.getItem("binderhuntWish") || "[]");
+    return Array.isArray(raw) ? raw : [];
+  } catch { return []; }
+}
+function loadFilters(){
+  try {
+    const raw = JSON.parse(localStorage.getItem("binderhuntFilters") || "null");
+    if (!raw || typeof raw !== "object") return { ...DEFAULTS };
+    return {
+      name: String(raw.name || ""),
+      type: String(raw.type || ""),
+      set: String(raw.set || ""),
+      rarity: String(raw.rarity || ""),
+      min: numOrNull(raw.min),
+      max: numOrNull(raw.max),
+      chase: !!raw.chase
+    };
+  } catch { return { ...DEFAULTS }; }
+}
+function saveWish(){
+  try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch {}
+  document.getElementById("cnt").textContent = String(wish.length);
+  if (!wishEl.hidden) renderWish();
+}
+function saveFilters(){
+  try { localStorage.setItem("binderhuntFilters", JSON.stringify(filters)); } catch {}
+}
+function addWish(card){
+  if (!wish.some(w => w.id === card.id)) {
+    wish.push(card);
+    saveWish();
+  }
+}
+function headline(card){
+  const markets = (card.variants || []).map(v => v.market).filter(v => typeof v === "number");
+  if (!markets.length) {
+    if (typeof card.price === "number") return { amount: card.price, currency: "USD" };
+    return null;
+  }
+  const b = bounds();
+  const inRange = markets.filter(m => (b.min == null || m >= b.min) && (b.max == null || m <= b.max));
+  const pool = inRange.length ? inRange : markets;
+  return { amount: Math.min(...pool), currency: "USD" };
+}
+function passPrice(card){
+  if (!priceActive()) return true;
+  const b = bounds();
+  const markets = (card.variants || []).map(v => v.market).filter(v => typeof v === "number");
+  if (!markets.length) return false;
+  return markets.some(m => (b.min == null || m >= b.min) && (b.max == null || m <= b.max));
+}
+function withAffiliate(url, vendor){
+  const extra = (AFFILIATE[vendor] && AFFILIATE[vendor].params) || {};
+  const u = new URL(url);
+  for (const [k, v] of Object.entries(extra)) {
+    if (v != null && v !== "") u.searchParams.set(k, String(v));
+  }
+  return u.toString();
+}
+function searchText(card){
+  return [card.name, card.set, card.number].filter(Boolean).join(" ");
+}
+function buyLinks(card){
+  const q = searchText(card);
+  const pid = (card.variants || []).map(v => v.productId).find(Boolean) || null;
+  const shown = headline(card);
+  const match = shown && (card.variants || []).find(v => v.market === shown.amount && v.productId);
+  const productId = (match && match.productId) || pid;
+  const tcg = productId
+    ? "https://www.tcgplayer.com/product/" + productId
+    : "https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&view=grid&q=" + encodeURIComponent(q);
+  const ebay = new URL("https://www.ebay.com/sch/i.html");
+  ebay.searchParams.set("_nkw", q + " pokemon card");
+  ebay.searchParams.set("LH_Sold", "1");
+  ebay.searchParams.set("LH_Complete", "1");
+  const links = [
+    { label: "TCGplayer", href: withAffiliate(tcg, "tcgplayer") },
+    { label: "eBay sold", href: withAffiliate(ebay.toString(), "ebay") }
+  ];
+  if (card.cm && card.cm.idProduct) {
+    links.push({
+      label: "Cardmarket",
+      href: withAffiliate("https://www.cardmarket.com/en/Pokemon/Products?idProduct=" + card.cm.idProduct, "cardmarket")
+    });
+  }
+  return links;
+}
+function linksHtml(card, cls){
+  return `<div class="${cls}">${buyLinks(card).map(l => `<a href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join("")}</div>`;
+}
+
+async function getJson(url){
+  const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+function usdVariants(tp){
+  if (!tp || typeof tp !== "object") return [];
+  const out = [];
+  for (const [key, val] of Object.entries(tp)) {
+    if (!val || typeof val !== "object") continue;
+    const market = num(val.marketPrice);
+    const mid = num(val.midPrice);
+    const low = num(val.lowPrice);
+    const high = num(val.highPrice);
+    if (market == null && mid == null && low == null && high == null) continue;
+    out.push({
+      key, label: variantLabel(key), low, mid, high, market,
+      directLow: num(val.directLowPrice),
+      productId: val.productId || null
+    });
+  }
+  return out;
+}
+function normalizeDex(c){
+  const tp = (c.pricing && c.pricing.tcgplayer) || {};
+  const cm = (c.pricing && c.pricing.cardmarket) || {};
+  const printings = [];
+  const seenP = new Set();
+  for (const v of c.variants_detailed || []) {
+    const pcm = v.pricing && v.pricing.cardmarket;
+    if (!pcm) continue;
+    const label = [v.type, v.subtype].filter(Boolean).join(" · ") || "printing";
+    const sig = [label, pcm.avg, pcm.avg1, pcm.avg7, pcm.avg30].join("|");
+    if (seenP.has(sig)) continue;
+    seenP.add(sig);
+    const pts = avgPoints(pcm.avg30, pcm.avg7, pcm.avg1);
+    if (!pts.length && num(pcm.avg) == null && num(pcm.low) == null) continue;
+    printings.push({
+      label, avg: num(pcm.avg), low: num(pcm.low), trend: num(pcm.trend),
+      points: pts, updated: pcm.updated || "", unit: pcm.unit || "EUR"
+    });
+  }
+  return {
+    source: "tcgdex",
+    id: c.id,
+    name: c.name,
+    img: c.image ? safeImg(c.image + "/high.webp") : "",
+    thumb: c.image ? safeImg(c.image + "/low.webp") : "",
+    set: (c.set && c.set.name) || "",
+    setId: (c.set && c.set.id) || "",
+    number: c.localId || "",
+    printedTotal: c.set && c.set.cardCount ? c.set.cardCount.official : null,
+    rarity: c.rarity || "—",
+    artist: c.illustrator || "",
+    releaseDate: "",
+    series: "",
+    category: c.category || "",
+    stage: c.stage || "",
+    hp: num(c.hp),
+    types: c.types || [],
+    dexId: c.dexId || [],
+    evolveFrom: c.evolveFrom || "",
+    retreat: num(c.retreat),
+    regulationMark: c.regulationMark || "",
+    legal: c.legal || null,
+    weaknesses: c.weaknesses || [],
+    resistances: c.resistances || [],
+    attacks: (c.attacks || []).map(a => ({ name:a.name, cost:a.cost || [], damage:a.damage || "", effect:a.effect || "" })),
+    abilities: (c.abilities || []).map(a => ({ name:a.name, type:a.type || "Ability", effect:a.effect || "" })),
+    flavor: c.description || "",
+    variants: usdVariants(tp),
+    tcgUpdated: tp.updated || "",
+    cm: {
+      unit: cm.unit || "EUR",
+      updated: cm.updated || "",
+      avg: num(cm.avg),
+      low: num(cm.low),
+      trend: num(cm.trend),
+      idProduct: cm.idProduct || null,
+      points: avgPoints(cm.avg30, cm.avg7, cm.avg1),
+      altLabel: "Holo",
+      altPoints: avgPoints(cm["avg30-holo"], cm["avg7-holo"], cm["avg1-holo"])
+    },
+    printings
+  };
+}
+function normalizePtcg(c){
+  const prices = (c.tcgplayer && c.tcgplayer.prices) || {};
+  const variants = [];
+  for (const [key, val] of Object.entries(prices)) {
+    if (!val || typeof val !== "object") continue;
+    const market = num(val.market), mid = num(val.mid), low = num(val.low), high = num(val.high);
+    if (market == null && mid == null && low == null && high == null) continue;
+    variants.push({ key, label: variantLabel(key), low, mid, high, market, directLow: num(val.directLow), productId: null });
+  }
+  const cm = (c.cardmarket && c.cardmarket.prices) || {};
+  return {
+    source: "pokemontcg.io",
+    id: c.id,
+    name: c.name,
+    img: safeImg(c.images && c.images.large),
+    thumb: safeImg(c.images && c.images.small),
+    set: (c.set && c.set.name) || "",
+    setId: (c.set && c.set.id) || "",
+    number: c.number || "",
+    printedTotal: c.set ? c.set.printedTotal : null,
+    rarity: c.rarity || "—",
+    artist: c.artist || "",
+    releaseDate: (c.set && c.set.releaseDate) || "",
+    series: (c.set && c.set.series) || "",
+    category: c.supertype || "",
+    stage: (c.subtypes || []).join(" · "),
+    hp: c.hp == null || c.hp === "" ? null : num(Number(c.hp)),
+    types: c.types || [],
+    dexId: c.nationalPokedexNumbers || [],
+    evolveFrom: c.evolvesFrom || "",
+    retreat: num(c.convertedRetreatCost),
+    regulationMark: c.regulationMark || "",
+    legal: c.legalities ? {
+      standard: c.legalities.standard === "Legal",
+      expanded: c.legalities.expanded === "Legal"
+    } : null,
+    weaknesses: c.weaknesses || [],
+    resistances: c.resistances || [],
+    attacks: (c.attacks || []).map(a => ({ name:a.name, cost:a.cost || [], damage:a.damage || "", effect:a.text || "" })),
+    abilities: (c.abilities || []).map(a => ({ name:a.name, type:a.type || "Ability", effect:a.text || "" })),
+    flavor: c.flavorText || "",
+    variants,
+    tcgUpdated: (c.tcgplayer && c.tcgplayer.updatedAt) || "",
+    cm: {
+      unit: "EUR",
+      updated: (c.cardmarket && c.cardmarket.updatedAt) || "",
+      avg: num(cm.averageSellPrice),
+      low: num(cm.lowPrice),
+      trend: num(cm.trendPrice),
+      idProduct: null,
+      points: avgPoints(cm.avg30, cm.avg7, cm.avg1),
+      altLabel: "Reverse holo",
+      altPoints: avgPoints(cm.reverseHoloAvg30, cm.reverseHoloAvg7, cm.reverseHoloAvg1)
+    },
+    printings: []
+  };
+}
+
+async function loadMeta(){
+  if (meta.ready) return;
+  const [sets, types, rarities] = await Promise.all([
+    getJson(TCGDEX + "/sets"),
+    getJson(TCGDEX + "/types"),
+    getJson(TCGDEX + "/rarities")
+  ]);
+  meta.sets = (sets || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+  meta.types = types || [];
+  meta.rarities = (rarities || []).slice().sort((a, b) => a.localeCompare(b));
+  meta.ready = true;
+  const typeSel = document.getElementById("fType");
+  const raritySel = document.getElementById("fRarity");
+  const setSel = document.getElementById("fSet");
+  for (const t of meta.types) typeSel.insertAdjacentHTML("beforeend", `<option value="${esc(t)}">${esc(t)}</option>`);
+  for (const r of meta.rarities) raritySel.insertAdjacentHTML("beforeend", `<option value="${esc(r)}">${esc(r)}</option>`);
+  for (const s of meta.sets) setSel.insertAdjacentHTML("beforeend", `<option value="${esc(s.id)}">${esc(s.name)}</option>`);
+  syncForm();
+}
+async function fetchSet(id){
+  if (setCache.has(id)) return setCache.get(id);
+  const data = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
+  const rec = {
+    releaseDate: data.releaseDate || "",
+    series: data.serie && data.serie.name || "",
+    cards: data.cards || []
+  };
+  setCache.set(id, rec);
+  return rec;
+}
+async function hydrate(brief){
+  if (cardCache.has(brief.id)) return cardCache.get(brief.id);
+  let card;
+  try {
+    card = normalizeDex(await getJson(TCGDEX + "/cards/" + encodeURIComponent(brief.id)));
+  } catch (err) {
+    const raw = await getJson("https://api.pokemontcg.io/v2/cards/" + encodeURIComponent(brief.id));
+    card = normalizePtcg(raw.data || raw);
+  }
+  if (!card.img && brief.image) {
+    card.img = safeImg(brief.image + "/high.webp");
+    card.thumb = safeImg(brief.image + "/low.webp");
+  }
+  cardCache.set(brief.id, card);
+  return card;
+}
+function listQuery(pageNo){
+  const parts = [];
+  if (filters.name.trim()) parts.push("name=" + encodeURIComponent(filters.name.trim()));
+  if (filters.type) parts.push("types=eq:" + encodeURIComponent(filters.type));
+  if (filters.set) parts.push("set=eq:" + encodeURIComponent(filters.set));
+  if (filters.rarity) parts.push("rarity=eq:" + encodeURIComponent(filters.rarity));
+  else if (filters.chase) parts.push("rarity=eq:" + encodeURIComponent(CHASE_RARITIES.join("|")));
+  parts.push("pagination:page=" + pageNo);
+  parts.push("pagination:itemsPerPage=" + PAGE_SIZE);
+  return TCGDEX + "/cards?" + parts.join("&");
+}
+async function pullQuery(){
+  if (queryExhausted) return 0;
+  if (page == null) {
+    startPage = filters.name || filters.set ? 1 : 1 + Math.floor(Math.random() * (filters.chase || filters.rarity ? 6 : 12));
+    page = startPage;
+    rewound = false;
+  }
+  const list = await getJson(listQuery(page));
+  if (!Array.isArray(list) || list.length === 0) {
+    if (startPage > 1 && !rewound) { rewound = true; page = 1; return pullQuery(); }
+    queryExhausted = true;
+    return 0;
+  }
+  let added = 0;
+  for (const c of shuffle(list)) {
+    if (!c || !c.id || seen.has(c.id)) continue;
+    seen.add(c.id);
+    if (!c.image) continue;
+    briefs.push({ id:c.id, name:c.name, image:c.image, localId:c.localId });
+    added++;
+  }
+  if (list.length < PAGE_SIZE) {
+    if (startPage > 1 && !rewound) { rewound = true; page = 1; }
+    else queryExhausted = true;
+  } else if (startPage > 1 && rewound && page + 1 >= startPage) {
+    queryExhausted = true;
+  } else page += 1;
+  return added;
+}
+async function pullDiscovery(){
+  if (!meta.ready) await loadMeta();
+  if (!setOrder.length) setOrder = shuffle(meta.sets.map(s => s.id));
+  let spins = 0;
+  while (spins < 12) {
+    spins++;
+    if (drySets >= setOrder.length) {
+      seen.clear();
+      for (const c of queue) seen.add(c.id);
+      deck.querySelectorAll(".card").forEach(el => { if (el.card) seen.add(el.card.id); });
+      drySets = 0;
+    }
+    const id = setOrder[setCursor % setOrder.length];
+    setCursor++;
+    let cards = [];
+    try { cards = (await fetchSet(id)).cards; } catch { drySets++; continue; }
+    let added = 0;
+    for (const c of shuffle(cards)) {
+      if (!c || !c.id || seen.has(c.id)) continue;
+      seen.add(c.id);
+      if (!c.image) continue;
+      briefs.push(c);
+      added++;
+    }
+    if (added) { drySets = 0; return added; }
+    drySets++;
+  }
+  return 0;
+}
+async function pullMore(){
+  if (useQuery()) return pullQuery();
+  return pullDiscovery();
+}
+async function pump(my){
+  if (loading || my !== generation || paused || impossibleRange()) return;
+  loading = true;
+  pumpError = "";
+  let hydrations = 0;
+  try {
+    while (queue.length < 7 && my === generation && hydrations < 36) {
+      if (briefs.length < 4) {
+        const added = await pullMore();
+        if (my !== generation) return;
+        if (!added && !briefs.length) { streamDone = true; break; }
+      }
+      const batch = briefs.splice(0, 4);
+      if (!batch.length) { streamDone = true; break; }
+      const cards = await Promise.all(batch.map(b => hydrate(b).catch(() => null)));
+      hydrations += batch.length;
+      if (my !== generation) return;
+      for (const card of cards) {
+        if (!card || !passPrice(card)) continue;
+        queue.push(card);
+        const src = card.thumb || card.img;
+        if (src) { const img = new Image(); img.src = src; }
+      }
+    }
+    if (!streamDone && queue.length < 4 && hydrations >= 36) paused = true;
+  } catch (err) {
+    pumpError = "The card catalog didn't respond. Check your connection and try again.";
+    paused = true;
+  } finally {
+    if (my === generation) loading = false;
+  }
+  if (my === generation) render();
+}
+function restart(){
+  generation++;
+  queue = [];
+  briefs = [];
+  seen = new Set();
+  page = null;
+  rewound = false;
+  queryExhausted = false;
+  streamDone = false;
+  paused = false;
+  pumpError = "";
+  setOrder = [];
+  setCursor = 0;
+  drySets = 0;
+  loading = false;
+  deck.innerHTML = "";
+  renderChips();
+  if (impossibleRange()) {
+    render();
+    return;
+  }
+  showLoading(priceActive() ? "Checking TCGplayer prices…" : "Shuffling cards…");
+  pump(generation);
+}
+function showLoading(text){
+  if (deck.querySelector(".card")) return;
+  deck.innerHTML = `<div class="empty" id="loading">${esc(text)}</div>`;
+}
+
+function topCard(){
+  const cards = deck.querySelectorAll(".card");
+  return cards[cards.length - 1] || null;
+}
+function layoutStack(){
+  const cards = [...deck.querySelectorAll(".card")];
+  cards.forEach((el, i) => {
+    const depth = cards.length - 1 - i;
+    el.style.zIndex = String(10 + i);
+    if (depth === 0) {
+      if (!el.classList.contains("dragging") && !el.classList.contains("leaving")) el.style.transform = "";
+      return;
+    }
+    el.style.transform = `translateY(${depth * 12}px) scale(${1 - depth * 0.045})`;
+  });
+}
+function mk(card){
+  const el = document.createElement("div");
+  el.className = "card";
+  el.card = card;
+  const shown = headline(card);
+  const price = shown ? money(shown.amount, shown.currency) : "n/a";
+  const bits = [card.set, card.number ? "#" + card.number : "", card.rarity].filter(Boolean);
+  el.innerHTML = `<span class="stamp like">WANT</span><span class="stamp nope">PASS</span>
+    <img class="art" src="${esc(card.thumb || card.img)}" alt="${esc(card.name)}">
+    <div class="info"><span class="price">${esc(price)}</span><b>${esc(card.name)}</b><small>${esc(bits.join(" · "))}</small>${linksHtml(card, "buy")}</div>`;
+  deck.prepend(el);
+  bindDrag(el);
+}
+function bindDrag(el){
+  let startX = 0, startY = 0, dx = 0, dy = 0, pid = null, dragged = false;
+  const stamps = () => {
+    const like = el.querySelector(".like");
+    const nope = el.querySelector(".nope");
+    if (like) like.style.opacity = String(Math.max(0, dx / 110));
+    if (nope) nope.style.opacity = String(Math.max(0, -dx / 110));
+  };
+  const move = e => {
+    if (e.pointerId !== pid) return;
+    dx = e.clientX - startX;
+    dy = e.clientY - startY;
+    if (!dragged && Math.hypot(dx, dy) > 12) {
+      dragged = true;
+      el.classList.add("dragging");
+    }
+    if (!dragged) return;
+    el.style.transform = `translate3d(${dx}px, ${dy}px, 0) rotate(${dx / 18}deg)`;
+    stamps();
+  };
+  const up = e => {
+    if (e.pointerId !== pid) return;
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+    window.removeEventListener("pointercancel", up);
+    pid = null;
+    el.classList.remove("dragging");
+    if (!dragged) { openProfile(el.card); dx = dy = 0; return; }
+    if (Math.abs(dx) > 100) fly(Math.sign(dx));
+    else {
+      el.style.transition = "transform .25s ease";
+      el.style.transform = "";
+      el.querySelectorAll(".stamp").forEach(s => { s.style.opacity = "0"; });
+      layoutStack();
+    }
+    dx = dy = 0;
+  };
+  el.addEventListener("pointerdown", e => {
+    if (e.button != null && e.button !== 0) return;
+    if (el !== topCard() || sheetOpen() || el.classList.contains("leaving")) return;
+    if (e.target.closest("a,button")) return;
+    e.preventDefault();
+    pid = e.pointerId;
+    dragged = false;
+    dx = dy = 0;
+    startX = e.clientX;
+    startY = e.clientY;
+    el.style.transition = "none";
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  });
+}
+function fly(dir){
+  const el = topCard();
+  if (!el || el.classList.contains("leaving")) return;
+  el.classList.add("leaving");
+  el.style.transition = "transform .35s ease";
+  el.style.transform = `translate(${dir * 130}%, -36px) rotate(${dir * 16}deg)`;
+  if (dir > 0) addWish(el.card);
+  const idx = queue.indexOf(el.card);
+  if (idx >= 0) queue.splice(idx, 1);
+  setTimeout(() => { el.remove(); render(); }, 320);
+}
+function render(){
+  if (impossibleRange()) {
+    deck.innerHTML = `<div class="empty"><p>Chase mode's $25 floor is above your max price, so no card can match.</p><button class="tab" id="fixRange" type="button">Edit filters</button></div>`;
+    document.getElementById("fixRange").onclick = openFilters;
+    return;
+  }
+  if (!queue.length && loading) {
+    showLoading(priceActive() ? "Checking TCGplayer prices…" : "Shuffling cards…");
+    return;
+  }
+  deck.querySelectorAll(".empty").forEach(n => n.remove());
+  while (deck.querySelectorAll(".card").length < Math.min(3, queue.length)) {
+    mk(queue[deck.querySelectorAll(".card").length]);
+  }
+  layoutStack();
+  if (!queue.length) {
+    const retry = pumpError
+      ? `<p class="err">${esc(pumpError)}</p><button class="tab" id="retry" type="button">Retry</button>`
+      : streamDone
+        ? `<p>No cards match these filters.</p><button class="tab" id="editEmpty" type="button">Edit filters</button>`
+        : `<p>Still looking through the catalog for cards in this price range.</p><button class="tab" id="keepLooking" type="button">Keep looking</button>`;
+    deck.innerHTML = `<div class="empty">${retry}</div>`;
+    const again = document.getElementById("retry") || document.getElementById("keepLooking");
+    if (again) again.onclick = () => { paused = false; pumpError = ""; streamDone = false; pump(generation); };
+    const edit = document.getElementById("editEmpty");
+    if (edit) edit.onclick = openFilters;
+    return;
+  }
+  if (queue.length < 4 && !loading && !streamDone && !paused) pump(generation);
+}
+function setName(id){
+  const s = meta.sets.find(x => x.id === id);
+  return s ? s.name : id;
+}
+function renderChips(){
+  const items = [];
+  if (filters.name) items.push(["name", filters.name]);
+  if (filters.type) items.push(["type", filters.type]);
+  if (filters.set) items.push(["set", setName(filters.set)]);
+  if (filters.rarity) items.push(["rarity", filters.rarity]);
+  if (filters.min != null) items.push(["min", "Min " + money(filters.min)]);
+  if (filters.max != null) items.push(["max", "Max " + money(filters.max)]);
+  if (filters.chase) items.push(["chase", "Chase ≥ " + money(CHASE_MIN)]);
+  chipsEl.innerHTML = items.map(([key, label]) => `<button class="chip" type="button" data-k="${esc(key)}">${esc(label)} ×</button>`).join("");
+  chipsEl.querySelectorAll(".chip").forEach(btn => {
+    btn.onclick = () => {
+      const k = btn.dataset.k;
+      if (k === "chase") filters.chase = false;
+      else if (k === "min" || k === "max") filters[k] = null;
+      else filters[k] = "";
+      saveFilters();
+      syncForm();
+      closeSheets();
+      restart();
+    };
+  });
+}
+function syncForm(){
+  document.getElementById("fName").value = filters.name;
+  document.getElementById("fType").value = filters.type;
+  document.getElementById("fSet").value = filters.set;
+  document.getElementById("fRarity").value = filters.rarity;
+  document.getElementById("fMin").value = filters.min == null ? "" : String(filters.min);
+  document.getElementById("fMax").value = filters.max == null ? "" : String(filters.max);
+  document.getElementById("fChase").checked = filters.chase;
+}
+function readForm(){
+  const min = numOrNull(document.getElementById("fMin").value.trim());
+  const max = numOrNull(document.getElementById("fMax").value.trim());
+  if (min != null && max != null && min > max && !document.getElementById("fChase").checked) {
+    filterWarn.hidden = false;
+    filterWarn.textContent = "Min price is higher than max price.";
+    return null;
+  }
+  filterWarn.hidden = true;
+  return {
+    name: document.getElementById("fName").value.trim(),
+    type: document.getElementById("fType").value,
+    set: document.getElementById("fSet").value,
+    rarity: document.getElementById("fRarity").value,
+    min, max,
+    chase: document.getElementById("fChase").checked
+  };
+}
+function openFilters(){
+  syncForm();
+  wishEl.hidden = true;
+  profileEl.hidden = true;
+  filtersEl.hidden = false;
+  if (!meta.ready) {
+    filterWarn.hidden = false;
+    filterWarn.textContent = "Loading set, type, and rarity lists…";
+    loadMeta().then(() => { filterWarn.hidden = true; }).catch(() => {
+      filterWarn.hidden = false;
+      filterWarn.textContent = "Couldn't load filter lists. You can still type a name, a price, or chase mode.";
+    });
+  }
+}
+function closeSheets(){
+  filtersEl.hidden = true;
+  wishEl.hidden = true;
+  profileEl.hidden = true;
+}
+
+function pips(cost){
+  if (!Array.isArray(cost) || !cost.length) return "";
+  return `<span class="pips">${cost.map(t => `<i class="pip" style="background:${TYPE_COLOR[t] || "#aaa"}" title="${esc(t)}">${esc(String(t).slice(0, 1))}</i>`).join("")}</span>`;
+}
+function fact(label, value){
+  if (value == null || value === "" || value === "—") return "";
+  return `<div class="fact"><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
+}
+function chartSvg(series){
+  const labels = AVG_ORDER.filter(label => series.some(s => s.points.some(p => p.label === label && typeof p.value === "number")));
+  const usable = series
+    .map(s => ({ ...s, points: s.points.filter(p => labels.includes(p.label) && typeof p.value === "number") }))
+    .filter(s => s.points.length >= 2);
+  if (labels.length < 2 || !usable.length) return "";
+  const vals = usable.flatMap(s => s.points.map(p => p.value));
+  let min = Math.min(...vals);
+  let max = Math.max(...vals);
+  if (min === max) { min -= 1; max += 1; }
+  const w = 320, h = 168, padL = 16, padR = 16, padT = 22, padB = 32;
+  const xOf = label => {
+    const i = labels.indexOf(label);
+    return padL + (labels.length === 1 ? 0 : i * (w - padL - padR) / (labels.length - 1));
+  };
+  const yOf = v => padT + (1 - (v - min) / (max - min)) * (h - padT - padB);
+  const colors = ["#5cf2a0", "#ffcb05"];
+  let marks = "";
+  let lines = "";
+  usable.forEach((s, si) => {
+    const ordered = labels.map(label => s.points.find(p => p.label === label)).filter(Boolean);
+    const d = ordered.map((p, i) => `${i ? "L" : "M"}${xOf(p.label).toFixed(1)},${yOf(p.value).toFixed(1)}`).join(" ");
+    lines += `<path d="${d}" fill="none" stroke="${colors[si % colors.length]}" stroke-width="2.5" stroke-linejoin="round"/>`;
+    for (const p of ordered) {
+      const x = xOf(p.label), y = yOf(p.value);
+      marks += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${colors[si % colors.length]}"/>`;
+      marks += `<text x="${x.toFixed(1)}" y="${(y - 8).toFixed(1)}" text-anchor="middle" fill="${colors[si % colors.length]}" font-size="11">${esc(money(p.value, "EUR"))}</text>`;
+    }
+  });
+  const axis = labels.map(label => `<text x="${xOf(label).toFixed(1)}" y="${h - 8}" text-anchor="middle" fill="#ffffffb0" font-size="11">${esc(label.replace(" avg", ""))}</text>`).join("");
+  const legend = usable.map((s, si) => `<text x="${padL + si * 110}" y="14" fill="${colors[si % colors.length]}" font-size="11">${esc(s.name)}</text>`).join("");
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Cardmarket period averages">${legend}${lines}${marks}${axis}</svg>`;
+}
+function priceSection(card){
+  const rows = (card.variants || []).map(v => `<tr><td>${esc(v.label)}${v.productId ? `<br><a href="${esc(withAffiliate("https://www.tcgplayer.com/product/" + v.productId, "tcgplayer"))}" target="_blank" rel="noopener noreferrer">TCGplayer</a>` : ""}</td><td>${esc(money(v.market))}</td><td>${esc(money(v.low))}</td><td>${esc(money(v.mid))}</td><td>${esc(money(v.high))}</td></tr>`).join("");
+  const table = rows
+    ? `<div class="table-wrap"><table><thead><tr><th>Variant</th><th>Market</th><th>Low</th><th>Mid</th><th>High</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    : `<p class="fine">No TCGplayer prices were published for this card.</p>`;
+  const updated = card.tcgUpdated ? ` Updated ${esc(fmtDate(card.tcgUpdated))}.` : "";
+  return `<h2>Current prices</h2><p class="fine">TCGplayer, USD.${updated} Market is the price used by filters and the wishlist total.</p>${table}`;
+}
+function historySection(card){
+  const cm = card.cm || { points:[], altPoints:[], altLabel:"" };
+  const series = [];
+  if ((cm.points || []).length >= 2) series.push({ name: "Cardmarket", points: cm.points });
+  if ((cm.altPoints || []).length >= 2) series.push({ name: cm.altLabel || "Other", points: cm.altPoints });
+  if (!series.length) {
+    const printing = (card.printings || []).find(p => p.points && p.points.length >= 2);
+    if (printing) series.push({ name: printing.label, points: printing.points });
+  }
+  const chart = chartSvg(series);
+  const current = [cm.avg, cm.low, cm.trend].some(v => typeof v === "number")
+    ? `<p class="fine">Cardmarket now: average ${esc(money(cm.avg, "EUR"))}, low ${esc(money(cm.low, "EUR"))}, trend ${esc(money(cm.trend, "EUR"))}.${cm.updated ? " Updated " + esc(fmtDate(cm.updated)) + "." : ""}</p>`
+    : "";
+  const extras = (card.printings || []).filter(p => p.points && p.points.length).slice(0, 4).map(p =>
+    `<li>${esc(p.label)}: ${p.points.map(pt => esc(pt.label) + " " + esc(money(pt.value, "EUR"))).join(", ")}</li>`
+  ).join("");
+  const extraHtml = extras ? `<p class="fine">Other Cardmarket printings on file:</p><ul class="fine">${extras}</ul>` : "";
+  if (!chart) {
+    return `<h2>Price history</h2><div class="soon"><p><b>Coming soon.</b> A free day-by-day price series isn't available without a paid key, and this card doesn't have enough Cardmarket period averages to chart.</p></div>${current}${extraHtml}`;
+  }
+  return `<h2>Price history</h2>
+    <p class="fine">The line is Cardmarket's published 30-day, 7-day, and 1-day average sell prices in EUR, via ${esc(card.source)}. It is not a daily close chart.</p>
+    ${chart}
+    ${current}
+    ${extraHtml}
+    <div class="soon"><p><b>Daily price history — coming soon.</b> BinderHunt won't invent dates or prices between these averages.</p></div>`;
+}
+function popSection(){
+  return `<h2>Graded population</h2><div class="soon"><p><b>Coming soon.</b> PSA, CGC, BGS, and SGC population counts aren't available from a free public API, so this card shows no pop numbers.</p></div>`;
+}
+function infoBlock(card){
+  const legal = card.legal ? [
+    card.legal.standard ? "Standard" : "",
+    card.legal.expanded ? "Expanded" : ""
+  ].filter(Boolean).join(", ") || "Not legal in Standard or Expanded" : "";
+  const weak = (card.weaknesses || []).map(w => [w.type, w.value].filter(Boolean).join(" ")).join(", ");
+  const resist = (card.resistances || []).map(w => [w.type, w.value].filter(Boolean).join(" ")).join(", ");
+  const types = (card.types || []).join(", ");
+  const dex = (card.dexId || []).join(", ");
+  const number = card.number ? (card.printedTotal ? card.number + " / " + card.printedTotal : card.number) : "";
+  return `<div class="facts">
+    ${fact("Set", card.set)}
+    ${fact("Number", number)}
+    ${fact("Rarity", card.rarity)}
+    ${fact("Illustrator", card.artist)}
+    ${fact("Release", card.releaseDate || "…")}
+    ${fact("Series", card.series)}
+    ${fact("Category", card.category)}
+    ${fact("Stage", card.stage)}
+    ${fact("Type", types)}
+    ${fact("HP", card.hp != null ? String(card.hp) : "")}
+    ${fact("Evolves from", card.evolveFrom)}
+    ${fact("Retreat", card.retreat != null ? String(card.retreat) : "")}
+    ${fact("Weakness", weak)}
+    ${fact("Resistance", resist)}
+    ${fact("Regulation", card.regulationMark)}
+    ${fact("Legality", legal)}
+    ${fact("Pokédex", dex)}
+  </div>`;
+}
+function renderProfile(card){
+  profileCard = card;
+  const shown = headline(card);
+  const price = shown ? money(shown.amount, shown.currency) : "No US market price";
+  const attacks = (card.attacks || []).map(a => `<div class="atk"><div class="top"><b>${pips(a.cost)} ${esc(a.name || "Attack")}</b><b>${esc(a.damage || "")}</b></div>${a.effect ? `<p class="fine">${esc(a.effect)}</p>` : ""}</div>`).join("");
+  const abilities = (card.abilities || []).map(a => `<div class="ability"><div class="top"><b>${esc(a.name || "Ability")}</b><span class="fine">${esc(a.type || "")}</span></div><p class="fine">${esc(a.effect || "")}</p></div>`).join("");
+  const img = card.img || card.thumb || "";
+  profileBody.innerHTML = `
+    ${img ? `<img class="hero" src="${esc(img)}" alt="${esc(card.name)}">` : ""}
+    <div class="headline"><div><h2 style="margin:0">${esc(card.name)}</h2><p class="fine">${esc([card.set, card.rarity].filter(Boolean).join(" · "))}</p></div><div class="amt">${esc(price)}</div></div>
+    ${linksHtml(card, "links")}
+    ${infoBlock(card)}
+    ${card.flavor ? `<p class="flavor">${esc(card.flavor)}</p>` : ""}
+    ${abilities ? `<h2>Abilities</h2>${abilities}` : ""}
+    ${attacks ? `<h2>Attacks</h2>${attacks}` : ""}
+    ${priceSection(card)}
+    ${historySection(card)}
+    ${popSection()}
+    <p class="fine">Card text and prices from ${esc(card.source || "the catalog")}. BinderHunt doesn't sell packs or cards.</p>`;
+  const wishBtn = document.getElementById("profileWish");
+  const on = wish.some(w => w.id === card.id);
+  wishBtn.textContent = on ? "♥ On wishlist" : "♥ Add to wishlist";
+  if (card.setId && !card.releaseDate) {
+    fetchSet(card.setId).then(metaSet => {
+      if (!profileCard || profileCard.id !== card.id) return;
+      card.releaseDate = metaSet.releaseDate || "—";
+      card.series = card.series || metaSet.series || "";
+      const facts = profileBody.querySelectorAll(".fact");
+      facts.forEach(node => {
+        const label = node.querySelector("span");
+        if (!label) return;
+        if (label.textContent === "Release") node.querySelector("b").textContent = card.releaseDate || "—";
+        if (label.textContent === "Series" && card.series) node.querySelector("b").textContent = card.series;
+      });
+      if (card.series && ![...facts].some(n => n.querySelector("span") && n.querySelector("span").textContent === "Series")) {
+        const gridEl = profileBody.querySelector(".facts");
+        if (gridEl) gridEl.insertAdjacentHTML("beforeend", fact("Series", card.series));
+      }
+    }).catch(() => {});
+  }
+}
+function openProfile(card){
+  if (!card) return;
+  filtersEl.hidden = true;
+  wishEl.hidden = true;
+  profileEl.hidden = false;
+  profileEl.scrollTop = 0;
+  renderProfile(card);
+  if (!card.source && card.id) {
+    hydrate({ id: card.id }).then(full => {
+      const i = wish.findIndex(w => w.id === card.id);
+      if (i >= 0) { wish[i] = full; saveWish(); }
+      if (profileCard && profileCard.id === card.id && !profileEl.hidden) renderProfile(full);
+    }).catch(() => {});
+  }
+}
+function renderWish(){
+  let total = 0;
+  grid.innerHTML = "";
+  if (!wish.length) {
+    grid.innerHTML = `<p class="fine">Swipe right, or tap the heart, to keep a card for your binder.</p>`;
+    document.getElementById("total").textContent = money(0);
+    return;
+  }
+  wish.forEach((card, i) => {
+    const shown = headline(card);
+    if (shown && shown.currency === "USD") total += shown.amount;
+    const d = document.createElement("div");
+    d.className = "w";
+    const img = card.thumb || card.img || "";
+    d.innerHTML = `<button class="x" type="button" aria-label="Remove">×</button>
+      ${img ? `<img src="${esc(img)}" alt="">` : ""}
+      <b>${esc(card.name || "Card")}</b><br>${esc(shown ? money(shown.amount, shown.currency) : "n/a")}
+      <div class="fine">${esc(typeof card.set === "string" ? card.set : "")}</div>
+      ${card.source || card.variants ? linksHtml(card, "wish-links") : `<div class="wish-links"><a href="${esc(card.url || "#")}" target="_blank" rel="noopener noreferrer">Listing</a></div>`}`;
+    d.querySelector(".x").onclick = e => { e.stopPropagation(); wish.splice(i, 1); saveWish(); };
+    d.onclick = e => { if (e.target.closest("a,button")) return; openProfile(card); };
+    grid.append(d);
+  });
+  document.getElementById("total").textContent = money(total);
+}
+
+document.getElementById("openFilters").onclick = openFilters;
+document.getElementById("closeFilters").onclick = () => { filtersEl.hidden = true; };
+document.getElementById("filterForm").onsubmit = e => {
+  e.preventDefault();
+  const next = readForm();
+  if (!next) return;
+  filters = next;
+  saveFilters();
+  filtersEl.hidden = true;
+  restart();
+};
+document.getElementById("resetFilters").onclick = () => {
+  filters = { ...DEFAULTS };
+  saveFilters();
+  syncForm();
+  filterWarn.hidden = true;
+  filtersEl.hidden = true;
+  restart();
+};
+document.getElementById("fSetSearch").addEventListener("input", () => {
+  const q = document.getElementById("fSetSearch").value.trim().toLowerCase();
+  for (const opt of document.getElementById("fSet").options) {
+    if (!opt.value) { opt.hidden = false; continue; }
+    opt.hidden = !!(q && !opt.text.toLowerCase().includes(q));
+  }
+});
+document.getElementById("openWish").onclick = () => {
+  filtersEl.hidden = true;
+  profileEl.hidden = true;
+  wishEl.hidden = false;
+  wishEl.scrollTop = 0;
+  renderWish();
+};
+document.getElementById("closeWish").onclick = () => { wishEl.hidden = true; };
+document.getElementById("closeProfile").onclick = () => { profileEl.hidden = true; };
+document.getElementById("profileWish").onclick = () => {
+  if (!profileCard) return;
+  if (wish.some(w => w.id === profileCard.id)) wish = wish.filter(w => w.id !== profileCard.id);
+  else wish.push(profileCard);
+  saveWish();
+  renderProfile(profileCard);
+};
+document.getElementById("yes").onclick = () => { if (!sheetOpen()) fly(1); };
+document.getElementById("no").onclick = () => { if (!sheetOpen()) fly(-1); };
+document.addEventListener("keydown", e => {
+  const tag = e.target && e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  if (e.key === "Escape") { closeSheets(); return; }
+  if (sheetOpen()) return;
+  if (e.key === "ArrowRight") fly(1);
+  if (e.key === "ArrowLeft") fly(-1);
+  if (e.key === "Enter" || e.key === "ArrowUp") { const el = topCard(); if (el) openProfile(el.card); }
+});
+
+saveWish();
+renderChips();
+loadMeta().catch(() => {});
+restart();
+</script>
+</body>
+</html>
