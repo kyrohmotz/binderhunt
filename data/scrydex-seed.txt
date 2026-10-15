@@ -1,0 +1,32 @@
+# Cards refreshed by scripts/sync_scrydex.py.
+# Column 1 is the tier: A is refreshed about every 2 days, B about every 7 days.
+# Column 2 is the card id used by the catalog (TCGdex / Pokémon TCG API style).
+# The sync fetches at most 10 of these per run. Add ids here sparingly.
+
+A base1-4
+A swsh7-215
+A swsh7-214
+A sv03.5-199
+A sv08-238
+A swsh7-218
+A swsh11-186
+A swsh12-211
+A sv03-223
+A me02-125
+A gym2-2
+A neo1-9
+
+B base1-2
+B base1-6
+B base1-10
+B base1-15
+B sv03.5-006
+B sv03.5-173
+B sv04.5-234
+B swsh7-95
+B swsh7-217
+B swsh12-186
+B swsh12.5-102
+B swsh11-201
+B swsh9tg-TG23
+B sv04-199
