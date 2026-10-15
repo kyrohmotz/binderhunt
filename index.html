@@ -1,0 +1,77 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>BinderHunt – swipe to find the cards your binder is missing</title>
+<meta name="description" content="BinderHunt: swipe through real Pokémon TCG cards and build a wishlist for your binder. No packs, no gambling, just hunting the cards you want.">
+<meta property="og:title" content="BinderHunt"><meta property="og:description" content="Swipe to find the cards your binder is missing."><meta property="og:type" content="website"><meta property="og:url" content="https://kyrohmotz.github.io/binderhunt/"><meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔎</text></svg>">
+<style>
+*{box-sizing:border-box;margin:0}body{font-family:system-ui,sans-serif;background:radial-gradient(circle at top,#3b1d6e,#0d0b1f 70%);color:#fff;min-height:100vh;overflow:hidden;touch-action:none}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px}
+h1{font-size:24px;background:linear-gradient(90deg,#ffcb05,#ff5e8a);-webkit-background-clip:text;color:transparent}
+.tab{background:#ffffff1a;border:0;color:#fff;padding:8px 14px;border-radius:20px;font-weight:600}
+#deck{position:relative;width:min(88vw,360px);height:min(62vh,500px);margin:6px auto}
+.card{position:absolute;inset:0;border-radius:18px;background:#1c1838;box-shadow:0 10px 30px #0008;display:flex;flex-direction:column;overflow:hidden;cursor:grab;user-select:none}
+.card img{flex:1;min-height:0;object-fit:contain;padding:10px;pointer-events:none}
+.info{padding:10px 14px;background:#0006}.info b{font-size:18px}.info small{display:block;opacity:.75}
+.price{float:right;color:#5cf2a0;font-weight:700}
+.stamp{position:absolute;top:24px;padding:4px 12px;border:4px solid;border-radius:8px;font-size:28px;font-weight:900;opacity:0}
+.like{left:20px;color:#5cf2a0;transform:rotate(-15deg)}.nope{right:20px;color:#ff5e8a;transform:rotate(15deg)}
+.btns{display:flex;justify-content:center;gap:40px;margin:10px}
+.btns button{width:64px;height:64px;border-radius:50%;border:0;font-size:28px;background:#fff;box-shadow:0 4px 14px #0007}
+.ad{margin:8px auto;width:min(88vw,360px);border:1px dashed #ffcb05;border-radius:10px;padding:8px;text-align:center;font-size:13px;color:#ffcb05}
+#wish{position:fixed;inset:0;background:#0d0b1f;overflow:auto;padding:16px;display:none}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:10px}
+.w{background:#1c1838;border-radius:10px;padding:6px;font-size:12px;position:relative}.w img{width:100%}
+.w button{position:absolute;top:4px;right:4px;border:0;border-radius:50%;width:24px;height:24px;background:#ff5e8a;color:#fff}
+#loading{text-align:center;padding-top:40%;opacity:.7}
+</style></head><body>
+<header><h1>BinderHunt</h1><button class="tab" id="openWish">♥ Wishlist (<span id="cnt">0</span>)</button></header>
+<div id="deck"><div id="loading">Shuffling cards…</div></div>
+<div class="btns"><button id="no">✖</button><button id="yes">♥</button></div>
+<div class="ad"><b>SPONSORED · EXAMPLE PLACEMENT</b><br>Your shop or brand here — reach collectors mid-swipe.</div>
+<div id="wish"><header><h1>Wishlist</h1><button class="tab" id="closeWish">← Back</button></header>
+<p>Total estimated value: <b id="total" style="color:#5cf2a0">$0.00</b></p><div class="grid" id="grid"></div></div>
+<script>
+const deck=document.getElementById('deck');let queue=[],loading=false,seen=new Set();
+let wish=JSON.parse(localStorage.binderhuntWish||'[]');
+const save=()=>{localStorage.binderhuntWish=JSON.stringify(wish);cnt.textContent=wish.length};save();
+function price(c){const p=c.tcgplayer&&c.tcgplayer.prices;if(!p)return null;for(const k in p){const v=p[k].market||p[k].mid;if(v)return v}return null}
+async function fromPTCG(){const page=1+Math.floor(Math.random()*900);
+ const ctl=new AbortController();setTimeout(()=>ctl.abort(),8000);
+ const r=await fetch(`https://api.pokemontcg.io/v2/cards?pageSize=20&page=${page}&select=id,name,images,set,rarity,tcgplayer`,{signal:ctl.signal});
+ const j=await r.json();if(!j.data||!j.data.length)throw 0;
+ return j.data.map(c=>({id:c.id,name:c.name,img:c.images.large,set:c.set.name,rarity:c.rarity||'—',price:price(c),url:c.tcgplayer&&c.tcgplayer.url}))}
+let dexList=null;
+async function fromDex(){if(!dexList)dexList=(await (await fetch('https://api.tcgdex.net/v2/en/cards')).json()).filter(c=>c.image);
+ const out=[];for(let i=0;i<10;i++){const c=dexList[Math.floor(Math.random()*dexList.length)];
+  try{const d=await (await fetch('https://api.tcgdex.net/v2/en/cards/'+c.id)).json();
+  const tp=d.pricing&&d.pricing.tcgplayer;let pr=null;if(tp)for(const k in tp){if(tp[k]&&tp[k].marketPrice){pr=tp[k].marketPrice;break}}
+  out.push({id:d.id,name:d.name,img:d.image+'/high.webp',set:d.set.name,rarity:d.rarity||'—',price:pr})}catch(e){}}return out}
+async function refill(){if(loading)return;loading=true;let cards;
+ try{cards=await fromPTCG()}catch(e){try{cards=await fromDex()}catch(e2){cards=[]}}
+ cards.sort(()=>Math.random()-.5).forEach(c=>{if(!seen.has(c.id)){seen.add(c.id);queue.push(c);new Image().src=c.img}});
+ loading=false;render()}
+function render(){const l=document.getElementById('loading');if(l&&queue.length)l.remove();
+ while(deck.querySelectorAll('.card').length<Math.min(3,queue.length)){const n=deck.querySelectorAll('.card').length;mk(queue[n])}
+ if(queue.length<8)refill()}
+function mk(c){const el=document.createElement('div');el.className='card';el.c=c;
+ el.innerHTML=`<span class="stamp like">WANT</span><span class="stamp nope">PASS</span><img src="${c.img}" alt=""><div class="info"><span class="price">${c.price?'$'+c.price.toFixed(2):'n/a'}</span><b>${c.name}</b><small>${c.set} · ${c.rarity}</small></div>`;
+ deck.prepend(el);drag(el)}
+function topCard(){const a=deck.querySelectorAll('.card');return a[a.length-1]}
+function fly(dir){const el=topCard();if(!el)return;el.style.transition='transform .35s ease';
+ el.style.transform=`translate(${dir*600}px,-40px) rotate(${dir*30}deg)`;
+ if(dir>0&&!wish.find(w=>w.id===el.c.id)){wish.push(el.c);save()}
+ queue.shift();setTimeout(()=>{el.remove();render()},300)}
+function drag(el){let x0,y0,dx=0,dy=0,on=false;
+ el.onpointerdown=e=>{if(el!==topCard())return;on=true;x0=e.clientX;y0=e.clientY;el.setPointerCapture(e.pointerId);el.style.transition='none'};
+ el.onpointermove=e=>{if(!on)return;dx=e.clientX-x0;dy=e.clientY-y0;el.style.transform=`translate(${dx}px,${dy}px) rotate(${dx/15}deg)`;
+  el.querySelector('.like').style.opacity=Math.max(0,dx/100);el.querySelector('.nope').style.opacity=Math.max(0,-dx/100)};
+ el.onpointerup=()=>{if(!on)return;on=false;if(Math.abs(dx)>100)fly(Math.sign(dx));else{el.style.transition='transform .25s';el.style.transform='';el.querySelectorAll('.stamp').forEach(s=>s.style.opacity=0)}dx=dy=0}}
+yes.onclick=()=>fly(1);no.onclick=()=>fly(-1);
+onkeydown=e=>{if(e.key==='ArrowRight')fly(1);if(e.key==='ArrowLeft')fly(-1)};
+function showWish(){grid.innerHTML='';let t=0;wish.forEach((c,i)=>{t+=c.price||0;const d=document.createElement('div');d.className='w';
+ d.innerHTML=`<button>×</button><img src="${c.img}"><b>${c.name}</b><br>${c.price?'$'+c.price.toFixed(2):'n/a'}`;
+ d.querySelector('button').onclick=()=>{wish.splice(i,1);save();showWish()};grid.append(d)});
+ total.textContent='$'+t.toFixed(2);wish_el.style.display='block'}
+const wish_el=document.getElementById('wish');openWish.onclick=showWish;closeWish.onclick=()=>wish_el.style.display='none';
+refill();
+</script></body></html>
