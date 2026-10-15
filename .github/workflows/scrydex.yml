@@ -1,0 +1,82 @@
+name: Sync Scrydex cache
+
+on:
+  schedule:
+    # Once a day. Scrydex asks that prices be cached at least 24 hours.
+    - cron: "15 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: scrydex-cache
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Require Scrydex secrets
+        env:
+          SCRYDEX_API_KEY: ${{ secrets.SCRYDEX_API_KEY }}
+          SCRYDEX_TEAM_ID: ${{ secrets.SCRYDEX_TEAM_ID }}
+        run: |
+          missing=0
+          if [ -z "$SCRYDEX_API_KEY" ]; then
+            echo "::error title=Missing SCRYDEX_API_KEY::Add repository secret SCRYDEX_API_KEY (Settings → Secrets and variables → Actions → New repository secret). Use the API key from the Scrydex dashboard. The value is not printed."
+            missing=1
+          fi
+          if [ -z "$SCRYDEX_TEAM_ID" ]; then
+            echo "::error title=Missing SCRYDEX_TEAM_ID::Add repository secret SCRYDEX_TEAM_ID. Scrydex requires the X-Team-ID header. Copy the team id from the Scrydex account hub. The value is not printed."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Refresh cached cards
+        env:
+          SCRYDEX_API_KEY: ${{ secrets.SCRYDEX_API_KEY }}
+          SCRYDEX_TEAM_ID: ${{ secrets.SCRYDEX_TEAM_ID }}
+        run: python3 scripts/sync_scrydex.py
+
+      - name: Commit cache
+        id: commit
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/scrydex.json
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "Update cached Scrydex prices"
+            git push origin HEAD:main
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Pages
+        if: github.ref == 'refs/heads/main' && steps.commit.outputs.changed == 'true'
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload site
+        if: github.ref == 'refs/heads/main' && steps.commit.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        if: github.ref == 'refs/heads/main' && steps.commit.outputs.changed == 'true'
+        uses: actions/deploy-pages@v4

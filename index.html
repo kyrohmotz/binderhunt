@@ -916,38 +916,67 @@ function fact(label, value){
   if (value == null || value === "" || value === "—") return "";
   return `<div class="fact"><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
 }
-function chartSvg(series){
+function chartSvg(series, currency){
   const labels = AVG_ORDER.filter(label => series.some(s => s.points.some(p => p.label === label && typeof p.value === "number")));
   const usable = series
     .map(s => ({ ...s, points: s.points.filter(p => labels.includes(p.label) && typeof p.value === "number") }))
     .filter(s => s.points.length >= 2);
   if (labels.length < 2 || !usable.length) return "";
+  return chartLines(usable, labels, currency || "EUR", "Cardmarket period averages");
+}
+function chartTime(series){
+  const usable = (series || [])
+    .map(s => ({ name: s.name, points: (s.points || []).filter(p => p && typeof p.value === "number" && p.label).slice().sort((a, b) => String(a.label).localeCompare(String(b.label))) }))
+    .filter(s => s.points.length >= 2);
+  if (!usable.length) return "";
+  const labels = [];
+  const seen = new Set();
+  for (const s of usable) {
+    for (const p of s.points) {
+      if (!seen.has(p.label)) { seen.add(p.label); labels.push(p.label); }
+    }
+  }
+  labels.sort();
+  if (labels.length < 2) return "";
+  return chartLines(usable, labels, "USD", "Scrydex daily Near Mint market prices");
+}
+function chartLines(usable, labels, currency, aria){
   const vals = usable.flatMap(s => s.points.map(p => p.value));
   let min = Math.min(...vals);
   let max = Math.max(...vals);
   if (min === max) { min -= 1; max += 1; }
-  const w = 320, h = 168, padL = 16, padR = 16, padT = 22, padB = 32;
+  const w = 320, h = 176, padL = 16, padR = 16, padT = 22, padB = 32;
   const xOf = label => {
     const i = labels.indexOf(label);
+    if (i < 0) return padL;
     return padL + (labels.length === 1 ? 0 : i * (w - padL - padR) / (labels.length - 1));
   };
   const yOf = v => padT + (1 - (v - min) / (max - min)) * (h - padT - padB);
   const colors = ["#5cf2a0", "#ffcb05"];
+  const tickEvery = Math.max(1, Math.ceil(labels.length / 5));
   let marks = "";
   let lines = "";
   usable.forEach((s, si) => {
-    const ordered = labels.map(label => s.points.find(p => p.label === label)).filter(Boolean);
+    const ordered = s.points.filter(p => labels.includes(p.label));
     const d = ordered.map((p, i) => `${i ? "L" : "M"}${xOf(p.label).toFixed(1)},${yOf(p.value).toFixed(1)}`).join(" ");
     lines += `<path d="${d}" fill="none" stroke="${colors[si % colors.length]}" stroke-width="2.5" stroke-linejoin="round"/>`;
-    for (const p of ordered) {
+    ordered.forEach((p, i) => {
+      const last = i === ordered.length - 1;
       const x = xOf(p.label), y = yOf(p.value);
+      if (!last && labels.length > 8) return;
       marks += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${colors[si % colors.length]}"/>`;
-      marks += `<text x="${x.toFixed(1)}" y="${(y - 8).toFixed(1)}" text-anchor="middle" fill="${colors[si % colors.length]}" font-size="11">${esc(money(p.value, "EUR"))}</text>`;
-    }
+      if (last || labels.length <= 4) {
+        marks += `<text x="${x.toFixed(1)}" y="${Math.max(12, y - 8).toFixed(1)}" text-anchor="middle" fill="${colors[si % colors.length]}" font-size="11">${esc(money(p.value, currency))}</text>`;
+      }
+    });
   });
-  const axis = labels.map(label => `<text x="${xOf(label).toFixed(1)}" y="${h - 8}" text-anchor="middle" fill="#ffffffb0" font-size="11">${esc(label.replace(" avg", ""))}</text>`).join("");
-  const legend = usable.map((s, si) => `<text x="${padL + si * 110}" y="14" fill="${colors[si % colors.length]}" font-size="11">${esc(s.name)}</text>`).join("");
-  return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Cardmarket period averages">${legend}${lines}${marks}${axis}</svg>`;
+  const axis = labels.map((label, i) => {
+    if (i % tickEvery !== 0 && i !== labels.length - 1) return "";
+    const short = String(label).replace(" avg", "").replace(/^\d{4}-/, "");
+    return `<text x="${xOf(label).toFixed(1)}" y="${h - 8}" text-anchor="middle" fill="#ffffffb0" font-size="11">${esc(short)}</text>`;
+  }).join("");
+  const legend = usable.map((s, si) => `<text x="${padL + si * 150}" y="14" fill="${colors[si % colors.length]}" font-size="11">${esc(s.name)}</text>`).join("");
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(aria)}">${legend}${lines}${marks}${axis}</svg>`;
 }
 function priceSection(card){
   const rows = (card.variants || []).map(v => `<tr><td>${esc(v.label)}${v.productId ? `<br><a href="${esc(withAffiliate("https://www.tcgplayer.com/product/" + v.productId, "tcgplayer"))}" target="_blank" rel="noopener noreferrer">TCGplayer</a>` : ""}</td><td>${esc(money(v.market))}</td><td>${esc(money(v.low))}</td><td>${esc(money(v.mid))}</td><td>${esc(money(v.high))}</td></tr>`).join("");
@@ -957,8 +986,64 @@ function priceSection(card){
   const updated = card.tcgUpdated ? ` Updated ${esc(fmtDate(card.tcgUpdated))}.` : "";
   return `<h2>Current prices</h2><p class="fine">TCGplayer, USD.${updated} Market is the price used by filters and the wishlist total.</p>${table}`;
 }
-function historySection(card){
+let scrydex = { ready: false, generated_at: null, cards: {} };
+let scrydexPromise = null;
+function loadScrydex(){
+  if (scrydexPromise) return scrydexPromise;
+  scrydexPromise = fetch("data/scrydex.json", { cache: "no-cache" })
+    .then(r => r.ok ? r.json() : null)
+    .then(j => {
+      scrydex = {
+        ready: true,
+        generated_at: j && j.generated_at || null,
+        cards: (j && j.cards && typeof j.cards === "object") ? j.cards : {}
+      };
+    })
+    .catch(() => { scrydex = { ready: true, generated_at: null, cards: {} }; });
+  return scrydexPromise;
+}
+function scrydexRecord(card){
+  if (!card || !card.id || !scrydex.ready) return undefined;
+  return Object.prototype.hasOwnProperty.call(scrydex.cards, card.id) ? scrydex.cards[card.id] : null;
+}
+function variantWords(name){
+  return String(name || "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, ch => ch.toUpperCase());
+}
+function scrydexHistorySeries(rec){
+  const groups = new Map();
+  for (const row of (rec && rec.history) || []) {
+    if (!row || typeof row.m !== "number" || !row.d) continue;
+    const key = row.v || "Near Mint";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ label: String(row.d).slice(0, 10), value: row.m });
+  }
+  return [...groups.entries()]
+    .map(([name, points]) => ({ name: variantWords(name), points }))
+    .filter(s => s.points.length >= 2)
+    .sort((a, b) => b.points.length - a.points.length)
+    .slice(0, 2);
+}
+function historySection(card, rec){
   const cm = card.cm || { points:[], altPoints:[], altLabel:"" };
+  const cmCurrent = [cm.avg, cm.low, cm.trend].some(v => typeof v === "number")
+    ? `<p class="fine">Cardmarket now: average ${esc(money(cm.avg, "EUR"))}, low ${esc(money(cm.low, "EUR"))}, trend ${esc(money(cm.trend, "EUR"))}.${cm.updated ? " Updated " + esc(fmtDate(cm.updated)) + "." : ""}</p>`
+    : "";
+  if (rec === undefined) {
+    return `<h2>Price history</h2><p class="fine">Loading the cached Scrydex prices…</p>${cmCurrent}`;
+  }
+  const daily = rec && !rec.missing ? scrydexHistorySeries(rec) : [];
+  const dailyChart = chartTime(daily);
+  if (dailyChart) {
+    const when = rec.fetched_at ? ` Cached ${esc(fmtDate(rec.fetched_at))}.` : "";
+    const truncated = rec.history_truncated ? " This is the page Scrydex returned, not a filled-in series." : "";
+    return `<h2>Price history</h2>
+      <p class="fine">Daily raw Near Mint market prices in USD from Scrydex.${when}${truncated}</p>
+      ${dailyChart}
+      ${cmCurrent}`;
+  }
   const series = [];
   if ((cm.points || []).length >= 2) series.push({ name: "Cardmarket", points: cm.points });
   if ((cm.altPoints || []).length >= 2) series.push({ name: cm.altLabel || "Other", points: cm.altPoints });
@@ -967,25 +1052,55 @@ function historySection(card){
     if (printing) series.push({ name: printing.label, points: printing.points });
   }
   const chart = chartSvg(series);
-  const current = [cm.avg, cm.low, cm.trend].some(v => typeof v === "number")
-    ? `<p class="fine">Cardmarket now: average ${esc(money(cm.avg, "EUR"))}, low ${esc(money(cm.low, "EUR"))}, trend ${esc(money(cm.trend, "EUR"))}.${cm.updated ? " Updated " + esc(fmtDate(cm.updated)) + "." : ""}</p>`
-    : "";
-  const extras = (card.printings || []).filter(p => p.points && p.points.length).slice(0, 4).map(p =>
-    `<li>${esc(p.label)}: ${p.points.map(pt => esc(pt.label) + " " + esc(money(pt.value, "EUR"))).join(", ")}</li>`
-  ).join("");
-  const extraHtml = extras ? `<p class="fine">Other Cardmarket printings on file:</p><ul class="fine">${extras}</ul>` : "";
+  const cachedNote = rec && rec.missing
+    ? "Scrydex has no card with this id."
+    : "Daily Scrydex history isn't cached for this card yet. The sync covers popular and high-value cards first.";
   if (!chart) {
-    return `<h2>Price history</h2><div class="soon"><p><b>Coming soon.</b> A free day-by-day price series isn't available without a paid key, and this card doesn't have enough Cardmarket period averages to chart.</p></div>${current}${extraHtml}`;
+    return `<h2>Price history</h2><div class="soon"><p>${esc(cachedNote)} Cardmarket didn't return enough period averages to chart either.</p></div>`;
   }
   return `<h2>Price history</h2>
-    <p class="fine">The line is Cardmarket's published 30-day, 7-day, and 1-day average sell prices in EUR, via ${esc(card.source)}. It is not a daily close chart.</p>
+    <p class="fine">Cardmarket's 30-day, 7-day, and 1-day average sell prices in EUR. ${esc(cachedNote)}</p>
     ${chart}
-    ${current}
-    ${extraHtml}
-    <div class="soon"><p><b>Daily price history — coming soon.</b> BinderHunt won't invent dates or prices between these averages.</p></div>`;
+    ${cmCurrent}`;
 }
-function popSection(){
-  return `<h2>Graded population</h2><div class="soon"><p><b>Coming soon.</b> PSA, CGC, BGS, and SGC population counts aren't available from a free public API, so this card shows no pop numbers.</p></div>`;
+function gradeSort(a, b){
+  const na = Number(a), nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return nb - na;
+  if (Number.isFinite(na)) return -1;
+  if (Number.isFinite(nb)) return 1;
+  return String(a).localeCompare(String(b));
+}
+function gradedSection(rec){
+  if (rec === undefined) {
+    return `<h2>Graded prices and population</h2><p class="fine">Loading the cached Scrydex report…</p>`;
+  }
+  if (!rec || rec.missing) {
+    const why = rec && rec.missing
+      ? "Scrydex has no card with this id, so there is no graded price or population to show."
+      : "Not cached yet. The daily sync stores graded prices and PSA population for popular and high-value cards first.";
+    return `<h2>Graded prices and population</h2><div class="soon"><p>${esc(why)}</p></div>`;
+  }
+  const prices = Array.isArray(rec.graded) ? rec.graded : [];
+  const pops = Array.isArray(rec.pop) ? rec.pop : [];
+  if (!prices.length && !pops.length) {
+    return `<h2>Graded prices and population</h2><div class="soon"><p>Scrydex didn't return graded prices or a population report for this card.</p></div>`;
+  }
+  const priceRows = prices.map(p => `<tr><td>${esc(p.company || "—")} ${esc(p.grade || "")}</td><td>${esc(variantWords(p.variant))}</td><td>${esc(money(p.market, p.currency || "USD"))}</td><td>${esc(money(p.low, p.currency || "USD"))}</td><td>${esc(money(p.mid, p.currency || "USD"))}</td><td>${esc(money(p.high, p.currency || "USD"))}</td></tr>`).join("");
+  const priceTable = priceRows
+    ? `<div class="table-wrap"><table><thead><tr><th>Grade</th><th>Variant</th><th>Market</th><th>Low</th><th>Mid</th><th>High</th></tr></thead><tbody>${priceRows}</tbody></table></div>`
+    : `<p class="fine">Scrydex didn't return graded prices for this card.</p>`;
+  const popBlocks = pops.map(report => {
+    const grades = (report.grades || []).slice().sort((a, b) => gradeSort(a.grade, b.grade));
+    const highlight = grades.filter(g => ["10", "9", "8"].includes(String(g.grade)));
+    const headline = highlight.map(g => `${esc(report.company || "Grade")} ${esc(g.grade)}: ${esc(String(g.count))}`).join(" · ");
+    const total = typeof report.total === "number" ? `Total graded: ${esc(String(report.total))}.` : "";
+    const all = grades.map(g => `<tr><td>${esc(String(g.grade))}</td><td>${esc(String(g.count))}</td></tr>`).join("");
+    return `<p class="fine"><b>${esc(report.company || "Grader")}</b> · ${esc(variantWords(report.variant))}. ${total} ${headline}</p>
+      ${all ? `<details><summary>All ${esc(report.company || "")} grades</summary><div class="table-wrap"><table><thead><tr><th>Grade</th><th>Count</th></tr></thead><tbody>${all}</tbody></table></div></details>` : ""}`;
+  }).join("");
+  const popHtml = popBlocks || `<p class="fine">Scrydex didn't include a population report for this card. PSA is the population source Scrydex documents; other companies appear here only when Scrydex sends them.</p>`;
+  const when = rec.fetched_at ? ` Cached ${esc(fmtDate(rec.fetched_at))}.` : "";
+  return `<h2>Graded prices and population</h2><p class="fine">From Scrydex.${when} Counts and prices are only the numbers in that cache.</p>${priceTable}${popHtml}`;
 }
 function infoBlock(card){
   const legal = card.legal ? [
@@ -1033,12 +1148,17 @@ function renderProfile(card){
     ${abilities ? `<h2>Abilities</h2>${abilities}` : ""}
     ${attacks ? `<h2>Attacks</h2>${attacks}` : ""}
     ${priceSection(card)}
-    ${historySection(card)}
-    ${popSection()}
-    <p class="fine">Card text and prices from ${esc(card.source || "the catalog")}. BinderHunt doesn't sell packs or cards.</p>`;
+    ${historySection(card, scrydexRecord(card))}
+    ${gradedSection(scrydexRecord(card))}
+    <p class="fine">Card text from ${esc(card.source || "the catalog")}. Daily history and graded data come from the Scrydex cache when this card is in it. BinderHunt doesn't sell packs or cards.</p>`;
   const wishBtn = document.getElementById("profileWish");
   const on = wish.some(w => w.id === card.id);
   wishBtn.textContent = on ? "♥ On wishlist" : "♥ Add to wishlist";
+  if (!scrydex.ready) {
+    loadScrydex().then(() => {
+      if (profileCard && profileCard.id === card.id && !profileEl.hidden) renderProfile(card);
+    });
+  }
   if (card.setId && !card.releaseDate) {
     fetchSet(card.setId).then(metaSet => {
       if (!profileCard || profileCard.id !== card.id) return;
@@ -1155,6 +1275,7 @@ document.addEventListener("keydown", e => {
 
 saveWish();
 renderChips();
+loadScrydex();
 loadMeta().catch(() => {});
 restart();
 </script>
