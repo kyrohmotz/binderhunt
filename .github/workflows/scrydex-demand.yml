@@ -1,0 +1,19 @@
+name: Plan Scrydex coverage
+
+# Manual estimate only. This workflow does not receive Scrydex secrets and
+# does not call the API. The daily cache job in scrydex.yml is unchanged.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Estimate credits for 2,000 chase cards
+        run: python3 scripts/plan_price_coverage.py
