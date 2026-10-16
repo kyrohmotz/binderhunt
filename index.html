@@ -53,9 +53,18 @@ img{max-width:100%}
 header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none}
 .brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;min-width:0}
 .mark{width:36px;height:36px;flex:none;filter:drop-shadow(0 4px 8px rgba(92,70,150,.18))}
-.word{font-family:Fraunces,Georgia,serif;font-weight:700;font-size:26px;letter-spacing:-.03em;line-height:1}
-.actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-.tab{background:#fff;border:0;border-radius:999px;padding:8px 12px;font-weight:800;box-shadow:0 6px 16px rgba(92,70,150,.1)}
+.word{font-family:Fraunces,Georgia,serif;font-weight:700;font-size:26px;letter-spacing:-.03em;line-height:1;white-space:nowrap}
+.actions{display:flex;gap:6px;flex-wrap:nowrap;justify-content:flex-end;flex:none}
+.tab{background:#fff;border:0;border-radius:999px;padding:8px 12px;font-weight:800;white-space:nowrap;box-shadow:0 6px 16px rgba(92,70,150,.1)}
+@media (max-width:430px){
+  .app{padding:8px 10px 8px}
+  .mark{width:28px;height:28px}
+  .word{font-size:18px}
+  .brand{gap:6px}
+  header{gap:6px}
+  .actions{gap:4px}
+  .tab{padding:6px 8px;font-size:12px}
+}
 .tab[aria-pressed="true"]{background:#d9f5e8}
 .layout{flex:1;min-height:0;display:flex;flex-direction:column}
 main{flex:1;min-height:0;display:flex;flex-direction:column}
@@ -90,8 +99,17 @@ main{flex:1;min-height:0;display:flex;flex-direction:column}
 .like{left:16px;color:#1f8a62;border-color:#1f8a62;transform:rotate(-12deg)}
 .nope{right:16px;color:#c45b78;border-color:#c45b78;transform:rotate(12deg)}
 .btns{display:flex;justify-content:center;align-items:center;gap:18px;margin:8px 0;flex:none}
-.btns button{width:64px;height:64px;border-radius:50%;border:0;font-size:24px;box-shadow:0 8px 20px rgba(80,60,140,.16)}
+.btns button{position:relative;width:64px;height:64px;border-radius:50%;border:0;font-size:24px;box-shadow:0 8px 20px rgba(80,60,140,.16)}
 .btns button:disabled{opacity:.38;cursor:default}
+.haptic-hit{position:absolute;inset:0;border-radius:inherit;cursor:pointer}
+#hapticSwitch{position:fixed;left:8px;bottom:8px;width:16px;height:16px;margin:0;opacity:.02;z-index:1;border:0}
+.edition-note{clear:both;display:block;margin-top:6px;color:#6a4a1f;background:#fff4df;border-radius:10px;padding:6px 8px;font-size:12px;font-weight:800;line-height:1.35}
+.buy-btn{display:inline-flex;align-items:center;justify-content:center;background:#5b4dc7;color:#fff;border-radius:999px;padding:8px 12px;text-decoration:none;font-weight:800;font-size:13px;box-shadow:0 6px 14px rgba(91,77,199,.22)}
+.stat-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.cm-box{background:#fff;border-radius:16px;padding:10px 12px;margin-top:8px;box-shadow:0 4px 12px rgba(80,60,140,.05)}
+.cm-row{display:grid;grid-template-columns:7.2em minmax(0,1fr);gap:2px 8px;padding:8px 0;border-top:1px solid #efeaf8}
+.cm-row b{font-size:16px}
+.cm-row small{grid-column:1/-1;color:#5c5670;font-weight:700}
 #no{background:#ffd7c8}
 #undo{width:52px;height:52px;background:#ece6ff;font-size:18px}
 #yes{background:#d9f5e8}
@@ -168,6 +186,7 @@ h2{font-size:22px;margin:16px 0 8px}
 </head>
 <body>
 <div id="live" class="sr-only" aria-live="polite"></div>
+<input id="hapticSwitch" type="checkbox" switch tabindex="-1" aria-hidden="true">
 <div class="app">
   <header>
     <a class="brand" href="./">
@@ -197,9 +216,9 @@ h2{font-size:22px;margin:16px 0 8px}
         <div class="empty" id="loading"><div class="sk"></div><div class="sk sk2"></div><p>Shuffling cards…</p></div>
       </div>
       <div class="btns">
-        <button id="no" type="button" aria-label="Pass" disabled>✕</button>
+        <button id="no" type="button" aria-label="Pass" disabled>✕<label for="hapticSwitch" class="haptic-hit" aria-hidden="true"></label></button>
         <button id="undo" type="button" aria-label="Undo last swipe" disabled>↩</button>
-        <button id="yes" type="button" aria-label="Save to wishlist" disabled>♥</button>
+        <button id="yes" type="button" aria-label="Save to wishlist" disabled>♥<label for="hapticSwitch" class="haptic-hit" aria-hidden="true"></label></button>
       </div>
       <p class="legal" id="legal">Not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. Wishlists, filters, and sound stay in this browser. Sources: TCGdex, TCGplayer, Cardmarket, Scrydex.</p>
     </main>
@@ -210,7 +229,7 @@ h2{font-size:22px;margin:16px 0 8px}
       </section>
       <section class="panel-card">
         <h2>At the table</h2>
-        <p class="fine">The deck opens on physical chase cards. Filters and a price range keep dealing until the stack fills. Undo puts the last swipe back.</p>
+        <p class="fine">The opening deck deals illustration rares, secret rares, hyper rares, and similar chase cards, one or two at a time from many sets and eras. A card with a known US price under $10 stays out. Filters and a price range keep dealing until the stack fills. Undo puts the last swipe back.</p>
       </section>
       <section class="panel-card">
         <h2>Sources</h2>
@@ -295,16 +314,18 @@ const AFFILIATE = {
 };
 
 const CHASE_MIN = 25;
+const OPENING_MIN = 10;
 const CHASE_RARITIES = [
   "Special illustration rare","Illustration rare","Hyper rare","Mega Hyper Rare",
   "Secret Rare","Shiny Ultra Rare","Shiny rare VMAX","Holo Rare VMAX",
   "Holo Rare VSTAR","Radiant Rare","Amazing Rare"
 ];
-const SHOWCASE = CHASE_RARITIES.concat([
-  "Rare Holo","Ultra Rare","Double Rare","Rare Ultra","Holo Rare",
-  "Rare Holo EX","Rare Holo GX","Rare Holo V","Rare Holo VMAX","Rare Holo VSTAR","Rare ACE"
-]);
 const CURATED = ["sv08","sv03.5","swsh7","sv04.5","sv03","me02","base1","swsh12.5","sv07","swsh11","swsh12","sv01","sv06","sv02","neo1","swsh8"];
+const OPENING_ERAS = [
+  ["sv08","sv04.5","sv07","sv06","sv01","me02","sv02"],
+  ["swsh7","swsh12.5","swsh11","swsh12","swsh8"],
+  ["sv03.5","base1","neo1","sv03"]
+];
 const POCKET_SET = /^(?:P-A|[AB]\d+[a-z]*)$/;
 const POCKET_RARITIES = new Set(["One Diamond","Two Diamond","Three Diamond","Four Diamond","One Star","Two Star","Three Star","One Shiny","Two Shiny","Crown"]);
 const PAGE_SIZE = 24;
@@ -352,6 +373,13 @@ let profileCard = null;
 let restoreFocus = null;
 let springToken = 0;
 let audioCtx = null;
+let reserved = new Set();
+let pendingSwipes = [];
+let swipeBusy = false;
+let hapticTrusted = false;
+let openingOrder = [];
+let openingCursor = 0;
+const setPools = new Map();
 const cardCache = new Map();
 const setCache = new Map();
 const meta = { sets:[], types:[], rarities:[], ready:false };
@@ -477,7 +505,23 @@ function playTone(freq){
   o.stop(ctx.currentTime + 0.2);
 }
 function haptic(pattern){
-  try { if (typeof navigator.vibrate === "function") navigator.vibrate(pattern); } catch (e) {}
+  try {
+    if (typeof navigator.vibrate === "function") {
+      navigator.vibrate(pattern);
+      return;
+    }
+  } catch (e) {}
+  // iOS Safari has no vibrate. A rendered checkbox[switch] pulses the Taptic
+  // Engine when its label is clicked inside a user gesture (iOS 18+).
+  // A real tap on the heart or pass label is already that click; iOS 26.5
+  // ignores a scripted click, so this only fills in swipe gestures.
+  if (hapticTrusted) { hapticTrusted = false; return; }
+  const label = document.querySelector("label[for='hapticSwitch']");
+  if (label) label.click();
+}
+function groupNum(n){
+  if (typeof n !== "number" || !Number.isFinite(n)) return String(n ?? "");
+  return new Intl.NumberFormat("en-US").format(n);
 }
 function syncSoundButton(){
   const on = soundOn();
@@ -587,9 +631,29 @@ function keepCard(card){
   if (!card || isDigital(card)) return false;
   if (!passPrice(card)) return false;
   if (useQuery() || priceActive()) return true;
-  const rarity = card.rarity || "";
-  if (!rarity || rarity === "None" || rarity === "—" || rarity === "Common" || rarity === "Uncommon") return false;
+  if (!CHASE_RARITIES.includes(card.rarity || "")) return false;
+  const markets = (card.variants || []).map(v => v.market).filter(v => typeof v === "number");
+  if (markets.length && Math.max(...markets) < OPENING_MIN) return false;
   return true;
+}
+function scanMismatch(card){
+  if (!card || !card.stampedFirst) return false;
+  const priced = primaryVariant(card);
+  if (!priced) return false;
+  return !editionFlags(priced.key + " " + priced.label).first;
+}
+function pricedPrintingName(card){
+  const priced = primaryVariant(card);
+  if (!priced) return "";
+  const flags = editionFlags(priced.key + " " + priced.label);
+  if (flags.first) return priced.label;
+  if (card.stampedFirst && (priced.key === "holofoil" || flags.raw.includes("holo"))) return "Unlimited Holofoil";
+  return priced.label;
+}
+function scanBanner(card){
+  if (!scanMismatch(card)) return "";
+  const name = pricedPrintingName(card) || "a different printing";
+  return "The catalog scan shows a 1st Edition stamp. Prices are " + name + ".";
 }
 function withAffiliate(url, vendor){
   const extra = (AFFILIATE[vendor] && AFFILIATE[vendor].params) || {};
@@ -729,6 +793,7 @@ function normalizeDex(c){
     abilities: (c.abilities || []).map(a => ({ name:a.name, type:a.type || "Ability", effect:a.effect || "" })),
     flavor: c.description || "",
     variants: usdVariants(tp),
+    stampedFirst: (c.variants_detailed || []).some(v => Array.isArray(v.stamp) && v.stamp.some(s => String(s).toLowerCase().includes("1st"))),
     tcgUpdated: tp.updated || "",
     cm: {
       unit: cm.unit || "EUR",
@@ -879,7 +944,16 @@ function listQuery(pageNo){
   return TCGDEX + "/cards?" + parts.join("&");
 }
 function showcaseUrl(setId){
-  return TCGDEX + "/cards?set=eq:" + encodeURIComponent(setId) + "&rarity=eq:" + encodeURIComponent(SHOWCASE.join("|")) + "&pagination:page=1&pagination:itemsPerPage=" + PAGE_SIZE;
+  return TCGDEX + "/cards?set=eq:" + encodeURIComponent(setId) + "&rarity=eq:" + encodeURIComponent(CHASE_RARITIES.join("|")) + "&pagination:page=1&pagination:itemsPerPage=" + PAGE_SIZE;
+}
+function buildOpeningOrder(){
+  const have = new Set(meta.sets.map(s => s.id));
+  const eras = OPENING_ERAS.map(ids => shuffle(ids.filter(id => !have.size || have.has(id))));
+  const order = [];
+  const max = Math.max(0, ...eras.map(b => b.length));
+  for (let i = 0; i < max; i++) eras.forEach(bucket => { if (bucket[i]) order.push(bucket[i]); });
+  const rest = shuffle([...have].filter(id => !order.includes(id) && !isPocketId(id)));
+  return order.concat(rest);
 }
 function takeBriefs(list){
   let added = 0;
@@ -937,26 +1011,45 @@ function finishDiscovery(){
     queue.forEach(c => seen.add(c.id));
     deck.querySelectorAll(".card").forEach(el => { if (el.card) seen.add(el.card.id); });
     setCursor = 0;
+    openingCursor = 0;
+    setPools.clear();
     return false;
   }
   streamDone = true;
   return true;
 }
-async function pullShowcase(spins){
+async function pullShowcase(){
   if (!meta.ready) await loadMeta();
-  ensureOrder();
-  if (!setOrder.length) { streamDone = true; return 0; }
-  if (setCursor >= setOrder.length) {
-    if (finishDiscovery()) return 0;
-    return pullShowcase(spins || 0);
-  }
-  const ids = [];
-  while (ids.length < 2 && setCursor < setOrder.length) ids.push(setOrder[setCursor++]);
-  const lists = await Promise.all(ids.map(id => getJson(showcaseUrl(id)).catch(() => [])));
+  if (!openingOrder.length) openingOrder = buildOpeningOrder();
+  if (!openingOrder.length) { streamDone = true; return 0; }
   let added = 0;
-  lists.forEach(list => { added += takeBriefs(list); });
-  if (!added && (spins || 0) < 4 && setCursor <= setOrder.length) return pullShowcase((spins || 0) + 1);
-  if (!added && setCursor >= setOrder.length) finishDiscovery();
+  let hops = 0;
+  while (added < 4 && hops < 8) {
+    hops++;
+    if (openingCursor >= openingOrder.length) {
+      if (finishDiscovery()) return added;
+      if (!openingOrder.length) return added;
+      continue;
+    }
+    const id = openingOrder[openingCursor++];
+    if (!setPools.has(id)) {
+      let list = [];
+      try { list = await getJson(showcaseUrl(id)); } catch (e) { list = []; }
+      const pool = [];
+      for (const c of shuffle(Array.isArray(list) ? list : [])) {
+        if (!c || !c.id || seen.has(c.id) || !c.image) continue;
+        if (isPocketId(String(c.id).split("-")[0])) continue;
+        seen.add(c.id);
+        pool.push({ id:c.id, name:c.name, image:c.image, localId:c.localId });
+      }
+      setPools.set(id, pool);
+    }
+    const pool = setPools.get(id) || [];
+    const take = pool.splice(0, 1);
+    take.forEach(b => briefs.push(b));
+    added += take.length;
+  }
+  if (!added && openingCursor >= openingOrder.length) finishDiscovery();
   return added;
 }
 async function pullBulk(){
@@ -1061,6 +1154,12 @@ function restart(){
   setOrder = [];
   setCursor = 0;
   rewoundDiscovery = false;
+  openingOrder = [];
+  openingCursor = 0;
+  setPools.clear();
+  reserved = new Set();
+  pendingSwipes = [];
+  swipeBusy = false;
   effort = 0;
   loading = false;
   deck.innerHTML = "";
@@ -1104,9 +1203,10 @@ function mk(card){
   const shown = headline(card);
   const price = shown ? money(shown.amount, shown.currency) : "No US price";
   const bits = [card.set, card.number ? "#" + card.number : "", card.rarity].filter(Boolean);
+  const note = scanBanner(card);
   el.innerHTML = `<span class="holo"></span><span class="stamp like">WANT</span><span class="stamp nope">PASS</span>
     <img class="art" src="${esc(faceSrc(card))}" alt="${esc(card.name)}">
-    <div class="info"><span class="price${shown ? "" : " none"}">${esc(price)}</span><b>${esc(card.name)}</b><small>${esc(bits.join(" · "))}</small>${linksHtml(card, "buy")}</div>`;
+    <div class="info"><span class="price${shown ? "" : " none"}">${esc(price)}</span><b>${esc(card.name)}</b><small>${esc(bits.join(" · "))}</small>${note ? `<span class="edition-note">${esc(note)}</span>` : ""}${linksHtml(card, "buy")}</div>`;
   deck.prepend(el);
   bindDrag(el);
 }
@@ -1152,7 +1252,7 @@ function bindDrag(el){
   };
   el.addEventListener("pointerdown", e => {
     if (e.button != null && e.button !== 0) return;
-    if (el !== topCard() || sheetOpen() || el.classList.contains("leaving")) return;
+    if (el !== topCard() || sheetOpen() || el.classList.contains("leaving") || reserved.has(el.card && el.card.id)) return;
     if (e.target.closest("a,button")) return;
     e.preventDefault();
     springToken++;
@@ -1217,16 +1317,15 @@ function sparkle(anchor){
   }
 }
 function fly(dir, from){
-  const el = topCard();
-  if (!el || el.classList.contains("leaving") || sheetOpen()) return;
-  const card = el.card;
-  el.classList.add("leaving");
-  const added = dir > 0 && !wish.some(w => w.id === card.id);
+  if (sheetOpen()) return;
+  const card = queue.find(c => c && !reserved.has(c.id));
+  if (!card) return;
+  reserved.add(card.id);
+  let added = false;
   if (dir > 0) {
-    addWish(card);
+    added = addWish(card);
     haptic([12, 36, 18]);
     playTone(720);
-    sparkle(el);
     announce("Saved " + card.name + ".");
   } else {
     haptic(12);
@@ -1237,26 +1336,63 @@ function fly(dir, from){
   if (undoStack.length > 12) undoStack.shift();
   const idx = queue.indexOf(card);
   if (idx >= 0) queue.splice(idx, 1);
-  const w = deck.clientWidth || 320;
-  const origin = from || { x: 0, y: 0, rot: 0 };
-  spring(el, origin, { x: dir * (w + 120), y: -30, rot: dir * 16 }, () => {
-    if (el.isConnected) el.remove();
-    render();
-  });
-  setTimeout(() => { if (el.isConnected) { el.remove(); render(); } }, 720);
+  pendingSwipes.push({ card, dir, from: from || null });
   syncControls();
+  runSwipe();
+}
+function runSwipe(){
+  if (swipeBusy) return;
+  const job = pendingSwipes[0];
+  if (!job) return;
+  const el = [...deck.querySelectorAll(".card")].find(n => n.card === job.card);
+  if (!el) {
+    pendingSwipes.shift();
+    reserved.delete(job.card.id);
+    runSwipe();
+    return;
+  }
+  if (topCard() !== el) return;
+  pendingSwipes.shift();
+  swipeBusy = true;
+  el.classList.add("leaving");
+  if (job.dir > 0) sparkle(el);
+  const w = deck.clientWidth || 320;
+  const origin = job.from || { x: 0, y: 0, rot: 0 };
+  const fast = pendingSwipes.length > 0 || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let finished = false;
+  const done = () => {
+    if (finished) return;
+    finished = true;
+    reserved.delete(job.card.id);
+    if (el.isConnected) el.remove();
+    swipeBusy = false;
+    render();
+    runSwipe();
+  };
+  if (fast) {
+    el.style.transition = "transform .16s ease-out";
+    el.style.transform = `translate3d(${job.dir * (w + 80)}px, -24px, 0) rotate(${job.dir * 12}deg)`;
+    setTimeout(done, 180);
+    return;
+  }
+  spring(el, origin, { x: job.dir * (w + 120), y: -30, rot: job.dir * 16 }, done);
+  setTimeout(done, 720);
 }
 function undo(){
   const last = undoStack.pop();
   if (!last || sheetOpen()) return;
   if (last.added) wish = wish.filter(w => w.id !== last.card.id);
   saveWish();
+  pendingSwipes = pendingSwipes.filter(job => job.card.id !== last.card.id);
+  reserved.delete(last.card.id);
   queue = queue.filter(c => c.id !== last.card.id);
   queue.unshift(last.card);
+  swipeBusy = false;
   springToken++;
   deck.querySelectorAll(".card").forEach(el => el.remove());
   announce("Brought " + last.card.name + " back.");
   render();
+  runSwipe();
 }
 function render(){
   if (impossibleRange()) {
@@ -1276,9 +1412,15 @@ function render(){
     return;
   }
   deck.querySelectorAll(".empty").forEach(n => n.remove());
-  while (deck.querySelectorAll(".card").length < Math.min(3, queue.length)) mk(queue[deck.querySelectorAll(".card").length]);
+  const stacked = () => [...deck.querySelectorAll(".card")].filter(el => el.card && queue.includes(el.card));
+  while (stacked().length < Math.min(3, queue.length)) {
+    const have = new Set(stacked().map(el => el.card.id));
+    const next = queue.find(c => !have.has(c.id));
+    if (!next) break;
+    mk(next);
+  }
   layoutStack();
-  if (!queue.length) {
+  if (!queue.length && !deck.querySelector(".card")) {
     deck.dataset.status = pumpError ? "error" : (paused ? "paused" : "empty");
     deck.removeAttribute("aria-busy");
     const retry = pumpError
@@ -1415,7 +1557,7 @@ function fact(label, value){
 }
 function statCard(title, extra, cells){
   const body = cells.map(c => `<div><dt>${esc(c[0])}</dt><dd>${esc(c[1])}</dd></div>`).join("");
-  return `<li><b>${esc(title)}</b>${extra || ""}<dl>${body}</dl></li>`;
+  return `<li><div class="stat-head"><b>${esc(title)}</b>${extra || ""}</div><dl>${body}</dl></li>`;
 }
 function axisLabel(label){
   if (label === "30-day avg") return "30d";
@@ -1456,7 +1598,7 @@ function chartOne(points){
 }
 function priceSection(card){
   const items = (card.variants || []).map(v => {
-    const link = v.productId ? ` <a href="${esc(withAffiliate("https://www.tcgplayer.com/product/" + v.productId, "tcgplayer"))}" target="_blank" rel="noopener noreferrer">TCGplayer</a>` : "";
+    const link = v.productId ? `<a class="buy-btn" href="${esc(withAffiliate("https://www.tcgplayer.com/product/" + v.productId, "tcgplayer"))}" target="_blank" rel="noopener noreferrer">View on TCGplayer</a>` : "";
     return statCard(v.label, link, [
       ["Market", money(v.market)],
       ["Low", money(v.low)],
@@ -1514,17 +1656,14 @@ function historyPoints(card, rec){
 }
 function cmNote(printing){
   if (!printing) return "";
-  const bits = [];
-  if (typeof printing.avg === "number") bits.push("average sale " + money(printing.avg, "EUR"));
-  if (typeof printing.low === "number") bits.push("low " + money(printing.low, "EUR"));
-  if (typeof printing.trend === "number") bits.push("trend price " + money(printing.trend, "EUR"));
-  if (!bits.length) return "";
-  let text = "Cardmarket for " + (printing.label || "this printing") + ": " + bits.join(", ") + ".";
-  if (typeof printing.avg === "number" && typeof printing.trend === "number") {
-    text += " Average sale and trend price are different Cardmarket statistics, so they are not expected to match.";
-  }
-  if (printing.updated) text += " Updated " + fmtDate(printing.updated) + ".";
-  return `<p class="fine">${esc(text)}</p>`;
+  const rows = [];
+  if (typeof printing.avg === "number") rows.push(["Average sale", money(printing.avg, "EUR"), "Mean of recorded sales"]);
+  if (typeof printing.trend === "number") rows.push(["Trend", money(printing.trend, "EUR"), "Cardmarket's separate estimate"]);
+  if (typeof printing.low === "number") rows.push(["Low", money(printing.low, "EUR"), "Lowest current ask"]);
+  if (!rows.length) return "";
+  const body = rows.map(r => `<div class="cm-row"><span>${esc(r[0])}</span><b>${esc(r[1])}</b><small>${esc(r[2])}</small></div>`).join("");
+  const when = printing.updated ? " Updated " + fmtDate(printing.updated) + "." : "";
+  return `<div class="cm-box"><p class="fine"><b>Cardmarket</b> · ${esc(printing.label || "this printing")}.${esc(when)} Average sale and trend stay in their own rows because they measure different things.</p>${body}</div>`;
 }
 function historySection(card, rec){
   const printing = matchingPrinting(card);
@@ -1553,10 +1692,16 @@ function historySection(card, rec){
   if (!fallback) return `<h2>Price history</h2><div class="panel"><p>${esc(cachedNote)}</p></div>${note}`;
   return `<h2>Price history</h2><p class="fine">${esc(cachedNote)} The line is Cardmarket's 30-day, 7-day, and 1-day average for this printing, in EUR.</p>${fallback}${note}`;
 }
+function gradeValue(grade){
+  const s = String(grade ?? "").trim();
+  const n = Number(s);
+  if (Number.isFinite(n)) return n;
+  const m = s.match(/^(\d+(?:\.\d+)?)/);
+  if (m) return Number(m[1]) - 0.001;
+  return -1;
+}
 function gradeSort(a, b){
-  const na = Number(a), nb = Number(b);
-  if (Number.isFinite(na) && Number.isFinite(nb)) return nb - na;
-  return String(a).localeCompare(String(b));
+  return gradeValue(b) - gradeValue(a) || String(a).localeCompare(String(b));
 }
 function gradedSection(card, rec){
   if (rec === undefined) return `<h2>Graded prices and population</h2><p class="fine">Loading the cached Scrydex report…</p>`;
@@ -1618,9 +1763,9 @@ function gradedSection(card, rec){
   const popHtml = pops.map(report => {
     const grades = (report.grades || []).slice().sort((a, b) => gradeSort(a.grade, b.grade));
     const highlight = grades.filter(g => ["10", "9", "8"].includes(String(g.grade)));
-    const line = highlight.map(g => (report.company || "Grade") + " " + g.grade + ": " + g.count).join(" · ");
-    const total = typeof report.total === "number" ? "Total graded: " + report.total + "." : "";
-    const all = grades.map(g => `<div><dt>${esc(String(g.grade))}</dt><dd>${esc(String(g.count))}</dd></div>`).join("");
+    const line = highlight.map(g => (report.company || "Grade") + " " + g.grade + ": " + groupNum(g.count)).join(" · ");
+    const total = typeof report.total === "number" ? "Total graded: " + groupNum(report.total) + "." : "";
+    const all = grades.map(g => `<div><dt>${esc(String(g.grade))}</dt><dd>${esc(groupNum(g.count))}</dd></div>`).join("");
     return `<p class="fine"><b>${esc(report.company || "Grader")}</b> · ${esc(variantLabel(report.variant))}. ${esc(total)} ${esc(line)}</p>${all ? `<details><summary>All ${esc(report.company || "")} population grades</summary><dl class="stat-list" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">${all}</dl></details>` : ""}`;
   }).join("");
   const when = rec.fetched_at ? " Cached " + esc(fmtDate(rec.fetched_at)) + "." : "";
@@ -1668,7 +1813,9 @@ function renderProfile(card){
   profileCard = card;
   document.getElementById("profileTitle").textContent = card.name || "Card profile";
   const shown = headline(card);
+  const printingName = pricedPrintingName(card);
   const price = shown ? money(shown.amount, shown.currency) : "No US market price";
+  const banner = scanBanner(card);
   const attacks = (card.attacks || []).map(a => `<div class="atk"><div class="top"><b>${pips(a.cost)} ${esc(a.name || "Attack")}</b><b>${esc(a.damage || "")}</b></div>${a.effect ? `<p class="fine">${esc(a.effect)}</p>` : ""}</div>`).join("");
   const abilities = (card.abilities || []).map(a => `<div class="ability"><div class="top"><b>${esc(a.name || "Ability")}</b><span class="fine">${esc(a.type || "")}</span></div><p class="fine">${esc(a.effect || "")}</p></div>`).join("");
   const img = card.img || card.thumb || "";
@@ -1676,7 +1823,8 @@ function renderProfile(card){
   const url = cardUrl(card.id);
   profileBody.innerHTML = `
     ${img ? `<img class="hero" src="${esc(img)}" alt="${esc(card.name)}">` : ""}
-    <div class="headline"><div><h2 style="margin:0">${esc(card.name)}</h2><p class="fine">${esc([card.set, card.rarity].filter(Boolean).join(" · "))}</p></div><div class="amt${shown ? "" : " unpriced"}">${esc(price)}</div></div>
+    ${banner ? `<p class="banner">${esc(banner)}</p>` : ""}
+    <div class="headline"><div><h2 style="margin:0">${esc(card.name)}</h2><p class="fine">${esc([card.set, card.rarity, printingName].filter(Boolean).join(" · "))}</p></div><div class="amt${shown ? "" : " unpriced"}">${esc(price)}</div></div>
     ${digital}
     ${linksHtml(card, "links")}
     <label class="share">Share this card
@@ -1867,6 +2015,9 @@ document.getElementById("soundToggle").onclick = () => {
   renderTaste();
   announce(next === "1" ? "Sound effects on." : "Sound effects off.");
 };
+document.querySelectorAll(".haptic-hit").forEach(label => {
+  label.addEventListener("click", e => { if (e.isTrusted) hapticTrusted = true; });
+});
 document.getElementById("yes").onclick = () => fly(1);
 document.getElementById("no").onclick = () => fly(-1);
 document.getElementById("undo").onclick = undo;
