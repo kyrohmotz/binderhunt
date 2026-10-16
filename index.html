@@ -54,9 +54,9 @@ img{max-width:100%}
 .context{justify-self:center;max-width:100%;background:var(--paper-2);border:2.5px solid var(--ink);border-radius:999px;padding:6px 12px;font-family:var(--display);font-weight:600;box-shadow:3px 3px 0 var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .iconbtn{width:44px;height:44px;border-radius:14px;border:2.5px solid var(--ink);background:var(--paper-2);box-shadow:3px 3px 0 var(--ink);font-size:20px;display:grid;place-items:center}
 .iconbtn:active,.chip:active,.act:active,.tabbtn:active{transform:scale(.96)}
-.chips{display:flex;gap:6px;overflow:auto;padding:8px 12px 0;flex:none;scrollbar-width:none}
-.chips::-webkit-scrollbar{display:none}
-.chip{flex:none;min-height:44px;border:2.5px solid var(--ink);background:#fff;border-radius:999px;padding:0 12px;font-family:var(--display);font-weight:600;box-shadow:2px 2px 0 var(--ink)}
+.chipbar{min-width:0;flex:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px;min-width:0;padding:8px 12px 0}
+.chip{flex:none;white-space:nowrap;min-height:44px;border:2.5px solid var(--ink);background:#fff;border-radius:999px;padding:0 12px;font-family:var(--display);font-weight:600;box-shadow:2px 2px 0 var(--ink)}
 .chip[aria-pressed="true"],.chip.on{background:var(--sky)}
 .discovery{margin:8px 12px 0;flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--butter);border:2.5px solid var(--ink);border-radius:16px;padding:8px 10px;box-shadow:3px 3px 0 var(--ink)}
 .discovery b{font-family:var(--display);font-weight:700}
@@ -73,10 +73,12 @@ img{max-width:100%}
 .stamp{position:absolute;top:18px;padding:4px 10px;border:3px solid;border-radius:12px;font-family:var(--display);font-weight:700;font-size:22px;background:#fff;opacity:0;pointer-events:none}
 .stamp.like{left:12px;color:var(--green-deep);border-color:var(--green-deep);transform:rotate(-8deg)}
 .stamp.nope{right:12px;color:#8d4a4a;border-color:#8d4a4a;transform:rotate(8deg)}
-.meta{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;padding:0 4px;flex:none}
-.meta b{display:block;font-family:var(--display);font-size:18px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
-.meta small{color:var(--ink-2);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
-.pill{font-variant-numeric:tabular-nums;background:var(--sky);border:2.5px solid var(--ink);border-radius:999px;padding:6px 10px;font-family:var(--display);font-weight:700;box-shadow:2px 2px 0 var(--ink);flex:none}
+.card .meta{display:none}
+.card.showcap .meta{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;padding:0 4px;flex:none;min-width:0;width:100%}
+.meta .cap{min-width:0;flex:1}
+.meta b{display:block;font-family:var(--display);font-size:18px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta small{display:block;color:var(--ink-2);margin-top:2px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{font-variant-numeric:tabular-nums;background:var(--sky);border:2.5px solid var(--ink);border-radius:999px;padding:6px 10px;font-family:var(--display);font-weight:700;box-shadow:2px 2px 0 var(--ink);flex:none;max-width:46%;white-space:nowrap}
 .pill.missing{background:var(--paper-2);color:var(--ink-2);font-weight:600}
 .skel{position:absolute;inset:10px 8px 8px;border:2.5px solid var(--ink);border-radius:22px;background:linear-gradient(90deg,var(--paper-2),#fff 40%,var(--sage) 50%,var(--paper-2));background-size:200% 100%;animation:sheen 1.1s linear infinite;box-shadow:3px 3px 0 var(--ink)}
 @keyframes sheen{to{background-position:-100% 0}}
@@ -137,8 +139,10 @@ img{max-width:100%}
 .delta.down{background:var(--rose)}
 .grade-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
 .grade{text-align:left;background:#fff;border:2.5px solid var(--ink);border-radius:14px;padding:6px 8px;box-shadow:2px 2px 0 var(--ink)}
-.grade span{display:block;font-size:12px;color:var(--ink-2)}
-.grade b{font-variant-numeric:tabular-nums;font-size:16px}
+.grade span,.grade b,.grade small{display:block}
+.grade span{font-size:12px;color:var(--ink-2)}
+.grade b{font-variant-numeric:tabular-nums;font-size:16px;margin-top:2px}
+.grade small{margin-top:2px}
 .chart-wrap{margin-top:8px;background:#fff;border:2.5px solid var(--ink);border-radius:16px;padding:8px;box-shadow:2px 2px 0 var(--ink)}
 .ranges{display:flex;gap:4px;flex-wrap:nowrap;overflow:auto;scrollbar-width:none}
 .ranges button,.vtoggle button{min-height:44px;flex:none;border:2px solid var(--ink);border-radius:999px;background:var(--paper);padding:0 10px;font-family:var(--display)}
@@ -221,6 +225,7 @@ html.reduce *{animation:none !important;transition:none !important}
       <button class="iconbtn" id="gear" type="button" aria-label="Settings">⚙</button>
     </header>
     <div id="viewHunt" class="view">
+      <div class="chipbar" id="chipbar">
       <div class="chips" id="chips" role="toolbar" aria-label="Filters">
         <button class="chip" type="button" data-filter="set">Set</button>
         <button class="chip" type="button" data-filter="rarity">Rarity</button>
@@ -229,6 +234,7 @@ html.reduce *{animation:none !important;transition:none !important}
         <button class="chip" type="button" data-filter="type">Type</button>
         <button class="chip" type="button" id="gradedChip" aria-pressed="false">Graded only</button>
         <button class="chip" type="button" id="resetFilters">Reset</button>
+      </div>
       </div>
       <div class="discovery" id="discovery" hidden>
         <span>Adding to: <b id="discoveryName">Binder</b></span>
@@ -381,11 +387,12 @@ function money(n, currency){
 }
 function priceText(n, currency){ return money(n, currency) || "—"; }
 function groupNum(n){ return typeof n === "number" && Number.isFinite(n) ? new Intl.NumberFormat("en-US").format(n) : "—"; }
-function compactMoney(n){
+function compactMoney(n, currency){
   if (typeof n !== "number" || !Number.isFinite(n) || n < 0.01) return "";
-  if (n >= 10000) return "$" + Math.round(n / 1000) + "k";
-  if (n >= 100) return "$" + Math.round(n).toLocaleString("en-US");
-  return "$" + n.toFixed(2);
+  const sym = currency === "EUR" ? "€" : "$";
+  if (n >= 10000) return sym + Math.round(n / 1000) + "k";
+  if (n >= 100) return sym + Math.round(n).toLocaleString("en-US");
+  return sym + n.toFixed(2);
 }
 function variantLabel(key){ return String(key).replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase()); }
 function wide(){ return matchMedia("(min-width: 1024px)").matches; }
@@ -528,12 +535,21 @@ function selectedVariant(card){
   const want = variantChoice.get(card.id);
   return list.find(v => v.key === want) || list.slice().sort((a, b) => (pos(a.market) || 1e12) - (pos(b.market) || 1e12))[0];
 }
+function printingName(variant){
+  if (!variant) return "";
+  if (variant.key === "holofoil" || editionFlags(variant.key).raw.includes("holo")) return "Unlimited Holofoil";
+  return variant.label || "Unlimited";
+}
 function scanBanner(card){
   const v = selectedVariant(card);
   if (!card || !card.stampedFirst || !v) return "";
   if (editionFlags(v.key + " " + v.label).first) return "";
-  const name = (v.key === "holofoil" || editionFlags(v.key).raw.includes("holo")) ? "Unlimited Holofoil" : v.label;
-  return "The catalog scan shows a 1st Edition stamp. Prices are " + name + ".";
+  return "The catalog scan shows a 1st Edition stamp. Prices are " + printingName(v) + ".";
+}
+function marketCaption(card, variant){
+  if (settings.currency === "EUR") return "Cardmarket average";
+  if (card && card.stampedFirst && variant && !editionFlags(variant.key + " " + variant.label).first) return printingName(variant);
+  return "Market (raw NM)";
 }
 
 function withAffiliate(url, vendor){
@@ -608,6 +624,7 @@ function normalizeDex(c){
 }
 function normalizePtcg(c){
   const prices = (c.tcgplayer && c.tcgplayer.prices) || {};
+  const cm = (c.cardmarket && c.cardmarket.prices) || {};
   const variants = [];
   for (const [key, val] of Object.entries(prices)) {
     if (!val || typeof val !== "object") continue;
@@ -622,7 +639,12 @@ function normalizePtcg(c){
     rarity:c.rarity || "—", artist:c.artist || "", types:c.types || [],
     hp:c.hp == null || c.hp === "" ? null : pos(Number(c.hp)),
     flavor:c.flavorText || "", legal:c.legalities ? { standard:c.legalities.standard === "Legal", expanded:c.legalities.expanded === "Legal" } : null,
-    variants, stampedFirst:false, cm:null, printings:[]
+    variants, stampedFirst:false,
+    cm:{ avg:pos(cm.averageSellPrice), low:pos(cm.lowPrice), trend:pos(cm.trendPrice), idProduct:null, points:avgPoints(cm.avg30, cm.avg7, cm.avg1) },
+    printings:[
+      { label:"Holofoil", avg:pos(cm.averageSellPrice), low:pos(cm.lowPrice), trend:pos(cm.trendPrice), points:avgPoints(cm.avg30, cm.avg7, cm.avg1), updated:(c.cardmarket && c.cardmarket.updatedAt) || "" },
+      { label:"Reverse Holofoil", avg:pos(cm.reverseHoloSell), low:pos(cm.reverseHoloLow), trend:pos(cm.reverseHoloTrend), points:avgPoints(cm.reverseHoloAvg30, cm.reverseHoloAvg7, cm.reverseHoloAvg1), updated:(c.cardmarket && c.cardmarket.updatedAt) || "" }
+    ].filter(p => p.avg || p.points.length)
   };
 }
 async function hydrate(brief){
@@ -663,7 +685,9 @@ function loadScrydex(){
   if (scrydexPromise) return scrydexPromise;
   scrydexPromise = fetch("data/scrydex.json", { cache:"no-cache" }).then(r => r.ok ? r.json() : null).then(j => {
     scrydex = { ready:true, cards:(j && j.cards) || {} };
-  }).catch(() => { scrydex = { ready:true, cards:{} }; });
+  }).catch(() => { scrydex = { ready:true, cards:{} }; }).then(() => {
+    if (profileCard && !profileEl.hidden) renderProfile(cardCache.get(profileCard.id) || profileCard);
+  });
   return scrydexPromise;
 }
 function scryRecord(card){
@@ -880,9 +904,12 @@ function paintArt(host, card){
 }
 function topCard(){ const cards = deck.querySelectorAll(".card"); return cards[cards.length - 1] || null; }
 function layoutStack(){
-  [...deck.querySelectorAll(".card")].forEach((el, i, arr) => {
-    const depth = arr.length - 1 - i;
+  const cards = [...deck.querySelectorAll(".card")];
+  const top = [...cards].reverse().find(el => !el.classList.contains("leaving"));
+  cards.forEach((el, i) => {
+    const depth = cards.length - 1 - i;
     el.style.zIndex = String(10 + i);
+    el.classList.toggle("showcap", el === top || el.classList.contains("dragging") || el.classList.contains("leaving"));
     if (el.classList.contains("leaving") || el.classList.contains("dragging")) return;
     el.style.transform = depth ? `translateY(${depth * 12}px) scale(${1 - depth * 0.04})` : "";
   });
@@ -906,7 +933,7 @@ function renderDeck(){
     el.card = card;
     const shown = shownMoney(card);
     el.innerHTML = `<div class="frame"><span class="stamp like">${discoveryBinder() ? "BINDER!" : "WISH!"}</span><span class="stamp nope">PASS</span></div>
-      <div class="meta"><div><b>${esc(card.name)}</b><small>${esc([card.set, card.number ? "#" + card.number : "", card.rarity].filter(Boolean).join(" · "))}</small></div>
+      <div class="meta"><div class="cap"><b>${esc(card.name)}</b><small>${esc([card.set, card.number ? "#" + card.number : "", card.rarity].filter(Boolean).join(" · "))}</small></div>
       <span class="pill${shown ? "" : " missing"}">${esc(shown ? priceText(shown.amount, shown.currency) : "—")}</span></div>`;
     paintArt(el.querySelector(".frame"), card);
     deck.prepend(el);
@@ -1004,6 +1031,7 @@ function runSwipe(){
   pendingSwipes.shift();
   swipeBusy = true;
   el.classList.add("leaving");
+  layoutStack();
   const w = deck.clientWidth || 320;
   const fast = pendingSwipes.length > 0 || reduceMotion();
   let doneOnce = false;
@@ -1089,6 +1117,13 @@ function playTone(freq){
   g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
   o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.14);
 }
+function syncChipFade(){
+  const el = document.getElementById("chips");
+  const bar = document.getElementById("chipbar");
+  if (!el || !bar) return;
+  const more = el.scrollWidth > el.clientWidth + 2 && el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+  bar.classList.toggle("more", more);
+}
 function paintChips(){
   document.querySelectorAll("[data-filter]").forEach(btn => {
     const key = btn.dataset.filter;
@@ -1102,6 +1137,7 @@ function paintChips(){
   const g = document.getElementById("gradedChip");
   g.setAttribute("aria-pressed", filters.graded ? "true" : "false");
   g.classList.toggle("on", filters.graded);
+  syncChipFade();
 }
 function paintContext(){
   const b = discoveryBinder();
@@ -1601,7 +1637,7 @@ function parseDay(s){
   if (!m) return null;
   return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
 }
-function historyPoints(card){
+function scryHistory(card){
   const rec = scryRecord(card);
   const variant = selectedVariant(card);
   if (!rec || rec.missing || !variant) return [];
@@ -1609,6 +1645,29 @@ function historyPoints(card){
   const name = chosenVariant(names, variant.key);
   if (!name) return [];
   return (rec.history || []).filter(row => row && row.v === name && pos(row.m)).map(row => ({ t:parseDay(row.d), label:String(row.d).slice(0, 10), value:pos(row.m) })).filter(p => p.t && p.value).sort((a, b) => a.t - b.t);
+}
+function trendHistory(card){
+  const variant = selectedVariant(card);
+  const list = (card.printings || []).filter(p => p && ((p.points && p.points.length) || pos(p.avg)));
+  const printing = variant ? list.find(p => samePrinting(p.label, variant.key)) : null;
+  const source = printing || null;
+  const pts = (source && source.points && source.points.length) ? source.points : ((card.cm && card.cm.points) || []);
+  const avg = source ? pos(source.avg) : pos(card.cm && card.cm.avg);
+  if (!pts.length && avg == null) return [];
+  const anchor = parseDay(source && source.updated) || Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate());
+  const day = 86400000;
+  const back = { "30-day avg":30, "7-day avg":7, "1-day avg":1 };
+  const points = pts.filter(p => p && p.value).map(p => ({ t:anchor - (back[p.label] || 0) * day, label:p.label, value:p.value }));
+  if (avg) points.push({ t:anchor, label:"Latest average", value:avg });
+  const seen = new Set();
+  return points.filter(p => p.t && p.value && !seen.has(p.t) && seen.add(p.t)).sort((a, b) => a.t - b.t);
+}
+function priceSeries(card){
+  const sales = scryHistory(card);
+  if (sales.length >= 2) return { points:sales, source:"sales", currency:"USD" };
+  const trend = trendHistory(card);
+  if (trend.length >= 2) return { points:trend, source:"trend", currency:"EUR" };
+  return { points:[], source:"", currency:"USD" };
 }
 function ranged(points){
   if (!points.length) return [];
@@ -1638,7 +1697,7 @@ function gradeFacts(card){
     pops: name ? (rec.pop || []).filter(p => p.variant === name) : []
   };
 }
-function chartSvg(points, guide){
+function chartSvg(points, guide, currency){
   if (points.length < 2) return "";
   const vals = points.map(p => p.value);
   let min = Math.min(...vals), max = Math.max(...vals);
@@ -1651,11 +1710,13 @@ function chartSvg(points, guide){
   const ticks = [0, Math.round((points.length - 1) / 2), points.length - 1];
   const axis = [...new Set(ticks)].map(i => {
     const anchor = i === 0 ? "start" : i === points.length - 1 ? "end" : "middle";
-    const label = points[i].label.slice(5).replace("-", "/");
+    const raw = points[i].label || "";
+    const label = /^\d{4}/.test(raw) ? raw.slice(5).replace("-", "/") : raw.replace(" average", "").replace("-day avg", "d");
     return `<text x="${i === 0 ? padL : i === points.length - 1 ? w - padR : xOf(i)}" y="${h - 6}" text-anchor="${anchor}" fill="#404241" font-size="11">${esc(label)}</text>`;
   }).join("");
   const guideLine = guide ? `<line x1="${padL}" x2="${w - padR}" y1="${yOf(guide.value).toFixed(1)}" y2="${yOf(guide.value).toFixed(1)}" stroke="#737863" stroke-dasharray="5 4" stroke-width="2"/>` : "";
-  return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Price history"><path d="${d}" fill="none" stroke="#2FA9D9" stroke-width="3" stroke-linejoin="round"/>${guideLine}<text x="4" y="14" fill="#404241" font-size="11">${esc(compactMoney(max))}</text><text x="4" y="${h - padB}" fill="#404241" font-size="11">${esc(compactMoney(min))}</text>${axis}</svg>`;
+  const moneyCur = currency || "USD";
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Price history"><path d="${d}" fill="none" stroke="#2FA9D9" stroke-width="3" stroke-linejoin="round"/>${guideLine}<text x="4" y="14" fill="#404241" font-size="11">${esc(compactMoney(max, moneyCur))}</text><text x="4" y="${h - padB}" fill="#404241" font-size="11">${esc(compactMoney(min, moneyCur))}</text>${axis}</svg>`;
 }
 function openProfile(card){
   if (card && card.id && !card.variants) {
@@ -1694,12 +1755,14 @@ function renderProfile(card){
   profileCard = card;
   const variant = selectedVariant(card);
   const shown = settings.currency === "EUR" ? shownMoney(card) : (variant && pos(variant.market) ? { amount:variant.market, currency:"USD" } : shownMoney(card));
-  const points = historyPoints(card);
-  const windowed = ranged(points.length ? points : []);
-  const delta = change30(points);
+  const series = priceSeries(card);
+  const windowed = ranged(series.points);
+  const delta = series.source === "sales" ? change30(series.points) : change30(windowed);
   const facts = gradeFacts(card);
   const guide = compareGrade ? gradePrice(facts, compareGrade) : null;
-  const svg = chartSvg(windowed, guide);
+  const svg = chartSvg(windowed, guide, series.currency);
+  const gradedReady = scrydex.ready;
+  const gradedKnown = gradedReady && gradesAvailable(facts);
   const variants = (card.variants || []).filter(v => pos(v.market));
   const banner = scanBanner(card);
   const onWish = wish.some(w => w.id === card.id);
@@ -1712,18 +1775,17 @@ function renderProfile(card){
       <button class="iconbtn" id="closeProfile" type="button" aria-label="Close profile">✕</button>
     </div>
     ${banner ? `<p class="note">${esc(banner)}</p>` : ""}
-    <div class="market"><div><p class="fine">${settings.currency === "EUR" ? "Cardmarket average" : "Market (raw NM)"}</p><p class="market-price">${esc(shown ? priceText(shown.amount, shown.currency) : "—")}</p></div>
+    <div class="market"><div><p class="fine">${esc(marketCaption(card, variant))}</p><p class="market-price">${esc(shown ? priceText(shown.amount, shown.currency) : "—")}</p></div>
       ${delta == null ? "" : `<span class="delta ${delta < 0 ? "down" : ""}">${delta < 0 ? "▼" : "▲"} ${Math.abs(delta).toFixed(1)}%</span>`}
     </div>
     ${variants.length > 1 ? `<div class="vtoggle" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${variants.map(v => `<button type="button" data-variant="${esc(v.key)}" aria-pressed="${variant && variant.key === v.key ? "true" : "false"}">${esc(v.label)}</button>`).join("")}</div>` : ""}
-    <div class="grade-grid">${GRADES.map(([company, grade]) => gradeCell(facts, company, grade)).join("")}</div>
+    ${!gradedReady ? `<p class="fine">Checking graded prices…</p>` : gradedKnown ? `<div class="grade-grid">${GRADES.map(([company, grade]) => gradeCell(facts, company, grade)).join("")}</div>` : `<p class="note">No graded sales yet</p>`}
     <div class="chart-wrap">
       <div class="ranges">${["1M","3M","1Y","All"].map(r => `<button type="button" data-range="${r}" aria-pressed="${chartRange === r ? "true" : "false"}">${r}</button>`).join("")}
-        <button type="button" data-compare="" aria-pressed="${compareGrade ? "false" : "true"}">Raw</button>
-        ${GRADES.map(([c, g]) => `<button type="button" data-compare="${c} ${g}" aria-pressed="${compareGrade === c + " " + g ? "true" : "false"}">${c} ${g}</button>`).join("")}
+        ${gradedKnown ? `<button type="button" data-compare="" aria-pressed="${compareGrade ? "false" : "true"}">Raw</button>${GRADES.map(([c, g]) => `<button type="button" data-compare="${c} ${g}" aria-pressed="${compareGrade === c + " " + g ? "true" : "false"}">${c} ${g}</button>`).join("")}` : ""}
       </div>
       ${svg || `<p class="empty-state">Not enough sales yet 🐸</p>`}
-      <p class="scrub" id="scrub">${guide ? esc(guide.label) + " latest cached " + esc(priceText(guide.value, "USD")) + ". The dashed line is that price, not a daily history." : "Drag along the line for a day."}</p>
+      <p class="scrub" id="scrub">${guide ? esc(guide.label) + " latest cached " + esc(priceText(guide.value, "USD")) + ". The dashed line is that price, not a daily history." : series.source === "trend" ? "Cardmarket 30-day, 7-day, and 1-day averages, in euros. Not a daily sales history." : series.source === "sales" ? "Drag along the line for a day." : ""}</p>
     </div>
     <div class="links">${buyLinks(card).map(l => `<a class="buy-btn" href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join("")}
       <button class="chip" id="profileWish" type="button">${onWish ? "On wishlist" : "★ Add to wishlist"}</button>
@@ -1766,7 +1828,7 @@ function renderProfile(card){
     const x = (e.clientX - rect.left) / rect.width;
     const i = Math.max(0, Math.min(windowed.length - 1, Math.round(x * (windowed.length - 1))));
     const p = windowed[i];
-    if (p) document.getElementById("scrub").textContent = p.label + " · " + priceText(p.value, "USD");
+    if (p) document.getElementById("scrub").textContent = p.label + " · " + priceText(p.value, series.currency);
   });
   if (!card.releaseDate && card.setId) {
     getJson(TCGDEX + "/sets/" + encodeURIComponent(card.setId)).then(set => {
@@ -1786,6 +1848,14 @@ function gradePrice(facts, label){
   const [company, grade] = label.split(" ");
   const row = (facts.prices || []).find(p => p.company === company && String(p.grade) === grade && pos(p.market));
   return row ? { label, value:pos(row.market) } : null;
+}
+function gradesAvailable(facts){
+  return GRADES.some(([company, grade]) => {
+    const price = (facts.prices || []).find(p => p.company === company && String(p.grade) === String(grade));
+    const popReport = (facts.pops || []).find(p => p.company === company);
+    const pop = popReport && (popReport.grades || []).find(g => String(g.grade) === String(grade));
+    return !!(price && pos(price.market)) || !!(pop && typeof pop.count === "number");
+  });
 }
 function gradeCell(facts, company, grade){
   const price = (facts.prices || []).find(p => p.company === company && String(p.grade) === String(grade));
@@ -1886,6 +1956,8 @@ applyMotion();
 syncHaptics();
 syncProfilePane();
 matchMedia("(min-width: 1024px)").addEventListener("change", syncProfilePane);
+document.getElementById("chips").addEventListener("scroll", syncChipFade);
+window.addEventListener("resize", syncChipFade);
 paintChips();
 paintContext();
 paintDiscovery();
