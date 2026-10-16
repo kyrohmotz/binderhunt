@@ -102,6 +102,134 @@ class TrimTests(unittest.TestCase):
         self.assertLessEqual(len(ids), 40)
 
 
+class IdMapTests(unittest.TestCase):
+    def test_maps_tcgdex_ids_to_scrydex_ids(self):
+        expected = {
+            "base1-4": "base1-4",
+            "swsh7-215": "swsh7-215",
+            "gym2-2": "gym2-2",
+            "neo1-9": "neo1-9",
+            "swsh9tg-TG23": "swsh9tg-TG23",
+            "sv03-223": "sv3-223",
+            "sv08-238": "sv8-238",
+            "sv03.5-199": "sv3pt5-199",
+            "sv03.5-006": "sv3pt5-6",
+            "sv04.5-234": "sv4pt5-234",
+            "swsh12.5-102": "swsh12pt5-102",
+            "me02-125": "me2-125",
+            "sv04-199": "sv4-199",
+        }
+        for catalog_id, scrydex_id in expected.items():
+            self.assertEqual(sync.map_scrydex_id(catalog_id), scrydex_id)
+        self.assertEqual(sync.scrydex_candidates("sv03-223"), ["sv3-223", "sv03-223"])
+        self.assertEqual(sync.scrydex_candidates("base1-4"), ["base1-4"])
+
+    def test_missing_raw_id_is_due_until_the_mapped_id_is_tried(self):
+        now = datetime(2026, 10, 16, tzinfo=timezone.utc)
+        fresh = (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        seed = [("A", "sv03-223"), ("A", "base1-4")]
+        cards = {
+            "sv03-223": {"missing": True, "fetched_at": fresh},
+            "base1-4": {"fetched_at": fresh, "history": []},
+        }
+        self.assertEqual(sync.select_due(seed, cards, now, max_cards=10), ["sv03-223"])
+        cards["sv03-223"]["lookup_id"] = "sv3-223"
+        self.assertEqual(sync.select_due(seed, cards, now, max_cards=10), [])
+
+    def test_fetch_uses_mapped_id_and_does_not_fan_out(self):
+        calls = []
+
+        def fake(url, headers):
+            calls.append(url)
+            if "sv3-223?" in url:
+                return 200, {"data": {"name": "Charizard ex", "variants": []}}
+            if "price_history" in url:
+                self.assertIn("/sv3-223/", url)
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 404, {}
+
+        original = sync.request_json
+        original_sleep = sync.time.sleep
+        sync.request_json = fake
+        sync.time.sleep = lambda *args, **kwargs: None
+        try:
+            record, stop = sync.fetch_card("sv03-223", {}, datetime(2026, 10, 16, tzinfo=timezone.utc))
+        finally:
+            sync.request_json = original
+            sync.time.sleep = original_sleep
+        self.assertFalse(stop)
+        self.assertFalse(record.get("missing"))
+        self.assertEqual(record["lookup_id"], "sv3-223")
+        self.assertEqual(len(calls), 2)
+        self.assertNotIn("sv03-223", calls[0])
+
+    def test_fetch_tries_one_fallback_then_stops(self):
+        calls = []
+
+        def fake(url, headers):
+            calls.append(url)
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            if "/sv3-223?" in url:
+                return 404, {}
+            if "/sv03-223?" in url:
+                return 200, {"data": {"name": "Charizard ex", "variants": []}}
+            return 500, {}
+
+        original = sync.request_json
+        original_sleep = sync.time.sleep
+        sync.request_json = fake
+        sync.time.sleep = lambda *args, **kwargs: None
+        try:
+            record, stop = sync.fetch_card("sv03-223", {}, datetime(2026, 10, 16, tzinfo=timezone.utc))
+        finally:
+            sync.request_json = original
+            sync.time.sleep = original_sleep
+        self.assertFalse(record.get("missing"))
+        self.assertEqual(record["lookup_id"], "sv03-223")
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(sum("price_history" in url for url in calls), 1)
+
+    def test_fetch_missing_does_not_request_history(self):
+        calls = []
+
+        def fake(url, headers):
+            calls.append(url)
+            return 404, {}
+
+        original = sync.request_json
+        original_sleep = sync.time.sleep
+        sync.request_json = fake
+        sync.time.sleep = lambda *args, **kwargs: None
+        try:
+            record, stop = sync.fetch_card("sv03-223", {}, datetime(2026, 10, 16, tzinfo=timezone.utc))
+        finally:
+            sync.request_json = original
+            sync.time.sleep = original_sleep
+        self.assertTrue(record.get("missing"))
+        self.assertEqual(record["lookup_id"], "sv3-223")
+        self.assertFalse(stop)
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(any("price_history" in url for url in calls))
+
+    def test_rate_limit_stops_before_a_second_lookup(self):
+        calls = []
+
+        def fake(url, headers):
+            calls.append(url)
+            return 429, {}
+
+        original = sync.request_json
+        sync.request_json = fake
+        try:
+            with self.assertRaises(sync.ScrydexError) as caught:
+                sync.fetch_card("sv03-223", {}, datetime(2026, 10, 16, tzinfo=timezone.utc))
+        finally:
+            sync.request_json = original
+        self.assertEqual(str(caught.exception), "RATE_LIMIT")
+        self.assertEqual(len(calls), 1)
+
+
 class CacheWriteTests(unittest.TestCase):
     def test_write_cache_roundtrip(self):
         with tempfile.TemporaryDirectory() as tmp:

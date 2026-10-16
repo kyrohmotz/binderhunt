@@ -1,7 +1,8 @@
 # Cards refreshed by scripts/sync_scrydex.py.
 # Column 1 is the tier: A is refreshed about every 2 days, B about every 7 days.
-# Column 2 is the card id used by the catalog (TCGdex / Pokémon TCG API style).
-# The sync fetches at most 10 of these per run. Add ids here sparingly.
+# Column 2 is the catalog id (TCGdex). The sync maps it to the Scrydex id
+# (sv03-223 -> sv3-223, sv03.5-199 -> sv3pt5-199, me02-125 -> me2-125)
+# and stores the result under the catalog id. At most 10 cards per run.
 
 A base1-4
 A swsh7-215

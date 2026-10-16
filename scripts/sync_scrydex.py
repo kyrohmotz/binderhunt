@@ -7,10 +7,16 @@ Scrydex documents general card requests as 1 credit and price history as
   GET /pokemon/v1/cards/{id}?include=prices,pop_reports
   GET /pokemon/v1/cards/{id}/price_history?days=90&page_size=100
 
-A full run is therefore at most 40 credits. The daily workflow stays near
-that ceiling only while the cache is catching up. Once warm, tier A cards
-are older than 48 hours and tier B cards older than 7 days, which is about
-30 credits a day, or roughly 900–1,200 credits a month.
+A full run is therefore at most 40 credits when every lookup hits.
+Catalog ids from TCGdex are mapped to the Scrydex id before the request
+(sv03-223 becomes sv3-223, sv03.5-199 becomes sv3pt5-199, me02-125 becomes
+me2-125). The record is still stored under the catalog id. If that mapped
+id is missing, the original catalog id is tried once and history is not
+requested for a miss, so a wrong id cannot fan out. A card that 404s on a
+mapped id and then hits on the fallback costs 5 credits; both missing costs
+2. The daily workflow stays near 40 credits only while the cache is catching
+up. Once warm, tier A cards are older than 48 hours and tier B cards older
+than 7 days, which is about 30 credits a day, or roughly 900–1,200 a month.
 
 The API key and team id are read from the environment and sent only as
 request headers. They are never printed, written into the JSON, or passed
@@ -21,6 +27,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -39,10 +46,50 @@ TIER_A_HOURS = 48
 TIER_B_HOURS = 24 * 7
 MISSING_HOURS = 24 * 14
 REQUEST_PAUSE_SEC = 0.35
+# TCGdex zero-pads set numbers and writes special sets as ".5".
+# Scrydex uses the Pokémon TCG API form: sv03 -> sv3, sv03.5 -> sv3pt5, me02 -> me2.
+_SET_RE = re.compile(r"^([a-z]+)(\d+)(\.5)?$")
 
 
 class ScrydexError(Exception):
     pass
+
+
+def map_scrydex_id(catalog_id: str) -> str:
+    """Return the Scrydex id for a catalog id. Unchanged when already canonical."""
+    if not isinstance(catalog_id, str) or "-" not in catalog_id:
+        return catalog_id
+    set_id, number = catalog_id.rsplit("-", 1)
+    match = _SET_RE.fullmatch(set_id)
+    if not match:
+        return catalog_id
+    prefix, digits, half = match.group(1), match.group(2), match.group(3)
+    if not half and not digits.startswith("0"):
+        return catalog_id
+    mapped_set = f"{prefix}{int(digits)}{'pt5' if half else ''}"
+    mapped_number = str(int(number)) if number.isdigit() else number
+    return f"{mapped_set}-{mapped_number}"
+
+
+def scrydex_candidates(catalog_id: str) -> list[str]:
+    """Mapped id first, then the catalog id. Never more than two."""
+    mapped = map_scrydex_id(catalog_id)
+    if mapped != catalog_id:
+        return [mapped, catalog_id]
+    return [catalog_id]
+
+
+def record_needs_remap(rec: dict, catalog_id: str) -> bool:
+    """A miss stored under the raw TCGdex id should be tried with the mapped id."""
+    if not isinstance(rec, dict) or not rec.get("missing"):
+        return False
+    mapped = map_scrydex_id(catalog_id)
+    if mapped == catalog_id:
+        return False
+    tried = rec.get("lookup_id")
+    if not isinstance(tried, str) or not tried:
+        return True
+    return tried != mapped
 
 
 def require_secrets() -> tuple[str, str]:
@@ -239,7 +286,10 @@ def select_due(
     for index, (tier, card_id) in enumerate(seed):
         rec = cards.get(card_id) if isinstance(cards.get(card_id), dict) else {}
         fetched = parse_time(rec.get("fetched_at"))
-        if rec.get("missing"):
+        remap = record_needs_remap(rec, card_id)
+        if remap:
+            limit = 0
+        elif rec.get("missing"):
             limit = MISSING_HOURS
         elif tier == "A":
             limit = TIER_A_HOURS
@@ -248,7 +298,7 @@ def select_due(
         age = None if fetched is None else (now - fetched).total_seconds() / 3600
         if age is not None and age < limit:
             continue
-        ranked.append((0 if tier == "A" else 1, 0 if age is None else 1, -(age or 0), index, card_id))
+        ranked.append((0 if remap else 1, 0 if tier == "A" else 1, 0 if age is None else 1, -(age or 0), index, card_id))
     ranked.sort()
     chosen = []
     seen = set()
@@ -282,22 +332,42 @@ def request_json(url: str, headers: dict) -> tuple[int, dict | list | None]:
 
 
 def fetch_card(card_id: str, headers: dict, now: datetime) -> tuple[dict, bool]:
-    """Return (record, stop). stop is true when Scrydex rate-limits the run."""
-    quoted = urllib.parse.quote(card_id, safe="")
-    status, payload = request_json(f"{API}/{quoted}?include=prices,pop_reports", headers)
-    if status in (401, 403):
-        raise ScrydexError(
-            f"Scrydex rejected the credentials (HTTP {status}). "
-            "Check the SCRYDEX_API_KEY and SCRYDEX_TEAM_ID repository secrets. "
-            "The secret values were not printed."
-        )
-    if status == 429:
-        raise ScrydexError("RATE_LIMIT")
-    if status == 404:
-        return {"fetched_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "missing": True}, False
-    if status != 200 or not isinstance(payload, dict):
+    """Return (record, stop). stop is true when Scrydex rate-limits the run.
+
+    At most two card lookups. History (3 credits) runs only after a hit.
+    """
+    payload = None
+    used = None
+    candidates = scrydex_candidates(card_id)
+    for index, lookup in enumerate(candidates):
+        quoted = urllib.parse.quote(lookup, safe="")
+        status, body = request_json(f"{API}/{quoted}?include=prices,pop_reports", headers)
+        if status in (401, 403):
+            raise ScrydexError(
+                f"Scrydex rejected the credentials (HTTP {status}). "
+                "Check the SCRYDEX_API_KEY and SCRYDEX_TEAM_ID repository secrets. "
+                "The secret values were not printed."
+            )
+        if status == 429:
+            raise ScrydexError("RATE_LIMIT")
+        if status == 200 and isinstance(body, dict):
+            payload = body
+            used = lookup
+            break
+        if status == 404:
+            if index < len(candidates) - 1:
+                time.sleep(REQUEST_PAUSE_SEC)
+                continue
+            return {
+                "fetched_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "missing": True,
+                "lookup_id": map_scrydex_id(card_id),
+            }, False
         raise ScrydexError(f"Card {card_id} lookup failed with HTTP {status}.")
+    if payload is None or used is None:
+        raise ScrydexError(f"Card {card_id} lookup failed.")
     time.sleep(REQUEST_PAUSE_SEC)
+    quoted = urllib.parse.quote(used, safe="")
     h_status, history_payload = request_json(
         f"{API}/{quoted}/price_history?days={HISTORY_DAYS}&page_size=100",
         headers,
@@ -320,6 +390,7 @@ def fetch_card(card_id: str, headers: dict, now: datetime) -> tuple[dict, bool]:
     name = card_body(payload).get("name")
     record = {
         "fetched_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "lookup_id": used,
         "name": name if isinstance(name, str) else "",
         "history": history,
         "history_truncated": truncated,
@@ -347,7 +418,10 @@ def sync(now: datetime | None = None) -> int:
     if not due:
         print(f"No cards due. Cache has {len(cards)} card(s); nothing was requested.")
         return 0
-    print(f"Refreshing {len(due)} card(s). Published cost is 4 credits each (1 card + 3 history), {len(due) * 4} credits max.")
+    print(
+        f"Refreshing {len(due)} card(s). A hit costs 4 credits (1 card + 3 history). "
+        "A mapped id that is missing tries the catalog id once and does not request history."
+    )
     refreshed = 0
     rate_limited = False
     try:
