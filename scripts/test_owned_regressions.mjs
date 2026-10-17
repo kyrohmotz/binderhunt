@@ -19,7 +19,8 @@
 //    does not cancel a profile set request. A set line that joins a toast
 //    keeps that toast up.
 // 6. After Skip, focus stays on the hunt and ArrowLeft, ArrowRight, and Z
-//    still work. The same check runs at 390 and 1440.
+//    still work. The same check runs at 390 and 1440. A select is a typing
+//    target, and those hunt keys do nothing while Settings is open.
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -165,18 +166,53 @@ const keyScript = `(() => {
   document.getElementById("hapticSwitch").focus();
   press("ArrowLeft");
   note(pile.map(c => c.id).join(",") === "key-4", "ArrowLeft still works while the haptic switch is focused", pile.map(c => c.id).join(",") + " focus " + ((document.activeElement && document.activeElement.id) || ""));
+  const huntIds = pile.map(c => c.id).join(",");
+  const undoBefore = undoStack.length;
+  document.getElementById("gear").click();
+  const motion = document.getElementById("setMotion");
+  motion.focus();
+  note(typingTarget(motion) && motion.tagName === "SELECT", "a select is a typing target");
+  press("ArrowLeft");
+  press("ArrowRight");
+  press("f");
+  press("z");
+  note(pile.map(c => c.id).join(",") === huntIds && undoStack.length === undoBefore, "hunt keys do nothing while the motion dropdown is focused", pile.map(c => c.id).join(","));
+  note(document.getElementById("filterSheet").hidden && !document.getElementById("settingsSheet").hidden, "F does not open filters over Settings");
+  document.getElementById("retakeOnboard").focus();
+  press("ArrowLeft");
+  press("f");
+  note(pile.map(c => c.id).join(",") === huntIds && document.getElementById("filterSheet").hidden, "hunt keys stay inert while Settings is open");
+  closeSheet("settingsSheet");
+  showTab("sets");
+  setView = { id:"base1", name:"Base", release:"1999", mode:"flip", loading:false, cards:Array.from({ length:18 }, (_, i) => ({ id:"base1-" + (i + 1), localId:String(i + 1), name:"Card " + (i + 1), image:art })) };
+  flipPage = 0;
+  renderSets();
+  document.getElementById("gear").click();
+  document.getElementById("retakeOnboard").focus();
+  press("ArrowRight");
+  note(flipPage === 0, "ArrowRight does not turn the set page behind Settings", String(flipPage));
+  flipPage = 1;
+  renderSets();
+  document.getElementById("setMotion").focus();
+  press("ArrowLeft");
+  note(flipPage === 1, "ArrowLeft does not turn the set page from the motion dropdown", String(flipPage));
+  closeSheet("settingsSheet");
+  setView = null;
+  flipPage = 0;
+  showTab("hunt");
   wish = [];
   saveWish();
   return problems;
 })()`;
-mkdirSync("/opt/cursor/artifacts/screenshots", { recursive: true });
+const screenshotDir = process.env.SCREENSHOT_DIR || resolve(root, "qa-artifacts");
+mkdirSync(screenshotDir, { recursive: true });
 const keyFails = [];
 for (const [width, height] of [[390, 844], [1440, 900]]) {
   await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 700 });
   await sleep(80);
   const problems = await ev(keyScript);
   const shot = await cdp.send("Page.captureScreenshot", { format: "png" });
-  writeFileSync("/opt/cursor/artifacts/screenshots/keys-" + width + ".png", Buffer.from(shot.data, "base64"));
+  writeFileSync(resolve(screenshotDir, "keys-" + width + ".png"), Buffer.from(shot.data, "base64"));
   if (!Array.isArray(problems)) keyFails.push(width + " key test did not return a list");
   else problems.forEach(p => keyFails.push(width + ": " + p));
 }

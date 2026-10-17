@@ -4193,7 +4193,7 @@ function typingTarget(el){
   if (!el || el.nodeType !== 1) return false;
   if (el.isContentEditable) return true;
   const tag = el.tagName;
-  if (tag === "TEXTAREA") return true;
+  if (tag === "TEXTAREA" || tag === "SELECT") return true;
   if (tag !== "INPUT") return false;
   const type = String(el.getAttribute("type") || "text").toLowerCase();
   return type === "text" || type === "search" || type === "number";
@@ -4214,7 +4214,7 @@ document.addEventListener("keydown", e => {
     if (!profileEl.hidden && !wide()) closeProfile();
     return;
   }
-  if (typingTarget(e.target)) return;
+  if (typingTarget(e.target) || blocking()) return;
   if ((e.key === "f" || e.key === "F") && tab === "hunt") { e.preventDefault(); openFilter("set", document.querySelector("[data-filter=set]")); return; }
   if (e.key === "z" || e.key === "Z") { if (tab === "hunt") undo(); return; }
   if (tab === "hunt" && !blocking()) {
