@@ -44,7 +44,7 @@ html,body{height:100%;margin:0}
 body{background:var(--paper);color:var(--ink);font-family:Nunito,system-ui,sans-serif;font-weight:600;overflow:hidden}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
-img{max-width:100%}
+img{max-width:100%;-webkit-user-drag:none}
 :focus-visible{outline:3px solid var(--ink);outline-offset:2px}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
 .shell{height:100dvh;display:flex;flex-direction:column;min-width:0}
@@ -55,9 +55,14 @@ img{max-width:100%}
 .context{justify-self:center;max-width:100%;background:var(--paper-2);border:2.5px solid var(--ink);border-radius:999px;padding:6px 12px;font-family:var(--display);font-weight:600;box-shadow:3px 3px 0 var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .iconbtn{width:44px;height:44px;border-radius:14px;border:2.5px solid var(--ink);background:var(--paper-2);box-shadow:3px 3px 0 var(--ink);font-size:20px;display:grid;place-items:center}
 .iconbtn:active,.chip:active,.act:active,.tabbtn:active{transform:scale(.96)}
-.chipbar{min-width:0;flex:none}
-.chips{display:flex;flex-wrap:wrap;gap:6px;min-width:0;padding:8px 12px 0}
-.chip{flex:none;white-space:nowrap;min-height:44px;border:2.5px solid var(--ink);background:#fff;border-radius:999px;padding:0 12px;font-family:var(--display);font-weight:600;box-shadow:2px 2px 0 var(--ink)}
+.chipbar{position:relative;min-width:0;flex:none}
+.chipbar::before,.chipbar::after{content:"";position:absolute;top:0;bottom:0;width:28px;pointer-events:none;z-index:2;opacity:0}
+.chipbar::before{left:0;background:linear-gradient(90deg,var(--paper),rgba(248,247,239,0))}
+.chipbar::after{right:0;background:linear-gradient(90deg,rgba(248,247,239,0),var(--paper))}
+.chipbar.before::before,.chipbar.more::after{opacity:1}
+.chips{display:flex;flex-wrap:nowrap;gap:6px;min-width:0;padding:8px 12px 0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;white-space:nowrap;max-width:148px;overflow:hidden;text-overflow:ellipsis;min-height:44px;border:2.5px solid var(--ink);background:#fff;border-radius:999px;padding:0 12px;font-family:var(--display);font-weight:600;box-shadow:2px 2px 0 var(--ink)}
 .chip[aria-pressed="true"],.chip.on{background:var(--sky)}
 .discovery{margin:8px 12px 0;flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--butter);border:2.5px solid var(--ink);border-radius:16px;padding:8px 10px;box-shadow:3px 3px 0 var(--ink)}
 .discovery b{font-family:var(--display);font-weight:700}
@@ -65,10 +70,10 @@ img{max-width:100%}
 .countline{margin:4px 14px 0;font-size:13px;color:var(--ink-2);flex:none}
 .view{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column}
 .view[hidden]{display:none !important}
-#deck{position:relative;flex:1;min-height:0;margin:6px auto 0;width:min(100%,420px);touch-action:none;overflow:hidden;background:var(--paper)}
-.card{position:absolute;inset:4px 6px 18px;display:flex;flex-direction:column;user-select:none;touch-action:none;transform-origin:center bottom}
-.frame{flex:1;min-height:0;margin:0 auto;width:100%;height:100%;aspect-ratio:63/88;max-height:100%;background:var(--paper-2);border:2.5px solid var(--ink);border-radius:22px;box-shadow:3px 3px 0 var(--ink);overflow:hidden;position:relative;display:grid;place-items:center}
-.frame img{width:100%;height:100%;object-fit:contain;background:#fff}
+#deck{position:relative;flex:1;min-height:0;margin:6px auto 0;width:min(100%,420px);touch-action:none;overflow:hidden;background:var(--paper);container-type:size}
+.card{position:absolute;left:0;right:0;bottom:18px;margin-inline:auto;width:min(calc(100% - 12px),calc((100cqh - 26px) * 63 / 88));aspect-ratio:63/88;height:auto;max-height:calc(100% - 22px);display:flex;flex-direction:column;user-select:none;touch-action:none;transform-origin:center bottom}
+.frame{flex:1;min-height:0;margin:0 auto;width:100%;height:100%;aspect-ratio:63/88;background:var(--paper-2);border:2.5px solid var(--ink);border-radius:22px;box-shadow:3px 3px 0 var(--ink);overflow:hidden;position:relative;display:grid;place-items:center}
+.frame img,.card img{width:100%;height:100%;object-fit:contain;object-position:center;background:#fff;-webkit-user-drag:none;user-select:none;pointer-events:none}
 .ph{padding:16px;text-align:center}
 .ph b{font-family:Fraunces,Georgia,serif;font-weight:500;font-size:22px;display:block}
 .stamp{position:absolute;top:18px;padding:4px 10px;border:3px solid;border-radius:12px;font-family:var(--display);font-weight:700;font-size:22px;background:#fff;opacity:0;pointer-events:none}
@@ -106,14 +111,18 @@ img{max-width:100%}
 .cover.add{background:var(--paper-2);font-family:var(--display);font-weight:700}
 .spread{perspective:1200px;min-height:280px}
 .spread-row{display:grid;grid-template-columns:1fr;gap:12px}
+.spread-row.single{justify-content:center}
+.spread-row.single .paper{width:min(100%,520px);justify-self:center}
 .paper{background:var(--tan);border:2.5px solid var(--ink);border-radius:18px;padding:10px;box-shadow:3px 3px 0 var(--ink);transform-origin:left center}
 .paper.turning{animation:turn .45s ease-in}
 @keyframes turn{to{transform:rotateY(-96deg)}}
 .paper h3{font-family:var(--display);margin:0 0 8px;font-size:16px}
 .pockets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.pocket{background:rgba(255,255,255,.72);border-radius:12px;min-height:92px;padding:4px;display:flex;flex-direction:column;gap:3px;position:relative}
+.pocket{background:rgba(255,255,255,.72);border-radius:12px;min-height:0;padding:4px;display:flex;flex-direction:column;gap:3px;position:relative}
 .pocket img{width:100%;aspect-ratio:63/88;object-fit:contain;background:#fff;border-radius:8px}
 .pocket b{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pocket .iconish{align-self:center;width:32px;height:32px;min-height:32px;padding:0;border-radius:10px;border:2px solid var(--ink);background:#fff;box-shadow:none;font-size:16px;line-height:1}
+.pocket .open{border:0;background:transparent;padding:0;min-height:0}
 .pocket.empty{border:2px dashed var(--ink-2);background:transparent;align-items:center;justify-content:center}
 .toad{width:36px;height:24px}
 .pager{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px}
@@ -133,7 +142,7 @@ img{max-width:100%}
 .phead .thumb{width:56px;height:78px;background:#fff;border:2.5px solid var(--ink);border-radius:12px;box-shadow:2px 2px 0 var(--ink);flex:none;overflow:hidden;display:grid;place-items:center}
 .phead .thumb img{width:100%;height:100%;object-fit:contain}
 .foot p{min-width:0}
-.pname{font-family:Fraunces,Georgia,serif;font-weight:500;font-size:26px;line-height:1.05;margin:0}
+.pname{font-family:var(--display);font-weight:700;font-size:26px;line-height:1.05;margin:0}
 .market{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:8px}
 .market-price{font-family:var(--display);font-weight:700;font-size:32px;line-height:1;font-variant-numeric:tabular-nums;margin:0}
 .delta{font-variant-numeric:tabular-nums;border:2px solid var(--ink);border-radius:999px;padding:3px 8px;background:var(--sage);font-size:13px}
@@ -145,8 +154,11 @@ img{max-width:100%}
 .grade b{font-variant-numeric:tabular-nums;font-size:16px;margin-top:2px}
 .grade small{margin-top:2px}
 .chart-wrap{margin-top:8px;background:#fff;border:2.5px solid var(--ink);border-radius:16px;padding:8px;box-shadow:2px 2px 0 var(--ink)}
-.ranges{display:flex;gap:4px;flex-wrap:nowrap;overflow:auto;scrollbar-width:none}
-.ranges button,.vtoggle button{min-height:44px;flex:none;border:2px solid var(--ink);border-radius:999px;background:var(--paper);padding:0 10px;font-family:var(--display)}
+.rangebar{position:relative;min-width:0}
+.rangebar::after{content:"";position:absolute;top:0;right:0;bottom:0;width:36px;pointer-events:none;background:linear-gradient(90deg,rgba(255,255,255,0),#fff);opacity:0}
+.rangebar.more::after{opacity:1}
+.ranges{display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;min-width:0;padding-bottom:2px}
+.ranges button,.vtoggle button{min-height:36px;flex:none;border:2px solid var(--ink);border-radius:999px;background:var(--paper);padding:0 8px;font-family:var(--display);font-size:13px}
 .ranges button[aria-pressed="true"],.vtoggle button[aria-pressed="true"]{background:var(--sky)}
 .chart{width:100%;height:auto;display:block;touch-action:none}
 .scrub{min-height:1.2em;font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums}
@@ -191,16 +203,114 @@ img{max-width:100%}
   .rail nav{display:flex;flex-direction:column;gap:6px}
   .rail .tabbtn{text-align:left;padding:0 12px}
   .rail .credit{margin-top:auto}
-  .tabs,.foot{display:none}
+  .rail .credit p{font-size:11px;line-height:1.35}
+  .stage .word{display:none}
+  .stage .top{grid-template-columns:minmax(0,1fr) 44px}
+  .tabs{display:none}
+  .foot{padding:8px 16px 12px}
   .stage{min-width:0}
   #profile{position:static;z-index:auto;border-left:2.5px solid var(--ink);background:var(--paper)}
   .sheet.popover .sheet-card{left:var(--pop-x);top:var(--pop-y);bottom:auto;right:auto;width:min(360px,calc(100vw - 24px));max-height:55vh;border-bottom:2.5px solid var(--ink);border-radius:22px}
   .spread-row{grid-template-columns:1fr 1fr}
+  .spread-row.single{grid-template-columns:minmax(0,520px);justify-content:center}
+}
+#setsScroll.fitting{display:flex;flex-direction:column;overflow:hidden}
+.setpage{flex:1;min-height:0;display:flex;flex-direction:column}
+.setflip{flex:1;min-height:0;display:flex;flex-direction:column}
+.setflip .spread{flex:1;min-height:0;display:flex;flex-direction:column}
+.setflip .paper{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.setflip .pockets{flex:1;min-height:0;grid-template-rows:repeat(3,minmax(0,1fr))}
+.setpage h2{margin:0;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sethead{display:flex;align-items:center;gap:8px;min-width:0}
+.sethead h2{flex:1;min-width:0}
+.setpage .modes{flex-wrap:nowrap;overflow-x:auto;margin:4px 0}
+.setpage .fine{margin:0}
+.setflip .paper{container-type:size;align-items:center;justify-content:center}
+.setflip .pockets{flex:none;width:min(100cqw, calc((100cqh - 24px) * 63 / 88));height:min(calc(100cqh - 24px), calc(100cqw * 88 / 63));margin-inline:auto}
+.setflip .pocket{position:relative;overflow:hidden;min-height:0}
+.setflip .pocket .open{position:absolute;inset:0 0 26px 0;display:block}
+.setflip .pocket img{position:absolute;inset:0;width:100%;height:100%;max-height:none;aspect-ratio:auto;object-fit:contain}
+.setflip .pocket b{position:absolute;left:2px;right:2px;bottom:26px;margin:0;font-size:10px;line-height:1.1;background:rgba(248,247,239,.92);border-radius:4px}
+.setflip .pocket .iconish{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:24px;height:24px;min-height:24px}
+#bindersScroll.reading{display:flex;flex-direction:column;overflow:hidden}
+.booktools{flex:none;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:6px}
+.booktools::-webkit-scrollbar{display:none}
+.bookstage{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;min-width:0}
+.book{flex:1;min-height:0;width:min(100%,440px);margin:0 auto;display:flex;flex-direction:column;min-width:0}
+.book-spread{flex:1;min-height:0;display:grid;grid-template-columns:14px minmax(0,1fr);grid-template-rows:minmax(0,1fr);perspective:1600px;position:relative}
+.spine,.rings{grid-column:1;grid-row:1;display:flex;flex-direction:column;justify-content:space-evenly;align-items:center;z-index:3}
+.spine{background:linear-gradient(90deg,#c9bfb0,#f3edc8 55%,#b7ad9e);border-radius:8px 0 0 8px;border:2px solid var(--ink);border-right:0}
+.rings{display:none}
+.rings i,.spine i{width:12px;height:9px;border:2.5px solid #6f675c;border-radius:50%;background:linear-gradient(#f7f4ee,#cfc6b8);box-shadow:inset 0 0 0 1px #fff}
+.under,.leaf{grid-column:2;grid-row:1;min-width:0;min-height:0;position:relative}
+.leaf{z-index:2;transform-style:preserve-3d}
+.leaf.left,.under.left{display:none}
+.face{position:absolute;inset:0;display:flex;flex-direction:column;min-height:0;backface-visibility:hidden;background:linear-gradient(180deg,#fbf6ea,#f3edc8);border:2.5px solid var(--ink);border-radius:4px 16px 16px 4px;box-shadow:3px 3px 0 var(--ink);overflow:hidden;padding:8px}
+.face.back{transform:rotateY(180deg)}
+.leaf.hot{z-index:4;transition:transform .48s cubic-bezier(.2,.75,.2,1)}
+.leaf.hot.live{transition:none}
+.leaf.hot.forward{transform-origin:left center;transform:rotateY(calc(var(--turn, 0) * -178deg))}
+.leaf.hot.backward{transform-origin:right center;transform:rotateY(calc(var(--turn, 0) * 178deg))}
+.face h3{font-family:var(--display);margin:0 0 4px;font-size:13px;flex:none}
+.sleeves{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:5px}
+.slot{min-width:0;min-height:0;display:flex;flex-direction:column;gap:2px}
+.sleeve{position:relative;flex:1;min-height:0;border-radius:8px;background:linear-gradient(165deg,rgba(255,255,255,.72),rgba(255,255,255,.2) 46%,rgba(134,222,255,.18));box-shadow:inset 0 0 0 1px rgba(31,31,30,.28), inset 0 7px 10px rgba(31,31,30,.08);overflow:hidden;user-select:none;-webkit-touch-callout:none}
+.booknav .iconish{width:36px;height:36px;min-height:36px;padding:0;border-radius:12px;border:2px solid var(--ink);background:#fff}
+.sleeve .gloss,.sleeve .shine{position:absolute;inset:0;pointer-events:none}
+.sleeve .gloss{background:linear-gradient(115deg,rgba(255,255,255,.7),transparent 46%)}
+.sleeve .shine{opacity:0}
+.sleeve .cardhit{position:absolute;inset:8% 9% 11%;border:0;padding:0;background:transparent;display:block}
+.sleeve img{width:100%;height:100%;object-fit:contain;border-radius:3px;background:#fff;box-shadow:0 1px 2px rgba(31,31,30,.28);-webkit-user-drag:none}
+.sleeve.empty .ghost-card{position:absolute;inset:11% 12% 13%;border:1.5px dashed rgba(31,31,30,.28);border-radius:4px;background:rgba(255,255,255,.25)}
+.sleeve.holo .shine{opacity:.9;background:linear-gradient(115deg,transparent 28%,rgba(255,255,255,.72) 40%,rgba(134,222,255,.55) 50%,rgba(246,201,201,.5) 60%,transparent 74%);background-size:220% 220%;background-position:var(--sx,30%) var(--sy,30%);mix-blend-mode:soft-light}
+.sleeve.holo img{transform:perspective(480px) rotateX(var(--ty,0deg)) rotateY(var(--tx,0deg))}
+.slot .iconish{align-self:center}
+.pad{flex:1;min-height:0;margin:2px;border-radius:8px 18px 18px 8px;border:2.5px solid var(--ink);background:var(--cover,#e9d5c0);box-shadow:inset 0 0 0 7px rgba(255,255,255,.28), inset 0 -14px 0 rgba(31,31,30,.05);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px 14px;position:relative;overflow:hidden}
+.pad-stitch{position:absolute;inset:12px;border:1.5px dashed rgba(31,31,30,.35);border-radius:6px 14px 14px 6px;pointer-events:none}
+.pad h2{font-family:var(--display);font-size:28px;line-height:1.05;margin:6px 0;position:relative}
+.pad .count{font-family:var(--display);font-size:18px;margin:0;position:relative}
+.charm{position:absolute;right:16px;bottom:16px;width:52px;height:52px;display:grid;place-items:center;background:#fff;border:2.5px solid var(--ink);border-radius:50%;box-shadow:2px 2px 0 var(--ink)}
+.charm.sticker{border-radius:12px;transform:rotate(8deg);background:var(--butter);font-family:var(--display);font-size:26px}
+.dogear{position:absolute;width:64px;height:64px;border:0;background:linear-gradient(135deg,transparent 46%,rgba(31,31,30,.2) 46%);z-index:6;padding:0}
+.dogear.next{right:0;bottom:0}
+.dogear.prev{left:14px;bottom:0;transform:scaleX(-1)}
+.booknav{flex:none;display:flex;align-items:center;gap:6px;min-width:0}
+.dots{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0;padding:2px 0}
+.dots::-webkit-scrollbar{display:none}
+.dots button{width:10px;height:10px;min-height:10px;border-radius:50%;border:2px solid var(--ink);background:#fff;padding:0;flex:none}
+.dots button[aria-current="true"]{background:var(--sky)}
+.jump{display:flex;align-items:center;gap:4px;font-size:12px;flex:none}
+.jump select{border:2px solid var(--ink);border-radius:10px;background:#fff;padding:4px 6px;max-width:120px}
+.spark{position:absolute;inset:0;pointer-events:none;z-index:5}
+.spark i{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--sky);animation:pop .7s ease-out forwards}
+@keyframes pop{to{transform:translateY(-18px) scale(.2);opacity:0}}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:70;display:flex;gap:8px;align-items:center;background:#fff;border:2.5px solid var(--ink);border-radius:999px;padding:8px 10px 8px 14px;box-shadow:3px 3px 0 var(--ink);max-width:min(92vw,420px)}
+.toast[hidden]{display:none !important}
+.confetti{position:fixed;inset:0;z-index:80;display:grid;place-items:center;pointer-events:none;background:rgba(248,247,239,.2)}
+.confetti p{font-family:var(--display);font-size:28px;background:#fff;border:2.5px solid var(--ink);border-radius:18px;padding:12px 16px;box-shadow:3px 3px 0 var(--ink)}
+.confetti b{position:absolute;width:10px;height:10px;border-radius:50%;animation:conf .9s ease-out forwards}
+@keyframes conf{to{transform:translateY(40vh);opacity:0}}
+.lifting{animation:lift .18s ease-out}
+@keyframes lift{to{transform:translateY(-8px) scale(1.04)}}
+.empty-note{margin:0;text-align:center}
+.ghost{position:fixed;z-index:75;width:72px;pointer-events:none;border:2px solid var(--ink);border-radius:8px;box-shadow:3px 3px 0 var(--ink);transform:translate(-50%,-60%)}
+@media (min-width:1024px){
+  .book{width:min(100%,980px)}
+  .book.spread .book-spread{grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr)}
+  .book.spread .spine{display:none}
+  .book.spread .rings{display:flex;grid-column:2}
+  .book.spread .leaf.left,.book.spread .under.left{display:block;grid-column:1}
+  .book.spread .leaf.right,.book.spread .under.right{grid-column:3}
+  .book.spread .rings i{width:22px;height:12px}
+  .book.spread .face.page-left{border-radius:16px 4px 4px 16px}
+  .dogear.prev{left:0}
 }
 @media (prefers-reduced-motion:reduce){
   html:not(.motion-on) *{animation:none !important;transition:none !important}
 }
 html.reduce *{animation:none !important;transition:none !important}
+html.reduce .leaf.hot{transition:none}
+html.reduce .sleeve.holo img{transform:none}
 </style>
 </head>
 <body>
@@ -216,7 +326,7 @@ html.reduce *{animation:none !important;transition:none !important}
     </nav>
     <div class="credit">
       <img src="assets/brand/two-toads-logo.png" width="32" height="32" alt="Two Toads">
-      <p class="fine">BinderHunt · made with 🐸 by Two Toads</p>
+      <p class="fine">BinderHunt · made with 🐸 by Two Toads. Not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. Wishlists and binders stay in this browser. Sources: TCGdex, TCGplayer, Cardmarket, Scrydex.</p>
     </div>
   </aside>
   <div class="stage">
@@ -304,6 +414,9 @@ html.reduce *{animation:none !important;transition:none !important}
 <script>
 const AFFILIATE = { tcgplayer:{ params:{} }, ebay:{ params:{} }, cardmarket:{ params:{} } };
 const CHASE = ["Special illustration rare","Illustration rare","Hyper rare","Mega Hyper Rare","Secret Rare","Shiny Ultra Rare","Shiny rare VMAX","Holo Rare VMAX","Holo Rare VSTAR","Radiant Rare","Amazing Rare"];
+const VINTAGE_RARITIES = ["Rare Holo","Holo Rare","Rare Holo LV.X","Rare PRIME","LEGEND","Classic Collection","Shiny rare","Ultra Rare"];
+const HUNT_RARITIES = CHASE.concat(VINTAGE_RARITIES);
+const VINTAGE_SET = /^(?:base|gym|neo|ecard|lc|ex|pop|si|np)/;
 const OPENING = [
   ["sv08","sv04.5","sv07","sv06","sv01","me02","sv02"],
   ["swsh7","swsh12.5","swsh11","swsh12","swsh8"],
@@ -345,6 +458,9 @@ let pageNo = 1;
 let queryDone = false;
 let openingOrder = [];
 let openingCursor = 0;
+let openingDone = false;
+let chasePage = 1;
+let chaseDone = false;
 let bulkCursor = 0;
 let gradedCursor = 0;
 const setPools = new Map();
@@ -366,6 +482,9 @@ let audioCtx = null;
 let setView = null;
 let binderView = null;
 let flipPage = 0;
+let pendingSparkle = -1;
+let binderToastTimer = 0;
+const celebrated = new Set();
 let fillBinderId = "";
 let fillSelected = new Set();
 let menuCard = null;
@@ -746,8 +865,23 @@ function scryRecord(card){
   return Object.prototype.hasOwnProperty.call(scrydex.cards, card.id) ? scrydex.cards[card.id] : null;
 }
 
+function filtersActive(){
+  return !!(filters.set || filters.type || filters.rarities.length || filters.era || filters.graded || filters.min != null || filters.max != null);
+}
+function raritiesForSet(id){
+  const list = HUNT_RARITIES.slice();
+  if (VINTAGE_SET.test(id || "")) list.push("Rare");
+  return list;
+}
+function acceptsHunt(card){
+  const rarity = card.rarity || "";
+  if (HUNT_RARITIES.includes(rarity)) return true;
+  const setId = card.setId || String(card.id || "").split("-")[0];
+  return rarity === "Rare" && VINTAGE_SET.test(setId);
+}
 function keep(card){
   if (!card || isDigital(card)) return false;
+  if (discoveryBinder() && savedIds().has(card.id)) return false;
   if (filters.set && card.setId !== filters.set) return false;
   if (filters.era && eraOf(card.setId) !== filters.era) return false;
   if (filters.type && !(card.types || []).includes(filters.type)) return false;
@@ -759,9 +893,9 @@ function keep(card){
     const rec = scrydex.cards[card.id];
     if (!rec || rec.missing || !(rec.graded || []).length) return false;
   }
-  const scoped = filters.set || filters.type || filters.rarities.length || filters.era || filters.graded || filters.min != null || filters.max != null || discoveryBinder();
+  const scoped = filtersActive() || discoveryBinder();
   if (scoped) return true;
-  if (!CHASE.includes(card.rarity || "")) return false;
+  if (!acceptsHunt(card)) return false;
   if (price != null && price < 10) return false;
   return true;
 }
@@ -781,33 +915,65 @@ async function pullSet(id){
     } catch (e) { setLists.set(id, { cards:[], release:"", name:id }); }
   }
   const bag = setLists.get(id);
-  const fresh = bag.cards.filter(c => c && c.id && c.image && !seen.has(c.id));
+  let fresh = bag.cards.filter(c => c && c.id && c.image && !seen.has(c.id));
+  if (discoveryBinder()) {
+    const saved = savedIds();
+    fresh.forEach(c => { if (saved.has(c.id)) seen.add(c.id); });
+    fresh = shuffle(fresh.filter(c => !saved.has(c.id)));
+  }
   const take = fresh.slice(0, 8);
   take.forEach(c => { seen.add(c.id); briefs.push({ id:c.id, name:c.name, image:c.image, localId:c.localId }); });
   return take.length;
 }
 async function pullQuery(){
   if (queryDone) return 0;
-  const parts = [];
-  if (filters.set) parts.push("set=eq:" + encodeURIComponent(filters.set));
-  if (filters.type) parts.push("types=eq:" + encodeURIComponent(filters.type));
-  if (filters.rarities.length) parts.push("rarity=eq:" + encodeURIComponent(filters.rarities.join("|")));
-  parts.push("pagination:page=" + pageNo, "pagination:itemsPerPage=24");
-  const list = await getJson(TCGDEX + "/cards?" + parts.join("&"));
-  pageNo += 1;
-  if (!Array.isArray(list) || !list.length) { queryDone = true; return 0; }
-  if (list.length < 24) queryDone = true;
-  let n = 0;
-  list.forEach(c => {
-    if (!c || !c.id || !c.image || seen.has(c.id) || isPocketId(String(c.id).split("-")[0])) return;
-    if (filters.era && eraOf(String(c.id).split("-")[0]) !== filters.era) return;
-    seen.add(c.id);
-    briefs.push({ id:c.id, name:c.name, image:c.image, localId:c.localId });
-    n++;
-  });
-  return n;
+  let guard = 0;
+  while (guard++ < 6 && !queryDone) {
+    const parts = [];
+    if (filters.set) parts.push("set=eq:" + encodeURIComponent(filters.set));
+    if (filters.type) parts.push("types=eq:" + encodeURIComponent(filters.type));
+    if (filters.rarities.length) parts.push("rarity=eq:" + encodeURIComponent(filters.rarities.join("|")));
+    parts.push("pagination:page=" + pageNo, "pagination:itemsPerPage=24");
+    const list = await getJson(TCGDEX + "/cards?" + parts.join("&"));
+    pageNo += 1;
+    if (!Array.isArray(list) || !list.length) { queryDone = true; return 0; }
+    if (list.length < 24) queryDone = true;
+    let rows = list.filter(c => c && c.id && c.image && !seen.has(c.id) && !isPocketId(String(c.id).split("-")[0]));
+    if (filters.era) rows = rows.filter(c => eraOf(String(c.id).split("-")[0]) === filters.era);
+    if (discoveryBinder()) {
+      const saved = savedIds();
+      rows.forEach(c => { if (saved.has(c.id)) seen.add(c.id); });
+      rows = shuffle(rows.filter(c => !saved.has(c.id)));
+    }
+    rows.forEach(c => { seen.add(c.id); briefs.push({ id:c.id, name:c.name, image:c.image, localId:c.localId }); });
+    if (rows.length) return rows.length;
+  }
+  return 0;
+}
+async function takeOpening(id){
+  let bag = setPools.get(id);
+  if (!bag) { bag = { cards:[], page:1, done:false }; setPools.set(id, bag); }
+  const saved = discoveryBinder() ? savedIds() : null;
+  let guard = 0;
+  while (guard++ < 6) {
+    const fresh = bag.cards.filter(c => c && c.id && c.image && !seen.has(c.id) && !isPocketId(String(c.id).split("-")[0]) && !(saved && saved.has(c.id)));
+    if (fresh.length) {
+      const take = fresh.slice(0, 4);
+      take.forEach(c => { seen.add(c.id); briefs.push({ id:c.id, name:c.name, image:c.image, localId:c.localId }); });
+      return take.length;
+    }
+    if (saved) bag.cards.forEach(c => { if (c && saved.has(c.id)) seen.add(c.id); });
+    if (bag.done) return 0;
+    const list = await getJson(TCGDEX + "/cards?set=eq:" + encodeURIComponent(id) + "&rarity=eq:" + encodeURIComponent(raritiesForSet(id).join("|")) + "&pagination:page=" + bag.page + "&pagination:itemsPerPage=24");
+    bag.page += 1;
+    const rows = shuffle(Array.isArray(list) ? list : []).filter(c => c && c.id && c.image && !isPocketId(String(c.id).split("-")[0]));
+    rows.forEach(c => { if (!bag.cards.some(x => x.id === c.id)) bag.cards.push(c); });
+    if (!Array.isArray(list) || list.length < 24 || !rows.length) bag.done = true;
+  }
+  return 0;
 }
 async function pullOpening(){
+  if (openingDone) return 0;
   if (!openingOrder.length) {
     const have = new Set(meta.sets.map(s => s.id));
     const eras = OPENING.map(ids => shuffle(ids.filter(id => !have.size || have.has(id))));
@@ -816,23 +982,39 @@ async function pullOpening(){
     for (let i = 0; i < max; i++) eras.forEach(b => { if (b[i]) order.push(b[i]); });
     openingOrder = order;
   }
+  if (!openingOrder.length) { openingDone = true; return 0; }
   let hops = 0;
-  while (hops < 6 && openingCursor < openingOrder.length) {
+  while (hops < openingOrder.length) {
+    const id = openingOrder[openingCursor % openingOrder.length];
+    openingCursor++;
     hops++;
-    const id = openingOrder[openingCursor++];
-    if (!setPools.has(id)) {
-      let list = [];
-      try { list = await getJson(TCGDEX + "/cards?set=eq:" + encodeURIComponent(id) + "&rarity=eq:" + encodeURIComponent(CHASE.join("|")) + "&pagination:page=1&pagination:itemsPerPage=24"); }
-      catch (e) { list = []; }
-      const pool = shuffle(Array.isArray(list) ? list : []).filter(c => c && c.id && c.image && !isPocketId(String(c.id).split("-")[0]));
-      setPools.set(id, pool);
-    }
-    const pool = setPools.get(id) || [];
-    const next = pool.find(c => !seen.has(c.id));
-    if (!next) continue;
-    seen.add(next.id);
-    briefs.push({ id:next.id, name:next.name, image:next.image, localId:next.localId });
-    return 1;
+    const took = await takeOpening(id);
+    if (took) return took;
+  }
+  openingDone = openingOrder.every(id => {
+    const bag = setPools.get(id);
+    return bag && bag.done;
+  });
+  return 0;
+}
+async function pullChaseAll(){
+  if (chaseDone) return 0;
+  let guard = 0;
+  while (guard++ < 5 && !chaseDone) {
+    const list = await getJson(TCGDEX + "/cards?rarity=eq:" + encodeURIComponent(HUNT_RARITIES.join("|")) + "&pagination:page=" + chasePage + "&pagination:itemsPerPage=24");
+    chasePage += 1;
+    if (!Array.isArray(list) || !list.length) { chaseDone = true; return 0; }
+    if (list.length < 24) chaseDone = true;
+    const saved = discoveryBinder() ? savedIds() : null;
+    let n = 0;
+    shuffle(list).forEach(c => {
+      if (!c || !c.id || !c.image || seen.has(c.id) || isPocketId(String(c.id).split("-")[0])) return;
+      if (saved && saved.has(c.id)) { seen.add(c.id); return; }
+      seen.add(c.id);
+      briefs.push({ id:c.id, name:c.name, image:c.image, localId:c.localId });
+      n++;
+    });
+    if (n) return n;
   }
   return 0;
 }
@@ -842,7 +1024,13 @@ async function pullBulk(){
     const id = ids[bulkCursor++];
     try {
       const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
-      const cards = shuffle(set.cards || []).filter(c => c && c.id && c.image && !seen.has(c.id)).slice(0, 10);
+      let cards = shuffle(set.cards || []).filter(c => c && c.id && c.image && !seen.has(c.id));
+      if (discoveryBinder()) {
+        const saved = savedIds();
+        cards.forEach(c => { if (saved.has(c.id)) seen.add(c.id); });
+        cards = cards.filter(c => !saved.has(c.id));
+      }
+      cards = cards.slice(0, 10);
       if (!cards.length) continue;
       cards.forEach(c => { seen.add(c.id); briefs.push({ id:c.id, name:c.name, image:c.image, localId:c.localId }); });
       return cards.length;
@@ -869,7 +1057,10 @@ async function pullMore(){
   if (filters.set) return pullSet(filters.set);
   if (filters.type || filters.rarities.length) return pullQuery();
   if (filters.era || filters.min != null || filters.max != null || filters.graded) return pullBulk();
-  return pullOpening();
+  const opened = await pullOpening();
+  if (opened) return opened;
+  if (!openingDone) return 0;
+  return pullChaseAll();
 }
 function showSkeleton(){
   if (deck.querySelector(".card")) return;
@@ -892,11 +1083,18 @@ async function pump(my){
   pumpError = "";
   try {
     let steps = 0;
-    while (pile.length < 5 && my === generation && steps < 8 && effort < (filters.min != null || filters.max != null ? 160 : 80)) {
+    const capped = filtersActive() || !!discoveryBinder();
+    const ceiling = !capped ? Infinity : (filters.min != null || filters.max != null ? 160 : 80);
+    while (pile.length < 5 && my === generation && steps < 12 && effort < ceiling) {
       if (briefs.length < 4) {
         const added = await pullMore();
         if (my !== generation) return;
-        if (!added && !briefs.length) { streamDone = true; break; }
+        if (!added && !briefs.length) {
+          const openHunt = !filtersActive() && !discoveryBinder();
+          if (openHunt && !openingDone) { steps++; continue; }
+          if (openHunt && !chaseDone) { steps++; continue; }
+          streamDone = true; break;
+        }
       }
       const batch = briefs.splice(0, 4);
       if (!batch.length) { streamDone = true; break; }
@@ -913,7 +1111,9 @@ async function pump(my){
     paused = true;
   } finally { if (my === generation) loading = false; }
   if (my !== generation) return;
-  if (!streamDone && pile.length < 3 && effort >= (filters.min != null || filters.max != null ? 160 : 80)) paused = true;
+  const capped = filtersActive() || !!discoveryBinder();
+  const ceiling = filters.min != null || filters.max != null ? 160 : 80;
+  if (capped && !streamDone && pile.length < 3 && effort >= ceiling) paused = true;
   renderDeck();
   paintCount();
   if (!paused && !streamDone && pile.length < 4) setTimeout(() => pump(my), 30);
@@ -923,7 +1123,7 @@ function restart(){
   enforceTheme();
   saveFilters();
   pile = []; briefs = []; seen = new Set(); matched = 0; pageNo = 1; queryDone = false;
-  openingOrder = []; openingCursor = 0; bulkCursor = 0; gradedCursor = 0;
+  openingOrder = []; openingCursor = 0; openingDone = false; chasePage = 1; chaseDone = false; bulkCursor = 0; gradedCursor = 0;
   setPools.clear(); streamDone = false; paused = false; pumpError = ""; effort = 0; loading = false;
   pendingSwipes = []; reserved = new Set(); swipeBusy = false;
   deck.innerHTML = "";
@@ -950,6 +1150,9 @@ function paintArt(host, card){
   if (!urls.length) { host.append(placeholder(card)); return; }
   const img = document.createElement("img");
   img.alt = altText(card);
+  img.draggable = false;
+  img.decoding = "async";
+  img.addEventListener("dragstart", e => e.preventDefault());
   let i = 0;
   img.onerror = () => { i++; if (urls[i]) img.src = urls[i]; else { img.remove(); host.append(placeholder(card)); } };
   img.src = urls[0];
@@ -996,6 +1199,7 @@ function renderDeck(){
     if (have.has(card.id)) return;
     const el = document.createElement("div");
     el.className = "card";
+    el.draggable = false;
     el.card = card;
     el.innerHTML = `<div class="frame"><span class="stamp like">${discoveryBinder() ? "BINDER!" : "WISH!"}</span><span class="stamp nope">PASS</span></div>`;
     paintArt(el.querySelector(".frame"), card);
@@ -1004,13 +1208,18 @@ function renderDeck(){
   });
   layoutStack();
   if (!pile.length && !deck.querySelector(".card")) {
+    const openHunt = !filtersActive() && !discoveryBinder();
     deck.dataset.status = pumpError ? "error" : (paused ? "paused" : "empty");
     deck.removeAttribute("aria-busy");
-    deck.innerHTML = `<div class="empty-state">${pumpError ? `<p class="warn">${esc(pumpError)}</p>` : paused ? "<p>Still matching cards.</p>" : "<p>No physical cards match these filters.</p>"}${toad()}<button class="chip" id="retryDeck" type="button">${paused || pumpError ? "Keep looking" : "Edit filters"}</button></div>`;
+    const msg = pumpError ? `<p class="warn">${esc(pumpError)}</p>` : paused ? "<p>Still matching cards.</p>" : openHunt ? "<p>The hunt is still shuffling the table.</p>" : "<p>No physical cards match these filters.</p>";
+    deck.innerHTML = `<div class="empty-state">${msg}${toad()}<button class="chip" id="retryDeck" type="button">${paused || pumpError || openHunt ? "Keep looking" : "Edit filters"}</button></div>`;
     const btn = document.getElementById("retryDeck");
     if (btn) btn.onclick = () => {
-      if (paused || pumpError) { paused = false; pumpError = ""; streamDone = false; effort = 0; showSkeleton(); pump(generation); }
-      else openFilter("set", document.querySelector("[data-filter=set]"));
+      if (paused || pumpError || openHunt) {
+        paused = false; pumpError = ""; streamDone = false; effort = 0;
+        if (openHunt) { openingDone = false; chaseDone = false; chasePage = 1; openingCursor = 0; seen = new Set(); setPools.clear(); }
+        showSkeleton(); pump(generation);
+      } else openFilter("set", document.querySelector("[data-filter=set]"));
     };
   } else {
     deck.dataset.status = "ready";
@@ -1020,6 +1229,8 @@ function renderDeck(){
 }
 function bindDrag(el){
   let sx = 0, sy = 0, dx = 0, dy = 0, pid = null, dragged = false;
+  el.draggable = false;
+  el.addEventListener("dragstart", e => e.preventDefault());
   const rot = x => Math.max(-12, Math.min(12, x / 18));
   el.addEventListener("pointerdown", e => {
     if (e.button != null && e.button !== 0) return;
@@ -1141,6 +1352,7 @@ function addWish(card){
 function addToBinder(binder, card){
   if (!binder || binder.cards.some(c => c.id === card.id)) return false;
   binder.cards.push(snapshot(card));
+  if (binder.cards.length % 9 === 0) pendingSparkle = Math.floor((binder.cards.length - 1) / 9);
   saveBinders();
   return true;
 }
@@ -1187,6 +1399,7 @@ function syncChipFade(){
   if (!el || !bar) return;
   const more = el.scrollWidth > el.clientWidth + 2 && el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
   bar.classList.toggle("more", more);
+  bar.classList.toggle("before", el.scrollLeft > 2);
 }
 function paintChips(){
   document.querySelectorAll("[data-filter]").forEach(btn => {
@@ -1197,6 +1410,7 @@ function paintChips(){
     else if (key === "type" && filters.type) btn.textContent = filters.type;
     else if (key === "era" && filters.era) btn.textContent = filters.era;
     else btn.textContent = key === "set" ? "Set" : key === "rarity" ? "Rarity" : key === "price" ? "Price" : key === "era" ? "Era" : "Type";
+    btn.title = btn.textContent;
   });
   const g = document.getElementById("gradedChip");
   g.setAttribute("aria-pressed", filters.graded ? "true" : "false");
@@ -1315,6 +1529,7 @@ function openFilter(kind, anchor){
 
 function renderSets(){
   const root = document.getElementById("setsScroll");
+  root.classList.toggle("fitting", !!setView);
   if (setView) { renderSetPage(root); return; }
   const q = (root.querySelector("#setFind") || {}).value || "";
   const groups = new Map();
@@ -1377,8 +1592,8 @@ function renderSetPage(root){
   const total = s.cards.length || 0;
   const pct = total ? Math.round(have / total * 100) : 0;
   if (s.mode !== "flip" && s.mode !== "about") s.mode = "flip";
-  root.innerHTML = `<button class="chip" id="backSets" type="button">All sets</button>
-    <h2>${esc(s.name)}</h2>
+  root.innerHTML = `<div class="setpage"><div class="sethead"><button class="chip" id="backSets" type="button">All sets</button>
+    <h2>${esc(s.name)}</h2></div>
     <p class="fine">${esc([s.release, eraOf(s.id), total ? total + " cards" : ""].filter(Boolean).join(" · "))}</p>
     <div class="modes">
       <button class="chip" id="swipeSet" type="button">Swipe this set</button>
@@ -1386,7 +1601,7 @@ function renderSetPage(root){
     </div>
     <p class="fine">${have} / ${total || "…"} saved</p>
     <div class="bar" aria-hidden="true"><span style="width:${pct}%"></span></div>
-    <div id="setBody"></div>`;
+    <div class="setflip" id="setBody"></div></div>`;
   document.getElementById("backSets").onclick = () => { setView = null; renderSets(); paintContext(); };
   document.getElementById("swipeSet").onclick = () => {
     binderState.discoveryId = "";
@@ -1410,9 +1625,11 @@ function renderSetPage(root){
     const pocket = document.createElement("article");
     pocket.className = "pocket";
     const on = wish.some(w => w.id === c.id);
-    pocket.innerHTML = `<button type="button" class="open" aria-label="${esc(c.name)} – ${esc(s.name)} #${esc(c.localId || "")}"><img alt=""></button><b>${esc(c.name)}</b><button class="chip heart" type="button" aria-label="${on ? "On wishlist" : "Add to wishlist"}">${on ? "♥" : "♡"}</button>`;
+    pocket.innerHTML = `<button type="button" class="open" aria-label="${esc(c.name)} – ${esc(s.name)} #${esc(c.localId || "")}"><img alt="" draggable="false" decoding="async" loading="lazy"></button><b>${esc(c.name)}</b><button class="iconish heart" type="button" aria-label="${on ? "On wishlist" : "Add to wishlist"}">${on ? "♥" : "♡"}</button>`;
     const img = pocket.querySelector("img");
     img.alt = c.name + " – " + s.name + " #" + (c.localId || "");
+    img.draggable = false;
+    img.addEventListener("dragstart", e => e.preventDefault());
     const urls = [c.image + "/low.webp", c.image + "/high.webp"];
     let i = 0;
     img.onerror = () => { i++; if (urls[i]) img.src = urls[i]; else img.replaceWith(placeholder(c)); };
@@ -1451,6 +1668,7 @@ function renderSetPage(root){
 function renderBinders(){
   const root = document.getElementById("bindersScroll");
   if (binderView) { renderCollection(root); return; }
+  root.classList.remove("reading");
   const total = valueOf(wish);
   root.innerHTML = `<p class="fine">Wishlist is the master list. Every right-swipe lands there. Binders are themes you build from it.</p>
     <button class="wish-row" id="openWish" type="button"><span><b>Wishlist</b><span class="fine">${wish.length} cards · not a binder</span></span><span class="pill${total ? "" : " missing"}">${esc(total ? priceText(total, "USD") : "—")}</span></button>
@@ -1476,73 +1694,514 @@ function renderBinders(){
   document.getElementById("openWish").onclick = () => { binderView = { kind:"wish" }; flipPage = 0; renderBinders(); };
   paintContext();
 }
-function pagesOf(list){ return Math.max(1, Math.ceil(list.length / 9)); }
+function pagesOf(list){ return Math.max(1, Math.ceil(list.length / 9) || 1); }
+function isHolo(card){ return /holo|illustration|hyper|secret|shiny|radiant|amazing/i.test((card && card.rarity) || ""); }
+function lowUrls(card){
+  const urls = [];
+  if (card.thumb) urls.push(card.thumb);
+  if (card.image) urls.push(String(card.image) + "/low.webp");
+  if (card.img) urls.push(card.img);
+  if (card.image) urls.push(String(card.image) + "/high.webp");
+  return [...new Set(urls.filter(Boolean))];
+}
+function playPaper(){
+  if (!settings.sound || reduceMotion()) return;
+  playTone(150);
+  setTimeout(() => { if (settings.sound) playTone(96); }, 70);
+}
+function showToast(text, undo){
+  let toast = document.getElementById("binderToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "binderToast";
+    toast.className = "toast";
+    toast.innerHTML = `<span></span><button type="button">Undo</button>`;
+    document.body.append(toast);
+  }
+  toast.hidden = false;
+  toast.querySelector("span").textContent = text;
+  toast.querySelector("button").onclick = () => { toast.hidden = true; undo(); };
+  clearTimeout(binderToastTimer);
+  binderToastTimer = setTimeout(() => { toast.hidden = true; }, 5200);
+}
+function sparkBits(){
+  const s = document.createElement("div");
+  s.className = "spark";
+  s.setAttribute("aria-hidden", "true");
+  for (let i = 0; i < 8; i++) {
+    const dot = document.createElement("i");
+    dot.style.left = (12 + (i % 4) * 24) + "%";
+    dot.style.top = (18 + Math.floor(i / 4) * 46) + "%";
+    dot.style.background = ["#86DEFF","#F6C9C9","#F3EDC8","#ABB28D"][i % 4];
+    s.append(dot);
+  }
+  return s;
+}
+function showConfetti(){
+  announce("This set is complete.");
+  if (reduceMotion()) return;
+  const el = document.createElement("div");
+  el.className = "confetti";
+  el.innerHTML = `<p>The set is complete.</p>`;
+  el.querySelector("p").append(document.createRange().createContextualFragment(toad()));
+  for (let i = 0; i < 16; i++) {
+    const b = document.createElement("b");
+    b.style.left = (4 + (i * 6) % 92) + "%";
+    b.style.top = (8 + (i % 4) * 8) + "%";
+    b.style.background = ["#86DEFF","#F6C9C9","#ABB28D","#F3EDC8","#E9D5C0"][i % 5];
+    el.append(b);
+  }
+  document.body.append(el);
+  setTimeout(() => el.remove(), 1500);
+}
+function maybeCelebrate(binder){
+  if (!binder || celebrated.has(binder.id)) return;
+  const theme = themeOf(binder);
+  if (theme.kind !== "set" || !theme.setId) return;
+  const known = meta.sets.find(s => s.id === theme.setId);
+  const official = known && known.cardCount && (known.cardCount.official || known.cardCount.total);
+  if (official && binder.cards.length < official) return;
+  const check = cards => {
+    if (!cards || !cards.length || !cards.every(c => binder.cards.some(x => x.id === c.id))) return;
+    if (celebrated.has(binder.id)) return;
+    celebrated.add(binder.id);
+    showConfetti();
+  };
+  const bag = setLists.get(theme.setId);
+  if (bag) { check(bag.cards); return; }
+  getJson(TCGDEX + "/sets/" + encodeURIComponent(theme.setId)).then(set => {
+    setLists.set(theme.setId, { cards:set.cards || [], release:"", name:set.name || theme.setId });
+    if (binderView && binderView.id === binder.id) check(set.cards || []);
+  }).catch(() => {});
+}
+function coverPad(binder, list){
+  const pad = document.createElement("div");
+  pad.className = "pad";
+  pad.style.setProperty("--cover", binder.color || "#E9D5C0");
+  const val = valueOf(list);
+  const charm = binder.charm === "toad" ? `<div class="charm">${toad()}</div>` : binder.charm === "sticker" ? `<div class="charm sticker" aria-hidden="true">★</div>` : "";
+  pad.innerHTML = `<div class="pad-stitch"></div><p class="fine">Binder</p><h2>${esc(binder.name)}</h2><p class="count">${list.length} ${list.length === 1 ? "card" : "cards"}</p><p class="count">${esc(val ? priceText(val, "USD") : "—")}</p>${list.length ? `<p class="fine">${esc(themeLabel(themeOf(binder)))}</p>` : `<p class="fine">A fresh binder. These pockets are waiting.</p>${toad()}`}${charm}`;
+  return pad;
+}
+function endPaper(text){
+  const wrap = document.createElement("div");
+  wrap.className = "pad";
+  wrap.style.setProperty("--cover", "#F3EDC8");
+  wrap.innerHTML = `<div class="pad-stitch"></div><p class="count">${esc(text)}</p>${toad()}`;
+  return wrap;
+}
+function sleeveSlot(card, index, ctx){
+  const slot = document.createElement("div");
+  slot.className = "slot";
+  const sleeve = document.createElement("div");
+  sleeve.className = "sleeve" + (isHolo(card) ? " holo" : "");
+  sleeve.dataset.index = String(index);
+  sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card))}"><img alt="" draggable="false" decoding="async" loading="lazy"></button><span class="shine" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span>`;
+  const img = sleeve.querySelector("img");
+  img.alt = altText(card);
+  const urls = lowUrls(card);
+  let n = 0;
+  img.addEventListener("dragstart", e => e.preventDefault());
+  img.onerror = () => { n++; if (urls[n]) img.src = urls[n]; };
+  if (urls[0]) img.src = urls[0];
+  const more = document.createElement("button");
+  more.type = "button";
+  more.className = "iconish more";
+  more.setAttribute("aria-label", "Card menu");
+  more.textContent = "⋯";
+  more.onclick = e => { e.stopPropagation(); openMenu(more, card, ctx.binder); };
+  slot.append(sleeve, more);
+  return slot;
+}
+function emptySlot(insertAt){
+  const slot = document.createElement("div");
+  slot.className = "slot";
+  const sleeve = document.createElement("div");
+  sleeve.className = "sleeve empty";
+  if (insertAt != null) sleeve.dataset.insert = String(insertAt);
+  sleeve.innerHTML = `<span class="ghost-card"></span><span class="gloss" aria-hidden="true"></span>`;
+  slot.append(sleeve);
+  return slot;
+}
+function buildFace(sheet, ctx, spark){
+  const face = document.createElement("div");
+  face.className = "face";
+  if (sheet < 0 || sheet >= ctx.total) { face.append(endPaper("That's the last page.")); return face; }
+  if (ctx.withCover && sheet === 0) { face.append(coverPad(ctx.binder, ctx.list)); return face; }
+  const page = ctx.withCover ? sheet - 1 : sheet;
+  if (page < 0) { face.append(endPaper("That's the last page.")); return face; }
+  const h = document.createElement("h3");
+  h.textContent = "Page " + (page + 1);
+  face.append(h);
+  if (!ctx.list.length && page === 0) {
+    const note = document.createElement("p");
+    note.className = "fine empty-note";
+    note.textContent = ctx.withCover ? "Empty pockets. Swipe to discover, or fill from your wishlist." : "Nothing saved yet. Right-swipe a card and it lands here.";
+    face.append(note);
+  }
+  const grid = document.createElement("div");
+  grid.className = "sleeves";
+  const slice = ctx.list.slice(page * 9, page * 9 + 9);
+  for (let i = 0; i < 9; i++) {
+    const card = slice[i];
+    grid.append(card ? sleeveSlot(card, page * 9 + i, ctx) : emptySlot(Math.min(ctx.list.length, page * 9 + i)));
+  }
+  face.append(grid);
+  if (spark && pendingSparkle === page) {
+    face.append(sparkBits());
+    pendingSparkle = -1;
+  }
+  return face;
+}
 function renderCollection(root){
   const wishMode = binderView.kind === "wish";
   const binder = wishMode ? null : binderState.binders.find(b => b.id === binderView.id);
   if (!wishMode && !binder) { binderView = null; renderBinders(); return; }
+  root.classList.add("reading");
   const list = wishMode ? wish : binder.cards;
-  const pages = pagesOf(list);
-  if (flipPage >= pages) flipPage = pages - 1;
-  const spread = wide();
-  const step = spread ? 2 : 1;
-  const leftIndex = spread ? Math.floor(flipPage / 2) * 2 : flipPage;
+  const withCover = !wishMode;
+  const cardPages = Math.max(1, Math.ceil(list.length / 9) || 1);
+  const total = withCover ? cardPages + 1 : cardPages;
+  if (flipPage < 0) flipPage = 0;
+  if (flipPage >= total) flipPage = total - 1;
+  if (wide() && flipPage % 2 === 1) flipPage -= 1;
+  const desktop = wide();
+  const ctx = { list, binder, withCover, total };
   const val = valueOf(list);
-  root.innerHTML = `<button class="chip" id="backBinders" type="button">All binders</button>
-    <h2>${esc(wishMode ? "Wishlist" : binder.name)}</h2>
-    <p class="fine">${wishMode ? "Master list. Removing a card here leaves your binders alone." : esc(themeLabel(themeOf(binder)))}</p>
-    <div class="modes">
-      ${wishMode ? "" : `<button class="chip" id="fillFrom" type="button">Fill from wishlist</button><button class="chip" id="discover" type="button">Swipe to discover</button><button class="chip" id="renameBinder" type="button">Rename</button>`}
-      <button class="chip" id="copyList" type="button">Copy list</button>
-    </div>
-    <div class="spread"><div class="spread-row" id="spreadRow"></div>
-      <div class="pager"><button class="chip" id="pagePrev" type="button" aria-label="Previous page">←</button><button class="corner chip" id="pageCorner" type="button">Flip</button><button class="chip" id="pageNext" type="button" aria-label="Next page">→</button></div>
-      <p class="pagefoot">Page ${leftIndex + 1}${spread && leftIndex + 1 < pages ? "–" + Math.min(pages, leftIndex + 2) : ""} / ${pages} · ${esc(val ? priceText(val, "USD") : "—")}</p>
-    </div>`;
-  const row = document.getElementById("spreadRow");
-  const indexes = spread ? [leftIndex, leftIndex + 1] : [leftIndex];
-  indexes.forEach(pi => {
-    if (pi >= pages) return;
-    const paper = document.createElement("section");
-    paper.className = "paper";
-    paper.innerHTML = `<h3>Page ${pi + 1}</h3><div class="pockets"></div>`;
-    const host = paper.querySelector(".pockets");
-    const slice = list.slice(pi * 9, pi * 9 + 9);
-    slice.forEach(card => host.append(pocketEl(card, wishMode ? null : binder)));
-    while (host.children.length < 9) {
-      const empty = document.createElement("div");
-      empty.className = "pocket empty";
-      empty.setAttribute("aria-hidden", "true");
-      empty.innerHTML = toad();
-      host.append(empty);
+  root.innerHTML = "";
+  const tools = document.createElement("div");
+  tools.className = "booktools";
+  tools.innerHTML = `<button class="chip" id="backBinders" type="button">All binders</button>` +
+    (wishMode ? `<button class="chip" id="copyList" type="button">Copy list</button>`
+      : `<button class="chip" id="fillFrom" type="button">Fill from wishlist</button><button class="chip" id="discover" type="button">Swipe to discover</button><button class="chip" id="renameBinder" type="button">Rename</button><button class="chip" id="copyList" type="button">Copy list</button>`);
+  const stage = document.createElement("div");
+  stage.className = "bookstage";
+  const book = document.createElement("div");
+  book.className = "book" + (desktop ? " spread" : " solo");
+  book.setAttribute("aria-label", wishMode ? "Wishlist pages" : binder.name);
+  const spread = document.createElement("div");
+  spread.className = "book-spread";
+  const underL = document.createElement("div");
+  underL.className = "under left";
+  const underR = document.createElement("div");
+  underR.className = "under right";
+  const rings = document.createElement("div");
+  rings.className = "rings";
+  rings.setAttribute("aria-hidden", "true");
+  rings.innerHTML = "<i></i><i></i><i></i><i></i><i></i><i></i>";
+  const spine = document.createElement("div");
+  spine.className = "spine";
+  spine.setAttribute("aria-hidden", "true");
+  spine.innerHTML = "<i></i><i></i><i></i><i></i><i></i>";
+  const leafL = document.createElement("section");
+  leafL.className = "leaf left turn-prev";
+  const leafR = document.createElement("section");
+  leafR.className = "leaf right turn-next";
+  const put = (leaf, sheet, side, spark) => {
+    const face = buildFace(sheet, ctx, spark);
+    face.classList.add("front", "page-" + side);
+    const back = document.createElement("div");
+    back.className = "face back";
+    leaf.append(face, back);
+  };
+  if (desktop) put(leafL, flipPage, "left", true);
+  put(leafR, desktop ? Math.min(total, flipPage + 1) : flipPage, "right", true);
+  if (desktop && flipPage + 1 >= total) {
+    leafR.replaceChildren();
+    const face = buildFace(total, ctx, false);
+    face.classList.add("front", "page-right");
+    const back = document.createElement("div");
+    back.className = "face back";
+    leafR.append(face, back);
+  }
+  spread.append(underL, underR, spine, rings, leafL, leafR);
+  const prevEar = document.createElement("button");
+  prevEar.type = "button";
+  prevEar.className = "dogear prev";
+  prevEar.id = "pagePrev";
+  prevEar.setAttribute("aria-label", "Previous page");
+  const nextEar = document.createElement("button");
+  nextEar.type = "button";
+  nextEar.className = "dogear next";
+  nextEar.id = "pageCorner";
+  nextEar.setAttribute("aria-label", "Drag to turn the page");
+  book.append(spread, prevEar, nextEar);
+  const nav = document.createElement("div");
+  nav.className = "booknav";
+  const prevBtn = document.createElement("button");
+  prevBtn.type = "button";
+  prevBtn.className = "iconish";
+  prevBtn.id = "pagePrevBtn";
+  prevBtn.setAttribute("aria-label", "Previous page");
+  prevBtn.textContent = "←";
+  const dots = document.createElement("div");
+  dots.className = "dots";
+  dots.setAttribute("role", "tablist");
+  dots.setAttribute("aria-label", "Pages");
+  const jump = document.createElement("label");
+  jump.className = "jump";
+  jump.textContent = "Jump to page";
+  const select = document.createElement("select");
+  select.id = "jumpPage";
+  select.setAttribute("aria-label", "Jump to page");
+  for (let i = 0; i < total; i++) {
+    const label = withCover && i === 0 ? "Cover" : "Page " + (withCover ? i : i + 1);
+    const dot = document.createElement("button");
+    dot.type = "button";
+    dot.dataset.sheet = String(i);
+    dot.title = label;
+    dot.setAttribute("aria-label", label);
+    const here = i === flipPage || (desktop && i === flipPage + 1 && i < total);
+    dot.setAttribute("aria-current", here ? "true" : "false");
+    dots.append(dot);
+    const opt = document.createElement("option");
+    opt.value = String(i);
+    opt.textContent = label;
+    if (i === flipPage) opt.selected = true;
+    select.append(opt);
+  }
+  const nextBtn = document.createElement("button");
+  nextBtn.type = "button";
+  nextBtn.className = "iconish";
+  nextBtn.id = "pageNext";
+  nextBtn.setAttribute("aria-label", "Next page");
+  nextBtn.textContent = "→";
+  jump.append(select);
+  nav.append(prevBtn, dots, jump, nextBtn);
+  const foot = document.createElement("p");
+  foot.className = "pagefoot";
+  const shownLeft = withCover && flipPage === 0 ? "Cover" : "Page " + (withCover ? flipPage : flipPage + 1);
+  foot.textContent = (wishMode ? "Wishlist · " : "") + shownLeft + (desktop && flipPage + 1 < total ? " – " + (withCover && flipPage + 1 === 0 ? "Cover" : "Page " + (withCover ? flipPage + 1 : flipPage + 2)) : "") + " · " + list.length + (list.length === 1 ? " card · " : " cards · ") + (val ? priceText(val, "USD") : "—");
+  stage.append(book, nav, foot);
+  root.append(tools, stage);
+
+  const step = desktop ? 2 : 1;
+  let flipToken = 0;
+  const landed = dir => {
+    const dest = Math.max(0, Math.min(total - 1, flipPage + dir * step));
+    return desktop ? dest - (dest % 2) : dest;
+  };
+  const arm = dir => {
+    const leaf = book.querySelector(dir > 0 ? ".leaf.right" : (desktop ? ".leaf.left" : ".leaf.right"));
+    if (!leaf) return null;
+    const back = leaf.querySelector(".face.back");
+    const landing = dir > 0 ? (desktop ? flipPage + 2 : flipPage + 1) : (desktop ? flipPage - 1 : flipPage - 1);
+    const revealed = dir > 0 ? (desktop ? flipPage + 3 : flipPage + 1) : (desktop ? flipPage - 2 : flipPage - 1);
+    if (back) { back.replaceChildren(buildFace(landing, ctx, false)); back.classList.add("back"); }
+    const under = book.querySelector(dir > 0 || !desktop ? ".under.right" : ".under.left");
+    if (under) under.replaceChildren(buildFace(revealed, ctx, false));
+    leaf.classList.add("hot", dir > 0 ? "forward" : "backward");
+    leaf.style.setProperty("--turn", "0");
+    return leaf;
+  };
+  const goSheet = dest => {
+    const next = desktop ? Math.max(0, dest - (dest % 2)) : dest;
+    if (next === flipPage || next < 0 || next >= total) return;
+    flipPage = next;
+    renderBinders();
+  };
+  const finishFlip = dir => {
+    const dest = landed(dir);
+    if (dest === flipPage) return;
+    playPaper();
+    if (settings.haptics) haptic(8);
+    if (reduceMotion()) { flipPage = dest; renderBinders(); return; }
+    const token = ++flipToken;
+    let leaf = book.querySelector(".leaf.hot");
+    if (leaf) leaf.classList.remove("live");
+    else leaf = arm(dir);
+    let went = false;
+    const go = () => {
+      if (went || token !== flipToken) return;
+      went = true;
+      flipPage = dest;
+      renderBinders();
+    };
+    if (!leaf) { go(); return; }
+    leaf.addEventListener("transitionend", e => { if (e.propertyName === "transform") go(); });
+    requestAnimationFrame(() => leaf.style.setProperty("--turn", "1"));
+    setTimeout(go, 640);
+  };
+  prevBtn.onclick = () => finishFlip(-1);
+  nextBtn.onclick = () => finishFlip(1);
+  dots.querySelectorAll("button").forEach(btn => btn.onclick = () => {
+    const n = Number(btn.dataset.sheet);
+    const dest = desktop ? n - (n % 2) : n;
+    if (dest === flipPage) return;
+    if (Math.abs(dest - flipPage) === step) finishFlip(dest > flipPage ? 1 : -1);
+    else goSheet(dest);
+  });
+  select.onchange = () => {
+    const n = Number(select.value);
+    const dest = desktop ? n - (n % 2) : n;
+    if (Math.abs(dest - flipPage) === step) finishFlip(dest > flipPage ? 1 : -1);
+    else goSheet(dest);
+  };
+  let mode = "", pid = null, sx = 0, sy = 0, timer = 0, ghost = null, dragIndex = -1, leaf = null, fromPointer = false;
+  const clearTimer = () => { if (timer) { clearTimeout(timer); timer = 0; } };
+  const endGhost = () => { if (ghost) { ghost.remove(); ghost = null; } book.querySelectorAll(".sleeve").forEach(s => { s.style.opacity = ""; }); };
+  const onMove = e => {
+    if (e.pointerId !== pid) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (mode === "curl") {
+      const width = Math.max(120, (leaf && leaf.clientWidth) || 200);
+      const dir = leaf && leaf.classList.contains("backward") ? 1 : -1;
+      const turned = dir === -1 ? Math.max(0, Math.min(1, -dx / width)) : Math.max(0, Math.min(1, dx / width));
+      if (leaf) leaf.style.setProperty("--turn", String(turned));
+      return;
     }
-    row.append(paper);
+    if (mode === "card") {
+      if (ghost) { ghost.style.left = e.clientX + "px"; ghost.style.top = e.clientY + "px"; }
+      const box = book.getBoundingClientRect();
+      book.classList.toggle("out", e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom);
+      return;
+    }
+    if (!mode && Math.hypot(dx, dy) > 10) {
+      clearTimer();
+      if (Math.abs(dx) > Math.abs(dy)) mode = dx < 0 ? "swipe-next" : "swipe-prev";
+      else mode = "scroll";
+    }
+  };
+  const onUp = e => {
+    if (e.pointerId !== pid) return;
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onUp);
+    clearTimer();
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (mode === "curl" && leaf) {
+      fromPointer = true;
+      const turn = Number(leaf.style.getPropertyValue("--turn")) || 0;
+      const dir = leaf.classList.contains("backward") ? -1 : 1;
+      leaf.classList.remove("live");
+      if (turn > 0.33 || Math.hypot(dx, dy) < 8) finishFlip(dir);
+      else {
+        leaf.style.setProperty("--turn", "0");
+        setTimeout(() => { leaf.classList.remove("hot", "forward", "backward", "live"); }, 460);
+      }
+    } else if (mode === "card") {
+      const box = book.getBoundingClientRect();
+      const outside = e.clientX < box.left - 8 || e.clientX > box.right + 8 || e.clientY < box.top - 8 || e.clientY > box.bottom + 24;
+      endGhost();
+      book.classList.remove("out");
+      if (outside) removeAt(dragIndex);
+      else {
+        if (ghost) ghost.style.visibility = "hidden";
+        const hit = document.elementFromPoint(e.clientX, e.clientY);
+        const sleeve = hit && hit.closest(".sleeve[data-index]");
+        const blank = hit && hit.closest(".sleeve[data-insert]");
+        const dot = hit && hit.closest(".dots button[data-sheet]");
+        if (sleeve) moveIndex(dragIndex, Number(sleeve.dataset.index));
+        else if (blank) moveIndex(dragIndex, Number(blank.dataset.insert));
+        else if (dot) {
+          const sheet = Number(dot.dataset.sheet);
+          const page = withCover ? Math.max(0, sheet - 1) : sheet;
+          if (!(withCover && sheet === 0)) moveIndex(dragIndex, Math.min(list.length - 1, page * 9));
+        }
+      }
+    } else if (mode === "swipe-next" && dx < -48) finishFlip(1);
+    else if (mode === "swipe-prev" && dx > 48) finishFlip(-1);
+    else if (!mode && Math.hypot(dx, dy) < 8) {
+      const hit = e.target.closest(".sleeve[data-index] .cardhit, .sleeve[data-index]");
+      const sleeve = hit && hit.closest(".sleeve[data-index]");
+      if (sleeve && !e.target.closest(".iconish")) liftCard(list[Number(sleeve.dataset.index)]);
+    }
+    mode = ""; pid = null; leaf = null;
+  };
+  function liftCard(card){
+    if (!card) return;
+    const sleeve = book.querySelector('.sleeve[data-index="' + list.indexOf(card) + '"]');
+    const open = () => openProfile(card);
+    if (reduceMotion() || !sleeve) { open(); return; }
+    sleeve.classList.add("lifting");
+    setTimeout(open, 160);
+  }
+  function commit(){ if (binder) saveBinders(); else saveWish(); }
+  function removeAt(index){
+    const card = list[index];
+    if (!card) return;
+    list.splice(index, 1);
+    const kept = card;
+    showToast("Removed " + (card.name || "card") + ".", () => {
+      list.splice(Math.min(index, list.length), 0, kept);
+      commit();
+    });
+    commit();
+  }
+  function moveIndex(from, to){
+    if (from === to || from < 0 || to < 0 || from >= list.length) return;
+    const [card] = list.splice(from, 1);
+    let dest = to;
+    if (from < to) dest = to - 1;
+    dest = Math.max(0, Math.min(dest, list.length));
+    list.splice(dest, 0, card);
+    const page = Math.floor(dest / 9);
+    if (list.slice(page * 9, page * 9 + 9).length === 9) pendingSparkle = page;
+    commit();
+  }
+  book.addEventListener("pointerdown", e => {
+    if (e.button) return;
+    if (e.target.closest(".iconish")) return;
+    pid = e.pointerId; sx = e.clientX; sy = e.clientY; mode = "";
+    const dog = e.target.closest(".dogear");
+    if (dog) {
+      const dir = dog.classList.contains("prev") ? -1 : 1;
+      if (landed(dir) === flipPage) return;
+      mode = "curl";
+      leaf = arm(dir);
+      if (leaf) leaf.classList.add("live");
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
+      return;
+    }
+    const sleeve = e.target.closest(".sleeve[data-index]");
+    if (sleeve) {
+      dragIndex = Number(sleeve.dataset.index);
+      timer = setTimeout(() => {
+        mode = "card";
+        if (settings.haptics) haptic(6);
+        const img = sleeve.querySelector("img");
+        ghost = document.createElement("img");
+        ghost.className = "ghost";
+        ghost.alt = "";
+        ghost.src = img ? img.src : "";
+        ghost.style.left = sx + "px";
+        ghost.style.top = sy + "px";
+        document.body.append(ghost);
+        sleeve.style.opacity = ".35";
+      }, 420);
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  });
+  prevEar.addEventListener("click", () => { if (fromPointer) { fromPointer = false; return; } finishFlip(-1); });
+  nextEar.addEventListener("click", () => { if (fromPointer) { fromPointer = false; return; } finishFlip(1); });
+  book.addEventListener("pointermove", e => {
+    if (mode) return;
+    const sleeve = e.target.closest(".sleeve.holo");
+    if (!sleeve || reduceMotion()) return;
+    const r = sleeve.getBoundingClientRect();
+    const px = (e.clientX - r.left) / Math.max(1, r.width);
+    const py = (e.clientY - r.top) / Math.max(1, r.height);
+    sleeve.style.setProperty("--tx", ((px - 0.5) * 8).toFixed(2) + "deg");
+    sleeve.style.setProperty("--ty", ((0.5 - py) * 6).toFixed(2) + "deg");
+    sleeve.style.setProperty("--sx", (px * 100).toFixed(0) + "%");
+    sleeve.style.setProperty("--sy", (py * 100).toFixed(0) + "%");
   });
   document.getElementById("backBinders").onclick = () => { binderView = null; renderBinders(); };
-  const turn = (delta) => {
-    const next = Math.min(pages - 1, Math.max(0, leftIndex + delta * step));
-    if (next === leftIndex) return;
-    const paper = row.querySelector(".paper");
-    const go = () => { flipPage = next; renderBinders(); };
-    if (reduceMotion() || !paper) go();
-    else { paper.classList.add("turning"); setTimeout(go, 450); if (settings.sound) playTone(180); }
-  };
-  document.getElementById("pagePrev").onclick = () => turn(-1);
-  document.getElementById("pageNext").onclick = () => turn(1);
-  document.getElementById("pageCorner").onclick = () => turn(1);
   document.getElementById("copyList").onclick = async () => {
     const text = (wishMode ? "Wishlist" : binder.name) + "\n" + list.map(c => [c.name, c.set, c.number ? "#" + c.number : "", priceText(usdOf(c), "USD")].filter(Boolean).join(" — ")).join("\n");
     try { await navigator.clipboard.writeText(text); announce("List copied."); }
-    catch (e) { announce("List ready. Clipboard was blocked."); }
+    catch (err) { announce("List ready. Clipboard was blocked."); }
   };
   if (!wishMode) {
     document.getElementById("fillFrom").onclick = () => openFill(binder.id);
     document.getElementById("discover").onclick = () => startDiscovery(binder.id);
     document.getElementById("renameBinder").onclick = () => {
-      const name = binder.name;
-      const paper = document.getElementById("binderSheetBody");
       document.getElementById("binderSheetTitle").textContent = "Rename binder";
-      paper.innerHTML = `<label class="field">Name<input id="renameInput" value="${esc(name)}" maxlength="40"></label><button class="chip" id="saveRename" type="button">Save</button>`;
+      document.getElementById("binderSheetBody").innerHTML = `<label class="field">Name<input id="renameInput" value="${esc(binder.name)}" maxlength="40"></label><button class="chip" id="saveRename" type="button">Save</button>`;
       openSheet("binderSheet");
       document.getElementById("saveRename").onclick = () => {
         const next = document.getElementById("renameInput").value.trim();
@@ -1553,18 +2212,10 @@ function renderCollection(root){
         renderBinders();
       };
     };
+    maybeCelebrate(binder);
   }
 }
-function pocketEl(card, binder){
-  const el = document.createElement("article");
-  el.className = "pocket";
-  const shown = shownMoney(card);
-  el.innerHTML = `<button type="button" class="open" aria-label="${esc(altText(card))}"><span class="frame" style="aspect-ratio:63/88;width:100%;box-shadow:none"></span></button><b>${esc(card.name || "Card")}</b><span class="fine">${esc(shown ? priceText(shown.amount, shown.currency) : "—")}</span><button class="chip more" type="button" aria-label="Card menu">⋯</button>`;
-  paintArt(el.querySelector(".frame"), card);
-  el.querySelector(".open").onclick = () => openProfile(card);
-  el.querySelector(".more").onclick = (e) => openMenu(e.currentTarget, card, binder);
-  return el;
-}
+
 function openMenu(anchor, card, binder){
   menuCard = { card, binder };
   const menu = document.getElementById("menu");
@@ -1599,6 +2250,11 @@ async function openBinderForm(){
     <label class="field" id="typeField" hidden>Type<select id="bType">${types}</select></label>
     <p class="fine">Cover</p>
     <div class="swatches" id="swatches">${COLORS.map((c, i) => `<button type="button" class="swatch" data-color="${c}" style="background:${c}" aria-label="Cover ${i + 1}" aria-pressed="${i === 0 ? "true" : "false"}"></button>`).join("")}</div>
+    <fieldset><legend>Charm</legend>
+      <label class="choice"><input type="radio" name="charm" value="none" checked> Plain cover</label>
+      <label class="choice"><input type="radio" name="charm" value="toad"> Toad charm</label>
+      <label class="choice"><input type="radio" name="charm" value="sticker"> Star sticker</label>
+    </fieldset>
     <button class="chip" id="createBinder" type="button">Create binder</button>`;
   let color = COLORS[0];
   const syncThemeFields = () => {
@@ -1620,7 +2276,8 @@ async function openBinderForm(){
     if (kind === "set" && !setId) { announce("Pick a set for this theme."); return; }
     if (kind === "type" && !type) { announce("Pick a type for this theme."); return; }
     const theme = { kind, setId, type };
-    const binder = { id:"b" + Date.now().toString(36), name, color, theme, cards:[] };
+    const charm = (document.querySelector("input[name=charm]:checked") || {}).value || "none";
+    const binder = { id:"b" + Date.now().toString(36), name, color, theme, cards:[], charm };
     binderState.binders.push(binder);
     saveBinders();
     closeSheet("binderSheet");
@@ -1733,6 +2390,15 @@ function priceSeries(card){
   if (trend.length >= 2) return { points:trend, source:"trend", currency:"EUR" };
   return { points:[], source:"", currency:"USD" };
 }
+function trendIsThin(points){
+  const vals = points.map(p => p.value).filter(v => typeof v === "number" && v > 0);
+  if (vals.length < 2) return true;
+  const min = Math.min(...vals), max = Math.max(...vals);
+  if (max < 1) return true;
+  if (max - min < 0.05) return true;
+  if (min > 0 && (max - min) / min < 0.005) return true;
+  return false;
+}
 function ranged(points){
   if (!points.length) return [];
   const last = points[points.length - 1].t;
@@ -1821,7 +2487,9 @@ function renderProfile(card){
   profileCard = card;
   const variant = selectedVariant(card);
   const shown = settings.currency === "EUR" ? shownMoney(card) : (variant && pos(variant.market) ? { amount:variant.market, currency:"USD" } : shownMoney(card));
-  const series = priceSeries(card);
+  const rawSeries = priceSeries(card);
+  const thinTrend = rawSeries.source === "trend" && trendIsThin(rawSeries.points);
+  const series = thinTrend ? { points:[], source:"", currency:"USD" } : rawSeries;
   const windowed = ranged(series.points);
   const delta = series.source === "sales" ? change30(series.points) : change30(windowed);
   const facts = gradeFacts(card);
@@ -1848,10 +2516,10 @@ function renderProfile(card){
     ${variants.length > 1 ? `<div class="vtoggle" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${variants.map(v => `<button type="button" data-variant="${esc(v.key)}" aria-pressed="${variant && variant.key === v.key ? "true" : "false"}">${esc(v.label)}</button>`).join("")}</div>` : ""}
     ${!gradedReady ? `<p class="fine">Checking graded prices…</p>` : gradedKnown ? `<div class="grade-grid">${GRADES.map(([company, grade]) => gradeCell(facts, company, grade)).join("")}</div>` : `<p class="note">No graded sales yet</p>${priceQueued ? `<p class="fine">Queued for the next price batch.</p>` : ""}`}
     <div class="chart-wrap">
-      <div class="ranges">${["1M","3M","1Y","All"].map(r => `<button type="button" data-range="${r}" aria-pressed="${chartRange === r ? "true" : "false"}">${r}</button>`).join("")}
+      <div class="rangebar"><div class="ranges">${["1M","3M","1Y","All"].map(r => `<button type="button" data-range="${r}" aria-pressed="${chartRange === r ? "true" : "false"}">${r}</button>`).join("")}
         ${gradedKnown ? `<button type="button" data-compare="" aria-pressed="${compareGrade ? "false" : "true"}">Raw</button>${GRADES.map(([c, g]) => `<button type="button" data-compare="${c} ${g}" aria-pressed="${compareGrade === c + " " + g ? "true" : "false"}">${c} ${g}</button>`).join("")}` : ""}
-      </div>
-      ${svg || `<p class="empty-state">Not enough sales yet 🐸</p>`}
+      </div></div>
+      ${svg || `<p class="empty-state">Not enough price history</p>`}
       <p class="scrub" id="scrub">${guide ? esc(guide.label) + " latest cached " + esc(priceText(guide.value, "USD")) + ". The dashed line is that price, not a daily history." : series.source === "trend" ? "Cardmarket 30-day, 7-day, and 1-day averages, in euros. Not a daily sales history." : series.source === "sales" ? "Drag along the line for a day." : ""}</p>
     </div>
     <div class="links">${buyLinks(card).map(l => `<a class="buy-btn" href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join("")}
@@ -1877,6 +2545,16 @@ function renderProfile(card){
   profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => { variantChoice.set(card.id, btn.dataset.variant); renderProfile(card); });
   profileEl.querySelectorAll("[data-range]").forEach(btn => btn.onclick = () => { chartRange = btn.dataset.range; renderProfile(card); });
   profileEl.querySelectorAll("[data-compare]").forEach(btn => btn.onclick = () => { compareGrade = btn.dataset.compare; renderProfile(card); });
+  const ranges = profileEl.querySelector(".ranges");
+  if (ranges) {
+    const fade = () => {
+      const wrap = ranges.parentElement;
+      if (!wrap) return;
+      wrap.classList.toggle("more", ranges.scrollWidth > ranges.clientWidth + 2 && ranges.scrollLeft + ranges.clientWidth < ranges.scrollWidth - 2);
+    };
+    ranges.addEventListener("scroll", fade, { passive:true });
+    requestAnimationFrame(fade);
+  }
   document.getElementById("profileWish").onclick = () => {
     if (onWish) removeFromWish(card.id); else addWish(card);
     renderProfile(cardCache.get(card.id) || card);
@@ -2024,7 +2702,32 @@ syncHaptics();
 syncProfilePane();
 matchMedia("(min-width: 1024px)").addEventListener("change", syncProfilePane);
 document.getElementById("chips").addEventListener("scroll", syncChipFade);
-window.addEventListener("resize", syncChipFade);
+deck.addEventListener("dragstart", e => e.preventDefault());
+let resizeTick = 0;
+window.addEventListener("resize", () => {
+  syncChipFade();
+  clearTimeout(resizeTick);
+  resizeTick = setTimeout(() => {
+    if (tab === "binders" && binderView) renderBinders();
+    if (tab === "sets" && setView) renderSets();
+  }, 150);
+});
+let gyroFrame = 0;
+window.addEventListener("deviceorientation", e => {
+  if (reduceMotion() || tab !== "binders" || !binderView) return;
+  const gx = Math.max(-1, Math.min(1, (e.gamma || 0) / 35));
+  const gy = Math.max(-1, Math.min(1, ((e.beta || 40) - 40) / 40));
+  if (gyroFrame) return;
+  gyroFrame = requestAnimationFrame(() => {
+    gyroFrame = 0;
+    document.querySelectorAll("#bindersScroll .sleeve.holo").forEach(el => {
+      el.style.setProperty("--tx", (gx * 6).toFixed(2) + "deg");
+      el.style.setProperty("--ty", (gy * -6).toFixed(2) + "deg");
+      el.style.setProperty("--sx", ((gx + 1) * 50).toFixed(0) + "%");
+      el.style.setProperty("--sy", ((gy + 1) * 50).toFixed(0) + "%");
+    });
+  });
+}, { passive:true });
 paintChips();
 paintContext();
 paintDiscovery();
