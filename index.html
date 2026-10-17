@@ -273,6 +273,7 @@ img{max-width:100%;-webkit-user-drag:none}
 .sleeve.empty .ghost-card{position:absolute;inset:11% 12% 13%;border:1.5px dashed rgba(31,31,30,.28);border-radius:4px;background:rgba(255,255,255,.25)}
 .sleeve.holo .shine{opacity:.9;background:linear-gradient(115deg,transparent 28%,rgba(255,255,255,.72) 40%,rgba(134,222,255,.55) 50%,rgba(246,201,201,.5) 60%,transparent 74%);background-size:220% 220%;background-position:var(--sx,30%) var(--sy,30%);mix-blend-mode:soft-light}
 .sleeve.holo img{transform:perspective(480px) rotateX(var(--ty,0deg)) rotateY(var(--tx,0deg))}
+.sleeve.wanted.holo .shine{opacity:.45}
 .slot .iconish{align-self:center}
 .pad{flex:1;min-height:0;margin:2px;border-radius:8px 18px 18px 8px;border:2.5px solid var(--ink);background:var(--cover,#e9d5c0);box-shadow:inset 0 0 0 7px rgba(255,255,255,.28), inset 0 -14px 0 rgba(31,31,30,.05);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px 14px;position:relative;overflow:hidden}
 .pad-stitch{position:absolute;inset:12px;border:1.5px dashed rgba(31,31,30,.35);border-radius:6px 14px 14px 6px;pointer-events:none}
@@ -284,6 +285,7 @@ img{max-width:100%;-webkit-user-drag:none}
 .dogear.next{right:0;bottom:0}
 .dogear.prev{left:14px;bottom:0;transform:scaleX(-1)}
 .booknav{flex:none;display:flex;align-items:center;gap:6px;min-width:0}
+.bookstage .pagefoot{flex:none;overflow-wrap:anywhere}
 .dots{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0;padding:2px 0}
 .dots::-webkit-scrollbar{display:none}
 .dots button{width:10px;height:10px;min-height:10px;border-radius:50%;border:2px solid var(--ink);background:#fff;padding:0;flex:none}
@@ -299,7 +301,8 @@ img{max-width:100%;-webkit-user-drag:none}
   .toast{bottom:22px}
 }
 .confetti{position:fixed;inset:0;z-index:80;display:grid;place-items:center;pointer-events:none;background:rgba(248,247,239,.2)}
-.confetti p{font-family:var(--display);font-size:28px;background:#fff;border:2.5px solid var(--ink);border-radius:18px;padding:12px 16px;box-shadow:3px 3px 0 var(--ink)}
+.confetti p{font-family:var(--display);font-size:28px;background:#fff;border:2.5px solid var(--ink);border-radius:18px;padding:12px 16px;box-shadow:3px 3px 0 var(--ink);max-width:min(92vw,440px);text-align:center;line-height:1.2}
+.confetti.still{background:transparent}
 .confetti b{position:absolute;width:10px;height:10px;border-radius:50%;animation:conf .9s ease-out forwards}
 @keyframes conf{to{transform:translateY(40vh);opacity:0}}
 .lifting{animation:lift .18s ease-out}
@@ -346,6 +349,39 @@ html.reduce .sleeve.holo img{transform:none}
 @media (min-width:1024px){
   .onboard{align-items:center}
 }
+.cover-row{display:flex;align-items:center;gap:8px;min-width:0;width:100%}
+.cover-copy{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
+.cover-copy b,.cover-copy .fine{overflow-wrap:anywhere}
+.togo{font-family:var(--display);font-weight:700;font-size:14px;line-height:1.2}
+.ring{width:52px;height:52px;flex:none;display:block}
+.ring-track{fill:none;stroke:rgba(31,31,30,.28);stroke-width:4}
+.ring-val{fill:none;stroke:#1F1F1E;stroke-width:4;stroke-linecap:round;transform:rotate(-90deg);transform-origin:center}
+.ring text{font-family:Fredoka,Nunito,sans-serif;font-size:8px;font-weight:700;fill:#1F1F1E}
+.pad-ring{position:relative;display:flex;flex-direction:column;align-items:center}
+.pad-ring .ring{width:56px;height:56px}
+.pad h2{font-size:24px}
+.pad .count{font-size:16px}
+.set-tile{display:flex;flex-direction:column;align-items:flex-start}
+.set-tile .fine{overflow-wrap:anywhere}
+.setpct{width:100%;display:flex;align-items:center;gap:6px;margin-top:auto;padding-top:6px;min-width:0}
+.setpct .bar{flex:1;min-width:0;height:8px}
+.setpct .pct{font-family:var(--display);font-weight:700;font-size:13px;min-width:36px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+.pocket.owned{box-shadow:inset 0 0 0 2px var(--green-deep)}
+.sleeve.wanted img{opacity:.58;filter:saturate(.75)}
+.sleeve.wanted{box-shadow:inset 0 0 0 1.5px rgba(31,31,30,.45)}
+.sleeve.owned{background:#fff;box-shadow:inset 0 0 0 2px var(--ink), inset 0 0 0 5px rgba(171,178,141,.7)}
+.sleeve.owned .gloss{opacity:.28}
+.sleeve .sleeve-tag{position:absolute;z-index:3;top:3px;left:3px;font-family:var(--display);font-size:9px;font-weight:700;background:var(--paper);color:var(--ink);border:1.5px solid var(--ink);border-radius:999px;padding:0 4px;pointer-events:none;white-space:nowrap;max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis;line-height:1.35}
+.sleeve .gotbtn{position:absolute;z-index:4;right:0;bottom:0;width:32px;height:32px;min-width:32px;min-height:32px;padding:0;border:0;border-radius:0;background:transparent;color:var(--ink);box-shadow:none;display:grid;place-items:end;line-height:1;touch-action:manipulation;-webkit-touch-callout:none;user-select:none}
+.sleeve .gotbtn .mark{width:16px;height:16px;margin:0 3px 3px 0;border-radius:999px;border:1.5px solid var(--ink);background:var(--butter);box-shadow:1px 1px 0 var(--ink);display:grid;place-items:center;pointer-events:none}
+.sleeve .gotbtn .mark i{width:7px;height:4px;border-left:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:translateY(-1px) rotate(-45deg);display:none}
+.sleeve.owned .gotbtn .mark{background:var(--green)}
+.sleeve.owned .gotbtn .mark i{display:block}
+.gotbtn:focus-visible{outline-offset:-4px}
+.ownrow{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.ownrow .fine{margin:0;min-width:0}
+.ownchip{flex:none}
+.ownchip[aria-pressed="true"]{background:var(--green);color:var(--ink)}
 </style>
 </head>
 <body>
@@ -519,6 +555,13 @@ let filters = loadFilters();
 let wish = loadWish();
 let binderState = loadBinders();
 let settings = loadSettings();
+const ownedIds = new Set();
+const ownedSetById = new Map();
+const celebrated = new Set();
+let ownedNeedsSeed = false;
+let ownedInlineMigrated = false;
+const pendingCelebrate = [];
+let logState = { v:1, days:[], events:[] };
 let pile = [];
 let briefs = [];
 let seen = new Set();
@@ -591,7 +634,6 @@ let binderView = null;
 let flipPage = 0;
 let pendingSparkle = -1;
 let binderToastTimer = 0;
-const celebrated = new Set();
 let fillBinderId = "";
 let fillSelected = new Set();
 let menuCard = null;
@@ -618,9 +660,10 @@ function localDay(){
 }
 function countPage(){
   countEvent("pageview");
+  let day = "";
+  try { day = localDay(); logVisit(day); } catch (e) {}
   try {
-    const day = localDay();
-    if (localStorage.getItem("bh.visit.day") === day) return;
+    if (!day || localStorage.getItem("bh.visit.day") === day) return;
     localStorage.setItem("bh.visit.day", day);
   } catch (e) { return; }
   countEvent("visit");
@@ -744,6 +787,431 @@ function saveWish(){ try { localStorage.setItem("binderhuntWish", JSON.stringify
 function saveBinders(){ try { localStorage.setItem("bh.binders.v1", JSON.stringify(binderState)); } catch (e) {} if (tab === "binders") renderBinders(); paintDiscovery(); }
 function saveFilters(){ try { localStorage.setItem("bh.filters.v3", JSON.stringify(filters)); } catch (e) {} paintChips(); }
 function saveSettings(){ try { localStorage.setItem("bh.settings.v1", JSON.stringify(settings)); } catch (e) {} applyMotion(); syncHaptics(); }
+
+const OWNED_KEY = "bh.owned.v1";
+const LOG_KEY = "bh.log.v1";
+const LOG_MAX_EVENTS = 200;
+const LOG_MAX_DAYS = 400;
+function cleanId(id){
+  const s = typeof id === "string" ? id.trim() : "";
+  return s && s.length <= 80 ? s : "";
+}
+function asId(v){
+  if (typeof v === "string") return cleanId(v);
+  if (v && typeof v.id === "string") return cleanId(v.id);
+  return "";
+}
+function loadCollectionState(){
+  loadOwned();
+  loadLog();
+  quietSeedBinders();
+}
+function loadOwned(){
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(OWNED_KEY) || "null"); } catch (e) { raw = null; }
+  const ids = extractOwnedIds(raw);
+  if (ids) {
+    ids.forEach(v => { const id = asId(v); if (id) ownedIds.add(id); });
+    if (raw && raw.sets && typeof raw.sets === "object") {
+      Object.keys(raw.sets).forEach(id => {
+        if (!ownedIds.has(id)) return;
+        const sid = cleanId(raw.sets[id]);
+        if (sid) ownedSetById.set(id, sid);
+      });
+    }
+    if (raw && Array.isArray(raw.celebrated)) raw.celebrated.forEach(k => { if (typeof k === "string" && k.length && k.length < 80) celebrated.add(k); });
+    ownedNeedsSeed = !!(raw && raw.seeded === false);
+    if (!raw || raw.v !== 1 || !Array.isArray(raw.ids)) saveOwned();
+    return;
+  }
+  ownedNeedsSeed = true;
+  ownedInlineMigrated = migrateInlineOwned();
+  saveOwned();
+}
+function extractOwnedIds(raw){
+  if (raw == null) return null;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "object") {
+    if (Array.isArray(raw.ids)) return raw.ids;
+    if (Array.isArray(raw.cards)) return raw.cards;
+    return [];
+  }
+  return [];
+}
+function migrateInlineOwned(){
+  let found = false;
+  const take = card => {
+    if (!card || !card.id) return;
+    if (card.owned !== true && card.status !== "owned") return;
+    const id = cleanId(String(card.id));
+    if (!id) return;
+    ownedIds.add(id);
+    if (card.setId) ownedSetById.set(id, cleanId(String(card.setId)) || String(card.setId));
+    delete card.owned;
+    if (card.status === "owned") delete card.status;
+    found = true;
+  };
+  wish.forEach(take);
+  binderState.binders.forEach(b => (b.cards || []).forEach(take));
+  return found;
+}
+function saveOwned(){
+  const sets = {};
+  ownedIds.forEach(id => { const sid = ownedSetById.get(id); if (sid) sets[id] = sid; });
+  const payload = { v:1, ids:[...ownedIds], sets, celebrated:[...celebrated].slice(-500), seeded:!ownedNeedsSeed };
+  try { localStorage.setItem(OWNED_KEY, JSON.stringify(payload)); } catch (e) {}
+}
+function blankLog(){ return { v:1, days:[], events:[] }; }
+function loadLog(){
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(LOG_KEY) || "null"); } catch (e) { raw = null; }
+  if (!raw || typeof raw !== "object") {
+    logState = blankLog();
+    try {
+      const day = localStorage.getItem("bh.visit.day");
+      if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) logState.days.push(day);
+    } catch (e) {}
+    if (logState.days.length) saveLog();
+    return;
+  }
+  logState = trimLog({
+    v:1,
+    days:Array.isArray(raw.days) ? raw.days : [],
+    events:Array.isArray(raw.events) ? raw.events : []
+  });
+}
+function trimLog(log){
+  const days = [];
+  (log.days || []).forEach(d => {
+    if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) && !days.includes(d)) days.push(d);
+  });
+  const events = (log.events || []).filter(e => e && (e.k === "save" || e.k === "own") && typeof e.id === "string" && e.id.length <= 80 && /^\d{4}-\d{2}-\d{2}$/.test(e.t)).slice(-LOG_MAX_EVENTS);
+  return { v:1, days:days.slice(-LOG_MAX_DAYS), events };
+}
+function saveLog(){
+  logState = trimLog(logState);
+  try {
+    let payload = JSON.stringify(logState);
+    while (payload.length > 48000 && logState.events.length) {
+      logState.events.shift();
+      payload = JSON.stringify(logState);
+    }
+    localStorage.setItem(LOG_KEY, payload);
+  } catch (e) {}
+}
+function logVisit(day){
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day || "")) return;
+  if (logState.days.includes(day)) return;
+  logState.days.push(day);
+  saveLog();
+}
+function logEvent(kind, id, extra){
+  const clean = cleanId(String(id || ""));
+  if (!clean || (kind !== "save" && kind !== "own")) return;
+  const row = { t:localDay(), k:kind, id:clean };
+  if (extra && typeof extra.on === "boolean") row.on = extra.on;
+  logState.events.push(row);
+  saveLog();
+}
+function setIdOf(card){
+  if (!card) return "";
+  const explicit = card.setId ? cleanId(String(card.setId)) : "";
+  if (explicit) return explicit;
+  const id = cleanId(String(card.id || ""));
+  if (!id) return "";
+  const remembered = ownedSetById.get(id);
+  if (remembered) return remembered;
+  if (meta.sets.length) {
+    let best = "";
+    meta.sets.forEach(s => {
+      if ((id === s.id || id.startsWith(s.id + "-")) && s.id.length > best.length) best = s.id;
+    });
+    if (best) return best;
+  }
+  const cut = id.lastIndexOf("-");
+  return cut > 0 ? id.slice(0, cut) : "";
+}
+function ownedCountsBySet(){
+  const counts = new Map();
+  ownedIds.forEach(id => {
+    const sid = ownedSetById.get(id) || setIdOf({ id });
+    if (!sid) return;
+    counts.set(sid, (counts.get(sid) || 0) + 1);
+  });
+  return counts;
+}
+function setCardList(setId){
+  if (setView && setView.id === setId && Array.isArray(setView.cards) && setView.cards.length) return setView.cards;
+  const bag = setLists.get(setId);
+  if (bag && Array.isArray(bag.cards) && bag.cards.length) return bag.cards;
+  return null;
+}
+function countOwnedInSet(setId, cards){
+  const list = (cards && cards.length) ? cards : setCardList(setId);
+  if (list && list.length) {
+    const seen = new Set();
+    let n = 0;
+    list.forEach(c => {
+      const id = c && c.id;
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      if (ownedIds.has(id)) n++;
+    });
+    return n;
+  }
+  let n = 0;
+  ownedIds.forEach(id => { if (ownedSetById.get(id) === setId) n++; });
+  return n;
+}
+function clampedOwned(matched, total){
+  const n = Math.max(0, matched || 0);
+  if (total > 0) return Math.min(n, total);
+  return n;
+}
+function setTotal(set){
+  const c = set && set.cardCount;
+  if (!c || typeof c !== "object") return 0;
+  const total = Number(c.total);
+  const official = Number(c.official);
+  if (Number.isFinite(total) && total > 0) return Math.round(total);
+  if (Number.isFinite(official) && official > 0) return Math.round(official);
+  return 0;
+}
+function setCompletion(set){
+  const total = setTotal(set);
+  const owned = clampedOwned(countOwnedInSet(set && set.id), total);
+  if (!total) return { owned, total:0, pct:null };
+  const pct = Math.round((owned / total) * 100);
+  if (!Number.isFinite(pct)) return { owned, total, pct:null };
+  return { owned, total, pct:Math.max(0, Math.min(100, pct)) };
+}
+function progressLabel(owned, total){
+  const left = Math.max(0, total - owned);
+  if (left === 0) return "Complete";
+  if (left === 1) return "1 to go";
+  return left + " to go";
+}
+function progressOf(list){
+  const cards = list || [];
+  const total = cards.length;
+  const owned = cards.filter(c => c && ownedIds.has(c.id)).length;
+  return { owned, total, label: total ? progressLabel(owned, total) : "Ready for cards" };
+}
+function ringMarkup(owned, total){
+  const pct = total > 0 ? Math.max(0, Math.min(100, Math.round((owned / total) * 100))) : 0;
+  const c = 2 * Math.PI * 15.5;
+  const dash = total > 0 && Number.isFinite(pct) ? (pct / 100) * c : 0;
+  const shown = total > 0 && Number.isFinite(pct) ? pct + "%" : "–";
+  const done = total > 0 && owned >= total;
+  return `<svg class="ring${done ? " done" : ""}" viewBox="0 0 42 42" aria-hidden="true"><circle class="ring-track" cx="21" cy="21" r="15.5"></circle><circle class="ring-val" cx="21" cy="21" r="15.5" stroke-dasharray="${dash.toFixed(2)} ${c.toFixed(2)}"></circle><text x="21" y="21" text-anchor="middle" dominant-baseline="central">${esc(shown)}</text></svg>`;
+}
+function friendlySetName(id){
+  const name = setName(id);
+  if (!name || name === id) return "This set";
+  return name;
+}
+function binderFull(binder){
+  const cards = (binder && binder.cards) || [];
+  return cards.length > 0 && cards.every(c => c && ownedIds.has(c.id));
+}
+function noteBinder(binder, beforeOwned){
+  if (!binder || !binderFull(binder)) return "";
+  const total = (binder.cards || []).length;
+  const before = Number.isFinite(beforeOwned) ? beforeOwned : 0;
+  if (!(before < total)) return "";
+  const key = "binder:" + binder.id;
+  if (celebrated.has(key)) return "";
+  celebrated.add(key);
+  return binder.name + " is complete.";
+}
+function noteSet(setId){
+  if (!setId) return "";
+  const list = setCardList(setId);
+  if (!list || !list.length) return "";
+  const set = meta.sets.find(s => s.id === setId);
+  const total = setTotal(set) || list.length;
+  if (!total) return "";
+  const matched = countOwnedInSet(setId, list);
+  const owned = clampedOwned(matched, total);
+  if (owned < total) return "";
+  const key = "set:" + setId;
+  if (celebrated.has(key)) return "";
+  celebrated.add(key);
+  return friendlySetName(setId) + " is complete.";
+}
+const setListInflight = new Map();
+const deferSetConfetti = new Map();
+function publishSetCelebration(setId){
+  if (!setId || ownedNeedsSeed) return "";
+  const msg = noteSet(setId);
+  if (!msg) return "";
+  saveOwned();
+  if (deferSetConfetti.has(setId)) {
+    deferSetConfetti.set(setId, msg);
+    return msg;
+  }
+  showConfetti(msg);
+  return msg;
+}
+function rememberSetList(id, bag){
+  setLists.set(id, bag);
+  if (bag && bag.cards && bag.cards.length) publishSetCelebration(id);
+  return bag;
+}
+async function ensureSetList(id){
+  const ready = setCardList(id);
+  if (ready) return ready;
+  if (setLists.has(id)) return (setLists.get(id) || {}).cards || [];
+  if (setListInflight.has(id)) return setListInflight.get(id);
+  const job = (async () => {
+    try {
+      const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
+      const cards = (set.cards || []).slice().sort((a, b) => numId(a.localId) - numId(b.localId) || String(a.id).localeCompare(String(b.id)));
+      rememberSetList(id, { cards, release:set.releaseDate || "", name:set.name || id });
+      return cards;
+    } catch (e) {
+      if (isBusyError(e)) throw e;
+      setLists.set(id, { cards:[], release:"", name:id });
+      return [];
+    } finally {
+      setListInflight.delete(id);
+    }
+  })();
+  setListInflight.set(id, job);
+  return job;
+}
+function ownedResult(card, on, msgs){
+  if (msgs.length) showConfetti(msgs.join(" "));
+  else {
+    if (settings.sound && !reduceMotion()) playTone(on ? 540 : 300);
+    announce(on ? (card.name || "Card") + " is marked got it." : (card.name || "Card") + " is wanted again.");
+  }
+}
+function collectNewCompletions(card, prior){
+  const msgs = [];
+  if (!card) return msgs;
+  binderState.binders.forEach(b => {
+    if ((b.cards || []).some(c => c && c.id === card.id)) {
+      const before = prior && typeof prior.get === "function" ? prior.get(b.id) : 0;
+      const msg = noteBinder(b, before);
+      if (msg && !msgs.includes(msg)) msgs.push(msg);
+    }
+  });
+  const setMsg = noteSet(setIdOf(card));
+  if (setMsg && !msgs.includes(setMsg)) msgs.push(setMsg);
+  return msgs;
+}
+function quietSeedBinders(){
+  if (!ownedNeedsSeed) return;
+  binderState.binders.forEach(b => { if (binderFull(b)) celebrated.add("binder:" + b.id); });
+  saveOwned();
+}
+function backfillOwnedSets(){
+  let changed = false;
+  ownedIds.forEach(id => {
+    if (ownedSetById.get(id)) return;
+    const sid = setIdOf({ id });
+    if (!sid) return;
+    ownedSetById.set(id, sid);
+    changed = true;
+  });
+  if (changed) saveOwned();
+}
+function pendingCard(item){ return item && item.card ? item.card : item; }
+function quietSeedSets(){
+  if (!ownedNeedsSeed) return;
+  backfillOwnedSets();
+  const skip = new Set();
+  pendingCelebrate.forEach(item => { const id = setIdOf(pendingCard(item)); if (id) skip.add(id); });
+  meta.sets.forEach(s => {
+    if (skip.has(s.id)) return;
+    const list = setCardList(s.id);
+    if (!list || !list.length) return;
+    const total = setTotal(s) || list.length;
+    if (total && countOwnedInSet(s.id, list) >= total) celebrated.add("set:" + s.id);
+  });
+  const queued = pendingCelebrate.splice(0);
+  ownedNeedsSeed = false;
+  const msgs = [];
+  queued.forEach(item => collectNewCompletions(pendingCard(item), item && item.prior).forEach(m => { if (!msgs.includes(m)) msgs.push(m); }));
+  saveOwned();
+  if (msgs.length) showConfetti(msgs.join(" "));
+}
+function refreshOwnedViews(id){
+  if (tab === "binders") renderBinders();
+  if (tab === "sets") renderSets();
+  if (profileCard && profileCard.id === id && !profileEl.hidden) renderProfile(cardCache.get(id) || profileCard);
+}
+function focusOwnedControl(id, origin){
+  if (origin === "profile") {
+    const btn = document.getElementById("profileOwn");
+    if (btn) btn.focus();
+    return;
+  }
+  if (origin === "pocket" || origin === "menu") {
+    const btn = document.querySelector('.gotbtn[data-for="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]');
+    if (btn) btn.focus();
+  }
+}
+function binderOwnedNow(binder){
+  return ((binder && binder.cards) || []).filter(c => c && ownedIds.has(c.id)).length;
+}
+function priorsFor(cardId){
+  const prior = new Map();
+  binderState.binders.forEach(b => {
+    if ((b.cards || []).some(c => c && c.id === cardId)) prior.set(b.id, binderOwnedNow(b));
+  });
+  return prior;
+}
+function setOwned(card, on, origin){
+  if (!card || !card.id) return false;
+  const id = cleanId(String(card.id));
+  if (!id) return false;
+  const has = ownedIds.has(id);
+  if (!!on === has) return false;
+  const prior = on ? priorsFor(id) : null;
+  if (on) {
+    ownedIds.add(id);
+    const sid = setIdOf(card);
+    if (sid) ownedSetById.set(id, sid);
+  } else {
+    ownedIds.delete(id);
+    ownedSetById.delete(id);
+  }
+  logEvent("own", id, { on:!!on });
+  let msgs = [];
+  if (on && ownedNeedsSeed) pendingCelebrate.push({ card, prior });
+  else if (on) msgs = collectNewCompletions(card, prior);
+  saveOwned();
+  if (settings.haptics) haptic(on ? 12 : 6);
+  refreshOwnedViews(id);
+  focusOwnedControl(id, origin);
+  const sid = on ? setIdOf(card) : "";
+  const setTotalNow = sid ? setTotal(meta.sets.find(s => s.id === sid)) : 0;
+  const pendingSet = sid && !ownedNeedsSeed && !setCardList(sid) && !celebrated.has("set:" + sid) && setTotalNow && countOwnedInSet(sid) >= setTotalNow ? sid : "";
+  if (pendingSet) {
+    const binderMsgs = msgs.slice();
+    deferSetConfetti.set(pendingSet, "");
+    ensureSetList(pendingSet).then(() => {
+      const setMsg = deferSetConfetti.get(pendingSet) || "";
+      deferSetConfetti.delete(pendingSet);
+      const all = binderMsgs.slice();
+      if (setMsg && !all.includes(setMsg)) all.push(setMsg);
+      if (!setMsg) {
+        const late = noteSet(pendingSet);
+        if (late && !all.includes(late)) { saveOwned(); all.push(late); }
+      }
+      ownedResult(card, on, all);
+      if (tab === "sets") renderSets();
+    }).catch(() => {
+      deferSetConfetti.delete(pendingSet);
+      ownedResult(card, on, binderMsgs);
+    });
+    return true;
+  }
+  ownedResult(card, on, msgs);
+  return true;
+}
 function snapshot(card){
   return {
     id:card.id, name:card.name || "", set:card.set || "", setId:card.setId || "", number:card.number || "",
@@ -1154,12 +1622,10 @@ function enforceTheme(){
 async function pullSet(id){
   if (!setLists.has(id)) {
     try {
-      const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
-      const cards = (set.cards || []).slice().sort((a, b) => numId(a.localId) - numId(b.localId) || String(a.id).localeCompare(String(b.id)));
-      setLists.set(id, { cards, release:set.releaseDate || "", name:set.name || id });
+      await ensureSetList(id);
     } catch (e) {
       if (isBusyError(e)) throw e;
-      setLists.set(id, { cards:[], release:"", name:id });
+      if (!setLists.has(id)) setLists.set(id, { cards:[], release:"", name:id });
     }
   }
   const bag = setLists.get(id);
@@ -1958,6 +2424,7 @@ function addWish(card){
   wish.push(snapshot(card));
   noteDemand(card.id);
   saveWish();
+  logEvent("save", card.id);
   return true;
 }
 function addToBinder(binder, card){
@@ -1966,6 +2433,7 @@ function addToBinder(binder, card){
   binder.cards.push(snapshot(card));
   if (binder.cards.length % 9 === 0) pendingSparkle = Math.floor((binder.cards.length - 1) / 9);
   saveBinders();
+  logEvent("save", card.id);
   return true;
 }
 function removeFromBinder(binder, id){
@@ -2243,8 +2711,12 @@ function renderSets(){
     if (!list || !list.length) return;
     html.push(`<h2>${esc(era)}</h2><div class="set-grid">`);
     list.forEach(s => {
-      const count = (s.cardCount && (s.cardCount.official || s.cardCount.total)) || "";
-      html.push(`<button class="set-tile" type="button" data-set="${esc(s.id)}">${s.logo ? `<img alt="" src="${esc(s.logo + ".webp")}">` : ""}<b>${esc(s.name)}</b><span class="fine">${esc(era)}${count ? " · " + count + " cards" : ""}${s.year ? " · " + esc(s.year) : ""}</span></button>`);
+      const count = (s.cardCount && (s.cardCount.total || s.cardCount.official)) || "";
+      const comp = setCompletion(s);
+      const pctLabel = comp.pct == null ? "—" : comp.pct + "%";
+      const pctAria = comp.total ? comp.owned + " of " + comp.total + " owned, " + pctLabel : "Set size unknown";
+      const aria = [s.name, era, count ? count + " cards" : "", pctAria].filter(Boolean).join(", ");
+      html.push(`<button class="set-tile" type="button" data-set="${esc(s.id)}" aria-label="${esc(aria)}">${s.logo ? `<img alt="" src="${esc(s.logo + ".webp")}">` : ""}<b>${esc(s.name)}</b><span class="fine">${esc(era)}${count ? " · " + count + " cards" : ""}${s.year ? " · " + esc(s.year) : ""}</span><span class="setpct"><span class="bar" aria-hidden="true"><span style="width:${comp.pct == null ? 0 : comp.pct}%"></span></span><span class="pct">${esc(pctLabel)}</span></span></button>`);
     });
     html.push(`</div>`);
   });
@@ -2275,6 +2747,7 @@ async function openSet(id){
     const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
     const cards = (set.cards || []).slice().sort((a, b) => numId(a.localId) - numId(b.localId));
     if (!cards.some(c => safeImg(c && c.image))) imageless.add(id);
+    rememberSetList(id, { cards, release:set.releaseDate || "", name:set.name || known.name || id });
     setView = { id, name:set.name || known.name, release:(set.releaseDate || "").slice(0, 4), cards, mode:"flip", loading:false };
     const tile = meta.sets.find(s => s.id === id);
     if (tile) tile.year = setView.release;
@@ -2288,10 +2761,11 @@ function savedIds(){
 }
 function renderSetPage(root){
   const s = setView;
-  const saved = savedIds();
-  const have = s.cards.filter(c => saved.has(c.id)).length;
-  const total = s.cards.length || 0;
-  const pct = total ? Math.round(have / total * 100) : 0;
+  const knownSet = meta.sets.find(x => x.id === s.id);
+  const total = setTotal(knownSet) || s.cards.length || 0;
+  const owned = clampedOwned(countOwnedInSet(s.id, s.cards), total);
+  const pct = total ? Math.max(0, Math.min(100, Math.round(owned / total * 100))) : 0;
+  const progressLine = total ? pct + "% · " + owned + " / " + total + " owned" + (owned > 0 ? " · " + progressLabel(owned, total) : "") : "Owned progress shows once this set has a card count.";
   if (s.mode !== "flip" && s.mode !== "about") s.mode = "flip";
   root.innerHTML = `<div class="setpage"><div class="sethead"><button class="chip" id="backSets" type="button">All sets</button>
     <h2>${esc(s.name)}</h2></div>
@@ -2300,8 +2774,8 @@ function renderSetPage(root){
       <button class="chip" id="swipeSet" type="button">Swipe this set</button>
       <button class="chip on" id="flipSet" type="button" aria-pressed="true">Flip through</button>
     </div>
-    <p class="fine">${have} / ${total || "…"} saved</p>
-    <div class="bar" aria-hidden="true"><span style="width:${pct}%"></span></div>
+    <p class="fine" id="setProgress">${esc(progressLine)}</p>
+    <div class="bar" aria-hidden="true"><span style="width:${total ? pct : 0}%"></span></div>
     <div class="setflip" id="setBody"></div></div>`;
   document.getElementById("backSets").onclick = () => { setView = null; renderSets(); paintContext(); };
   document.getElementById("swipeSet").onclick = () => {
@@ -2330,9 +2804,10 @@ function renderSetPage(root){
   const host = document.getElementById("setPockets");
   slice.forEach(c => {
     const pocket = document.createElement("article");
-    pocket.className = "pocket";
+    const ownedCard = ownedIds.has(c.id);
+    pocket.className = "pocket" + (ownedCard ? " owned" : "");
     const on = wish.some(w => w.id === c.id);
-    pocket.innerHTML = `<button type="button" class="open" aria-label="${esc(c.name)} – ${esc(s.name)} #${esc(c.localId || "")}"><img alt="" draggable="false" decoding="async" loading="lazy"></button><b>${esc(c.name)}</b><button class="iconish heart" type="button" aria-label="${on ? "On wishlist" : "Add to wishlist"}">${on ? "♥" : "♡"}</button>`;
+    pocket.innerHTML = `<button type="button" class="open" aria-label="${esc(c.name)} – ${esc(s.name)} #${esc(c.localId || "")}${ownedCard ? ", owned" : ", wanted"}"><img alt="" draggable="false" decoding="async" loading="lazy"></button><b>${esc(c.name)}</b><button class="iconish heart" type="button" aria-label="${on ? "On wishlist" : "Add to wishlist"}">${on ? "♥" : "♡"}</button>`;
     const img = pocket.querySelector("img");
     img.alt = c.name + " – " + s.name + " #" + (c.localId || "");
     img.draggable = false;
@@ -2379,8 +2854,11 @@ function renderBinders(){
   if (binderView) { renderCollection(root); return; }
   root.classList.remove("reading");
   const total = valueOf(wish);
-  root.innerHTML = `<p class="fine">Wishlist is the master list. Every right-swipe lands there. Binders are themes you build from it.</p>
-    <button class="wish-row" id="openWish" type="button"><span><b>Wishlist</b><span class="fine">${wish.length} cards · not a binder</span></span><span class="pill${total ? "" : " missing"}">${esc(total ? priceText(total, "USD") : "—")}</span></button>
+  const ownedN = wish.filter(c => ownedIds.has(c.id)).length;
+  const wantedN = Math.max(0, wish.length - ownedN);
+  const wishFine = wish.length ? wish.length + " cards · " + ownedN + " owned · " + wantedN + " wanted · not a binder" : "Nothing saved yet · not a binder";
+  root.innerHTML = `<p class="fine">Wishlist is the master list. Mark a card Got it once it's in your hands. That owned mark is shared by every binder.</p>
+    <button class="wish-row" id="openWish" type="button"><span><b>Wishlist</b><span class="fine">${esc(wishFine)}</span></span><span class="pill${total ? "" : " missing"}">${esc(total ? priceText(total, "USD") : "—")}</span></button>
     <h2>Your binders</h2>
     <div class="shelf" id="shelf"></div>`;
   const shelf = document.getElementById("shelf");
@@ -2390,7 +2868,10 @@ function renderBinders(){
     btn.className = "cover";
     btn.style.background = b.color || COLORS[0];
     const val = valueOf(b.cards);
-    btn.innerHTML = `<b>${esc(b.name)}</b><span class="fine">${esc(themeLabel(themeOf(b)))}</span><span class="fine">${b.cards.length} cards · ${esc(val ? priceText(val, "USD") : "—")}</span>`;
+    const p = progressOf(b.cards);
+    const price = val ? priceText(val, "USD") : "—";
+    btn.dataset.progress = p.owned + "/" + p.total;
+    btn.innerHTML = `<span class="cover-row"><span class="cover-copy"><b>${esc(b.name)}</b><span class="fine">${esc(themeLabel(themeOf(b)))}</span><span class="togo">${esc(p.label)}</span><span class="fine">${b.cards.length} ${b.cards.length === 1 ? "card" : "cards"} · ${esc(price)}</span><span class="sr-only">${esc(p.total ? p.owned + " of " + p.total + " owned" : "No cards yet")}</span></span>${ringMarkup(p.owned, p.total)}</span>`;
     btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; renderBinders(); };
     shelf.append(btn);
   });
@@ -2438,50 +2919,42 @@ function sparkBits(){
   }
   return s;
 }
-function showConfetti(){
-  announce("This set is complete.");
-  if (reduceMotion()) return;
+function showConfetti(message){
+  const text = message || "Complete.";
+  announce(text);
+  if (settings.sound && !reduceMotion()) {
+    playTone(523);
+    setTimeout(() => { if (settings.sound && !reduceMotion()) playTone(659); }, 110);
+  }
+  document.querySelectorAll(".confetti").forEach(n => n.remove());
   const el = document.createElement("div");
-  el.className = "confetti";
-  el.innerHTML = `<p>The set is complete.</p>`;
-  el.querySelector("p").append(document.createRange().createContextualFragment(toad()));
-  for (let i = 0; i < 16; i++) {
-    const b = document.createElement("b");
-    b.style.left = (4 + (i * 6) % 92) + "%";
-    b.style.top = (8 + (i % 4) * 8) + "%";
-    b.style.background = ["#86DEFF","#F6C9C9","#ABB28D","#F3EDC8","#E9D5C0"][i % 5];
-    el.append(b);
+  el.className = "confetti" + (reduceMotion() ? " still" : "");
+  el.setAttribute("aria-hidden", "true");
+  const p = document.createElement("p");
+  p.textContent = text;
+  p.append(document.createRange().createContextualFragment(toad()));
+  el.append(p);
+  if (!reduceMotion()) {
+    for (let i = 0; i < 16; i++) {
+      const b = document.createElement("b");
+      b.style.left = (4 + (i * 6) % 92) + "%";
+      b.style.top = (8 + (i % 4) * 8) + "%";
+      b.style.background = ["#86DEFF","#F6C9C9","#ABB28D","#F3EDC8","#E9D5C0"][i % 5];
+      el.append(b);
+    }
   }
   document.body.append(el);
-  setTimeout(() => el.remove(), 1500);
-}
-function maybeCelebrate(binder){
-  if (!binder || celebrated.has(binder.id)) return;
-  const theme = themeOf(binder);
-  if (theme.kind !== "set" || !theme.setId) return;
-  const known = meta.sets.find(s => s.id === theme.setId);
-  const official = known && known.cardCount && (known.cardCount.official || known.cardCount.total);
-  if (official && binder.cards.length < official) return;
-  const check = cards => {
-    if (!cards || !cards.length || !cards.every(c => binder.cards.some(x => x.id === c.id))) return;
-    if (celebrated.has(binder.id)) return;
-    celebrated.add(binder.id);
-    showConfetti();
-  };
-  const bag = setLists.get(theme.setId);
-  if (bag) { check(bag.cards); return; }
-  getJson(TCGDEX + "/sets/" + encodeURIComponent(theme.setId)).then(set => {
-    setLists.set(theme.setId, { cards:set.cards || [], release:"", name:set.name || theme.setId });
-    if (binderView && binderView.id === binder.id) check(set.cards || []);
-  }).catch(() => {});
+  setTimeout(() => el.remove(), reduceMotion() ? 2400 : 1600);
 }
 function coverPad(binder, list){
   const pad = document.createElement("div");
   pad.className = "pad";
   pad.style.setProperty("--cover", binder.color || "#E9D5C0");
   const val = valueOf(list);
+  const p = progressOf(list);
+  const price = val ? priceText(val, "USD") : "—";
   const charm = binder.charm === "toad" ? `<div class="charm">${toad()}</div>` : binder.charm === "sticker" ? `<div class="charm sticker" aria-hidden="true">★</div>` : "";
-  pad.innerHTML = `<div class="pad-stitch"></div><p class="fine">Binder</p><h2>${esc(binder.name)}</h2><p class="count">${list.length} ${list.length === 1 ? "card" : "cards"}</p><p class="count">${esc(val ? priceText(val, "USD") : "—")}</p>${list.length ? `<p class="fine">${esc(themeLabel(themeOf(binder)))}</p>` : `<p class="fine">A fresh binder. These pockets are waiting.</p>${toad()}`}${charm}`;
+  pad.innerHTML = `<div class="pad-stitch"></div><div class="pad-ring">${ringMarkup(p.owned, p.total)}</div><h2>${esc(binder.name)}</h2><p class="count">${esc(p.label)}</p><p class="count">${list.length} ${list.length === 1 ? "card" : "cards"} · ${esc(price)}</p>${list.length ? `<p class="fine">${esc(themeLabel(themeOf(binder)))}</p>` : `<p class="fine">A fresh binder. These pockets are waiting.</p>${toad()}`}${charm}`;
   return pad;
 }
 function endPaper(text){
@@ -2491,14 +2964,49 @@ function endPaper(text){
   wrap.innerHTML = `<div class="pad-stitch"></div><p class="count">${esc(text)}</p>${toad()}`;
   return wrap;
 }
+let suppressGotClickUntil = 0;
+function gotPressIgnored(press, now, x, y){
+  if (now < suppressGotClickUntil) return true;
+  if (!press || !press.t) return false;
+  if (press.suppress) return true;
+  const dt = now - press.t;
+  const dist = Math.max(press.d || 0, Math.hypot((x || 0) - (press.x || 0), (y || 0) - (press.y || 0)));
+  return dt > 450 || dist > 8;
+}
 function sleeveSlot(card, index, ctx){
   const slot = document.createElement("div");
   slot.className = "slot";
+  const owned = ownedIds.has(card.id);
   const sleeve = document.createElement("div");
-  sleeve.className = "sleeve" + (isHolo(card) ? " holo" : "");
+  sleeve.className = "sleeve " + (owned ? "owned" : "wanted") + (isHolo(card) ? " holo" : "");
   sleeve.dataset.index = String(index);
-  sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card))}"></button><span class="shine" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span>`;
+  sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card) + (owned ? ", owned" : ", wanted"))}"></button><span class="sleeve-tag" aria-hidden="true">${owned ? "Owned" : "Wanted"}</span><span class="shine" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span>`;
   paintArt(sleeve.querySelector(".cardhit"), card);
+  const got = document.createElement("button");
+  got.type = "button";
+  got.className = "gotbtn";
+  got.dataset.for = card.id;
+  got.innerHTML = `<span class="mark" aria-hidden="true"><i></i></span>`;
+  got.setAttribute("aria-pressed", owned ? "true" : "false");
+  got.setAttribute("aria-label", owned ? "Undo got it for " + (card.name || "this card") : "Got it! Mark " + (card.name || "this card") + " as owned");
+  got.addEventListener("pointerdown", e => {
+    if (e.button) return;
+    got._press = { t:Date.now(), x:e.clientX, y:e.clientY, d:0, suppress:false };
+  });
+  got.addEventListener("pointermove", e => {
+    const p = got._press;
+    if (!p) return;
+    p.d = Math.max(p.d || 0, Math.hypot(e.clientX - p.x, e.clientY - p.y));
+  });
+  got.onclick = e => {
+    e.stopPropagation();
+    e.preventDefault();
+    const press = got._press;
+    got._press = null;
+    if (gotPressIgnored(press, Date.now(), e.clientX, e.clientY)) return;
+    setOwned(card, !ownedIds.has(card.id), "pocket");
+  };
+  sleeve.append(got);
   const more = document.createElement("button");
   more.type = "button";
   more.className = "iconish more";
@@ -2666,7 +3174,9 @@ function renderCollection(root){
   const foot = document.createElement("p");
   foot.className = "pagefoot";
   const shownLeft = withCover && flipPage === 0 ? "Cover" : "Page " + (withCover ? flipPage : flipPage + 1);
-  foot.textContent = (wishMode ? "Wishlist · " : "") + shownLeft + (desktop && flipPage + 1 < total ? " – " + (withCover && flipPage + 1 === 0 ? "Cover" : "Page " + (withCover ? flipPage + 1 : flipPage + 2)) : "") + " · " + list.length + (list.length === 1 ? " card · " : " cards · ") + (val ? priceText(val, "USD") : "—");
+  const ownedHere = list.filter(c => ownedIds.has(c.id)).length;
+  const ownBit = list.length ? " · " + ownedHere + " owned · " + (list.length - ownedHere) + " wanted" : "";
+  foot.textContent = (wishMode ? "Wishlist · " : "") + shownLeft + (desktop && flipPage + 1 < total ? " – " + (withCover && flipPage + 1 === 0 ? "Cover" : "Page " + (withCover ? flipPage + 1 : flipPage + 2)) : "") + " · " + list.length + (list.length === 1 ? " card" : " cards") + ownBit + " · " + (val ? priceText(val, "USD") : "—");
   stage.append(book, nav, foot);
   root.append(tools, stage);
 
@@ -2735,12 +3245,13 @@ function renderCollection(root){
     if (Math.abs(dest - flipPage) === step) finishFlip(dest > flipPage ? 1 : -1);
     else goSheet(dest);
   };
-  let mode = "", pid = null, sx = 0, sy = 0, timer = 0, ghost = null, dragIndex = -1, leaf = null, fromPointer = false;
+  let mode = "", pid = null, sx = 0, sy = 0, timer = 0, ghost = null, dragIndex = -1, leaf = null, fromPointer = false, pressBtn = null;
   const clearTimer = () => { if (timer) { clearTimeout(timer); timer = 0; } };
   const endGhost = () => { if (ghost) { ghost.remove(); ghost = null; } book.querySelectorAll(".sleeve").forEach(s => { s.style.opacity = ""; }); };
   const onMove = e => {
     if (e.pointerId !== pid) return;
     const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (pressBtn && pressBtn._press) pressBtn._press.d = Math.max(pressBtn._press.d || 0, Math.hypot(dx, dy));
     if (mode === "curl") {
       const width = Math.max(120, (leaf && leaf.clientWidth) || 200);
       const dir = leaf && leaf.classList.contains("backward") ? 1 : -1;
@@ -2786,6 +3297,7 @@ function renderCollection(root){
         else snapCurl(turning);
       }
     } else if (mode === "card") {
+      if (pressBtn) suppressGotClickUntil = Date.now() + 500;
       endGhost();
       book.classList.remove("out");
       if (!cancelled) {
@@ -2809,11 +3321,14 @@ function renderCollection(root){
     } else if (!cancelled && mode === "swipe-next" && dx < -48) finishFlip(1);
     else if (!cancelled && mode === "swipe-prev" && dx > 48) finishFlip(-1);
     else if (!cancelled && !mode && Math.hypot(dx, dy) < 8) {
-      const hit = e.target.closest(".sleeve[data-index] .cardhit, .sleeve[data-index]");
-      const sleeve = hit && hit.closest(".sleeve[data-index]");
-      if (sleeve && !e.target.closest(".iconish")) liftCard(list[Number(sleeve.dataset.index)]);
+      const origin = e.target instanceof Element ? e.target : document.elementFromPoint(e.clientX, e.clientY);
+      if (origin) {
+        const hit = origin.closest(".sleeve[data-index] .cardhit, .sleeve[data-index]");
+        const sleeve = hit && hit.closest(".sleeve[data-index]");
+        if (sleeve && !origin.closest(".iconish, .gotbtn")) liftCard(list[Number(sleeve.dataset.index)]);
+      }
     }
-    mode = ""; pid = null; leaf = null;
+    mode = ""; pid = null; leaf = null; pressBtn = null;
   };
   function liftCard(card){
     if (!card) return;
@@ -2856,10 +3371,12 @@ function renderCollection(root){
   book.addEventListener("pointerdown", e => {
     if (e.button) return;
     if (e.target.closest(".iconish")) return;
+    const onGot = e.target.closest(".gotbtn");
+    pressBtn = onGot || null;
     pid = e.pointerId; sx = e.clientX; sy = e.clientY; mode = "";
     const dog = e.target.closest(".dogear");
     const sleeveHit = e.target.closest(".sleeve");
-    if ((dog || sleeveHit) && e.cancelable) e.preventDefault();
+    if ((dog || sleeveHit) && !onGot && e.cancelable) e.preventDefault();
     if (dog) {
       const dir = dog.classList.contains("prev") ? -1 : 1;
       if (landed(dir) === flipPage) return;
@@ -2876,6 +3393,7 @@ function renderCollection(root){
       dragIndex = Number(sleeve.dataset.index);
       timer = setTimeout(() => {
         mode = "card";
+        if (pressBtn && pressBtn._press) pressBtn._press.suppress = true;
         if (settings.haptics) haptic(6);
         const img = sleeve.querySelector("img");
         ghost = document.createElement("img");
@@ -2908,7 +3426,7 @@ function renderCollection(root){
   });
   document.getElementById("backBinders").onclick = () => { binderView = null; renderBinders(); };
   document.getElementById("copyList").onclick = async () => {
-    const text = (wishMode ? "Wishlist" : binder.name) + "\n" + list.map(c => [c.name, c.set, c.number ? "#" + c.number : "", priceText(usdOf(c), "USD")].filter(Boolean).join(" — ")).join("\n");
+    const text = (wishMode ? "Wishlist" : binder.name) + "\n" + list.map(c => [c.name, c.set, c.number ? "#" + c.number : "", ownedIds.has(c.id) ? "owned" : "wanted", priceText(usdOf(c), "USD")].filter(Boolean).join(" — ")).join("\n");
     try { await navigator.clipboard.writeText(text); announce("List copied."); }
     catch (err) { announce("List ready. Clipboard was blocked."); }
   };
@@ -2928,7 +3446,6 @@ function renderCollection(root){
         renderBinders();
       };
     };
-    maybeCelebrate(binder);
   }
 }
 
@@ -2938,10 +3455,17 @@ function openMenu(anchor, card, binder){
   const r = anchor.getBoundingClientRect();
   menu.hidden = false;
   menu.style.left = Math.min(r.left, window.innerWidth - 200) + "px";
-  menu.style.top = Math.min(r.bottom + 4, window.innerHeight - 120) + "px";
-  menu.innerHTML = binder
+  menu.style.top = Math.min(r.bottom + 4, window.innerHeight - 180) + "px";
+  const owned = ownedIds.has(card.id);
+  menu.innerHTML = `<button type="button" id="menuOwn">${owned ? "Undo got it" : "Got it!"}</button>` + (binder
     ? `<button type="button" id="menuRemove">Remove from ${esc(binder.name)}</button>`
-    : `<button type="button" id="menuRemove">Remove from wishlist</button>`;
+    : `<button type="button" id="menuRemove">Remove from wishlist</button>`);
+  const ownBtn = document.getElementById("menuOwn");
+  ownBtn.setAttribute("aria-label", owned ? "Undo got it for " + (card.name || "this card") : "Got it! Mark " + (card.name || "this card") + " as owned");
+  ownBtn.onclick = () => {
+    menu.hidden = true;
+    setOwned(card, !ownedIds.has(card.id), "menu");
+  };
   document.getElementById("menuRemove").onclick = () => {
     if (binder) removeFromBinder(binder, card.id);
     else removeFromWish(card.id);
@@ -3039,7 +3563,7 @@ function drawFill(){
     btn.className = "pick";
     btn.setAttribute("aria-pressed", already ? "true" : "false");
     btn.disabled = already;
-    btn.innerHTML = `<span class="art"></span><b>${esc(card.name)}</b>`;
+    btn.innerHTML = `<span class="art"></span><b>${esc(card.name)}</b><span class="fine">${ownedIds.has(card.id) ? "Owned" : "Wanted"}</span>`;
     const art = document.createElement("div");
     paintArt(art, card);
     btn.querySelector(".art").replaceWith(art);
@@ -3273,6 +3797,9 @@ function renderProfile(card){
   const variants = (card.variants || []).filter(v => pos(v.market));
   const banner = scanBanner(card);
   const onWish = wish.some(w => w.id === card.id);
+  const owned = ownedIds.has(card.id);
+  const ownLabel = owned ? "Got it · undo" : "Got it!";
+  const ownAria = owned ? "Undo got it for " + (card.name || "this card") : "Got it! Mark " + (card.name || "this card") + " as owned";
   const binder = discoveryBinder();
   const inBinder = binder && binder.cards.some(c => c.id === card.id);
   profileEl.innerHTML = `<div class="profile-scroll">
@@ -3293,6 +3820,10 @@ function renderProfile(card){
       </div>
       ${svg || `<p class="empty-state">${series.pendingFx ? "Checking the dollar rate…" : "Not enough price history"}</p>`}
       <p class="scrub" id="scrub">${guide ? esc(guide.label) + " latest cached " + esc(priceText(guide.value, "USD")) + ". The dashed line is that price, not a daily history." : esc(series.note || "")}</p>
+    </div>
+    <div class="ownrow">
+      <button class="chip ownchip" id="profileOwn" type="button" aria-pressed="${owned ? "true" : "false"}" aria-label="${esc(ownAria)}">${esc(ownLabel)}</button>
+      <p class="fine">${owned ? "Owned. The same mark shows in every binder." : "Wanted. Got it fills this card in every binder."}</p>
     </div>
     <div class="links">${buyLinks(card).map(l => `<a class="buy-btn" href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join("")}
       <button class="chip" id="profileWish" type="button">${onWish ? "On wishlist" : "★ Add to wishlist"}</button>
@@ -3328,6 +3859,7 @@ function renderProfile(card){
     ranges.addEventListener("scroll", fade, { passive:true });
     requestAnimationFrame(fade);
   }
+  document.getElementById("profileOwn").onclick = () => setOwned(card, !ownedIds.has(card.id), "profile");
   document.getElementById("profileWish").onclick = () => {
     if (onWish) removeFromWish(card.id); else addWish(card);
     renderProfile(cardCache.get(card.id) || card);
@@ -3393,7 +3925,7 @@ document.getElementById("gear").onclick = () => {
     <label class="field">Currency<select id="setCur"><option value="USD">US dollars</option><option value="EUR">Cardmarket euros</option></select></label>
     <button class="chip" id="retakeOnboard" type="button">Retake the hunt quiz</button>
     <h2>About</h2>
-    <p class="fine">BinderHunt is not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. There is no account. Wishlists, binders, filters, and settings stay in this browser.</p>
+    <p class="fine">BinderHunt is not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. There is no account. Wishlists, binders, owned marks, filters, and settings stay in this browser.</p>
     <p class="fine">A public hit counter records page views, one visit a day, and a few actions. It sets no cookies and sends no identifier, and it stays off when Do Not Track is on.</p>
     <p class="fine">Card text and images come from TCGdex. US prices come from TCGplayer. European prices come from Cardmarket. Commons and cards under $10 use those catalog prices. Graded prices and population come from a Scrydex cache for chase cards and cards you open or save often, and only for the printing on screen. Prices are estimates, not financial advice. TCGplayer, eBay, and Cardmarket links are not affiliate links yet.</p>
     <p class="fine"><img src="assets/brand/two-toads-logo.png" width="32" height="32" alt="Two Toads"> BinderHunt · made with 🐸 by Two Toads</p>`;
@@ -3661,11 +4193,21 @@ function finishOnboard(){
 document.getElementById("onboardSkip").onclick = skipOnboard;
 document.getElementById("onboardBack").onclick = () => { onboardStep = 1; renderOnboard(); };
 document.getElementById("onboardNext").onclick = finishOnboard;
+loadCollectionState();
+if (ownedInlineMigrated) {
+  try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {}
+  try { localStorage.setItem("bh.binders.v1", JSON.stringify(binderState)); } catch (e) {}
+}
 paintChips();
 paintContext();
 paintDiscovery();
 loadScrydex();
-loadMeta().then(() => { if (tab === "sets") renderSets(); }).catch(() => {});
+loadMeta().then(() => {
+  backfillOwnedSets();
+  quietSeedSets();
+  if (tab === "sets") renderSets();
+  if (tab === "binders") renderBinders();
+}).catch(() => {});
 restart();
 const deepId = new URLSearchParams(location.search).get("card");
 const returning = wish.length > 0 || binderState.binders.length > 0;
