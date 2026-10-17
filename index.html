@@ -566,6 +566,31 @@ let fillSelected = new Set();
 let menuCard = null;
 let restoreFocus = null;
 
+const COUNT_NS = "binderhunt.kyrohmotz.github.io";
+function doNotTrack(){
+  try {
+    const flag = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+    return flag === "1" || flag === "yes";
+  } catch (e) { return true; }
+}
+function countEvent(name){
+  try {
+    if (doNotTrack()) return;
+    if (!/^[a-z0-9-]{3,32}$/.test(name)) return;
+    if (typeof fetch !== "function") return;
+    fetch("https://abacus.jasoncameron.dev/hit/" + COUNT_NS + "/" + name, { method:"GET", credentials:"omit", cache:"no-store", keepalive:true }).catch(() => {});
+  } catch (e) {}
+}
+function countPage(){
+  countEvent("pageview");
+  try {
+    const day = new Date().toISOString().slice(0, 10);
+    if (localStorage.getItem("bh.visit.day") === day) return;
+    localStorage.setItem("bh.visit.day", day);
+  } catch (e) { return; }
+  countEvent("visit");
+}
+
 function num(v){ return typeof v === "number" && Number.isFinite(v) ? v : null; }
 function pos(v){ const n = typeof v === "number" ? v : (v == null || v === "" ? null : Number(v)); return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : null; }
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, ch => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[ch])); }
@@ -1508,6 +1533,7 @@ function fly(dir, from){
   let addedWish = false, addedBinder = false;
   const binder = dir > 0 ? discoveryBinder() : null;
   if (dir > 0) {
+    countEvent("swipe-right");
     addedWish = addWish(card);
     if (binder) addedBinder = addToBinder(binder, card);
     if (settings.haptics) haptic(10);
@@ -1881,6 +1907,7 @@ function renderSets(){
   });
 }
 async function openSet(id){
+  countEvent("set-mode");
   const known = meta.sets.find(s => s.id === id) || { id, name:id };
   flipPage = 0;
   setView = { id, name:known.name, cards:[], release:"", loading:true };
@@ -2308,15 +2335,18 @@ function renderCollection(root){
     leaf.style.setProperty("--turn", "0");
     return leaf;
   };
+  const noteFlip = () => { if (!wishMode) countEvent("page-flip"); };
   const goSheet = dest => {
     const next = desktop ? Math.max(0, dest - (dest % 2)) : dest;
     if (next === flipPage || next < 0 || next >= total) return;
+    noteFlip();
     flipPage = next;
     renderBinders();
   };
   const finishFlip = dir => {
     const dest = landed(dir);
     if (dest === flipPage) return;
+    noteFlip();
     playPaper();
     if (settings.haptics) haptic(8);
     if (reduceMotion()) { flipPage = dest; renderBinders(); return; }
@@ -2617,6 +2647,7 @@ async function openBinderForm(){
     const binder = { id:"b" + Date.now().toString(36), name, color, theme, cards:[], charm };
     binderState.binders.push(binder);
     saveBinders();
+    countEvent("binder-created");
     closeSheet("binderSheet");
     binderView = { kind:"binder", id:binder.id };
     flipPage = 0;
@@ -2989,6 +3020,7 @@ document.getElementById("gear").onclick = () => {
     <button class="chip" id="retakeOnboard" type="button">Retake the hunt quiz</button>
     <h2>About</h2>
     <p class="fine">BinderHunt is not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. There is no account. Wishlists, binders, filters, and settings stay in this browser.</p>
+    <p class="fine">A public hit counter records page views, one visit a day, and a few actions. It sets no cookies and sends no identifier, and it stays off when Do Not Track is on.</p>
     <p class="fine">Card text and images come from TCGdex. US prices come from TCGplayer. European prices come from Cardmarket. Commons and cards under $10 use those catalog prices. Graded prices and population come from a Scrydex cache for chase cards and cards you open or save often, and only for the printing on screen. Prices are estimates, not financial advice. TCGplayer, eBay, and Cardmarket links are not affiliate links yet.</p>
     <p class="fine"><img src="assets/brand/two-toads-logo.png" width="32" height="32" alt="Two Toads"> BinderHunt · made with 🐸 by Two Toads</p>`;
   document.getElementById("setMotion").value = settings.reduce;
@@ -3219,6 +3251,7 @@ function skipOnboard(){
   document.getElementById("onboard").hidden = true;
   if (onboardMode === "retake") return;
   saveOnboard({ done:true, skipped:true, picks:[], custom:[], era:"", budget:"", at:Date.now() });
+  countEvent("onboard-skip");
 }
 function finishOnboard(){
   if (onboardStep === 1) { onboardStep = 2; renderOnboard(); return; }
@@ -3229,6 +3262,7 @@ function finishOnboard(){
   filters.pricePreset = onboardBudget || "";
   saveOnboard({ done:true, skipped:!names.length && !filters.era && !filters.pricePreset, picks:[...onboardPicks], custom:onboardCustom.slice(), era:filters.era, budget:filters.pricePreset, at:Date.now() });
   document.getElementById("onboard").hidden = true;
+  if (onboardMode !== "retake") countEvent("onboard-done");
   restart({ keepSpice: names.length > 0 });
   const bits = [];
   if (names.length) bits.push(namesLabel());
@@ -3246,6 +3280,7 @@ loadScrydex();
 loadMeta().then(() => { if (tab === "sets") renderSets(); }).catch(() => {});
 restart();
 if (!(loadOnboard() || {}).done) openOnboard("first");
+countPage();
 const deepId = new URLSearchParams(location.search).get("card");
 if (deepId) hydrate({ id:deepId }).then(card => { if (card && !card.digital) openProfile(card); }).catch(() => announce("That card link didn't load."));
 </script>
