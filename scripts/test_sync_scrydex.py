@@ -74,6 +74,10 @@ class TrimTests(unittest.TestCase):
             "stale-a": {"fetched_at": (now - timedelta(hours=50)).strftime("%Y-%m-%dT%H:%M:%SZ")},
         }
         due = sync.select_due(seed, cards, now, max_cards=2)
+        self.assertEqual(due, ["new-a"])
+        cards["new-a"] = {"fetched_at": (now - timedelta(days=9)).strftime("%Y-%m-%dT%H:%M:%SZ")}
+        cards["stale-a"] = {"fetched_at": (now - timedelta(days=8)).strftime("%Y-%m-%dT%H:%M:%SZ")}
+        due = sync.select_due(seed, cards, now, max_cards=2)
         self.assertEqual(due, ["new-a", "stale-a"])
 
     def test_missing_secret_does_not_echo_values(self):
@@ -97,9 +101,17 @@ class TrimTests(unittest.TestCase):
     def test_seed_file_parses(self):
         seed = sync.load_seed()
         ids = [card_id for _, card_id in seed]
-        self.assertIn("base1-4", ids)
-        self.assertIn("swsh7-215", ids)
-        self.assertLessEqual(len(ids), 40)
+        tiers = [tier for tier, _card_id in seed]
+        by_id = {card_id: tier for tier, card_id in seed}
+        self.assertEqual(by_id["base1-4"], "A")
+        self.assertEqual(by_id["swsh7-215"], "A")
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertGreaterEqual(len(ids), 1500)
+        self.assertLessEqual(len(ids), 2000)
+        self.assertEqual(tiers[:300].count("A"), 300)
+        self.assertEqual(tiers[300:].count("B"), len(tiers) - 300)
+        self.assertNotIn("B", tiers[:300])
+        self.assertTrue(all(not __import__("re").fullmatch(r"(?:P-A|[AB]\d+[a-z]*)", card_id.split("-")[0]) for card_id in ids))
 
 
 class IdMapTests(unittest.TestCase):
@@ -153,7 +165,7 @@ class IdMapTests(unittest.TestCase):
         sync.request_json = fake
         sync.time.sleep = lambda *args, **kwargs: None
         try:
-            record, stop = sync.fetch_card("sv03-223", {}, datetime(2026, 10, 16, tzinfo=timezone.utc))
+            record, stop, _credits = sync.fetch_card("sv03-223", {}, datetime(2026, 10, 16, tzinfo=timezone.utc))
         finally:
             sync.request_json = original
             sync.time.sleep = original_sleep
@@ -161,6 +173,7 @@ class IdMapTests(unittest.TestCase):
         self.assertFalse(record.get("missing"))
         self.assertEqual(record["lookup_id"], "sv3-223")
         self.assertEqual(len(calls), 2)
+        self.assertEqual(_credits, 4)
         self.assertNotIn("sv03-223", calls[0])
 
     def test_fetch_tries_one_fallback_then_stops(self):
@@ -181,13 +194,14 @@ class IdMapTests(unittest.TestCase):
         sync.request_json = fake
         sync.time.sleep = lambda *args, **kwargs: None
         try:
-            record, stop = sync.fetch_card("sv03-223", {}, datetime(2026, 10, 16, tzinfo=timezone.utc))
+            record, stop, _credits = sync.fetch_card("sv03-223", {}, datetime(2026, 10, 16, tzinfo=timezone.utc))
         finally:
             sync.request_json = original
             sync.time.sleep = original_sleep
         self.assertFalse(record.get("missing"))
         self.assertEqual(record["lookup_id"], "sv03-223")
         self.assertEqual(len(calls), 3)
+        self.assertEqual(_credits, 5)
         self.assertEqual(sum("price_history" in url for url in calls), 1)
 
     def test_fetch_missing_does_not_request_history(self):
@@ -202,7 +216,7 @@ class IdMapTests(unittest.TestCase):
         sync.request_json = fake
         sync.time.sleep = lambda *args, **kwargs: None
         try:
-            record, stop = sync.fetch_card("sv03-223", {}, datetime(2026, 10, 16, tzinfo=timezone.utc))
+            record, stop, _credits = sync.fetch_card("sv03-223", {}, datetime(2026, 10, 16, tzinfo=timezone.utc))
         finally:
             sync.request_json = original
             sync.time.sleep = original_sleep
@@ -210,6 +224,7 @@ class IdMapTests(unittest.TestCase):
         self.assertEqual(record["lookup_id"], "sv3-223")
         self.assertFalse(stop)
         self.assertEqual(len(calls), 2)
+        self.assertEqual(_credits, 2)
         self.assertFalse(any("price_history" in url for url in calls))
 
     def test_rate_limit_stops_before_a_second_lookup(self):
@@ -228,6 +243,92 @@ class IdMapTests(unittest.TestCase):
             sync.request_json = original
         self.assertEqual(str(caught.exception), "RATE_LIMIT")
         self.assertEqual(len(calls), 1)
+
+
+class BudgetTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.cache = root / "scrydex.json"
+        self.usage = root / "scrydex-usage.json"
+        self.seed = root / "seed.txt"
+        self.seed.write_text("A base1-4\nB sv03-223\n", encoding="utf-8")
+        self.saved = {
+            "CACHE_PATH": sync.CACHE_PATH,
+            "USAGE_PATH": sync.USAGE_PATH,
+            "SEED_PATH": sync.SEED_PATH,
+            "request_json": sync.request_json,
+            "sleep": sync.time.sleep,
+        }
+        sync.CACHE_PATH = self.cache
+        sync.USAGE_PATH = self.usage
+        sync.SEED_PATH = self.seed
+        sync.time.sleep = lambda *_args, **_kwargs: None
+        self.env = {name: os.environ.get(name) for name in (
+            "SCRYDEX_API_KEY", "SCRYDEX_TEAM_ID", "SCRYDEX_MONTHLY_CAP",
+            "SCRYDEX_STORE_RESERVE", "SCRYDEX_RUN_CAP", "SCRYDEX_RUN_CARD_CAP",
+        )}
+        os.environ["SCRYDEX_API_KEY"] = "super-secret-value"
+        os.environ["SCRYDEX_TEAM_ID"] = "team-secret-value"
+        os.environ["SCRYDEX_MONTHLY_CAP"] = "15000"
+        os.environ["SCRYDEX_STORE_RESERVE"] = "15000"
+        os.environ["SCRYDEX_RUN_CAP"] = "400"
+        os.environ["SCRYDEX_RUN_CARD_CAP"] = "80"
+        self.calls = []
+
+    def tearDown(self):
+        sync.CACHE_PATH = self.saved["CACHE_PATH"]
+        sync.USAGE_PATH = self.saved["USAGE_PATH"]
+        sync.SEED_PATH = self.saved["SEED_PATH"]
+        sync.request_json = self.saved["request_json"]
+        sync.time.sleep = self.saved["sleep"]
+        for name, value in self.env.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+        self.tmp.cleanup()
+
+    def test_low_balance_skips_card_lookups(self):
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 12000}
+            raise AssertionError("card lookup should not run")
+        sync.request_json = fake
+        self.assertEqual(sync.sync(datetime(2026, 10, 17, tzinfo=timezone.utc)), 0)
+        self.assertEqual(self.calls, [sync.USAGE_API])
+        self.assertFalse(self.cache.exists())
+        text = self.usage.read_text(encoding="utf-8")
+        self.assertNotIn("super-secret-value", text)
+        self.assertNotIn("team-secret-value", text)
+        self.assertEqual(json.loads(text)["months"]["2026-10"]["credits"], 1)
+
+    def test_full_ledger_skips_before_the_account_read(self):
+        self.usage.write_text(json.dumps({"months": {"2026-10": {"credits": 15000}}}), encoding="utf-8")
+        def fake(url, headers):
+            self.calls.append(url)
+            return 200, {"credits_remaining": 50000}
+        sync.request_json = fake
+        self.assertEqual(sync.sync(datetime(2026, 10, 17, tzinfo=timezone.utc)), 0)
+        self.assertEqual(self.calls, [])
+
+    def test_run_cap_stops_before_the_next_card(self):
+        os.environ["SCRYDEX_RUN_CAP"] = "5"
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+        sync.request_json = fake
+        self.assertEqual(sync.sync(datetime(2026, 10, 17, tzinfo=timezone.utc)), 0)
+        card_calls = [url for url in self.calls if "/cards/" in url]
+        self.assertEqual(len(card_calls), 2)
+        self.assertEqual(json.loads(self.usage.read_text())["months"]["2026-10"]["credits"], 5)
+        self.assertIn("base1-4", json.loads(self.cache.read_text())["cards"])
+        self.assertNotIn("sv03-223", json.loads(self.cache.read_text())["cards"])
 
 
 class CacheWriteTests(unittest.TestCase):

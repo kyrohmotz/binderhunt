@@ -1,26 +1,29 @@
 #!/usr/bin/env python3
-"""Refresh BinderHunt's small Scrydex cache.
+"""Refresh BinderHunt's Scrydex cache inside a shared Growth budget.
 
-Scrydex documents general card requests as 1 credit and price history as
-3 credits. This script makes those two calls for at most 10 due cards:
+Scrydex documents a card lookup as 1 credit and price history as 3 credits:
 
   GET /pokemon/v1/cards/{id}?include=prices,pop_reports
   GET /pokemon/v1/cards/{id}/price_history?days=90&page_size=100
+  GET /account/v1/usage
 
-A full run is therefore at most 40 credits when every lookup hits.
-Catalog ids from TCGdex are mapped to the Scrydex id before the request
-(sv03-223 becomes sv3-223, sv03.5-199 becomes sv3pt5-199, me02-125 becomes
-me2-125). The record is still stored under the catalog id. If that mapped
-id is missing, the original catalog id is tried once and history is not
-requested for a miss, so a wrong id cannot fan out. A card that 404s on a
-mapped id and then hits on the fallback costs 5 credits; both missing costs
-2. The daily workflow stays near 40 credits only while the cache is catching
-up. Once warm, tier A cards are older than 48 hours and tier B cards older
-than 7 days, which is about 30 credits a day, or roughly 900–1,200 a month.
+A hit is 4 credits. A mapped id that 404s and then hits on the catalog id
+costs 5, because history is requested only after a hit. Both ids missing
+costs 2. The account usage read is 1 credit when that endpoint responds.
 
-The API key and team id are read from the environment and sent only as
-request headers. They are never printed, written into the JSON, or passed
-on the command line.
+The subscription is shared with the store. Before any card lookup this script
+reads remaining credits. It skips the run when fewer than SCRYDEX_STORE_RESERVE
+credits would be left (default 15,000). BinderHunt's own ledger stops at
+SCRYDEX_MONTHLY_CAP (default 15,000). A run also stops at SCRYDEX_RUN_CAP
+credits (default 500) and SCRYDEX_RUN_CARD_CAP cards (default 100).
+
+While any seeded card has never been fetched, the run backfills the most
+valuable unfetched cards. After that, tier A (the top of the seed) refreshes
+weekly and tier B refreshes monthly.
+
+Catalog ids from TCGdex are mapped before the request (sv03-223 becomes
+sv3-223). The record is stored under the catalog id. Secrets are read from
+the environment and sent only as headers. They are never printed.
 """
 
 from __future__ import annotations
@@ -39,12 +42,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SEED_PATH = ROOT / "data" / "scrydex-seed.txt"
 CACHE_PATH = ROOT / "data" / "scrydex.json"
+USAGE_PATH = ROOT / "data" / "scrydex-usage.json"
 API = "https://api.scrydex.com/pokemon/v1/cards"
-MAX_PER_RUN = 10
+USAGE_API = "https://api.scrydex.com/account/v1/usage"
+MAX_PER_RUN = 100
+RUN_CREDIT_CAP = 500
+MONTHLY_CAP = 15000
+STORE_RESERVE = 15000
 HISTORY_DAYS = 90
-TIER_A_HOURS = 48
-TIER_B_HOURS = 24 * 7
-MISSING_HOURS = 24 * 14
+TIER_A_HOURS = 24 * 7
+TIER_B_HOURS = 24 * 30
+MISSING_HOURS = 24 * 30
 REQUEST_PAUSE_SEC = 0.35
 # TCGdex zero-pads set numbers and writes special sets as ".5".
 # Scrydex uses the Pokémon TCG API form: sv03 -> sv3, sv03.5 -> sv3pt5, me02 -> me2.
@@ -52,7 +60,9 @@ _SET_RE = re.compile(r"^([a-z]+)(\d+)(\.5)?$")
 
 
 class ScrydexError(Exception):
-    pass
+    def __init__(self, message: str, credits: int = 0):
+        super().__init__(message)
+        self.credits = credits
 
 
 def map_scrydex_id(catalog_id: str) -> str:
@@ -123,7 +133,8 @@ def parse_time(value: str | None) -> datetime | None:
         return None
 
 
-def load_seed(path: Path = SEED_PATH) -> list[tuple[str, str]]:
+def load_seed(path: Path | None = None) -> list[tuple[str, str]]:
+    path = SEED_PATH if path is None else path
     rows: list[tuple[str, str]] = []
     text = path.read_text(encoding="utf-8")
     for line in text.splitlines():
@@ -139,7 +150,8 @@ def load_seed(path: Path = SEED_PATH) -> list[tuple[str, str]]:
     return rows
 
 
-def load_cache(path: Path = CACHE_PATH) -> dict:
+def load_cache(path: Path | None = None) -> dict:
+    path = CACHE_PATH if path is None else path
     if not path.exists():
         return {"source": "Scrydex", "generated_at": None, "history_days": HISTORY_DAYS, "cards": {}}
     try:
@@ -276,20 +288,52 @@ def trim_graded_and_pop(payload: dict) -> tuple[list[dict], list[dict]]:
     return graded, pop
 
 
+def env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ScrydexError(f"{name} must be a whole number. The value was not printed.") from exc
+    if value < 0:
+        raise ScrydexError(f"{name} must be zero or greater.")
+    return value
+
+
+def card_is_unfilled(rec: dict, card_id: str) -> bool:
+    if not rec or not rec.get("fetched_at"):
+        return True
+    return record_needs_remap(rec, card_id)
+
+
 def select_due(
     seed: list[tuple[str, str]],
     cards: dict,
     now: datetime,
     max_cards: int = MAX_PER_RUN,
 ) -> list[str]:
+    """Backfill unfetched cards first. Then weekly tier A and monthly tier B."""
+    unfilled = []
+    seen = set()
+    for _tier, card_id in seed:
+        if card_id in seen:
+            continue
+        seen.add(card_id)
+        rec = cards.get(card_id) if isinstance(cards.get(card_id), dict) else {}
+        if card_is_unfilled(rec, card_id):
+            unfilled.append(card_id)
+    if unfilled:
+        return unfilled[:max_cards]
     ranked = []
+    seen.clear()
     for index, (tier, card_id) in enumerate(seed):
+        if card_id in seen:
+            continue
+        seen.add(card_id)
         rec = cards.get(card_id) if isinstance(cards.get(card_id), dict) else {}
         fetched = parse_time(rec.get("fetched_at"))
-        remap = record_needs_remap(rec, card_id)
-        if remap:
-            limit = 0
-        elif rec.get("missing"):
+        if rec.get("missing"):
             limit = MISSING_HOURS
         elif tier == "A":
             limit = TIER_A_HOURS
@@ -298,18 +342,14 @@ def select_due(
         age = None if fetched is None else (now - fetched).total_seconds() / 3600
         if age is not None and age < limit:
             continue
-        ranked.append((0 if remap else 1, 0 if tier == "A" else 1, 0 if age is None else 1, -(age or 0), index, card_id))
+        ranked.append((0 if tier == "A" else 1, -(age or 0), index, card_id))
     ranked.sort()
-    chosen = []
-    seen = set()
-    for *_, card_id in ranked:
-        if card_id in seen:
-            continue
-        seen.add(card_id)
-        chosen.append(card_id)
-        if len(chosen) >= max_cards:
-            break
-    return chosen
+    return [card_id for *_, card_id in ranked[:max_cards]]
+
+
+def max_card_credits(card_id: str) -> int:
+    """Worst case for one card: two lookups and one history read."""
+    return len(scrydex_candidates(card_id)) + 3
 
 
 def request_json(url: str, headers: dict) -> tuple[int, dict | list | None]:
@@ -331,25 +371,32 @@ def request_json(url: str, headers: dict) -> tuple[int, dict | list | None]:
     return status, body
 
 
-def fetch_card(card_id: str, headers: dict, now: datetime) -> tuple[dict, bool]:
-    """Return (record, stop). stop is true when Scrydex rate-limits the run.
+def fetch_card(card_id: str, headers: dict, now: datetime) -> tuple[dict, bool, int]:
+    """Return (record, stop, credits). stop is true when Scrydex rate-limits the run.
 
     At most two card lookups. History (3 credits) runs only after a hit.
+    Each completed card lookup counts as 1 credit. A history response counts as 3.
     """
+    credits = 0
     payload = None
     used = None
     candidates = scrydex_candidates(card_id)
+
+    def fail(message: str) -> None:
+        raise ScrydexError(message, credits=credits)
+
     for index, lookup in enumerate(candidates):
         quoted = urllib.parse.quote(lookup, safe="")
         status, body = request_json(f"{API}/{quoted}?include=prices,pop_reports", headers)
+        credits += 1
         if status in (401, 403):
-            raise ScrydexError(
+            fail(
                 f"Scrydex rejected the credentials (HTTP {status}). "
                 "Check the SCRYDEX_API_KEY and SCRYDEX_TEAM_ID repository secrets. "
                 "The secret values were not printed."
             )
         if status == 429:
-            raise ScrydexError("RATE_LIMIT")
+            fail("RATE_LIMIT")
         if status == 200 and isinstance(body, dict):
             payload = body
             used = lookup
@@ -362,18 +409,19 @@ def fetch_card(card_id: str, headers: dict, now: datetime) -> tuple[dict, bool]:
                 "fetched_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "missing": True,
                 "lookup_id": map_scrydex_id(card_id),
-            }, False
-        raise ScrydexError(f"Card {card_id} lookup failed with HTTP {status}.")
+            }, False, credits
+        fail(f"Card {card_id} lookup failed with HTTP {status}.")
     if payload is None or used is None:
-        raise ScrydexError(f"Card {card_id} lookup failed.")
+        fail(f"Card {card_id} lookup failed.")
     time.sleep(REQUEST_PAUSE_SEC)
     quoted = urllib.parse.quote(used, safe="")
     h_status, history_payload = request_json(
         f"{API}/{quoted}/price_history?days={HISTORY_DAYS}&page_size=100",
         headers,
     )
+    credits += 3
     if h_status in (401, 403):
-        raise ScrydexError(
+        fail(
             f"Scrydex rejected the credentials (HTTP {h_status}) on price history. "
             "Check SCRYDEX_API_KEY and SCRYDEX_TEAM_ID. The secret values were not printed."
         )
@@ -385,7 +433,7 @@ def fetch_card(card_id: str, headers: dict, now: datetime) -> tuple[dict, bool]:
     elif h_status == 200 and isinstance(history_payload, dict):
         history, truncated = trim_history(history_payload)
     elif h_status not in (200, 404):
-        raise ScrydexError(f"Price history for {card_id} failed with HTTP {h_status}.")
+        fail(f"Price history for {card_id} failed with HTTP {h_status}.")
     graded, pop = trim_graded_and_pop(payload)
     name = card_body(payload).get("name")
     record = {
@@ -397,54 +445,207 @@ def fetch_card(card_id: str, headers: dict, now: datetime) -> tuple[dict, bool]:
         "graded": graded,
         "pop": pop,
     }
-    return record, stop
+    return record, stop, credits
 
 
-def write_cache(cache: dict, path: Path = CACHE_PATH) -> None:
+def write_cache(cache: dict, path: Path | None = None) -> None:
+    path = CACHE_PATH if path is None else path
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(cache, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     temporary.replace(path)
 
 
+def load_usage(path: Path | None = None) -> dict:
+    path = USAGE_PATH if path is None else path
+    if not path.exists():
+        return {"months": {}}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"months": {}}
+    if not isinstance(data, dict) or not isinstance(data.get("months"), dict):
+        return {"months": {}}
+    return data
+
+
+def month_credits(usage: dict, month: str) -> int:
+    row = usage.get("months", {}).get(month) or {}
+    value = row.get("credits", 0) if isinstance(row, dict) else 0
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
+
+
+def add_usage(usage: dict, month: str, credits: int, now: datetime) -> None:
+    if credits <= 0:
+        return
+    months = usage.setdefault("months", {})
+    row = months.get(month)
+    if not isinstance(row, dict):
+        row = {"credits": 0, "runs": 0}
+        months[month] = row
+    row["credits"] = month_credits(usage, month) + credits
+    row["updated_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def write_usage(usage: dict, path: Path | None = None) -> None:
+    path = USAGE_PATH if path is None else path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(usage, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def remaining_credits(body: dict) -> int | None:
+    if not isinstance(body, dict):
+        return None
+    for key in ("credits_remaining", "remaining_credits", "creditsRemaining"):
+        value = body.get(key)
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float) and value == int(value):
+            return int(value)
+    nested = body.get("data")
+    if isinstance(nested, dict):
+        return remaining_credits(nested)
+    return None
+
+
+def read_account_remaining(headers: dict) -> tuple[int | None, int, bool]:
+    """Return (credits left, cost of this read, whether to skip).
+
+    A 404 means the endpoint is not offered, so the local ledger is enough.
+    A 200 without a remaining-credit field skips the run.
+    """
+    status, body = request_json(USAGE_API, headers)
+    if status == 404:
+        print("Scrydex account usage is not offered (HTTP 404). Using the local monthly ledger.")
+        return None, 0, False
+    if status in (401, 403):
+        raise ScrydexError(
+            f"Scrydex rejected the credentials (HTTP {status}) on account usage. "
+            "Check SCRYDEX_API_KEY and SCRYDEX_TEAM_ID. The secret values were not printed.",
+            credits=1,
+        )
+    if status != 200 or not isinstance(body, dict):
+        print(f"Scrydex account usage returned HTTP {status}. Using the local monthly ledger.")
+        return None, 0, False
+    remaining = remaining_credits(body)
+    if remaining is None:
+        keys = ",".join(sorted(str(key) for key in body.keys()))
+        print(
+            f"Scrydex account usage did not include a remaining-credit field ({keys}). "
+            "Skipping so the store balance is not guessed."
+        )
+        return None, 1, True
+    return remaining, 1, False
+
+
 def sync(now: datetime | None = None) -> int:
     key, team = require_secrets()
     headers = {"X-Api-Key": key, "X-Team-ID": team}
     now = now or datetime.now(timezone.utc)
+    monthly_cap = env_int("SCRYDEX_MONTHLY_CAP", MONTHLY_CAP)
+    store_reserve = env_int("SCRYDEX_STORE_RESERVE", STORE_RESERVE)
+    run_credit_cap = env_int("SCRYDEX_RUN_CAP", RUN_CREDIT_CAP)
+    run_card_cap = env_int("SCRYDEX_RUN_CARD_CAP", MAX_PER_RUN)
+    month = now.strftime("%Y-%m")
+    usage = load_usage()
+    spent_month = month_credits(usage, month)
+    if spent_month >= monthly_cap:
+        print(f"Skipping. BinderHunt has logged {spent_month} credits in {month}, and the cap is {monthly_cap}.")
+        return 0
+    try:
+        remaining, check_credits, usage_skip = read_account_remaining(headers)
+    except ScrydexError as exc:
+        if exc.credits:
+            add_usage(usage, month, exc.credits, now)
+            write_usage(usage)
+        raise
+    run_credits = check_credits
+    if check_credits:
+        add_usage(usage, month, check_credits, now)
+        spent_month += check_credits
+        write_usage(usage)
+    if usage_skip:
+        print(f"credits this run: {run_credits}")
+        print(f"credits this month ({month}): {spent_month} / {monthly_cap}")
+        return 0
+    if remaining is not None and remaining - store_reserve < 2:
+        print(
+            f"Skipping. Scrydex has {remaining} credits left. "
+            f"A card fetch would leave fewer than {store_reserve} for the store."
+        )
+        print(f"credits this run: {run_credits}")
+        print(f"credits this month ({month}): {spent_month} / {monthly_cap}")
+        return 0
+    room = monthly_cap - spent_month
+    if remaining is not None:
+        room = min(room, remaining - store_reserve)
+    if room < 2 or run_credit_cap < 2 or run_card_cap < 1:
+        print(
+            f"Skipping. Credit room this run is {max(room, 0)} "
+            f"(monthly cap {monthly_cap}, per-run cap {run_credit_cap})."
+        )
+        print(f"credits this run: {run_credits}")
+        print(f"credits this month ({month}): {spent_month} / {monthly_cap}")
+        return 0
+    run_cap = min(run_credit_cap, room)
     seed = load_seed()
     cache = load_cache()
     cards = cache["cards"]
-    due = select_due(seed, cards, now)
+    due = select_due(seed, cards, now, max_cards=run_card_cap)
     if not due:
         print(f"No cards due. Cache has {len(cards)} card(s); nothing was requested.")
+        print(f"credits this run: {run_credits}")
+        print(f"credits this month ({month}): {spent_month} / {monthly_cap}")
+        if remaining is not None:
+            print(f"account credits remaining: {remaining}")
         return 0
+    phase = "backfill" if any(card_is_unfilled(cards.get(card_id) if isinstance(cards.get(card_id), dict) else {}, card_id) for card_id in due) else "steady"
     print(
-        f"Refreshing {len(due)} card(s). A hit costs 4 credits (1 card + 3 history). "
-        "A mapped id that is missing tries the catalog id once and does not request history."
+        f"{phase}: up to {len(due)} card(s). "
+        f"Per-run credit cap {run_cap}. Monthly cap {monthly_cap}. Store reserve {store_reserve}."
     )
     refreshed = 0
+    card_credits = 0
     rate_limited = False
     try:
         for card_id in due:
+            worst = max_card_credits(card_id)
+            if card_credits + worst > run_cap or spent_month + worst > monthly_cap:
+                print(f"Stopping before {card_id}. The next card could pass the credit cap.")
+                break
+            if remaining is not None and remaining - card_credits - worst < store_reserve:
+                print(f"Stopping before {card_id}. The next card could drop the account under the store reserve.")
+                break
             try:
-                record, stop = fetch_card(card_id, headers, now)
+                record, stop, credits = fetch_card(card_id, headers, now)
             except ScrydexError as exc:
+                card_credits += exc.credits
+                spent_month += exc.credits
+                add_usage(usage, month, exc.credits, now)
                 if str(exc) == "RATE_LIMIT":
                     rate_limited = True
                     print("Scrydex returned HTTP 429. Stopped so this run does not spend more credits.")
                     break
                 raise
+            card_credits += credits
+            spent_month += credits
+            add_usage(usage, month, credits, now)
             cards[card_id] = record
             refreshed += 1
             if record.get("missing"):
-                print(f"  {card_id}: not found")
+                print(f"  {card_id}: not found, credits={credits}")
             else:
                 print(
-                    f"  {card_id}: history={len(record['history'])} graded={len(record['graded'])} pop={len(record['pop'])}"
+                    f"  {card_id}: history={len(record['history'])} graded={len(record['graded'])} "
+                    f"pop={len(record['pop'])} credits={credits}"
                 )
             if stop:
                 rate_limited = True
-                print("Scrydex returned HTTP 429 after a card lookup. History for that card was skipped and the run stopped.")
+                print("Scrydex returned HTTP 429 on price history. The run stopped.")
                 break
             time.sleep(REQUEST_PAUSE_SEC)
     finally:
@@ -454,11 +655,19 @@ def sync(now: datetime | None = None) -> int:
             cache["history_days"] = HISTORY_DAYS
             cache["cards"] = cards
             write_cache(cache)
-            print(f"Wrote {CACHE_PATH.relative_to(ROOT)} ({refreshed} card(s) updated).")
+            print(f"Wrote {CACHE_PATH.name} ({refreshed} card(s) updated).")
+        if card_credits or check_credits:
+            write_usage(usage)
+        run_credits += card_credits
+        print(f"credits this run: {run_credits}")
+        print(f"credits this month ({month}): {month_credits(usage, month)} / {monthly_cap}")
+        if remaining is not None:
+            print(f"account credits remaining at start of run: {remaining}")
     if rate_limited and not refreshed:
         raise ScrydexError(
             "Scrydex returned HTTP 429 before any card was saved. "
-            "Wait and run the workflow again. No secret values were printed."
+            "Wait and run the workflow again. No secret values were printed.",
+            credits=card_credits,
         )
     return 0
 

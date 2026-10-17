@@ -110,7 +110,7 @@ def live_fetch(card_id: str) -> dict:
 
     key, team = sync_scrydex.require_secrets()
     headers = {"X-Api-Key": key, "X-Team-ID": team}
-    record, _stop = sync_scrydex.fetch_card(card_id, headers, datetime.now(timezone.utc))
+    record, _stop, _credits = sync_scrydex.fetch_card(card_id, headers, datetime.now(timezone.utc))
     return record
 
 

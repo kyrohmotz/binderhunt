@@ -20,12 +20,16 @@ HISTORY_CREDITS = 3
 HIT_CREDITS = CARD_CREDITS + HISTORY_CREDITS
 MISS_THEN_HIT_CREDITS = CARD_CREDITS + HIT_CREDITS
 CHASE_CARDS = 2000
-TIER_A = 200
+TIER_A = 300
 TIER_B = CHASE_CARDS - TIER_A
-TIER_A_PER_MONTH = 15  # every 48 hours across a 30-day month
 MONTH_DAYS = 30
-TIER_B_INTERVAL_DAYS = 7
-CURRENT_MAX_PER_RUN = 10
+TIER_A_INTERVAL_DAYS = 7
+TIER_B_INTERVAL_DAYS = 30
+RUN_CARD_CAP = 100
+RUN_CREDIT_CAP = 500
+MONTHLY_CAP = 15000
+STORE_RESERVE = 15000
+USAGE_CHECK_CREDITS = 1
 
 PLANS = (
     {"name": "Starter", "monthly_usd": 29, "included": 5_000, "overage_usd": 0.006},
@@ -40,8 +44,8 @@ def backfill_credits(miss_then_hit: bool = False) -> int:
 
 
 def monthly_credits_exact() -> float:
-    """Tier A every 48 hours, tier B once a week, 4 credits per refresh."""
-    tier_a = TIER_A * HIT_CREDITS * TIER_A_PER_MONTH
+    """Top 300 weekly and the other 1,700 monthly, 4 credits per refresh."""
+    tier_a = TIER_A * HIT_CREDITS * (MONTH_DAYS / TIER_A_INTERVAL_DAYS)
     tier_b = TIER_B * HIT_CREDITS * (MONTH_DAYS / TIER_B_INTERVAL_DAYS)
     return tier_a + tier_b
 
@@ -50,9 +54,10 @@ def monthly_credits() -> int:
     return round(monthly_credits_exact())
 
 
-def aggressive_monthly_credits() -> int:
-    """Every chase card refreshed every 48 hours."""
-    return CHASE_CARDS * HIT_CREDITS * TIER_A_PER_MONTH
+def days_to_full_coverage(card_cap: int = RUN_CARD_CAP) -> int:
+    if card_cap < 1:
+        return 0
+    return (CHASE_CARDS + card_cap - 1) // card_cap
 
 
 def plan_cost(credits: float, plan: dict) -> float:
@@ -61,7 +66,7 @@ def plan_cost(credits: float, plan: dict) -> float:
 
 
 def cards_per_day_to_stay_fresh() -> float:
-    return (TIER_A / 2) + (TIER_B / TIER_B_INTERVAL_DAYS)
+    return (TIER_A / TIER_A_INTERVAL_DAYS) + (TIER_B / TIER_B_INTERVAL_DAYS)
 
 
 def rank_demand(counts: dict[str, int], limit: int = CHASE_CARDS) -> list[str]:
@@ -72,7 +77,7 @@ def rank_demand(counts: dict[str, int], limit: int = CHASE_CARDS) -> list[str]:
 
 def estimate() -> dict:
     monthly = monthly_credits_exact()
-    aggressive = aggressive_monthly_credits()
+    checks = USAGE_CHECK_CREDITS * MONTH_DAYS
     plans = []
     for plan in PLANS:
         plans.append(
@@ -81,8 +86,7 @@ def estimate() -> dict:
                 "monthly_usd": plan["monthly_usd"],
                 "included": plan["included"],
                 "overage_usd": plan["overage_usd"],
-                "tiered_usd": round(plan_cost(monthly, plan), 2),
-                "aggressive_usd": round(plan_cost(aggressive, plan), 2),
+                "steady_usd": round(plan_cost(monthly + checks, plan), 2),
             }
         )
     return {
@@ -90,14 +94,19 @@ def estimate() -> dict:
         "credits_per_hit": HIT_CREDITS,
         "backfill_credits": backfill_credits(False),
         "backfill_credits_if_mapped_404_then_hit": backfill_credits(True),
-        "monthly_credits_tiered": monthly_credits(),
-        "monthly_credits_tiered_exact": monthly,
-        "monthly_credits_if_all_refresh_every_48h": aggressive,
+        "backfill_days": days_to_full_coverage(),
+        "monthly_credits_steady": monthly_credits(),
+        "monthly_credits_steady_exact": monthly,
+        "monthly_credits_with_usage_checks": monthly_credits() + checks,
+        "monthly_cap": MONTHLY_CAP,
+        "store_reserve": STORE_RESERVE,
+        "run_card_cap": RUN_CARD_CAP,
+        "run_credit_cap": RUN_CREDIT_CAP,
         "tier_a_cards": TIER_A,
+        "tier_a_interval_days": TIER_A_INTERVAL_DAYS,
         "tier_b_cards": TIER_B,
+        "tier_b_interval_days": TIER_B_INTERVAL_DAYS,
         "cards_per_day_to_stay_fresh": cards_per_day_to_stay_fresh(),
-        "current_max_per_run": CURRENT_MAX_PER_RUN,
-        "runs_to_backfill_at_current_cap": CHASE_CARDS // CURRENT_MAX_PER_RUN,
         "plans": plans,
         "recommended_plan": "Growth",
         "pricing_page": "https://scrydex.com/pricing",
@@ -107,31 +116,21 @@ def estimate() -> dict:
 
 def main() -> int:
     report = estimate()
-    growth = next(plan for plan in report["plans"] if plan["name"] == "Growth")
-    starter = next(plan for plan in report["plans"] if plan["name"] == "Starter")
     print("Scrydex coverage estimate (no API calls made, spent_credits=0)")
     print(
-        f"Backfill {report['chase_cards']} chase cards at {report['credits_per_hit']} credits each: "
-        f"{report['backfill_credits']} credits if every mapped id hits, "
-        f"or {report['backfill_credits_if_mapped_404_then_hit']} if each 404s once and then hits."
+        f"Backfill {report['chase_cards']} cards at {report['run_card_cap']} a day: "
+        f"{report['backfill_days']} days, {report['backfill_credits']} credits if every mapped id hits, "
+        f"or {report['backfill_credits_if_mapped_404_then_hit']} if each misses once and then hits."
     )
     print(
-        f"Steady state, {report['tier_a_cards']} cards every 48 hours and "
-        f"{report['tier_b_cards']} weekly: {report['monthly_credits_tiered']} credits/month."
+        f"Steady state, {report['tier_a_cards']} cards weekly and "
+        f"{report['tier_b_cards']} monthly: {report['monthly_credits_steady']} credits "
+        f"plus {USAGE_CHECK_CREDITS} per day to read the account balance."
     )
     print(
-        f"That is ${growth['tiered_usd']:.0f}/month on Growth "
-        f"({growth['included']} included) and about ${starter['tiered_usd']:.0f}/month on Starter with overage."
-    )
-    print(
-        f"Refreshing all {report['chase_cards']} every 48 hours is "
-        f"{report['monthly_credits_if_all_refresh_every_48h']} credits/month, "
-        f"about ${growth['aggressive_usd']:.0f} on Growth."
-    )
-    print(
-        f"The daily job still caps at {report['current_max_per_run']} cards. "
-        f"Filling {report['chase_cards']} at that cap takes {report['runs_to_backfill_at_current_cap']} runs "
-        f"and cannot keep {report['cards_per_day_to_stay_fresh']:.0f} cards/day fresh."
+        f"BinderHunt cap {report['monthly_cap']}. "
+        f"The run is skipped when the account would drop under {report['store_reserve']} for the store. "
+        f"Per-run credit cap {report['run_credit_cap']}."
     )
     print(json.dumps(report, indent=2))
     return 0

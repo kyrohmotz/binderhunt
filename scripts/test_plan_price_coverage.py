@@ -18,22 +18,24 @@ class PlanTests(unittest.TestCase):
     def test_backfill_and_monthly_credits(self):
         self.assertEqual(plan.backfill_credits(), 8000)
         self.assertEqual(plan.backfill_credits(True), 10000)
-        self.assertAlmostEqual(plan.monthly_credits_exact(), 12000 + 1800 * 4 * 30 / 7)
-        self.assertEqual(plan.monthly_credits(), 42857)
-        self.assertEqual(plan.aggressive_monthly_credits(), 120000)
-        self.assertAlmostEqual(plan.cards_per_day_to_stay_fresh(), 2500 / 7)
+        self.assertAlmostEqual(plan.monthly_credits_exact(), 300 * 4 * 30 / 7 + 1700 * 4)
+        self.assertEqual(plan.monthly_credits(), 11943)
+        self.assertEqual(plan.days_to_full_coverage(), 20)
+        self.assertAlmostEqual(plan.cards_per_day_to_stay_fresh(), 300 / 7 + 1700 / 30)
+        self.assertGreaterEqual(plan.RUN_CARD_CAP, plan.cards_per_day_to_stay_fresh())
+        self.assertLess(plan.monthly_credits() + 30, plan.MONTHLY_CAP)
 
     def test_plan_costs(self):
         report = plan.estimate()
         self.assertEqual(report["spent_credits"], 0)
         self.assertEqual(report["recommended_plan"], "Growth")
-        self.assertEqual(report["runs_to_backfill_at_current_cap"], 200)
+        self.assertEqual(report["backfill_days"], 20)
+        self.assertEqual(report["monthly_cap"], 15000)
+        self.assertEqual(report["store_reserve"], 15000)
+        self.assertEqual(report["run_card_cap"], 100)
+        self.assertEqual(report["run_credit_cap"], 500)
         by_name = {row["name"]: row for row in report["plans"]}
-        self.assertEqual(by_name["Growth"]["tiered_usd"], 99)
-        self.assertEqual(by_name["Starter"]["tiered_usd"], 256.14)
-        self.assertEqual(by_name["Growth"]["aggressive_usd"], 239)
-        self.assertEqual(by_name["Professional"]["aggressive_usd"], 399)
-        self.assertEqual(by_name["Starter"]["aggressive_usd"], 719)
+        self.assertEqual(by_name["Growth"]["steady_usd"], 99)
 
     def test_rank_demand_prefers_most_requested(self):
         ranked = plan.rank_demand({"b": 1, "a": 4, "c": 4}, limit=2)
@@ -167,7 +169,12 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn("X-Api-Key", page)
         self.assertNotIn("SCRYDEX_API_KEY", page)
         sync = (ROOT.parent / "scripts" / "sync_scrydex.py").read_text(encoding="utf-8")
-        self.assertIn("MAX_PER_RUN = 10", sync)
+        self.assertIn("MONTHLY_CAP = 15000", sync)
+        self.assertIn("RUN_CREDIT_CAP = 500", sync)
+        self.assertIn("MAX_PER_RUN = 100", sync)
+        self.assertIn("SCRYDEX_MONTHLY_CAP", daily)
+        self.assertIn("SCRYDEX_RUN_CAP", daily)
+        self.assertIn("data/scrydex-usage.json", daily)
 
 
 if __name__ == "__main__":
