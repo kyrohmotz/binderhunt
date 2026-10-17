@@ -5,11 +5,14 @@
 // 2. A long press or a sloppy press on .gotbtn does not toggle owned, and a
 //    long press still starts a pocket drag.
 // 3. Set owned counts only include ids in the set's card list and the
-//    displayed fraction is clamped. A set celebrates once the real list
-//    proves it is complete, including when that list is fetched from a
-//    binder mark or arrives later. Planted ids do not celebrate early.
+//    displayed fraction is clamped. A binder celebration shows immediately.
+//    The set list is given about 1.5s to join that toast; a later confirmation
+//    is its own follow-up. Planted ids do not celebrate early. A failed set
+//    list fetch is not cached empty.
 // 4. After the set catalog loads, owned ids with no saved set id are
 //    backfilled so their set tile is not stuck at 0%.
+// 5. A hunt whose catalog request never returns shows busy/retrying within
+//    the watchdog and starts another attempt.
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { dirname, resolve } from "node:path";
@@ -121,7 +124,8 @@ const report = await ev(`(async () => {
   check("keyboard press kept", gotPressIgnored(null, now, 0, 0) === false);
 
   const notes = [];
-  showConfetti = m => notes.push(String(m));
+  const realShow = showConfetti;
+  showConfetti = m => { notes.push(String(m)); realShow(m); };
   ownedNeedsSeed = false;
   tab = "hunt";
   celebrated.clear();
@@ -246,8 +250,11 @@ const report = await ev(`(async () => {
   binderState.binders = [{ id:"bboth", name:"Both", color:"#F3EDC8", cards:[last], theme:{ kind:"none" }, charm:"none" }];
   tab = "hunt";
   setOwned(last, true, "pocket");
-  await waitNotes(1);
-  check("binder and set share one celebration", notes.length === 1 && notes[0].indexOf("Both is complete.") >= 0 && notes[0].indexOf("Late Set is complete.") >= 0, notes.join(" || "));
+  const immediate = (document.querySelector(".confetti p") || {}).textContent || "";
+  check("binder celebrates before the set list returns", notes.length === 1 && notes[0].indexOf("Both is complete.") >= 0 && immediate.indexOf("Late Set") < 0, notes.join(" || ") + " / " + immediate);
+  await new Promise(r => setTimeout(r, 60));
+  const joined = (document.querySelector(".confetti p") || {}).textContent || "";
+  check("a fast set list joins the binder celebration", notes.length === 1 && joined.indexOf("Both is complete.") >= 0 && joined.indexOf("Late Set is complete.") >= 0, notes.join(" || ") + " / " + joined);
   check("set key is stored once", celebrated.has("set:zzlate"));
   notes.length = 0;
   ownedIds.delete("zzlate-3");
@@ -284,6 +291,45 @@ const report = await ev(`(async () => {
   const lateNotes = notes.length;
   rememberSetList("zzlate", { cards:lateCards, release:"", name:"Late Set" });
   check("loading the list celebrates a finished set once", lateNotes === 1 && notes.length === 1 && notes[0].indexOf("Late Set is complete.") >= 0, notes.join(" || "));
+
+  if (!meta.sets.some(s => s.id === "zzslow")) meta.sets.push({ id:"zzslow", name:"Slow Set", cardCount:{ official:1, total:1 } });
+  getJson = async url => {
+    const u = String(url);
+    if (u.indexOf("/sets/zzslow") >= 0) {
+      await new Promise(r => setTimeout(r, 1800));
+      return { name:"Slow Set", releaseDate:"", cards:[{ id:"zzslow-1" }] };
+    }
+    return realGetJson(url);
+  };
+  notes.length = 0;
+  celebrated.delete("set:zzslow");
+  setLists.delete("zzslow");
+  deferSetConfetti.delete("zzslow");
+  ownedIds.clear();
+  ownedSetById.clear();
+  const slowCard = { id:"zzslow-1", name:"Slow", setId:"zzslow" };
+  binderState.binders = [{ id:"bslow", name:"Slow binder", color:"#F3EDC8", cards:[slowCard], theme:{ kind:"none" }, charm:"none" }];
+  const slowStart = Date.now();
+  setOwned(slowCard, true, "pocket");
+  check("slow set still celebrates the binder immediately", notes.length === 1 && notes[0].indexOf("Slow binder is complete.") >= 0 && notes[0].indexOf("Slow Set") < 0, notes.join(" || "));
+  await new Promise(r => setTimeout(r, 400));
+  check("binder celebration is not held for a slow set list", notes.length === 1 && Date.now() - slowStart < 1500, notes.join(" || "));
+  await waitNotes(2);
+  check("a late set list celebrates on its own", notes.length === 2 && notes[1].indexOf("Slow Set is complete.") >= 0 && Date.now() - slowStart >= 1500, notes.join(" || ") + " @" + (Date.now() - slowStart));
+
+  setLists.delete("zzmiss");
+  setListRetryAt.delete("zzmiss");
+  let misses = 0;
+  getJson = async url => {
+    if (String(url).indexOf("/sets/zzmiss") >= 0) { misses++; throw new Error("HTTP 404"); }
+    return realGetJson(url);
+  };
+  let failed = false;
+  try { await ensureSetList("zzmiss"); } catch (e) { failed = true; }
+  let cooled = false;
+  try { await ensureSetList("zzmiss"); } catch (e) { cooled = !!(e && e.name === "TimeoutError"); }
+  check("a failed set list stays unloaded", failed && !setLists.has("zzmiss") && misses === 1, "failed " + failed + " cached " + setLists.has("zzmiss") + " misses " + misses);
+  check("a failed set list backs off instead of caching empty", cooled && misses === 1 && !setLists.has("zzmiss"));
   getJson = realGetJson;
 
   const pocket = { id:"jungle-4", name:"Charizard", setId:"base2", rarity:"Rare Holo", number:"4" };
@@ -335,6 +381,49 @@ const report = await ev(`(async () => {
   point3("pointerup", x3, y3);
   tap.dispatchEvent(new MouseEvent("click", { bubbles:true, cancelable:true, clientX:x3, clientY:y3, detail:1 }));
   check("short tap owns", ownedIds.has(pocket.id));
+
+  const origFetch = window.fetch;
+  window.fetch = (url, opts) => {
+    if (String(url).indexOf("/cards") >= 0) {
+      return new Promise((resolve, reject) => {
+        const signal = opts && opts.signal;
+        const fail = () => reject(signal && signal.reason ? signal.reason : new DOMException("Aborted", "AbortError"));
+        if (signal) {
+          if (signal.aborted) { fail(); return; }
+          signal.addEventListener("abort", fail, { once:true });
+        }
+      });
+    }
+    return origFetch(url, opts);
+  };
+  HUNT_SILENT_MS = 500;
+  const pumpsBefore = huntPumps;
+  filters = blankFilters();
+  filters.names = ["Charizard", "Gengar", "Squirtle"];
+  filters.era = "vintage";
+  filters.pricePreset = "mid";
+  showTab("hunt");
+  restart();
+  const watchStart = Date.now();
+  await new Promise(resolve => {
+    const t = setInterval(() => {
+      const p = document.querySelector("#deck .empty-state p");
+      const text = p ? p.textContent : "";
+      if (/busy, retrying/.test(text) || Date.now() - watchStart > 4000) { clearInterval(t); resolve(); }
+    }, 40);
+  });
+  const busyText = (document.querySelector("#deck .empty-state p") || {}).textContent || "";
+  const busyAt = Date.now() - watchStart;
+  check("a stuck combo hunt shows busy within the watchdog", /busy, retrying/.test(busyText) && busyAt < 2500 && busyAt >= 400, busyText + " @" + busyAt);
+  await new Promise(r => setTimeout(r, 500));
+  check("the watchdog starts another hunt attempt", huntPumps >= pumpsBefore + 2, String(huntPumps - pumpsBefore));
+  window.fetch = origFetch;
+  generation++;
+  loading = false;
+  huntFetches = false;
+  clearHuntWatch();
+  if (huntAbort) huntAbort.abort();
+  HUNT_SILENT_MS = 20000;
   return fails;
 })()`);
 

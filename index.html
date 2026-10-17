@@ -608,6 +608,13 @@ let pullSerial = 0;
 let busyStrike = 0;
 let busyUntil = 0;
 let busyRenderTimer = 0;
+let pumpEpoch = 0;
+let huntPumps = 0;
+let huntAbort = null;
+let huntFetches = false;
+let huntWatch = 0;
+let HUNT_SILENT_MS = 20000;
+const SET_LIST_WAIT_MS = 1500;
 const fetchFails = new Map();
 let deferred = [];
 const CARD_FETCH_RETRIES = 3;
@@ -1040,6 +1047,7 @@ function noteSet(setId){
   return friendlySetName(setId) + " is complete.";
 }
 const setListInflight = new Map();
+const setListRetryAt = new Map();
 const deferSetConfetti = new Map();
 function publishSetCelebration(setId){
   if (!setId || ownedNeedsSeed) return "";
@@ -1053,26 +1061,46 @@ function publishSetCelebration(setId){
   showConfetti(msg);
   return msg;
 }
+function showSetFollowUp(binderMsgs, setMsg, startedAt){
+  if (!setMsg) return;
+  const live = document.querySelector(".confetti p");
+  if (binderMsgs.length && live && Date.now() - startedAt <= SET_LIST_WAIT_MS) {
+    live.textContent = binderMsgs.concat(setMsg).join(" ");
+    live.append(document.createRange().createContextualFragment(toad()));
+    announce(setMsg);
+    return;
+  }
+  showConfetti(setMsg);
+}
 function rememberSetList(id, bag){
   setLists.set(id, bag);
   if (bag && bag.cards && bag.cards.length) publishSetCelebration(id);
   return bag;
 }
+function pendingSetList(id){
+  const pending = setListInflight.get(id);
+  if (!pending) return null;
+  if (huntFetches && huntAbort) return Promise.race([pending, whenAborted(huntAbort.signal)]);
+  return pending;
+}
 async function ensureSetList(id){
   const ready = setCardList(id);
   if (ready) return ready;
   if (setLists.has(id)) return (setLists.get(id) || {}).cards || [];
-  if (setListInflight.has(id)) return setListInflight.get(id);
+  const again = setListRetryAt.get(id) || 0;
+  if (again > Date.now()) throw new DOMException("Set list retry", "TimeoutError");
+  const pending = pendingSetList(id);
+  if (pending) return pending;
   const job = (async () => {
     try {
       const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
       const cards = (set.cards || []).slice().sort((a, b) => numId(a.localId) - numId(b.localId) || String(a.id).localeCompare(String(b.id)));
+      setListRetryAt.delete(id);
       rememberSetList(id, { cards, release:set.releaseDate || "", name:set.name || id });
       return cards;
     } catch (e) {
-      if (isBusyError(e)) throw e;
-      setLists.set(id, { cards:[], release:"", name:id });
-      return [];
+      if (!isBusyError(e)) setListRetryAt.set(id, Date.now() + 4000);
+      throw e;
     } finally {
       setListInflight.delete(id);
     }
@@ -1191,21 +1219,22 @@ function setOwned(card, on, origin){
   const pendingSet = sid && !ownedNeedsSeed && !setCardList(sid) && !celebrated.has("set:" + sid) && setTotalNow && countOwnedInSet(sid) >= setTotalNow ? sid : "";
   if (pendingSet) {
     const binderMsgs = msgs.slice();
+    if (binderMsgs.length) ownedResult(card, on, binderMsgs);
     deferSetConfetti.set(pendingSet, "");
+    const startedAt = Date.now();
     ensureSetList(pendingSet).then(() => {
-      const setMsg = deferSetConfetti.get(pendingSet) || "";
+      let setMsg = deferSetConfetti.get(pendingSet) || "";
       deferSetConfetti.delete(pendingSet);
-      const all = binderMsgs.slice();
-      if (setMsg && !all.includes(setMsg)) all.push(setMsg);
       if (!setMsg) {
         const late = noteSet(pendingSet);
-        if (late && !all.includes(late)) { saveOwned(); all.push(late); }
+        if (late) { saveOwned(); setMsg = late; }
       }
-      ownedResult(card, on, all);
+      if (setMsg) showSetFollowUp(binderMsgs, setMsg, startedAt);
+      else if (!binderMsgs.length) ownedResult(card, on, []);
       if (tab === "sets") renderSets();
     }).catch(() => {
       deferSetConfetti.delete(pendingSet);
-      ownedResult(card, on, binderMsgs);
+      if (!binderMsgs.length) ownedResult(card, on, []);
     });
     return true;
   }
@@ -1393,24 +1422,57 @@ function noteBusy(){
   busyStrike = Math.min(6, busyStrike + 1);
 }
 function busyDelay(){ return Math.min(8000, 400 * (2 ** Math.min(busyStrike, 5))); }
+function abortError(signal){
+  if (signal && signal.reason) return signal.reason;
+  return new DOMException("The operation was aborted.", "AbortError");
+}
+function whenAborted(signal){
+  if (!signal) return new Promise(() => {});
+  if (signal.aborted) return Promise.reject(abortError(signal));
+  return new Promise((_, reject) => {
+    signal.addEventListener("abort", () => reject(abortError(signal)), { once:true });
+  });
+}
+function fetchSignal(){
+  const timeout = AbortSignal.timeout(12000);
+  const extra = huntFetches && huntAbort ? huntAbort.signal : null;
+  if (!extra) return timeout;
+  if (typeof AbortSignal.any === "function") return AbortSignal.any([timeout, extra]);
+  const merged = new AbortController();
+  const link = sig => {
+    if (sig.aborted) { if (!merged.signal.aborted) merged.abort(sig.reason); return; }
+    sig.addEventListener("abort", () => { if (!merged.signal.aborted) merged.abort(sig.reason); }, { once:true });
+  };
+  link(timeout);
+  link(extra);
+  return merged.signal;
+}
+async function readJson(res, signal){
+  const body = res.json();
+  if (!signal) return body;
+  return Promise.race([body, whenAborted(signal)]);
+}
 async function getJson(url){
   pullSerial++;
   let last;
   for (let attempt = 0; attempt < 3; attempt++) {
+    const signal = fetchSignal();
+    if (signal.aborted) throw abortError(signal);
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+      const res = await fetch(url, { signal });
       if (res.status === 429 || res.status >= 500) {
         last = new Error("HTTP " + res.status);
         touchBusy();
-        await new Promise(r => setTimeout(r, 280 * (attempt + 1)));
+        await Promise.race([new Promise(r => setTimeout(r, 280 * (attempt + 1))), whenAborted(signal)]);
         continue;
       }
       if (!res.ok) throw new Error("HTTP " + res.status);
       catalogBusy = false;
       busyStrike = 0;
-      return res.json();
+      return readJson(res, signal);
     } catch (e) {
       last = e;
+      if (signal.aborted || (huntFetches && huntAbort && huntAbort.signal.aborted)) throw e;
       const http = String(e && e.message || "");
       const retry = http.startsWith("HTTP ") ? /^HTTP (429|5)/.test(http) : true;
       if (isBusyError(e)) touchBusy();
@@ -1625,10 +1687,11 @@ async function pullSet(id){
       await ensureSetList(id);
     } catch (e) {
       if (isBusyError(e)) throw e;
-      if (!setLists.has(id)) setLists.set(id, { cards:[], release:"", name:id });
+      return 0;
     }
   }
   const bag = setLists.get(id);
+  if (!bag || !Array.isArray(bag.cards)) return 0;
   let fresh = bag.cards.filter(c => c && c.id && c.image && !seen.has(c.id));
   if (discoveryBinder()) {
     const saved = savedIds();
@@ -2071,9 +2134,46 @@ function paintCount(){
   const liveCount = document.getElementById("filterLive");
   if (liveCount && !document.getElementById("filterSheet").hidden) liveCount.textContent = el.textContent;
 }
+function clearHuntWatch(){
+  clearTimeout(huntWatch);
+  huntWatch = 0;
+}
+function huntStuck(){
+  if (streamDone || paused || pile.length || deck.querySelector(".card")) return false;
+  const status = deck.dataset.status || "";
+  if (status === "error" || status === "empty" || status === "ready") return false;
+  return loading || status === "loading" || status === "busy";
+}
+function armHuntWatch(my){
+  clearHuntWatch();
+  huntWatch = setTimeout(() => huntWatchdog(my), HUNT_SILENT_MS);
+}
+function huntWatchdog(my){
+  huntWatch = 0;
+  if (my !== generation) return;
+  if (!huntStuck()) {
+    if (!streamDone) armHuntWatch(my);
+    return;
+  }
+  const text = deck.innerText || "";
+  if (deck.dataset.status !== "busy" && !/busy, retrying/i.test(text)) noteBusy();
+  pumpEpoch++;
+  loading = false;
+  huntFetches = false;
+  if (huntAbort) huntAbort.abort();
+  huntAbort = new AbortController();
+  renderDeck();
+  paintCount();
+  setTimeout(() => { if (my === generation) pump(my); }, 300);
+  armHuntWatch(my);
+}
+function pumpStale(epoch, my){ return epoch !== pumpEpoch || my !== generation; }
 async function pump(my){
   if (loading || my !== generation) return;
+  const epoch = ++pumpEpoch;
+  huntPumps++;
   loading = true;
+  huntFetches = true;
   pumpError = "";
   const serialAtStart = pullSerial;
   const pileAtStart = pile.length;
@@ -2082,7 +2182,7 @@ async function pump(my){
     const capped = filtersActive() || !!discoveryBinder();
     const priced = priceHunt();
     const ceiling = !capped ? Infinity : ((filters.names || []).length ? 800 : (priced ? Infinity : 80));
-    while (pile.length < 5 && my === generation && steps < 8 && effort < ceiling) {
+    while (pile.length < 5 && my === generation && epoch === pumpEpoch && steps < 8 && effort < ceiling) {
       if (!pile.length && matched === 0 && !briefs.length && !busyBlock() && lastFound && Date.now() - lastFound >= 10000) {
         if (reclaimDeferred()) { steps++; continue; }
         streamDone = true; break;
@@ -2090,7 +2190,7 @@ async function pump(my){
       if (briefs.length < 4) {
         const mark = pullSerial;
         const added = await pullMore();
-        if (my !== generation) return;
+        if (pumpStale(epoch, my)) return;
         const requested = pullSerial !== mark;
         if (!added && !briefs.length) {
           const broad = !filters.set && !(filters.names || []).length && !filters.type && !filters.rarities.length && !filters.era && !priceHunt() && !filters.graded;
@@ -2111,16 +2211,16 @@ async function pump(my){
       const outcomes = await Promise.all(batch.map(async b => {
         try {
           const card = await hydrate(b);
-          if (my !== generation) return { brief:b, stale:true };
+          if (pumpStale(epoch, my)) return { brief:b, stale:true };
           fetchFails.delete(b.id);
           return { brief:b, card };
         } catch (err) {
-          if (my !== generation) return { brief:b, stale:true };
+          if (pumpStale(epoch, my)) return { brief:b, stale:true };
           if (isBusyError(err)) return { brief:b, throttled:true, card:null };
           return { brief:b, card:null };
         }
       }));
-      if (my !== generation) return;
+      if (pumpStale(epoch, my)) return;
       let throttled = false;
       outcomes.forEach(o => {
         if (o.stale) return;
@@ -2135,17 +2235,20 @@ async function pump(my){
         pile.push(card);
         matched++;
         lastFound = Date.now();
+        armHuntWatch(my);
       });
       renderDeck();
       paintCount();
       if (throttled) { noteBusy(); break; }
     }
   } catch (e) {
-    if (my !== generation) return;
+    if (pumpStale(epoch, my)) return;
     if (isBusyError(e)) noteBusy();
     else { pumpError = "The card catalog didn't respond. Check your connection and try again."; paused = true; }
-  } finally { if (my === generation) loading = false; }
-  if (my !== generation) return;
+  } finally {
+    if (!pumpStale(epoch, my)) { loading = false; huntFetches = false; }
+  }
+  if (pumpStale(epoch, my)) return;
   const capped = filtersActive() || !!discoveryBinder();
   const priced = priceHunt();
   const ceiling = (filters.names || []).length ? 800 : 80;
@@ -2187,6 +2290,11 @@ function restart(opts){
   deck.innerHTML = "";
   showSkeleton();
   paintChips(); paintContext(); paintDiscovery();
+  if (huntAbort) huntAbort.abort();
+  huntAbort = new AbortController();
+  pumpEpoch++;
+  clearHuntWatch();
+  armHuntWatch(generation);
   pump(generation);
 }
 function altText(card){ return (card.name || "Card") + " – " + (card.set || "Set") + (card.number ? " #" + card.number : ""); }
