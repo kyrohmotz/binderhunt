@@ -947,7 +947,7 @@ function setCardList(setId){
   return null;
 }
 function countOwnedInSet(setId, cards){
-  const list = cards || setCardList(setId);
+  const list = (cards && cards.length) ? cards : setCardList(setId);
   if (list && list.length) {
     const seen = new Set();
     let n = 0;
@@ -959,7 +959,9 @@ function countOwnedInSet(setId, cards){
     });
     return n;
   }
-  return ownedCountsBySet().get(setId) || 0;
+  let n = 0;
+  ownedIds.forEach(id => { if (ownedSetById.get(id) === setId) n++; });
+  return n;
 }
 function clampedOwned(matched, total){
   const n = Math.max(0, matched || 0);
@@ -1014,7 +1016,9 @@ function binderFull(binder){
 }
 function noteBinder(binder, beforeOwned){
   if (!binder || !binderFull(binder)) return "";
-  if (!(beforeOwned > 0)) return "";
+  const total = (binder.cards || []).length;
+  const before = Number.isFinite(beforeOwned) ? beforeOwned : 0;
+  if (!(before < total)) return "";
   const key = "binder:" + binder.id;
   if (celebrated.has(key)) return "";
   celebrated.add(key);
@@ -1022,14 +1026,14 @@ function noteBinder(binder, beforeOwned){
 }
 function noteSet(setId){
   if (!setId) return "";
-  const set = meta.sets.find(s => s.id === setId);
-  const total = setTotal(set);
-  if (!total) return "";
   const list = setCardList(setId);
+  if (!list || !list.length) return "";
+  const set = meta.sets.find(s => s.id === setId);
+  const total = setTotal(set) || list.length;
+  if (!total) return "";
   const matched = countOwnedInSet(setId, list);
   const owned = clampedOwned(matched, total);
   if (owned < total) return "";
-  if (!(list && list.length) && matched > total) return "";
   const key = "set:" + setId;
   if (celebrated.has(key)) return "";
   celebrated.add(key);
@@ -1073,12 +1077,10 @@ function quietSeedSets(){
   pendingCelebrate.forEach(item => { const id = setIdOf(pendingCard(item)); if (id) skip.add(id); });
   meta.sets.forEach(s => {
     if (skip.has(s.id)) return;
-    const total = setTotal(s);
-    if (!total) return;
     const list = setCardList(s.id);
-    const matched = countOwnedInSet(s.id, list);
-    const done = list && list.length ? matched >= total : matched === total;
-    if (done) celebrated.add("set:" + s.id);
+    if (!list || !list.length) return;
+    const total = setTotal(s) || list.length;
+    if (total && countOwnedInSet(s.id, list) >= total) celebrated.add("set:" + s.id);
   });
   const queued = pendingCelebrate.splice(0);
   ownedNeedsSeed = false;

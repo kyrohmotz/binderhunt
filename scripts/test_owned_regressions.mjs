@@ -1,10 +1,12 @@
 // Regression checks for owned-collection fixes:
-// 1. Filling or saving into a binder does not celebrate, and a binder that
-//    was empty of owned cards does not celebrate on the first mark.
+// 1. Filling or saving into a binder does not celebrate. Marking the last
+//    wanted card does, including a one-card binder going 0/1 to 1/1.
+//    Undo then Got it again stays quiet.
 // 2. A long press or a sloppy press on .gotbtn does not toggle owned, and a
 //    long press still starts a pocket drag.
 // 3. Set owned counts only include ids in the set's card list and the
-//    displayed fraction is clamped to the catalog total.
+//    displayed fraction is clamped. Set celebration waits until that list
+//    is loaded, so planted ids cannot complete the set early.
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { dirname, resolve } from "node:path";
@@ -154,7 +156,11 @@ const report = await ev(`(async () => {
   const solo = { id:"bsolo", name:"Solo", color:"#E9D5C0", cards:[wantedCard], theme:{ kind:"none" }, charm:"none" };
   binderState.binders = [solo];
   setOwned(wantedCard, true, "pocket");
-  check("empty-before binder does not celebrate", !notes.some(m => m.indexOf("complete") >= 0) && !celebrated.has("binder:bsolo"), notes.join("|"));
+  check("one-card binder celebrates", notes.some(m => m.indexOf("Solo is complete.") >= 0) && celebrated.has("binder:bsolo"), notes.join("|"));
+  notes.length = 0;
+  ownedIds.delete(wantedCard.id);
+  setOwned(wantedCard, true, "pocket");
+  check("one-card redo stays quiet", notes.length === 0 && celebrated.has("binder:bsolo"), notes.join("|"));
 
   if (!meta.sets.some(s => s.id === "zzset")) meta.sets.push({ id:"zzset", name:"Test Set", cardCount:{ official:3, total:3 } });
   const list = [{ id:"zzset-1" }, { id:"zzset-2" }, { id:"zzset-3" }];
@@ -170,6 +176,17 @@ const report = await ev(`(async () => {
   setLists.delete("zzset");
   celebrated.delete("set:zzset");
   check("overcount without a list does not burn celebration", noteSet("zzset") === "" && !celebrated.has("set:zzset"));
+  ownedIds.clear();
+  ownedSetById.clear();
+  ["zzset-plant-1", "zzset-plant-2", "zzset-plant-3"].forEach(id => { ownedIds.add(id); ownedSetById.set(id, "zzset"); });
+  ownedIds.add("base4-not-a-card");
+  setLists.delete("base4");
+  if (setView && setView.id === "base4") setView = null;
+  check("prefix id is not counted before the list loads", countOwnedInSet("base4") === 0);
+  check("planted ids do not celebrate before the list loads", noteSet("zzset") === "" && !celebrated.has("set:zzset"));
+  setLists.set("zzset", { cards:list, release:"", name:"Test Set" });
+  check("out-of-set ids do not complete a loaded set", noteSet("zzset") === "" && !celebrated.has("set:zzset"));
+  ["zzset-1","zzset-2","zzset-3","zzset-extra"].forEach(id => { ownedIds.add(id); ownedSetById.set(id, "zzset"); });
   setLists.set("zzset", { cards:list, release:"", name:"Test Set" });
   const msg = noteSet("zzset");
   check("celebration uses the list count", msg.indexOf("Test Set is complete.") >= 0 && celebrated.has("set:zzset"), msg);
