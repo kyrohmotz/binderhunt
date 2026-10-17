@@ -258,7 +258,7 @@
         </div>
       </div>
       ${guessRows ? `<ol class="guesses">${guessRows}</ol>` : ""}
-      ${done ? "" : `<form class="daily-form" id="dailyForm"><label>Raw price in USD<input id="dailyGuess" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0.00"></label><button class="go" type="submit">Guess</button></form><p class="daily-left fine">${esc(guessesLeft === 1 ? "1 guess left" : guessesLeft + " guesses left")}</p>`}
+      ${done ? "" : `<form class="daily-form" id="dailyForm"><label>Raw price in USD<input id="dailyGuess" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0.00"></label><button class="go" type="submit">Guess</button></form><p class="daily-left fine">${esc(guessesLeft === 1 ? "1 guess left" : guessesLeft + " guesses left")}</p>`}
       <section class="daily-reveal" id="dailyReveal"${done && !animate ? "" : " hidden"}>
         <p class="fine">Raw · ${esc(card.printing || "market")}</p>
         <p class="market-price" id="dailyAnswer">${esc(priceText(day.price, "USD"))}</p>

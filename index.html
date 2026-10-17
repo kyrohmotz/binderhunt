@@ -2689,7 +2689,8 @@ function removeFromWish(id){
 
 function blocking(){
   const prompt = document.getElementById("dropPrompt");
-  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (prompt && !prompt.hidden) || (!profileEl.hidden && !wide());
+  const daily = document.getElementById("viewDaily");
+  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (prompt && !prompt.hidden) || (daily && !daily.hidden) || (!profileEl.hidden && !wide());
 }
 function keepSwipeFocus(trigger){
   const box = document.getElementById("hapticSwitch");
@@ -4233,9 +4234,9 @@ function typingTarget(el){
   return type === "text" || type === "search" || type === "number";
 }
 document.addEventListener("keydown", e => {
-  const open = ["fillSheet","binderSheet","settingsSheet","filterSheet"].map(id => document.getElementById(id)).find(el => el && !el.hidden);
+  const open = ["fillSheet","binderSheet","settingsSheet","filterSheet","dropPrompt"].map(id => document.getElementById(id)).find(el => el && !el.hidden);
   if (open && e.key === "Tab") {
-    const items = [...open.querySelectorAll(".sheet-card button, .sheet-card input, .sheet-card select, .sheet-card a")].filter(el => !el.disabled && el.offsetParent);
+    const items = [...open.querySelectorAll(".sheet-card button, .sheet-card input, .sheet-card select, .sheet-card a, .drop-card button, .drop-card input, .drop-card select, .drop-card a")].filter(el => !el.disabled && el.offsetParent);
     if (items.length) {
       const first = items[0], last = items[items.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -4245,6 +4246,13 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") {
     if (!document.getElementById("menu").hidden) { document.getElementById("menu").hidden = true; return; }
     ["fillSheet","binderSheet","settingsSheet","filterSheet"].forEach(id => { if (!document.getElementById(id).hidden) closeSheet(id); });
+    const prompt = document.getElementById("dropPrompt");
+    if (prompt && !prompt.hidden) {
+      prompt.hidden = true;
+      const shell = document.getElementById("shell");
+      if (shell) shell.removeAttribute("inert");
+      syncActs();
+    }
     if (!profileEl.hidden && !wide()) closeProfile();
     return;
   }

@@ -84,7 +84,12 @@ const boot = `localStorage.setItem("bh.onboard.v1", JSON.stringify({done:true,sk
 localStorage.setItem("bh.filters.v3", JSON.stringify({set:"",rarities:[],era:"",type:"",names:[],min:null,max:null,pricePreset:"",graded:false}));
 localStorage.setItem("binderhuntWish","[]");
 localStorage.setItem("bh.binders.v1", JSON.stringify({discoveryId:"",binders:[]}));
-localStorage.setItem("bh.settings.v1", JSON.stringify({sound:false,haptics:false,reduce:"on",currency:"USD"}));`;
+localStorage.setItem("bh.settings.v1", JSON.stringify({sound:false,haptics:false,reduce:"on",currency:"USD"}));
+(() => {
+  const bag = {};
+  new Intl.DateTimeFormat("en-CA", { timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit" }).formatToParts(new Date()).forEach(part => { bag[part.type] = part.value; });
+  localStorage.setItem("bh.daily.v1", JSON.stringify({ v:1, current:0, best:0, lastPlayed:"", prompted: bag.year + "-" + bag.month + "-" + bag.day, days:{} }));
+})();`;
 await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: boot });
 await cdp.send("Page.navigate", { url: "http://127.0.0.1:" + PORT + "/index.html" });
 await sleep(800);
