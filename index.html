@@ -100,7 +100,6 @@ img{max-width:100%;-webkit-user-drag:none}
 .act.undo{width:44px;height:44px;background:var(--sage);font-size:18px}
 .act.add{width:68px;height:68px;background:var(--sky);font-size:28px}
 .act:disabled{opacity:.4}
-.haptic-hit{position:absolute;inset:0;border-radius:inherit}
 #hapticSwitch{position:fixed;left:8px;bottom:8px;width:16px;height:16px;opacity:.02;margin:0}
 .foot{display:flex;gap:8px;align-items:center;justify-content:center;padding:0 12px 6px;flex:none;text-align:center}
 .foot img{width:32px;height:32px;object-fit:contain}
@@ -427,15 +426,15 @@ html.reduce .sleeve.holo img{transform:none}
         <input id="cardFind" type="search" placeholder="e.g. Pikachu" aria-label="Search cards by name" enterkeyhint="search" autocomplete="off">
       </form>
       <p class="countline" id="matchCount" aria-live="polite">Looking…</p>
-      <div id="deck" data-status="loading" aria-busy="true"></div>
+      <div id="deck" data-status="loading" aria-busy="true" tabindex="-1"></div>
       <div id="deckCaption" class="deckcap" hidden>
         <div class="cap"><b id="capName"></b><small id="capSub"></small></div>
         <span class="pill" id="capPrice">—</span>
       </div>
       <div class="actions">
-        <button class="act" id="skip" type="button" aria-label="Skip" disabled>✕<label for="hapticSwitch" class="haptic-hit" aria-hidden="true"></label></button>
+        <button class="act" id="skip" type="button" aria-label="Skip" disabled>✕</button>
         <button class="act undo" id="undo" type="button" aria-label="Undo last swipe" disabled>↺</button>
-        <button class="act add" id="save" type="button" aria-label="Add to wishlist" disabled>♥<label for="hapticSwitch" class="haptic-hit" aria-hidden="true"></label></button>
+        <button class="act add" id="save" type="button" aria-label="Add to wishlist" disabled>♥</button>
       </div>
     </div>
     <div id="viewSets" class="view" hidden>
@@ -608,6 +607,23 @@ let pullSerial = 0;
 let busyStrike = 0;
 let busyUntil = 0;
 let busyRenderTimer = 0;
+let pumpEpoch = 0;
+let huntPumps = 0;
+let huntWatch = 0;
+let huntProgressAt = 0;
+let huntFetchSeq = 0;
+let huntBatch = [];
+let busyHold = false;
+let setListHoldUntil = 0;
+let confettiTimer = 0;
+let confettiUntil = 0;
+let HUNT_SILENT_MS = 20000;
+let HUNT_FETCH_MS = 12000;
+const SET_LIST_WAIT_MS = 1500;
+const SET_LIST_RETRY_MS = 4000;
+const SET_LIST_RETRY_CAP = 3;
+const huntInflight = new Map();
+const setListFails = new Map();
 const fetchFails = new Map();
 let deferred = [];
 const CARD_FETCH_RETRIES = 3;
@@ -627,7 +643,6 @@ let compareGrade = "";
 let reserved = new Set();
 let pendingSwipes = [];
 let swipeBusy = false;
-let hapticTrusted = false;
 let audioCtx = null;
 let setView = null;
 let binderView = null;
@@ -786,7 +801,7 @@ function loadSettings(){
 function saveWish(){ try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {} paintContext(); if (tab === "binders") renderBinders(); }
 function saveBinders(){ try { localStorage.setItem("bh.binders.v1", JSON.stringify(binderState)); } catch (e) {} if (tab === "binders") renderBinders(); paintDiscovery(); }
 function saveFilters(){ try { localStorage.setItem("bh.filters.v3", JSON.stringify(filters)); } catch (e) {} paintChips(); }
-function saveSettings(){ try { localStorage.setItem("bh.settings.v1", JSON.stringify(settings)); } catch (e) {} applyMotion(); syncHaptics(); }
+function saveSettings(){ try { localStorage.setItem("bh.settings.v1", JSON.stringify(settings)); } catch (e) {} applyMotion(); }
 
 const OWNED_KEY = "bh.owned.v1";
 const LOG_KEY = "bh.log.v1";
@@ -1040,6 +1055,7 @@ function noteSet(setId){
   return friendlySetName(setId) + " is complete.";
 }
 const setListInflight = new Map();
+const setListRetryAt = new Map();
 const deferSetConfetti = new Map();
 function publishSetCelebration(setId){
   if (!setId || ownedNeedsSeed) return "";
@@ -1053,31 +1069,79 @@ function publishSetCelebration(setId){
   showConfetti(msg);
   return msg;
 }
+function holdConfetti(el, ms){
+  if (!el) return;
+  clearTimeout(confettiTimer);
+  confettiUntil = Date.now() + ms;
+  confettiTimer = setTimeout(() => { if (el.isConnected) el.remove(); }, ms);
+}
+function showSetFollowUp(binderMsgs, setMsg, startedAt){
+  if (!setMsg) return;
+  const live = document.querySelector(".confetti p");
+  if (binderMsgs.length && live && Date.now() - startedAt <= SET_LIST_WAIT_MS) {
+    live.textContent = binderMsgs.concat(setMsg).join(" ");
+    live.append(document.createRange().createContextualFragment(toad()));
+    announce(setMsg);
+    holdConfetti(live.closest(".confetti"), 2500);
+    return;
+  }
+  showConfetti(setMsg);
+}
 function rememberSetList(id, bag){
   setLists.set(id, bag);
   if (bag && bag.cards && bag.cards.length) publishSetCelebration(id);
   return bag;
 }
-async function ensureSetList(id){
+function inflightSetList(id, hunt){
+  const entry = setListInflight.get(hunt ? id + ":hunt" : id);
+  if (entry) return entry;
+  if (!hunt) return null;
+  return setListInflight.get(id) || null;
+}
+async function ensureSetList(id, opts){
+  const hunt = !!(opts && opts.hunt);
   const ready = setCardList(id);
   if (ready) return ready;
   if (setLists.has(id)) return (setLists.get(id) || {}).cards || [];
-  if (setListInflight.has(id)) return setListInflight.get(id);
+  const again = setListRetryAt.get(id) || 0;
+  if (again > Date.now()) {
+    const err = new Error("set list retry");
+    err.setListRetry = true;
+    err.retryAt = again;
+    throw err;
+  }
+  const pending = inflightSetList(id, hunt);
+  if (pending) return pending;
+  const key = hunt ? id + ":hunt" : id;
   const job = (async () => {
     try {
-      const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
-      const cards = (set.cards || []).slice().sort((a, b) => numId(a.localId) - numId(b.localId) || String(a.id).localeCompare(String(b.id)));
+      const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id), hunt ? { hunt:true } : undefined);
+      const raw = set && Array.isArray(set.cards) ? set.cards : null;
+      if (!raw || !raw.length) throw new Error("bad set list");
+      const cards = raw.slice().sort((a, b) => numId(a.localId) - numId(b.localId) || String(a.id).localeCompare(String(b.id)));
+      setListRetryAt.delete(id);
+      setListFails.delete(id);
       rememberSetList(id, { cards, release:set.releaseDate || "", name:set.name || id });
       return cards;
     } catch (e) {
-      if (isBusyError(e)) throw e;
-      setLists.set(id, { cards:[], release:"", name:id });
-      return [];
+      if (e && !isBusyError(e)) {
+        const n = (setListFails.get(id) || 0) + 1;
+        setListFails.set(id, n);
+        if (n < SET_LIST_RETRY_CAP) {
+          const at = Date.now() + SET_LIST_RETRY_MS;
+          setListRetryAt.set(id, at);
+          e.setListRetry = true;
+          e.retryAt = at;
+        } else {
+          e.setListGaveUp = true;
+        }
+      }
+      throw e;
     } finally {
-      setListInflight.delete(id);
+      setListInflight.delete(key);
     }
   })();
-  setListInflight.set(id, job);
+  setListInflight.set(key, job);
   return job;
 }
 function ownedResult(card, on, msgs){
@@ -1191,21 +1255,22 @@ function setOwned(card, on, origin){
   const pendingSet = sid && !ownedNeedsSeed && !setCardList(sid) && !celebrated.has("set:" + sid) && setTotalNow && countOwnedInSet(sid) >= setTotalNow ? sid : "";
   if (pendingSet) {
     const binderMsgs = msgs.slice();
+    if (binderMsgs.length) ownedResult(card, on, binderMsgs);
     deferSetConfetti.set(pendingSet, "");
+    const startedAt = Date.now();
     ensureSetList(pendingSet).then(() => {
-      const setMsg = deferSetConfetti.get(pendingSet) || "";
+      let setMsg = deferSetConfetti.get(pendingSet) || "";
       deferSetConfetti.delete(pendingSet);
-      const all = binderMsgs.slice();
-      if (setMsg && !all.includes(setMsg)) all.push(setMsg);
       if (!setMsg) {
         const late = noteSet(pendingSet);
-        if (late && !all.includes(late)) { saveOwned(); all.push(late); }
+        if (late) { saveOwned(); setMsg = late; }
       }
-      ownedResult(card, on, all);
+      if (setMsg) showSetFollowUp(binderMsgs, setMsg, startedAt);
+      else if (!binderMsgs.length) ownedResult(card, on, []);
       if (tab === "sets") renderSets();
     }).catch(() => {
       deferSetConfetti.delete(pendingSet);
-      ownedResult(card, on, binderMsgs);
+      if (!binderMsgs.length) ownedResult(card, on, []);
     });
     return true;
   }
@@ -1393,24 +1458,82 @@ function noteBusy(){
   busyStrike = Math.min(6, busyStrike + 1);
 }
 function busyDelay(){ return Math.min(8000, 400 * (2 ** Math.min(busyStrike, 5))); }
-async function getJson(url){
+function abortError(signal){
+  if (signal && signal.reason) return signal.reason;
+  return new DOMException("The operation was aborted.", "AbortError");
+}
+function whenAborted(signal){
+  if (!signal) return new Promise(() => {});
+  if (signal.aborted) return Promise.reject(abortError(signal));
+  return new Promise((_, reject) => {
+    signal.addEventListener("abort", () => reject(abortError(signal)), { once:true });
+  });
+}
+function combineSignals(timeoutMs, ctrl){
+  const timeout = AbortSignal.timeout(timeoutMs);
+  if (!ctrl) return timeout;
+  if (typeof AbortSignal.any === "function") return AbortSignal.any([timeout, ctrl.signal]);
+  const merged = new AbortController();
+  const link = sig => {
+    if (sig.aborted) { if (!merged.signal.aborted) merged.abort(sig.reason); return; }
+    sig.addEventListener("abort", () => { if (!merged.signal.aborted) merged.abort(sig.reason); }, { once:true });
+  };
+  link(timeout);
+  link(ctrl.signal);
+  return merged.signal;
+}
+function noteHuntProgress(){
+  huntProgressAt = Date.now();
+  if (!streamDone) armHuntWatch(generation);
+}
+function abortStaleHuntFetches(){
+  const now = Date.now();
+  huntInflight.forEach(job => {
+    if (now - job.started >= HUNT_FETCH_MS) job.ctrl.abort();
+  });
+}
+async function readJson(res, signal){
+  const body = res.json();
+  if (!signal) return body;
+  return Promise.race([body, whenAborted(signal)]);
+}
+async function getJson(url, opts){
+  const hunt = !!(opts && opts.hunt);
   pullSerial++;
   let last;
+  const startedGen = generation;
   for (let attempt = 0; attempt < 3; attempt++) {
+    const ctrl = hunt ? new AbortController() : null;
+    const huntId = ctrl ? ++huntFetchSeq : 0;
+    if (ctrl) huntInflight.set(huntId, { started:Date.now(), ctrl });
+    const signal = combineSignals(hunt ? HUNT_FETCH_MS : 12000, ctrl);
+    let finished = false;
+    const finish = () => {
+      if (finished || !huntId) return;
+      finished = true;
+      huntInflight.delete(huntId);
+      if (startedGen === generation) noteHuntProgress();
+    };
+    if (signal.aborted) { finish(); throw abortError(signal); }
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+      const res = await fetch(url, { signal });
       if (res.status === 429 || res.status >= 500) {
         last = new Error("HTTP " + res.status);
         touchBusy();
-        await new Promise(r => setTimeout(r, 280 * (attempt + 1)));
+        finish();
+        await Promise.race([new Promise(r => setTimeout(r, 280 * (attempt + 1))), whenAborted(signal)]);
         continue;
       }
       if (!res.ok) throw new Error("HTTP " + res.status);
       catalogBusy = false;
       busyStrike = 0;
-      return res.json();
+      const body = await readJson(res, signal);
+      finish();
+      return body;
     } catch (e) {
       last = e;
+      finish();
+      if (signal.aborted) throw e;
       const http = String(e && e.message || "");
       const retry = http.startsWith("HTTP ") ? /^HTTP (429|5)/.test(http) : true;
       if (isBusyError(e)) touchBusy();
@@ -1488,13 +1611,13 @@ function normalizePtcg(c){
     ].filter(p => p.avg || p.points.length)
   };
 }
-async function hydrate(brief){
+async function hydrate(brief, opts){
   if (cardCache.has(brief.id)) return cardCache.get(brief.id);
   let card;
-  try { card = normalizeDex(await getJson(TCGDEX + "/cards/" + encodeURIComponent(brief.id))); }
+  try { card = normalizeDex(await getJson(TCGDEX + "/cards/" + encodeURIComponent(brief.id), opts)); }
   catch (e) {
     if (isBusyError(e)) throw e;
-    const raw = await getJson("https://api.pokemontcg.io/v2/cards/" + encodeURIComponent(brief.id));
+    const raw = await getJson("https://api.pokemontcg.io/v2/cards/" + encodeURIComponent(brief.id), opts);
     card = normalizePtcg(raw.data || raw);
   }
   if (!card.img && brief.image) {
@@ -1622,13 +1745,22 @@ function enforceTheme(){
 async function pullSet(id){
   if (!setLists.has(id)) {
     try {
-      await ensureSetList(id);
+      await ensureSetList(id, { hunt:true });
     } catch (e) {
       if (isBusyError(e)) throw e;
-      if (!setLists.has(id)) setLists.set(id, { cards:[], release:"", name:id });
+      if (e && e.setListGaveUp) {
+        feedExhausted = true;
+        catalogBusy = false;
+        busyHold = false;
+        busyUntil = 0;
+        return 0;
+      }
+      if (e && e.setListRetry) { setListHoldUntil = e.retryAt || (Date.now() + SET_LIST_RETRY_MS); return 0; }
+      return 0;
     }
   }
   const bag = setLists.get(id);
+  if (!bag || !Array.isArray(bag.cards)) return 0;
   let fresh = bag.cards.filter(c => c && c.id && c.image && !seen.has(c.id));
   if (discoveryBinder()) {
     const saved = savedIds();
@@ -1648,7 +1780,7 @@ async function pullQuery(){
     if (filters.type) parts.push("types=eq:" + encodeURIComponent(filters.type));
     if (filters.rarities.length) parts.push("rarity=eq:" + encodeURIComponent(filters.rarities.join("|")));
     parts.push("pagination:page=" + pageNo, "pagination:itemsPerPage=24");
-    const list = await getJson(TCGDEX + "/cards?" + parts.join("&"));
+    const list = await getJson(TCGDEX + "/cards?" + parts.join("&"), { hunt:true });
     pageNo += 1;
     if (!Array.isArray(list) || !list.length) { queryDone = true; return 0; }
     if (list.length < 24) queryDone = true;
@@ -1678,7 +1810,7 @@ async function takeOpening(id){
     }
     if (saved) bag.cards.forEach(c => { if (c && saved.has(c.id)) seen.add(c.id); });
     if (bag.done) return 0;
-    const list = await getJson(TCGDEX + "/cards?set=eq:" + encodeURIComponent(id) + "&rarity=eq:" + encodeURIComponent(raritiesForSet(id).join("|")) + "&pagination:page=" + bag.page + "&pagination:itemsPerPage=24");
+    const list = await getJson(TCGDEX + "/cards?set=eq:" + encodeURIComponent(id) + "&rarity=eq:" + encodeURIComponent(raritiesForSet(id).join("|")) + "&pagination:page=" + bag.page + "&pagination:itemsPerPage=24", { hunt:true });
     bag.page += 1;
     const rows = shuffle(Array.isArray(list) ? list : []).filter(c => c && c.id && c.image && !isPocketId(String(c.id).split("-")[0]));
     rows.forEach(c => { if (!bag.cards.some(x => x.id === c.id)) bag.cards.push(c); });
@@ -1715,7 +1847,7 @@ async function pullChaseAll(){
   if (chaseDone) return 0;
   let guard = 0;
   while (guard++ < 5 && !chaseDone) {
-    const list = await getJson(TCGDEX + "/cards?rarity=eq:" + encodeURIComponent(HUNT_RARITIES.join("|")) + "&pagination:page=" + chasePage + "&pagination:itemsPerPage=24");
+    const list = await getJson(TCGDEX + "/cards?rarity=eq:" + encodeURIComponent(HUNT_RARITIES.join("|")) + "&pagination:page=" + chasePage + "&pagination:itemsPerPage=24", { hunt:true });
     chasePage += 1;
     if (!Array.isArray(list) || !list.length) { chaseDone = true; return 0; }
     if (list.length < 24) chaseDone = true;
@@ -1744,7 +1876,7 @@ async function pullBulk(){
     const id = ids[bulkCursor];
     if (!bulkBags.has(id)) {
       try {
-        const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
+        const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id), { hunt:true });
         const all = set.cards || [];
         if (!all.some(c => c && safeImg(c.image))) imageless.add(id);
         bulkBags.set(id, shuffle(all.filter(c => c && c.id && safeImg(c.image) && !isDigital({ id:c.id }))));
@@ -1791,7 +1923,7 @@ async function pullNames(names){
   const page = namePages.get(species) || 1;
   let list = [];
   try {
-    list = await getJson(TCGDEX + "/cards?name=" + encodeURIComponent("like:" + species) + "&pagination:page=" + page + "&pagination:itemsPerPage=100");
+    list = await getJson(TCGDEX + "/cards?name=" + encodeURIComponent("like:" + species) + "&pagination:page=" + page + "&pagination:itemsPerPage=100", { hunt:true });
   } catch (e) {
     if (isBusyError(e)) throw e;
     namePages.set(species, 0);
@@ -1820,7 +1952,7 @@ async function pullMix(){
     spins++;
     if (!mixBags.has(id)) {
       try {
-        const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
+        const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id), { hunt:true });
         mixBags.set(id, (set.cards || []).filter(c => c && c.id && safeImg(c.image) && !isDigital({ id:c.id })));
       } catch (e) {
         if (isBusyError(e)) throw e;
@@ -1939,7 +2071,7 @@ async function pullTails(){
   while (tailCursor < ids.length) {
     const id = ids[tailCursor++];
     try {
-      const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
+      const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id), { hunt:true });
       const all = set.cards || [];
       if (!all.some(c => c && safeImg(c.image))) { imageless.add(id); continue; }
       const tail = all.filter(acceptBrief).slice(-12);
@@ -1976,7 +2108,7 @@ async function pullPrice(){
     const state = states[pick];
     let list;
     try {
-      list = await getJson(TCGDEX + "/cards?rarity=eq:" + encodeURIComponent(lanes[pick]) + "&pagination:page=" + state.page + "&pagination:itemsPerPage=24");
+      list = await getJson(TCGDEX + "/cards?rarity=eq:" + encodeURIComponent(lanes[pick]) + "&pagination:page=" + state.page + "&pagination:itemsPerPage=24", { hunt:true });
     } catch (e) {
       if (isBusyError(e)) throw e;
       state.done = true;
@@ -2058,6 +2190,7 @@ function reclaimDeferred(){
 }
 function showSkeleton(){
   if (deck.querySelector(".card")) return;
+  if (busyHold && !pile.length) return;
   deck.dataset.status = "loading";
   deck.setAttribute("aria-busy", "true");
   deck.innerHTML = `<div class="skel"></div>`;
@@ -2071,8 +2204,59 @@ function paintCount(){
   const liveCount = document.getElementById("filterLive");
   if (liveCount && !document.getElementById("filterSheet").hidden) liveCount.textContent = el.textContent;
 }
+function clearHuntWatch(){
+  clearTimeout(huntWatch);
+  huntWatch = 0;
+}
+function requeueHuntBatch(){
+  const batch = huntBatch || [];
+  huntBatch = [];
+  batch.forEach(b => {
+    if (!b || !b.id) return;
+    if (!briefs.some(x => x.id === b.id) && !deferred.some(x => x.id === b.id)) briefs.unshift(b);
+  });
+}
+function youngHuntFetch(){
+  const now = Date.now();
+  for (const job of huntInflight.values()) {
+    if (now - job.started < HUNT_FETCH_MS) return true;
+  }
+  return false;
+}
+function armHuntWatch(my){
+  clearHuntWatch();
+  const elapsed = Date.now() - huntProgressAt;
+  const wait = Math.max(250, HUNT_SILENT_MS - elapsed);
+  huntWatch = setTimeout(() => huntWatchdog(my), wait);
+}
+function huntWatchdog(my){
+  huntWatch = 0;
+  if (my !== generation) return;
+  const haveCard = pile.length || !!deck.querySelector(".card");
+  if (haveCard || streamDone || paused) {
+    if (!streamDone) armHuntWatch(my);
+    return;
+  }
+  const quiet = Date.now() - huntProgressAt;
+  if (quiet < HUNT_SILENT_MS || youngHuntFetch()) {
+    armHuntWatch(my);
+    return;
+  }
+  abortStaleHuntFetches();
+  if (!busyHold) noteBusy();
+  busyHold = true;
+  if (deck.dataset.status !== "busy") renderDeck();
+  armHuntWatch(my);
+}
+function pumpStale(epoch, my){
+  if (epoch === pumpEpoch && my === generation) return false;
+  if (my === generation) requeueHuntBatch();
+  return true;
+}
 async function pump(my){
   if (loading || my !== generation) return;
+  const epoch = ++pumpEpoch;
+  huntPumps++;
   loading = true;
   pumpError = "";
   const serialAtStart = pullSerial;
@@ -2082,7 +2266,7 @@ async function pump(my){
     const capped = filtersActive() || !!discoveryBinder();
     const priced = priceHunt();
     const ceiling = !capped ? Infinity : ((filters.names || []).length ? 800 : (priced ? Infinity : 80));
-    while (pile.length < 5 && my === generation && steps < 8 && effort < ceiling) {
+    while (pile.length < 5 && my === generation && epoch === pumpEpoch && steps < 8 && effort < ceiling) {
       if (!pile.length && matched === 0 && !briefs.length && !busyBlock() && lastFound && Date.now() - lastFound >= 10000) {
         if (reclaimDeferred()) { steps++; continue; }
         streamDone = true; break;
@@ -2090,11 +2274,12 @@ async function pump(my){
       if (briefs.length < 4) {
         const mark = pullSerial;
         const added = await pullMore();
-        if (my !== generation) return;
+        if (pumpStale(epoch, my)) return;
         const requested = pullSerial !== mark;
         if (!added && !briefs.length) {
           const broad = !filters.set && !(filters.names || []).length && !filters.type && !filters.rarities.length && !filters.era && !priceHunt() && !filters.graded;
           const broadOpen = broad && (!openingDone || !chaseDone || !mixExhausted);
+          if (setListHoldUntil > Date.now()) break;
           if (broadOpen && requested) { steps++; continue; }
           if (holdFeed) break;
           if (!feedExhausted && requested) { steps++; continue; }
@@ -2104,23 +2289,26 @@ async function pump(my){
       }
       const batch = briefs.splice(0, 4);
       if (!batch.length) {
+        if (setListHoldUntil > Date.now()) break;
         if (reclaimDeferred()) { steps++; continue; }
         streamDone = true; break;
       }
       steps++;
+      huntBatch = batch;
       const outcomes = await Promise.all(batch.map(async b => {
         try {
-          const card = await hydrate(b);
-          if (my !== generation) return { brief:b, stale:true };
+          const card = await hydrate(b, { hunt:true });
+          if (pumpStale(epoch, my)) return { brief:b, stale:true };
           fetchFails.delete(b.id);
           return { brief:b, card };
         } catch (err) {
-          if (my !== generation) return { brief:b, stale:true };
+          if (pumpStale(epoch, my)) return { brief:b, stale:true };
           if (isBusyError(err)) return { brief:b, throttled:true, card:null };
           return { brief:b, card:null };
         }
       }));
-      if (my !== generation) return;
+      if (pumpStale(epoch, my)) return;
+      huntBatch = [];
       let throttled = false;
       outcomes.forEach(o => {
         if (o.stale) return;
@@ -2135,17 +2323,20 @@ async function pump(my){
         pile.push(card);
         matched++;
         lastFound = Date.now();
+        armHuntWatch(my);
       });
       renderDeck();
       paintCount();
       if (throttled) { noteBusy(); break; }
     }
   } catch (e) {
-    if (my !== generation) return;
+    if (pumpStale(epoch, my)) return;
     if (isBusyError(e)) noteBusy();
     else { pumpError = "The card catalog didn't respond. Check your connection and try again."; paused = true; }
-  } finally { if (my === generation) loading = false; }
-  if (my !== generation) return;
+  } finally {
+    if (!pumpStale(epoch, my)) loading = false;
+  }
+  if (pumpStale(epoch, my)) return;
   const capped = filtersActive() || !!discoveryBinder();
   const priced = priceHunt();
   const ceiling = (filters.names || []).length ? 800 : 80;
@@ -2157,11 +2348,16 @@ async function pump(my){
   } else if (!streamDone && !busyBlock() && !briefs.length && !priced && capped && effort >= ceiling && pile.length < 3 && matched > 0) {
     if (!reclaimDeferred()) paused = true;
   }
-  if (!streamDone && !paused && !holdFeed && !briefs.length && pile.length < 4 && pile.length === pileAtStart && pullSerial === serialAtStart) {
+  if (!streamDone && !paused && !holdFeed && !briefs.length && pile.length < 4 && pile.length === pileAtStart && pullSerial === serialAtStart && !(setListHoldUntil > Date.now())) {
     if (!reclaimDeferred()) streamDone = true;
   }
   renderDeck();
   paintCount();
+  if (setListHoldUntil > Date.now() && !streamDone && my === generation) {
+    const wait = Math.max(40, setListHoldUntil - Date.now() + 30);
+    setTimeout(() => { if (my === generation) { setListHoldUntil = 0; pump(my); } }, wait);
+    return;
+  }
   if (catalogBusy && !streamDone && my === generation) { setTimeout(() => { if (my === generation) pump(my); }, busyDelay()); return; }
   if (streamDone && busyBlock()) {
     clearTimeout(busyRenderTimer);
@@ -2184,9 +2380,19 @@ function restart(opts){
   streamDone = false; paused = false; pumpError = ""; catalogBusy = false; busyStrike = 0; busyUntil = 0; clearTimeout(busyRenderTimer); effort = 0; loading = false; searchStarted = Date.now(); lastFound = Date.now();
   fetchFails.clear(); deferred = [];
   pendingSwipes = []; reserved = new Set(); swipeBusy = false;
+  busyHold = false;
+  setListHoldUntil = 0;
+  huntBatch = [];
   deck.innerHTML = "";
   showSkeleton();
   paintChips(); paintContext(); paintDiscovery();
+  abortStaleHuntFetches();
+  huntInflight.forEach(job => job.ctrl.abort());
+  huntInflight.clear();
+  pumpEpoch++;
+  huntProgressAt = Date.now();
+  clearHuntWatch();
+  armHuntWatch(generation);
   pump(generation);
 }
 function altText(card){ return (card.name || "Card") + " – " + (card.set || "Set") + (card.number ? " #" + card.number : ""); }
@@ -2243,10 +2449,14 @@ function syncActs(){
   document.getElementById("save").setAttribute("aria-label", b ? "Add to wishlist and " + b.name : "Add to wishlist");
 }
 function renderDeck(){
-  if (!pile.length && catalogBusy && !pumpError && !streamDone) {
-    deck.dataset.status = "busy";
-    deck.removeAttribute("aria-busy");
-    deck.innerHTML = `<div class="empty-state"><p>Card source is busy, retrying…</p>${toad()}</div>`;
+  if (pile.length) busyHold = false;
+  if (!pile.length && !pumpError && !streamDone && (busyHold || catalogBusy)) {
+    busyHold = true;
+    if (deck.dataset.status !== "busy") {
+      deck.dataset.status = "busy";
+      deck.removeAttribute("aria-busy");
+      deck.innerHTML = `<div class="empty-state"><p>Card source is busy, retrying…</p>${toad()}</div>`;
+    }
     syncActs();
     return;
   }
@@ -2349,6 +2559,7 @@ function fly(dir, from){
   if (blocking()) return;
   const card = pile.find(c => c && !reserved.has(c.id));
   if (!card) return;
+  const trigger = document.activeElement;
   reserved.add(card.id);
   let addedWish = false, addedBinder = false;
   const binder = dir > 0 ? discoveryBinder() : null;
@@ -2371,6 +2582,7 @@ function fly(dir, from){
   pendingSwipes.push({ card, dir, from: from || null });
   syncActs();
   runSwipe();
+  keepSwipeFocus(trigger);
 }
 function runSwipe(){
   if (swipeBusy) return;
@@ -2450,12 +2662,22 @@ function removeFromWish(id){
 function blocking(){
   return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (!profileEl.hidden && !wide());
 }
+function keepSwipeFocus(trigger){
+  const box = document.getElementById("hapticSwitch");
+  const button = trigger && trigger.closest ? trigger.closest("#skip, #save") : null;
+  if (button && document.body.contains(button)) { button.focus(); return; }
+  const active = document.activeElement;
+  if (active && active !== box && active !== document.body && active !== document.documentElement) return;
+  deck.focus();
+}
 function haptic(pattern){
   if (!settings.haptics) return;
   try { if (typeof navigator.vibrate === "function") { navigator.vibrate(pattern); return; } } catch (e) {}
-  if (hapticTrusted) { hapticTrusted = false; return; }
-  const label = document.querySelector("label[for='hapticSwitch']");
-  if (label) label.click();
+  const box = document.getElementById("hapticSwitch");
+  if (!box) return;
+  const back = document.activeElement;
+  box.click();
+  keepSwipeFocus(back);
 }
 function popBtn(btn){
   if (!btn) return;
@@ -2463,9 +2685,6 @@ function popBtn(btn){
   btn.classList.remove("pop");
   void btn.offsetWidth;
   btn.classList.add("pop");
-}
-function syncHaptics(){
-  document.querySelectorAll(".haptic-hit").forEach(el => { el.style.pointerEvents = settings.haptics ? "auto" : "none"; });
 }
 function playTone(freq){
   if (!settings.sound) return;
@@ -2944,7 +3163,7 @@ function showConfetti(message){
     }
   }
   document.body.append(el);
-  setTimeout(() => el.remove(), reduceMotion() ? 2400 : 1600);
+  holdConfetti(el, reduceMotion() ? 2400 : 1600);
 }
 function coverPad(binder, list){
   const pad = document.createElement("div");
@@ -3970,9 +4189,16 @@ document.getElementById("context").onclick = () => { if (tab === "hunt") openFil
 document.getElementById("skip").onclick = () => fly(-1);
 document.getElementById("save").onclick = () => fly(1);
 document.getElementById("undo").onclick = undo;
-document.querySelectorAll(".haptic-hit").forEach(label => label.addEventListener("click", e => { if (e.isTrusted) hapticTrusted = true; }));
+function typingTarget(el){
+  if (!el || el.nodeType !== 1) return false;
+  if (el.isContentEditable) return true;
+  const tag = el.tagName;
+  if (tag === "TEXTAREA" || tag === "SELECT") return true;
+  if (tag !== "INPUT") return false;
+  const type = String(el.getAttribute("type") || "text").toLowerCase();
+  return type === "text" || type === "search" || type === "number";
+}
 document.addEventListener("keydown", e => {
-  const tag = e.target && e.target.tagName;
   const open = ["fillSheet","binderSheet","settingsSheet","filterSheet"].map(id => document.getElementById(id)).find(el => el && !el.hidden);
   if (open && e.key === "Tab") {
     const items = [...open.querySelectorAll(".sheet-card button, .sheet-card input, .sheet-card select, .sheet-card a")].filter(el => !el.disabled && el.offsetParent);
@@ -3988,7 +4214,7 @@ document.addEventListener("keydown", e => {
     if (!profileEl.hidden && !wide()) closeProfile();
     return;
   }
-  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  if (typingTarget(e.target) || blocking()) return;
   if ((e.key === "f" || e.key === "F") && tab === "hunt") { e.preventDefault(); openFilter("set", document.querySelector("[data-filter=set]")); return; }
   if (e.key === "z" || e.key === "Z") { if (tab === "hunt") undo(); return; }
   if (tab === "hunt" && !blocking()) {
@@ -4008,7 +4234,6 @@ document.addEventListener("pointerdown", e => {
 });
 
 applyMotion();
-syncHaptics();
 syncProfilePane();
 matchMedia("(min-width: 1024px)").addEventListener("change", syncProfilePane);
 document.getElementById("chips").addEventListener("scroll", syncChipFade);
