@@ -68,6 +68,8 @@ img{max-width:100%;-webkit-user-drag:none}
 .discovery b{font-family:var(--display);font-weight:700}
 .discovery[hidden]{display:none !important}
 .countline{margin:4px 14px 0;font-size:13px;color:var(--ink-2);flex:none}
+.cardsearch{flex:none;padding:8px 12px 0}
+.cardsearch input{width:100%;border:2.5px solid var(--ink);border-radius:14px;padding:10px 12px;font:inherit;background:#fff;min-height:44px}
 .view{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column}
 .view[hidden]{display:none !important}
 #deck{position:relative;flex:1;min-height:0;margin:6px auto 0;width:min(100%,420px);touch-action:none;overflow:hidden;background:var(--paper);container-type:size}
@@ -157,7 +159,7 @@ img{max-width:100%;-webkit-user-drag:none}
 .rangebar{position:relative;min-width:0}
 .rangebar::after{content:"";position:absolute;top:0;right:0;bottom:0;width:36px;pointer-events:none;background:linear-gradient(90deg,rgba(255,255,255,0),#fff);opacity:0}
 .rangebar.more::after{opacity:1}
-.ranges{display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;min-width:0;padding-bottom:2px}
+.ranges{display:flex;gap:4px;flex-wrap:wrap;overflow:visible;min-width:0;padding-bottom:2px}
 .ranges button,.vtoggle button{min-height:36px;flex:none;border:2px solid var(--ink);border-radius:999px;background:var(--paper);padding:0 8px;font-family:var(--display);font-size:13px}
 .ranges button[aria-pressed="true"],.vtoggle button[aria-pressed="true"]{background:var(--sky)}
 .chart{width:100%;height:auto;display:block;touch-action:none}
@@ -207,7 +209,7 @@ img{max-width:100%;-webkit-user-drag:none}
   .stage .word{display:none}
   .stage .top{grid-template-columns:minmax(0,1fr) 44px}
   .tabs{display:none}
-  .foot{padding:8px 16px 12px}
+  .foot{display:none}
   .stage{min-width:0}
   #profile{position:static;z-index:auto;border-left:2.5px solid var(--ink);background:var(--paper)}
   .sheet.popover .sheet-card{left:var(--pop-x);top:var(--pop-y);bottom:auto;right:auto;width:min(360px,calc(100vw - 24px));max-height:55vh;border-bottom:2.5px solid var(--ink);border-radius:22px}
@@ -234,9 +236,10 @@ img{max-width:100%;-webkit-user-drag:none}
 .setflip .pocket .iconish{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:24px;height:24px;min-height:24px}
 #bindersScroll.reading{display:flex;flex-direction:column;overflow:hidden}
 .booktools{flex:none;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:6px}
+.booktools .chip{max-width:none}
 .booktools::-webkit-scrollbar{display:none}
 .bookstage{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;min-width:0}
-.book{flex:1;min-height:0;width:min(100%,440px);margin:0 auto;display:flex;flex-direction:column;min-width:0}
+.book{position:relative;flex:1;min-height:0;width:min(100%,440px);margin:0 auto;display:flex;flex-direction:column;min-width:0}
 .book-spread{flex:1;min-height:0;display:grid;grid-template-columns:14px minmax(0,1fr);grid-template-rows:minmax(0,1fr);perspective:1600px;position:relative}
 .spine,.rings{grid-column:1;grid-row:1;display:flex;flex-direction:column;justify-content:space-evenly;align-items:center;z-index:3}
 .spine{background:linear-gradient(90deg,#c9bfb0,#f3edc8 55%,#b7ad9e);border-radius:8px 0 0 8px;border:2px solid var(--ink);border-right:0}
@@ -254,7 +257,7 @@ img{max-width:100%;-webkit-user-drag:none}
 .face h3{font-family:var(--display);margin:0 0 4px;font-size:13px;flex:none}
 .sleeves{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:5px}
 .slot{min-width:0;min-height:0;display:flex;flex-direction:column;gap:2px}
-.sleeve{position:relative;flex:1;min-height:0;border-radius:8px;background:linear-gradient(165deg,rgba(255,255,255,.72),rgba(255,255,255,.2) 46%,rgba(134,222,255,.18));box-shadow:inset 0 0 0 1px rgba(31,31,30,.28), inset 0 7px 10px rgba(31,31,30,.08);overflow:hidden;user-select:none;-webkit-touch-callout:none}
+.sleeve{position:relative;flex:1;min-height:0;border-radius:8px;background:linear-gradient(165deg,rgba(255,255,255,.72),rgba(255,255,255,.2) 46%,rgba(134,222,255,.18));box-shadow:inset 0 0 0 1px rgba(31,31,30,.28), inset 0 7px 10px rgba(31,31,30,.08);overflow:hidden;user-select:none;-webkit-touch-callout:none;touch-action:none}
 .booknav .iconish{width:36px;height:36px;min-height:36px;padding:0;border-radius:12px;border:2px solid var(--ink);background:#fff}
 .sleeve .gloss,.sleeve .shine{position:absolute;inset:0;pointer-events:none}
 .sleeve .gloss{background:linear-gradient(115deg,rgba(255,255,255,.7),transparent 46%)}
@@ -271,7 +274,7 @@ img{max-width:100%;-webkit-user-drag:none}
 .pad .count{font-family:var(--display);font-size:18px;margin:0;position:relative}
 .charm{position:absolute;right:16px;bottom:16px;width:52px;height:52px;display:grid;place-items:center;background:#fff;border:2.5px solid var(--ink);border-radius:50%;box-shadow:2px 2px 0 var(--ink)}
 .charm.sticker{border-radius:12px;transform:rotate(8deg);background:var(--butter);font-family:var(--display);font-size:26px}
-.dogear{position:absolute;width:64px;height:64px;border:0;background:linear-gradient(135deg,transparent 46%,rgba(31,31,30,.2) 46%);z-index:6;padding:0}
+.dogear{position:absolute;width:64px;height:64px;border:0;background:linear-gradient(135deg,transparent 46%,rgba(31,31,30,.2) 46%);z-index:6;padding:0;touch-action:none}
 .dogear.next{right:0;bottom:0}
 .dogear.prev{left:14px;bottom:0;transform:scaleX(-1)}
 .booknav{flex:none;display:flex;align-items:center;gap:6px;min-width:0}
@@ -284,8 +287,11 @@ img{max-width:100%;-webkit-user-drag:none}
 .spark{position:absolute;inset:0;pointer-events:none;z-index:5}
 .spark i{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--sky);animation:pop .7s ease-out forwards}
 @keyframes pop{to{transform:translateY(-18px) scale(.2);opacity:0}}
-.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:70;display:flex;gap:8px;align-items:center;background:#fff;border:2.5px solid var(--ink);border-radius:999px;padding:8px 10px 8px 14px;box-shadow:3px 3px 0 var(--ink);max-width:min(92vw,420px)}
+.toast{position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:70;display:flex;gap:8px;align-items:center;background:#fff;border:2.5px solid var(--ink);border-radius:999px;padding:8px 10px 8px 14px;box-shadow:3px 3px 0 var(--ink);max-width:min(92vw,420px)}
 .toast[hidden]{display:none !important}
+@media (min-width:1024px){
+  .toast{bottom:22px}
+}
 .confetti{position:fixed;inset:0;z-index:80;display:grid;place-items:center;pointer-events:none;background:rgba(248,247,239,.2)}
 .confetti p{font-family:var(--display);font-size:28px;background:#fff;border:2.5px solid var(--ink);border-radius:18px;padding:12px 16px;box-shadow:3px 3px 0 var(--ink)}
 .confetti b{position:absolute;width:10px;height:10px;border-radius:50%;animation:conf .9s ease-out forwards}
@@ -375,6 +381,9 @@ html.reduce .sleeve.holo img{transform:none}
         <span>Adding to: <b id="discoveryName">Binder</b></span>
         <button class="chip" id="stopDiscovery" type="button">Done</button>
       </div>
+      <form class="cardsearch" id="cardSearch" role="search">
+        <input id="cardFind" type="search" placeholder="e.g. Pikachu" aria-label="Search cards by name" enterkeyhint="search" autocomplete="off">
+      </form>
       <p class="countline" id="matchCount" aria-live="polite">Looking…</p>
       <div id="deck" data-status="loading" aria-busy="true"></div>
       <div id="deckCaption" class="deckcap" hidden>
@@ -1647,6 +1656,8 @@ function paintChips(){
   const g = document.getElementById("gradedChip");
   g.setAttribute("aria-pressed", filters.graded ? "true" : "false");
   g.classList.toggle("on", filters.graded);
+  const find = document.getElementById("cardFind");
+  if (find && document.activeElement !== find) find.value = (filters.names || []).length === 1 ? filters.names[0] : "";
   syncChipFade();
 }
 function paintContext(){
@@ -1720,7 +1731,7 @@ function togglePreset(pick){
 }
 function drawPokemonFilter(body){
   const extras = (filters.names || []).filter(n => !HUNT_PICKS.some(p => presetOn(p) && p.names.some(x => sameName(x, n))));
-  body.innerHTML = `<div class="searchrow"><input id="monFind" type="search" placeholder="Search a Pokémon" aria-label="Search a Pokémon"></div><div class="suggest" id="monSuggest"></div><div class="huntpicks" id="monPicks">${HUNT_PICKS.map(p => `<button type="button" class="huntpick ${presetOn(p) ? "on" : ""}" data-pick="${p.id}">${esc(p.label)}</button>`).join("")}${extras.map(n => `<button type="button" class="huntpick on" data-extra="${esc(n)}">${esc(n)}</button>`).join("")}</div><p class="fine">Every print of a picked Pokémon stays in the hunt, including commons.</p>`;
+  body.innerHTML = `<div class="searchrow"><input id="monFind" type="search" placeholder="e.g. Pikachu" aria-label="Search a Pokémon"></div><div class="suggest" id="monSuggest"></div><div class="huntpicks" id="monPicks">${HUNT_PICKS.map(p => `<button type="button" class="huntpick ${presetOn(p) ? "on" : ""}" data-pick="${p.id}">${esc(p.label)}</button>`).join("")}${extras.map(n => `<button type="button" class="huntpick on" data-extra="${esc(n)}">${esc(n)}</button>`).join("")}</div><p class="fine">Every print of a picked Pokémon stays in the hunt, including commons.</p>`;
   const refresh = () => { drawPokemonFilter(body); saveFilters(); restart(); };
   body.querySelectorAll("[data-pick]").forEach(btn => btn.onclick = () => {
     popBtn(btn);
@@ -2365,46 +2376,55 @@ function renderCollection(root){
       else mode = "scroll";
     }
   };
+  const snapCurl = turning => {
+    if (!turning) return;
+    turning.classList.remove("live");
+    turning.style.setProperty("--turn", "0");
+    setTimeout(() => { turning.classList.remove("hot", "forward", "backward", "live"); }, 460);
+  };
   const onUp = e => {
     if (e.pointerId !== pid) return;
+    const cancelled = e.type === "pointercancel";
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
     window.removeEventListener("pointercancel", onUp);
     clearTimer();
-    const dx = e.clientX - sx, dy = e.clientY - sy;
+    const dx = cancelled ? 0 : e.clientX - sx, dy = cancelled ? 0 : e.clientY - sy;
     if (mode === "curl" && leaf) {
-      fromPointer = true;
-      const turn = Number(leaf.style.getPropertyValue("--turn")) || 0;
-      const dir = leaf.classList.contains("backward") ? -1 : 1;
-      leaf.classList.remove("live");
-      if (turn > 0.33 || Math.hypot(dx, dy) < 8) finishFlip(dir);
+      const turning = leaf;
+      if (cancelled) snapCurl(turning);
       else {
-        leaf.style.setProperty("--turn", "0");
-        setTimeout(() => { leaf.classList.remove("hot", "forward", "backward", "live"); }, 460);
+        fromPointer = true;
+        const turn = Number(turning.style.getPropertyValue("--turn")) || 0;
+        const dir = turning.classList.contains("backward") ? -1 : 1;
+        turning.classList.remove("live");
+        if (turn > 0.33 || Math.hypot(dx, dy) < 8) finishFlip(dir);
+        else snapCurl(turning);
       }
     } else if (mode === "card") {
-      const box = book.getBoundingClientRect();
-      const outside = e.clientX < box.left - 8 || e.clientX > box.right + 8 || e.clientY < box.top - 8 || e.clientY > box.bottom + 24;
       endGhost();
       book.classList.remove("out");
-      if (outside) removeAt(dragIndex);
-      else {
-        if (ghost) ghost.style.visibility = "hidden";
-        const hit = document.elementFromPoint(e.clientX, e.clientY);
-        const sleeve = hit && hit.closest(".sleeve[data-index]");
-        const blank = hit && hit.closest(".sleeve[data-insert]");
-        const dot = hit && hit.closest(".dots button[data-sheet]");
-        if (sleeve) moveIndex(dragIndex, Number(sleeve.dataset.index));
-        else if (blank) moveIndex(dragIndex, Number(blank.dataset.insert));
-        else if (dot) {
-          const sheet = Number(dot.dataset.sheet);
-          const page = withCover ? Math.max(0, sheet - 1) : sheet;
-          if (!(withCover && sheet === 0)) moveIndex(dragIndex, Math.min(list.length - 1, page * 9));
+      if (!cancelled) {
+        const box = book.getBoundingClientRect();
+        const outside = e.clientX < box.left - 8 || e.clientX > box.right + 8 || e.clientY < box.top - 8 || e.clientY > box.bottom + 24;
+        if (outside) removeAt(dragIndex);
+        else {
+          const hit = document.elementFromPoint(e.clientX, e.clientY);
+          const sleeve = hit && hit.closest(".sleeve[data-index]");
+          const blank = hit && hit.closest(".sleeve[data-insert]");
+          const dot = hit && hit.closest(".dots button[data-sheet]");
+          if (sleeve) moveIndex(dragIndex, Number(sleeve.dataset.index));
+          else if (blank) moveIndex(dragIndex, Number(blank.dataset.insert));
+          else if (dot) {
+            const sheet = Number(dot.dataset.sheet);
+            const page = withCover ? Math.max(0, sheet - 1) : sheet;
+            if (!(withCover && sheet === 0)) moveIndex(dragIndex, Math.min(list.length - 1, page * 9));
+          }
         }
       }
-    } else if (mode === "swipe-next" && dx < -48) finishFlip(1);
-    else if (mode === "swipe-prev" && dx > 48) finishFlip(-1);
-    else if (!mode && Math.hypot(dx, dy) < 8) {
+    } else if (!cancelled && mode === "swipe-next" && dx < -48) finishFlip(1);
+    else if (!cancelled && mode === "swipe-prev" && dx > 48) finishFlip(-1);
+    else if (!cancelled && !mode && Math.hypot(dx, dy) < 8) {
       const hit = e.target.closest(".sleeve[data-index] .cardhit, .sleeve[data-index]");
       const sleeve = hit && hit.closest(".sleeve[data-index]");
       if (sleeve && !e.target.closest(".iconish")) liftCard(list[Number(sleeve.dataset.index)]);
@@ -2434,19 +2454,28 @@ function renderCollection(root){
   function moveIndex(from, to){
     if (from === to || from < 0 || to < 0 || from >= list.length) return;
     const [card] = list.splice(from, 1);
-    let dest = to;
-    if (from < to) dest = to - 1;
-    dest = Math.max(0, Math.min(dest, list.length));
+    const dest = Math.max(0, Math.min(to, list.length));
     list.splice(dest, 0, card);
     const page = Math.floor(dest / 9);
     if (list.slice(page * 9, page * 9 + 9).length === 9) pendingSparkle = page;
     commit();
   }
+  book.addEventListener("keydown", e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const hit = e.target.closest(".cardhit");
+    if (!hit) return;
+    const sleeve = hit.closest(".sleeve[data-index]");
+    if (!sleeve) return;
+    e.preventDefault();
+    liftCard(list[Number(sleeve.dataset.index)]);
+  });
   book.addEventListener("pointerdown", e => {
     if (e.button) return;
     if (e.target.closest(".iconish")) return;
     pid = e.pointerId; sx = e.clientX; sy = e.clientY; mode = "";
     const dog = e.target.closest(".dogear");
+    const sleeveHit = e.target.closest(".sleeve");
+    if ((dog || sleeveHit) && e.cancelable) e.preventDefault();
     if (dog) {
       const dir = dog.classList.contains("prev") ? -1 : 1;
       if (landed(dir) === flipPage) return;
@@ -2690,12 +2719,43 @@ function trendHistory(card){
   const seen = new Set();
   return points.filter(p => p.t && p.value && !seen.has(p.t) && seen.add(p.t)).sort((a, b) => a.t - b.t);
 }
+const FX_KEY = "bh.fx.v1";
+let fxRate = null;
+let fxPending = null;
+function fxToday(){ return new Date().toISOString().slice(0, 10); }
+function readFx(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(FX_KEY) || "null");
+    if (raw && raw.date === fxToday() && raw.eurUsd > 0.2 && raw.eurUsd < 5) return raw.eurUsd;
+  } catch (e) {}
+  return null;
+}
+function ensureFx(){
+  if (fxRate) return Promise.resolve(fxRate);
+  const cached = readFx();
+  if (cached) { fxRate = cached; return Promise.resolve(fxRate); }
+  if (fxPending) return fxPending;
+  fxPending = getJson("https://api.frankfurter.app/latest?from=EUR&to=USD").then(j => {
+    const rate = j && j.rates ? pos(j.rates.USD) : null;
+    if (rate) {
+      fxRate = rate;
+      try { localStorage.setItem(FX_KEY, JSON.stringify({ date:fxToday(), eurUsd:rate })); } catch (e) {}
+    }
+    return fxRate;
+  }).catch(() => null).finally(() => { fxPending = null; });
+  return fxPending;
+}
 function priceSeries(card){
   const sales = scryHistory(card);
-  if (sales.length >= 2) return { points:sales, source:"sales", currency:"USD" };
+  if (sales.length >= 2) return { points:sales, source:"sales", currency:"USD", note:"Drag along the line for a day." };
   const trend = trendHistory(card);
-  if (trend.length >= 2) return { points:trend, source:"trend", currency:"EUR" };
-  return { points:[], source:"", currency:"USD" };
+  if (trend.length >= 2) {
+    if (settings.currency === "EUR") return { points:trend, source:"trend", currency:"EUR", note:"Cardmarket 30-day, 7-day, and 1-day averages, in euros. Not a daily sales history." };
+    if (!fxRate) return { points:[], source:"trend", currency:"USD", pendingFx:true, note:"" };
+    const points = trend.map(p => ({ t:p.t, label:p.label, value:Math.round(p.value * fxRate * 100) / 100 }));
+    return { points, source:"trend", currency:"USD", note:"approx. USD from Cardmarket. 30-day, 7-day, and 1-day averages, not a daily sales history." };
+  }
+  return { points:[], source:"", currency:"USD", note:"" };
 }
 function trendIsThin(points){
   const vals = points.map(p => p.value).filter(v => typeof v === "number" && v > 0);
@@ -2795,7 +2855,7 @@ function renderProfile(card){
   const variant = selectedVariant(card);
   const shown = settings.currency === "EUR" ? shownMoney(card) : (variant && pos(variant.market) ? { amount:variant.market, currency:"USD" } : shownMoney(card));
   const rawSeries = priceSeries(card);
-  const thinTrend = rawSeries.source === "trend" && trendIsThin(rawSeries.points);
+  const thinTrend = rawSeries.source === "trend" && !rawSeries.pendingFx && trendIsThin(rawSeries.points);
   const series = thinTrend ? { points:[], source:"", currency:"USD" } : rawSeries;
   const windowed = ranged(series.points);
   const delta = series.source === "sales" ? change30(series.points) : change30(windowed);
@@ -2823,11 +2883,11 @@ function renderProfile(card){
     ${variants.length > 1 ? `<div class="vtoggle" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${variants.map(v => `<button type="button" data-variant="${esc(v.key)}" aria-pressed="${variant && variant.key === v.key ? "true" : "false"}">${esc(v.label)}</button>`).join("")}</div>` : ""}
     ${!gradedReady ? `<p class="fine">Checking graded prices…</p>` : gradedKnown ? `<div class="grade-grid">${GRADES.map(([company, grade]) => gradeCell(facts, company, grade)).join("")}</div>` : `<p class="note">No graded sales yet</p>${priceQueued ? `<p class="fine">Queued for the next price batch.</p>` : ""}`}
     <div class="chart-wrap">
-      <div class="rangebar"><div class="ranges">${["1M","3M","1Y","All"].map(r => `<button type="button" data-range="${r}" aria-pressed="${chartRange === r ? "true" : "false"}">${r}</button>`).join("")}
-        ${gradedKnown ? `<button type="button" data-compare="" aria-pressed="${compareGrade ? "false" : "true"}">Raw</button>${GRADES.map(([c, g]) => `<button type="button" data-compare="${c} ${g}" aria-pressed="${compareGrade === c + " " + g ? "true" : "false"}">${c} ${g}</button>`).join("")}` : ""}
-      </div></div>
-      ${svg || `<p class="empty-state">Not enough price history</p>`}
-      <p class="scrub" id="scrub">${guide ? esc(guide.label) + " latest cached " + esc(priceText(guide.value, "USD")) + ". The dashed line is that price, not a daily history." : series.source === "trend" ? "Cardmarket 30-day, 7-day, and 1-day averages, in euros. Not a daily sales history." : series.source === "sales" ? "Drag along the line for a day." : ""}</p>
+      <div class="rangebar"><div class="ranges">${["1M","3M","1Y","All"].map(r => `<button type="button" data-range="${r}" aria-pressed="${chartRange === r ? "true" : "false"}">${r}</button>`).join("")}</div>
+        ${gradedKnown ? `<div class="ranges">${`<button type="button" data-compare="" aria-pressed="${compareGrade ? "false" : "true"}">Raw</button>`}${GRADES.map(([c, g]) => `<button type="button" data-compare="${c} ${g}" aria-pressed="${compareGrade === c + " " + g ? "true" : "false"}">${c} ${g}</button>`).join("")}</div>` : ""}
+      </div>
+      ${svg || `<p class="empty-state">${series.pendingFx ? "Checking the dollar rate…" : "Not enough price history"}</p>`}
+      <p class="scrub" id="scrub">${guide ? esc(guide.label) + " latest cached " + esc(priceText(guide.value, "USD")) + ". The dashed line is that price, not a daily history." : esc(series.note || "")}</p>
     </div>
     <div class="links">${buyLinks(card).map(l => `<a class="buy-btn" href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join("")}
       <button class="chip" id="profileWish" type="button">${onWish ? "On wishlist" : "★ Add to wishlist"}</button>
@@ -2852,6 +2912,7 @@ function renderProfile(card){
   profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => { variantChoice.set(card.id, btn.dataset.variant); renderProfile(card); });
   profileEl.querySelectorAll("[data-range]").forEach(btn => btn.onclick = () => { chartRange = btn.dataset.range; renderProfile(card); });
   profileEl.querySelectorAll("[data-compare]").forEach(btn => btn.onclick = () => { compareGrade = btn.dataset.compare; renderProfile(card); });
+  if (series.pendingFx) ensureFx().then(rate => { if (rate && profileCard && profileCard.id === card.id) renderProfile(cardCache.get(card.id) || card); });
   const ranges = profileEl.querySelector(".ranges");
   if (ranges) {
     const fade = () => {
@@ -3013,6 +3074,14 @@ syncHaptics();
 syncProfilePane();
 matchMedia("(min-width: 1024px)").addEventListener("change", syncProfilePane);
 document.getElementById("chips").addEventListener("scroll", syncChipFade);
+document.getElementById("cardSearch").onsubmit = e => {
+  e.preventDefault();
+  const name = cleanMon(document.getElementById("cardFind").value);
+  filters.names = name ? [name] : [];
+  saveFilters();
+  restart();
+};
+ensureFx();
 deck.addEventListener("dragstart", e => e.preventDefault());
 let resizeTick = 0;
 window.addEventListener("resize", () => {
@@ -3078,7 +3147,7 @@ function renderOnboard(){
     title.textContent = "Who are you hunting for?";
     sub.textContent = "Pick a few. You can change this anytime.";
     next.textContent = "Next";
-    body.innerHTML = `<div class="searchrow"><input id="obFind" type="search" placeholder="Search a Pokémon" aria-label="Search a Pokémon"></div><div class="suggest" id="obSuggest"></div><div class="huntpicks">${HUNT_PICKS.map(p => `<button type="button" class="huntpick ${onboardPicks.has(p.id) ? "on" : ""}" data-ob="${p.id}">${esc(p.label)}</button>`).join("")}${onboardCustom.map(n => `<button type="button" class="huntpick on" data-obx="${esc(n)}">${esc(n)}</button>`).join("")}</div>`;
+    body.innerHTML = `<div class="searchrow"><input id="obFind" type="search" placeholder="e.g. Pikachu" aria-label="Search a Pokémon"></div><div class="suggest" id="obSuggest"></div><div class="huntpicks">${HUNT_PICKS.map(p => `<button type="button" class="huntpick ${onboardPicks.has(p.id) ? "on" : ""}" data-ob="${p.id}">${esc(p.label)}</button>`).join("")}${onboardCustom.map(n => `<button type="button" class="huntpick on" data-obx="${esc(n)}">${esc(n)}</button>`).join("")}</div>`;
     body.querySelectorAll("[data-ob]").forEach(btn => btn.onclick = () => {
       popBtn(btn);
       const id = btn.dataset.ob;
