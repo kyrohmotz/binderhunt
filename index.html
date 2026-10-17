@@ -552,9 +552,19 @@ let bulkCursor = 0;
 let gradedCursor = 0;
 let priceLane = 0;
 let pricePage = 1;
+let priceOrigin = 1;
+let priceWrapped = false;
+let laneOrder = null;
+let laneStates = null;
+let setWalk = null;
 let feedExhausted = false;
+let holdFeed = false;
 let tailCursor = 0;
 let tailDone = false;
+let pullSerial = 0;
+let busyStrike = 0;
+let busyUntil = 0;
+let busyRenderTimer = 0;
 const bulkBags = new Map();
 const imageless = new Set(IMAGELESS_SETS);
 const setPools = new Map();
@@ -896,28 +906,48 @@ function buyLinks(card){
 }
 
 function isBusyError(e){
-  return /HTTP 429/.test(String(e && e.message || ""));
+  const name = e && e.name || "";
+  const msg = String(e && e.message || e || "");
+  if (/HTTP 429/.test(msg) || /^HTTP 5/.test(msg)) return true;
+  if (name === "AbortError" || name === "TimeoutError") return true;
+  return /Failed to fetch|NetworkError|Load failed|ECONN|timeout/i.test(msg);
 }
+function busyBlock(){ return catalogBusy || Date.now() < busyUntil; }
+function touchBusy(){
+  catalogBusy = true;
+  busyUntil = Date.now() + 10000;
+}
+function noteBusy(){
+  touchBusy();
+  busyStrike = Math.min(6, busyStrike + 1);
+}
+function busyDelay(){ return Math.min(8000, 400 * (2 ** Math.min(busyStrike, 5))); }
 async function getJson(url){
+  pullSerial++;
   let last;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
       if (res.status === 429 || res.status >= 500) {
         last = new Error("HTTP " + res.status);
+        touchBusy();
         await new Promise(r => setTimeout(r, 280 * (attempt + 1)));
         continue;
       }
       if (!res.ok) throw new Error("HTTP " + res.status);
+      catalogBusy = false;
+      busyStrike = 0;
       return res.json();
     } catch (e) {
       last = e;
       const http = String(e && e.message || "");
       const retry = http.startsWith("HTTP ") ? /^HTTP (429|5)/.test(http) : true;
-      if (attempt === 2 || !retry) throw e;
+      if (isBusyError(e)) touchBusy();
+      if (attempt === 2 || !retry) break;
       await new Promise(r => setTimeout(r, 280 * (attempt + 1)));
     }
   }
+  if (isBusyError(last)) touchBusy();
   throw last;
 }
 function usdVariants(tp){
@@ -992,6 +1022,7 @@ async function hydrate(brief){
   let card;
   try { card = normalizeDex(await getJson(TCGDEX + "/cards/" + encodeURIComponent(brief.id))); }
   catch (e) {
+    if (isBusyError(e)) throw e;
     const raw = await getJson("https://api.pokemontcg.io/v2/cards/" + encodeURIComponent(brief.id));
     card = normalizePtcg(raw.data || raw);
   }
@@ -1232,8 +1263,13 @@ async function pullChaseAll(){
   }
   return 0;
 }
+function huntSetIds(){
+  if (setWalk) return setWalk;
+  setWalk = shuffle(meta.sets.map(s => s.id).filter(id => !imageless.has(id) && (!filters.era || eraMatches(id, filters.era)) && (!filters.set || id === filters.set)));
+  return setWalk;
+}
 async function pullBulk(){
-  const ids = meta.sets.map(s => s.id).filter(id => !imageless.has(id) && (!filters.era || eraMatches(id, filters.era)));
+  const ids = huntSetIds();
   const takeN = priceHunt() ? 16 : 10;
   while (bulkCursor < ids.length) {
     const id = ids[bulkCursor];
@@ -1289,6 +1325,7 @@ async function pullNames(names){
     list = await getJson(TCGDEX + "/cards?name=" + encodeURIComponent("like:" + species) + "&pagination:page=" + page + "&pagination:itemsPerPage=100");
   } catch (e) {
     if (isBusyError(e)) throw e;
+    namePages.set(species, 0);
     return 0;
   }
   if (!Array.isArray(list) || !list.length) { namePages.set(species, 0); return 0; }
@@ -1353,13 +1390,50 @@ function priceyBand(){
   return priceHunt();
 }
 function priceLanes(){
-  const holos = ["Rare Holo","Holo Rare","Rare Holo LV.X","Rare PRIME","LEGEND","Classic Collection","Shiny rare","Shiny rare VMAX","Holo Rare VMAX","Holo Rare VSTAR"];
+  if (laneOrder) return laneOrder;
+  const holos = shuffle(["Rare Holo","Holo Rare","Rare Holo LV.X","Rare PRIME","LEGEND","Classic Collection","Shiny rare","Shiny rare VMAX","Holo Rare VMAX","Holo Rare VSTAR"]);
   const ultra = ["Ultra Rare"];
   const high = filters.pricePreset === "high" || (filters.min != null && filters.min >= 50 && (filters.max == null || filters.max >= 50));
-  const chase = high
+  const chase = shuffle(high
     ? ["Secret Rare","Special illustration rare","Hyper rare","Illustration rare","Mega Hyper Rare","Shiny Ultra Rare","Amazing Rare","Radiant Rare"]
-    : ["Illustration rare","Special illustration rare","Secret Rare","Ultra Rare","Hyper rare","Shiny Ultra Rare","Amazing Rare","Radiant Rare"];
-  return high ? chase.concat(holos, ultra) : chase.concat(holos);
+    : ["Illustration rare","Special illustration rare","Secret Rare","Ultra Rare","Hyper rare","Shiny Ultra Rare","Amazing Rare","Radiant Rare"]);
+  laneOrder = high ? chase.concat(holos, ultra) : chase.concat(holos);
+  return laneOrder;
+}
+function spreadRows(rows){
+  const buckets = new Map();
+  shuffle(rows).forEach(c => {
+    const id = String(c.id).split("-")[0];
+    if (!buckets.has(id)) buckets.set(id, []);
+    buckets.get(id).push(c);
+  });
+  const keys = shuffle([...buckets.keys()]);
+  const out = [];
+  let hop = true;
+  while (hop) {
+    hop = false;
+    keys.forEach(id => {
+      const bag = buckets.get(id);
+      if (bag.length) { out.push(bag.shift()); hop = true; }
+    });
+  }
+  return out;
+}
+function ensureLaneStates(){
+  const lanes = priceLanes();
+  if (!laneStates || laneStates.length !== lanes.length) {
+    laneStates = lanes.map(() => {
+      const origin = 1 + Math.floor(Math.random() * 6);
+      return { page: origin, origin, wrapped: false, done: false };
+    });
+  }
+  return laneStates;
+}
+function advanceLane(state, list){
+  const short = !Array.isArray(list) || list.length < 24;
+  if (!short) { state.page++; return; }
+  if (!state.wrapped && state.origin > 1) { state.wrapped = true; state.page = 1; return; }
+  state.done = true;
 }
 function laneFits(rarity){
   if (!filters.era) return true;
@@ -1392,7 +1466,7 @@ function acceptBrief(c){
   return true;
 }
 async function pullTails(){
-  const ids = meta.sets.map(s => s.id).filter(id => !imageless.has(id) && (!filters.era || eraMatches(id, filters.era)) && (!filters.set || id === filters.set));
+  const ids = huntSetIds();
   while (tailCursor < ids.length) {
     const id = ids[tailCursor++];
     try {
@@ -1413,44 +1487,89 @@ async function pullTails(){
 }
 async function pullPrice(){
   // The list endpoint hangs on pricing.* filters, so page chase rarities (then set tails) instead.
+  // Each pull samples a few lanes so one visit is not twenty cards from a single set.
+  const lanes = priceLanes();
+  const states = ensureLaneStates();
+  const staged = [];
+  const stagedSets = new Set();
   let hops = 0;
-  while (hops++ < 6 && !feedExhausted) {
-    const lanes = priceLanes();
-    while (priceLane < lanes.length && !laneFits(lanes[priceLane])) { priceLane++; pricePage = 1; }
-    if (priceLane >= lanes.length) return pullTails();
-    const rarity = lanes[priceLane];
+  let cursor = priceLane;
+  while (hops++ < 6 && !feedExhausted && stagedSets.size < 3) {
+    let pick = -1;
+    for (let n = 0; n < lanes.length; n++) {
+      const i = (cursor + n) % lanes.length;
+      if (states[i].done || !laneFits(lanes[i])) { states[i].done = states[i].done || !laneFits(lanes[i]); continue; }
+      pick = i;
+      break;
+    }
+    if (pick < 0) break;
+    cursor = pick + 1;
+    const state = states[pick];
     let list;
     try {
-      list = await getJson(TCGDEX + "/cards?rarity=eq:" + encodeURIComponent(rarity) + "&pagination:page=" + pricePage + "&pagination:itemsPerPage=24");
+      list = await getJson(TCGDEX + "/cards?rarity=eq:" + encodeURIComponent(lanes[pick]) + "&pagination:page=" + state.page + "&pagination:itemsPerPage=24");
     } catch (e) {
       if (isBusyError(e)) throw e;
-      priceLane++; pricePage = 1;
+      state.done = true;
       continue;
     }
-    if (!Array.isArray(list) || list.length < 24) { priceLane++; pricePage = 1; }
-    else pricePage++;
-    if (!Array.isArray(list) || !list.length) continue;
-    const rows = list.filter(acceptBrief);
-    rows.forEach(c => pushBrief(c));
-    if (rows.length) return rows.length;
+    advanceLane(state, list);
+    (Array.isArray(list) ? list : []).filter(acceptBrief).forEach(c => {
+      staged.push(c);
+      stagedSets.add(String(c.id).split("-")[0]);
+    });
   }
-  return 0;
+  priceLane = cursor;
+  if (!staged.length) {
+    if (states.every(s => s.done)) return pullTails();
+    return 0;
+  }
+  spreadRows(staged).forEach(c => pushBrief(c));
+  return staged.length;
+}
+function namesExhausted(){
+  const names = filters.names || [];
+  return names.length > 0 && names.every(n => namePages.get(n) === 0);
+}
+function setDrained(id){
+  if (!setLists.has(id)) return false;
+  const bag = setLists.get(id);
+  return !(bag.cards || []).some(c => c && c.id && c.image && !seen.has(c.id));
 }
 async function pullMore(){
+  holdFeed = false;
   await loadMeta();
-  if ((filters.names || []).length) return pullNames(filters.names);
+  if ((filters.names || []).length) {
+    const n = await pullNames(filters.names);
+    if (!n && namesExhausted()) feedExhausted = true;
+    return n;
+  }
   if (filters.graded && !filters.set && !filters.type && !filters.rarities.length) {
     const n = await pullGraded();
     if (n) return n;
   }
-  if (filters.set && !priceyBand()) return pullSet(filters.set);
-  if ((filters.type || filters.rarities.length) && !priceyBand()) return pullQuery();
+  if (filters.set && !priceyBand()) {
+    const n = await pullSet(filters.set);
+    if (!n && setDrained(filters.set)) feedExhausted = true;
+    return n;
+  }
+  if ((filters.type || filters.rarities.length) && !priceyBand()) {
+    const n = await pullQuery();
+    if (!n && queryDone) feedExhausted = true;
+    return n;
+  }
   if (priceyBand() && !feedExhausted) {
+    const before = pullSerial;
     const n = await pullPrice();
     if (n) return n;
-    if (!feedExhausted) return 0;
+    if (!feedExhausted && pullSerial !== before) { holdFeed = true; return 0; }
+    feedExhausted = true;
   }
-  if (filters.era || priceHunt() || filters.graded) return pullBulk();
+  if (filters.era || priceHunt() || filters.graded) {
+    const n = await pullBulk();
+    if (!n) feedExhausted = true;
+    return n;
+  }
   return pullUnscoped();
 }
 function showSkeleton(){
@@ -1472,29 +1591,31 @@ async function pump(my){
   if (loading || my !== generation) return;
   loading = true;
   pumpError = "";
-  catalogBusy = false;
+  const serialAtStart = pullSerial;
+  const pileAtStart = pile.length;
   try {
     let steps = 0;
     const capped = filtersActive() || !!discoveryBinder();
     const priced = priceHunt();
     const ceiling = !capped ? Infinity : ((filters.names || []).length ? 800 : (priced ? Infinity : 80));
     while (pile.length < 5 && my === generation && steps < 8 && effort < ceiling) {
-      if (!pile.length && matched === 0 && lastFound && Date.now() - lastFound >= 10000) { streamDone = true; break; }
+      if (!pile.length && matched === 0 && !busyBlock() && lastFound && Date.now() - lastFound >= 10000) { streamDone = true; break; }
       if (briefs.length < 4) {
+        const mark = pullSerial;
         const added = await pullMore();
         if (my !== generation) return;
+        const requested = pullSerial !== mark;
         if (!added && !briefs.length) {
           const broad = !filters.set && !(filters.names || []).length && !filters.type && !filters.rarities.length && !filters.era && !priceHunt() && !filters.graded;
-          if (broad && (!openingDone || !chaseDone || !mixExhausted)) { steps++; continue; }
-          if (priced && !feedExhausted) break;
+          const broadOpen = broad && (!openingDone || !chaseDone || !mixExhausted);
+          if (broadOpen && requested) { steps++; continue; }
+          if (holdFeed) break;
+          if (!feedExhausted && requested) { steps++; continue; }
           streamDone = true; break;
         }
       }
       const batch = briefs.splice(0, 4);
-      if (!batch.length) {
-        if (priced && !feedExhausted) break;
-        streamDone = true; break;
-      }
+      if (!batch.length) { streamDone = true; break; }
       effort += batch.length;
       steps++;
       const cards = await Promise.all(batch.map(b => hydrate(b).catch(err => { if (isBusyError(err)) throw err; return null; })));
@@ -1515,7 +1636,7 @@ async function pump(my){
     }
   } catch (e) {
     if (my !== generation) return;
-    if (isBusyError(e)) catalogBusy = true;
+    if (isBusyError(e)) noteBusy();
     else { pumpError = "The card catalog didn't respond. Check your connection and try again."; paused = true; }
   } finally { if (my === generation) loading = false; }
   if (my !== generation) return;
@@ -1523,13 +1644,19 @@ async function pump(my){
   const priced = priceHunt();
   const ceiling = (filters.names || []).length ? 800 : 80;
   const quiet = lastFound && Date.now() - lastFound >= 10000;
-  if (!streamDone && !catalogBusy && !pile.length && matched === 0 && quiet) streamDone = true;
-  else if (!streamDone && !catalogBusy && !priced && capped && effort >= ceiling && matched === 0) streamDone = true;
-  else if (!streamDone && !catalogBusy && !priced && capped && effort >= ceiling && pile.length < 3 && matched > 0) paused = true;
+  if (!streamDone && !busyBlock() && !pile.length && matched === 0 && quiet) streamDone = true;
+  else if (!streamDone && !busyBlock() && !priced && capped && effort >= ceiling && matched === 0) streamDone = true;
+  else if (!streamDone && !busyBlock() && !priced && capped && effort >= ceiling && pile.length < 3 && matched > 0) paused = true;
+  if (!streamDone && !paused && !holdFeed && !briefs.length && pile.length < 4 && pile.length === pileAtStart && pullSerial === serialAtStart) streamDone = true;
   renderDeck();
   paintCount();
-  if (catalogBusy && my === generation) { setTimeout(() => { if (my === generation) pump(my); }, 1200); return; }
-  if (!paused && !streamDone && pile.length < 4 && (priced || effort < ceiling || !capped)) setTimeout(() => pump(my), 30);
+  if (catalogBusy && !streamDone && my === generation) { setTimeout(() => { if (my === generation) pump(my); }, busyDelay()); return; }
+  if (streamDone && busyBlock()) {
+    clearTimeout(busyRenderTimer);
+    const wait = Math.max(40, busyUntil - Date.now() + 30);
+    busyRenderTimer = setTimeout(() => { if (my === generation) { renderDeck(); paintCount(); } }, wait);
+  }
+  if (!paused && !streamDone && pile.length < 4 && (holdFeed || briefs.length || priced || effort < ceiling || !capped)) setTimeout(() => pump(my), 30);
 }
 function restart(opts){
   spice = !!(opts && opts.keepSpice);
@@ -1540,8 +1667,9 @@ function restart(opts){
   openingOrder = []; openingCursor = 0; openingDone = false; chasePage = 1; chaseDone = false; bulkCursor = 0; gradedCursor = 0;
   mixTurn = 0; mixCursor = 0; mixExhausted = false; mixOrder = []; nameOrder = 0;
   mixBags.clear(); namePages.clear(); setPools.clear(); bulkBags.clear();
-  priceLane = 0; pricePage = 1; feedExhausted = false; tailCursor = 0; tailDone = false;
-  streamDone = false; paused = false; pumpError = ""; catalogBusy = false; effort = 0; loading = false; searchStarted = Date.now(); lastFound = Date.now();
+  priceLane = 0; priceOrigin = 1; pricePage = 1; priceWrapped = false; laneOrder = null; laneStates = null; setWalk = null;
+  feedExhausted = false; holdFeed = false; tailCursor = 0; tailDone = false;
+  streamDone = false; paused = false; pumpError = ""; catalogBusy = false; busyStrike = 0; busyUntil = 0; clearTimeout(busyRenderTimer); effort = 0; loading = false; searchStarted = Date.now(); lastFound = Date.now();
   pendingSwipes = []; reserved = new Set(); swipeBusy = false;
   deck.innerHTML = "";
   showSkeleton();
@@ -1602,7 +1730,7 @@ function syncActs(){
   document.getElementById("save").setAttribute("aria-label", b ? "Add to wishlist and " + b.name : "Add to wishlist");
 }
 function renderDeck(){
-  if (!pile.length && catalogBusy && !loading && !pumpError) {
+  if (!pile.length && catalogBusy && !pumpError && !streamDone) {
     deck.dataset.status = "busy";
     deck.removeAttribute("aria-busy");
     deck.innerHTML = `<div class="empty-state"><p>Card source is busy, retrying…</p>${toad()}</div>`;
@@ -1627,7 +1755,7 @@ function renderDeck(){
   layoutStack();
   if (!pile.length && !deck.querySelector(".card")) {
     const openHunt = !filtersActive() && !discoveryBinder();
-    const exhausted = streamDone && !paused && !catalogBusy;
+    const exhausted = streamDone && !paused && !busyBlock();
     const noMatch = !pumpError && !openHunt && exhausted;
     deck.dataset.status = pumpError ? "error" : (paused && !noMatch ? "paused" : "empty");
     deck.removeAttribute("aria-busy");
