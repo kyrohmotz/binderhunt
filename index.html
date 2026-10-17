@@ -273,6 +273,7 @@ img{max-width:100%;-webkit-user-drag:none}
 .sleeve.empty .ghost-card{position:absolute;inset:11% 12% 13%;border:1.5px dashed rgba(31,31,30,.28);border-radius:4px;background:rgba(255,255,255,.25)}
 .sleeve.holo .shine{opacity:.9;background:linear-gradient(115deg,transparent 28%,rgba(255,255,255,.72) 40%,rgba(134,222,255,.55) 50%,rgba(246,201,201,.5) 60%,transparent 74%);background-size:220% 220%;background-position:var(--sx,30%) var(--sy,30%);mix-blend-mode:soft-light}
 .sleeve.holo img{transform:perspective(480px) rotateX(var(--ty,0deg)) rotateY(var(--tx,0deg))}
+.sleeve.wanted.holo .shine{opacity:.45}
 .slot .iconish{align-self:center}
 .pad{flex:1;min-height:0;margin:2px;border-radius:8px 18px 18px 8px;border:2.5px solid var(--ink);background:var(--cover,#e9d5c0);box-shadow:inset 0 0 0 7px rgba(255,255,255,.28), inset 0 -14px 0 rgba(31,31,30,.05);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px 14px;position:relative;overflow:hidden}
 .pad-stitch{position:absolute;inset:12px;border:1.5px dashed rgba(31,31,30,.35);border-radius:6px 14px 14px 6px;pointer-events:none}
@@ -370,10 +371,13 @@ html.reduce .sleeve.holo img{transform:none}
 .sleeve.wanted{box-shadow:inset 0 0 0 1.5px rgba(31,31,30,.45)}
 .sleeve.owned{background:#fff;box-shadow:inset 0 0 0 2px var(--ink), inset 0 0 0 5px rgba(171,178,141,.7)}
 .sleeve.owned .gloss{opacity:.28}
-.sleeve .sleeve-tag{position:absolute;z-index:3;top:6px;left:50%;transform:translateX(-50%);font-family:var(--display);font-size:10px;font-weight:700;background:var(--paper);color:var(--ink);border:1.5px solid var(--ink);border-radius:999px;padding:1px 6px;pointer-events:none;white-space:nowrap;max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis}
-.sleeve .gotbtn{position:absolute;z-index:4;left:50%;bottom:6px;transform:translateX(-50%);min-height:32px;min-width:64px;max-width:calc(100% - 8px);padding:0 8px;border:2px solid var(--ink);border-radius:999px;background:#fff;color:var(--ink);font-family:var(--display);font-size:12px;font-weight:700;box-shadow:2px 2px 0 var(--ink);line-height:1;touch-action:manipulation}
-.sleeve.owned .gotbtn{background:var(--green);color:var(--ink)}
-.gotbtn:focus-visible{outline-offset:-3px}
+.sleeve .sleeve-tag{position:absolute;z-index:3;top:3px;left:3px;font-family:var(--display);font-size:9px;font-weight:700;background:var(--paper);color:var(--ink);border:1.5px solid var(--ink);border-radius:999px;padding:0 4px;pointer-events:none;white-space:nowrap;max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis;line-height:1.35}
+.sleeve .gotbtn{position:absolute;z-index:4;right:0;bottom:0;width:32px;height:32px;min-width:32px;min-height:32px;padding:0;border:0;border-radius:0;background:transparent;color:var(--ink);box-shadow:none;display:grid;place-items:end;line-height:1;touch-action:manipulation;-webkit-touch-callout:none;user-select:none}
+.sleeve .gotbtn .mark{width:16px;height:16px;margin:0 3px 3px 0;border-radius:999px;border:1.5px solid var(--ink);background:var(--butter);box-shadow:1px 1px 0 var(--ink);display:grid;place-items:center;pointer-events:none}
+.sleeve .gotbtn .mark i{width:7px;height:4px;border-left:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:translateY(-1px) rotate(-45deg);display:none}
+.sleeve.owned .gotbtn .mark{background:var(--green)}
+.sleeve.owned .gotbtn .mark i{display:block}
+.gotbtn:focus-visible{outline-offset:-4px}
 .ownrow{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
 .ownrow .fine{margin:0;min-width:0}
 .ownchip{flex:none}
@@ -936,6 +940,32 @@ function ownedCountsBySet(){
   });
   return counts;
 }
+function setCardList(setId){
+  if (setView && setView.id === setId && Array.isArray(setView.cards) && setView.cards.length) return setView.cards;
+  const bag = setLists.get(setId);
+  if (bag && Array.isArray(bag.cards) && bag.cards.length) return bag.cards;
+  return null;
+}
+function countOwnedInSet(setId, cards){
+  const list = cards || setCardList(setId);
+  if (list && list.length) {
+    const seen = new Set();
+    let n = 0;
+    list.forEach(c => {
+      const id = c && c.id;
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      if (ownedIds.has(id)) n++;
+    });
+    return n;
+  }
+  return ownedCountsBySet().get(setId) || 0;
+}
+function clampedOwned(matched, total){
+  const n = Math.max(0, matched || 0);
+  if (total > 0) return Math.min(n, total);
+  return n;
+}
 function setTotal(set){
   const c = set && set.cardCount;
   if (!c || typeof c !== "object") return 0;
@@ -945,9 +975,9 @@ function setTotal(set){
   if (Number.isFinite(official) && official > 0) return Math.round(official);
   return 0;
 }
-function setCompletion(set, counts){
+function setCompletion(set){
   const total = setTotal(set);
-  const owned = Math.max(0, (counts && counts.get(set.id)) || 0);
+  const owned = clampedOwned(countOwnedInSet(set && set.id), total);
   if (!total) return { owned, total:0, pct:null };
   const pct = Math.round((owned / total) * 100);
   if (!Number.isFinite(pct)) return { owned, total, pct:null };
@@ -982,8 +1012,9 @@ function binderFull(binder){
   const cards = (binder && binder.cards) || [];
   return cards.length > 0 && cards.every(c => c && ownedIds.has(c.id));
 }
-function noteBinder(binder){
+function noteBinder(binder, beforeOwned){
   if (!binder || !binderFull(binder)) return "";
+  if (!(beforeOwned > 0)) return "";
   const key = "binder:" + binder.id;
   if (celebrated.has(key)) return "";
   celebrated.add(key);
@@ -991,22 +1022,26 @@ function noteBinder(binder){
 }
 function noteSet(setId){
   if (!setId) return "";
-  const total = setTotal(meta.sets.find(s => s.id === setId));
+  const set = meta.sets.find(s => s.id === setId);
+  const total = setTotal(set);
   if (!total) return "";
-  const owned = ownedCountsBySet().get(setId) || 0;
+  const list = setCardList(setId);
+  const matched = countOwnedInSet(setId, list);
+  const owned = clampedOwned(matched, total);
   if (owned < total) return "";
+  if (!(list && list.length) && matched > total) return "";
   const key = "set:" + setId;
-  if (owned > total) { celebrated.add(key); return ""; }
   if (celebrated.has(key)) return "";
   celebrated.add(key);
   return friendlySetName(setId) + " is complete.";
 }
-function collectNewCompletions(card){
+function collectNewCompletions(card, prior){
   const msgs = [];
   if (!card) return msgs;
   binderState.binders.forEach(b => {
-    if ((b.cards || []).some(c => c.id === card.id)) {
-      const msg = noteBinder(b);
+    if ((b.cards || []).some(c => c && c.id === card.id)) {
+      const before = prior && typeof prior.get === "function" ? prior.get(b.id) : 0;
+      const msg = noteBinder(b, before);
       if (msg && !msgs.includes(msg)) msgs.push(msg);
     }
   });
@@ -1030,22 +1065,25 @@ function backfillOwnedSets(){
   });
   if (changed) saveOwned();
 }
+function pendingCard(item){ return item && item.card ? item.card : item; }
 function quietSeedSets(){
   if (!ownedNeedsSeed) return;
   backfillOwnedSets();
   const skip = new Set();
-  pendingCelebrate.forEach(card => { const id = setIdOf(card); if (id) skip.add(id); });
-  const counts = ownedCountsBySet();
+  pendingCelebrate.forEach(item => { const id = setIdOf(pendingCard(item)); if (id) skip.add(id); });
   meta.sets.forEach(s => {
     if (skip.has(s.id)) return;
     const total = setTotal(s);
-    const owned = counts.get(s.id) || 0;
-    if (total > 0 && owned >= total) celebrated.add("set:" + s.id);
+    if (!total) return;
+    const list = setCardList(s.id);
+    const matched = countOwnedInSet(s.id, list);
+    const done = list && list.length ? matched >= total : matched === total;
+    if (done) celebrated.add("set:" + s.id);
   });
   const queued = pendingCelebrate.splice(0);
   ownedNeedsSeed = false;
   const msgs = [];
-  queued.forEach(card => collectNewCompletions(card).forEach(m => { if (!msgs.includes(m)) msgs.push(m); }));
+  queued.forEach(item => collectNewCompletions(pendingCard(item), item && item.prior).forEach(m => { if (!msgs.includes(m)) msgs.push(m); }));
   saveOwned();
   if (msgs.length) showConfetti(msgs.join(" "));
 }
@@ -1065,12 +1103,23 @@ function focusOwnedControl(id, origin){
     if (btn) btn.focus();
   }
 }
+function binderOwnedNow(binder){
+  return ((binder && binder.cards) || []).filter(c => c && ownedIds.has(c.id)).length;
+}
+function priorsFor(cardId){
+  const prior = new Map();
+  binderState.binders.forEach(b => {
+    if ((b.cards || []).some(c => c && c.id === cardId)) prior.set(b.id, binderOwnedNow(b));
+  });
+  return prior;
+}
 function setOwned(card, on, origin){
   if (!card || !card.id) return false;
   const id = cleanId(String(card.id));
   if (!id) return false;
   const has = ownedIds.has(id);
   if (!!on === has) return false;
+  const prior = on ? priorsFor(id) : null;
   if (on) {
     ownedIds.add(id);
     const sid = setIdOf(card);
@@ -1081,8 +1130,8 @@ function setOwned(card, on, origin){
   }
   logEvent("own", id, { on:!!on });
   let msgs = [];
-  if (on && ownedNeedsSeed) pendingCelebrate.push(card);
-  else msgs = collectNewCompletions(card);
+  if (on && ownedNeedsSeed) pendingCelebrate.push({ card, prior });
+  else if (on) msgs = collectNewCompletions(card, prior);
   saveOwned();
   if (settings.haptics) haptic(on ? 12 : 6);
   if (msgs.length) showConfetti(msgs.join(" "));
@@ -2318,8 +2367,6 @@ function addToBinder(binder, card){
   if (binder.cards.length % 9 === 0) pendingSparkle = Math.floor((binder.cards.length - 1) / 9);
   saveBinders();
   logEvent("save", card.id);
-  const msg = noteBinder(binder);
-  if (msg) { saveOwned(); showConfetti(msg); }
   return true;
 }
 function removeFromBinder(binder, id){
@@ -2591,7 +2638,6 @@ function renderSets(){
     if (!groups.has(era)) groups.set(era, []);
     groups.get(era).push(s);
   });
-  const counts = ownedCountsBySet();
   const html = [`<input class="search" id="setFind" placeholder="Search sets" aria-label="Search sets" value="${esc(q)}">`];
   ERA_ORDER.forEach(era => {
     const list = groups.get(era);
@@ -2599,7 +2645,7 @@ function renderSets(){
     html.push(`<h2>${esc(era)}</h2><div class="set-grid">`);
     list.forEach(s => {
       const count = (s.cardCount && (s.cardCount.total || s.cardCount.official)) || "";
-      const comp = setCompletion(s, counts);
+      const comp = setCompletion(s);
       const pctLabel = comp.pct == null ? "—" : comp.pct + "%";
       const pctAria = comp.total ? comp.owned + " of " + comp.total + " owned, " + pctLabel : "Set size unknown";
       const aria = [s.name, era, count ? count + " cards" : "", pctAria].filter(Boolean).join(", ");
@@ -2634,6 +2680,7 @@ async function openSet(id){
     const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
     const cards = (set.cards || []).slice().sort((a, b) => numId(a.localId) - numId(b.localId));
     if (!cards.some(c => safeImg(c && c.image))) imageless.add(id);
+    setLists.set(id, { cards, release:set.releaseDate || "", name:set.name || known.name || id });
     setView = { id, name:set.name || known.name, release:(set.releaseDate || "").slice(0, 4), cards, mode:"flip", loading:false };
     const tile = meta.sets.find(s => s.id === id);
     if (tile) tile.year = setView.release;
@@ -2649,9 +2696,9 @@ function renderSetPage(root){
   const s = setView;
   const knownSet = meta.sets.find(x => x.id === s.id);
   const total = setTotal(knownSet) || s.cards.length || 0;
-  const owned = ownedCountsBySet().get(s.id) || 0;
+  const owned = clampedOwned(countOwnedInSet(s.id, s.cards), total);
   const pct = total ? Math.max(0, Math.min(100, Math.round(owned / total * 100))) : 0;
-  const progressLine = total ? pct + "% · " + owned + " / " + total + " owned" + (owned > 0 ? " · " + progressLabel(Math.min(owned, total), total) : "") : "Owned progress shows once this set has a card count.";
+  const progressLine = total ? pct + "% · " + owned + " / " + total + " owned" + (owned > 0 ? " · " + progressLabel(owned, total) : "") : "Owned progress shows once this set has a card count.";
   if (s.mode !== "flip" && s.mode !== "about") s.mode = "flip";
   root.innerHTML = `<div class="setpage"><div class="sethead"><button class="chip" id="backSets" type="button">All sets</button>
     <h2>${esc(s.name)}</h2></div>
@@ -2850,12 +2897,21 @@ function endPaper(text){
   wrap.innerHTML = `<div class="pad-stitch"></div><p class="count">${esc(text)}</p>${toad()}`;
   return wrap;
 }
+let suppressGotClickUntil = 0;
+function gotPressIgnored(press, now, x, y){
+  if (now < suppressGotClickUntil) return true;
+  if (!press || !press.t) return false;
+  if (press.suppress) return true;
+  const dt = now - press.t;
+  const dist = Math.max(press.d || 0, Math.hypot((x || 0) - (press.x || 0), (y || 0) - (press.y || 0)));
+  return dt > 450 || dist > 8;
+}
 function sleeveSlot(card, index, ctx){
   const slot = document.createElement("div");
   slot.className = "slot";
   const owned = ownedIds.has(card.id);
   const sleeve = document.createElement("div");
-  sleeve.className = "sleeve " + (owned ? "owned" : "wanted") + (owned && isHolo(card) ? " holo" : "");
+  sleeve.className = "sleeve " + (owned ? "owned" : "wanted") + (isHolo(card) ? " holo" : "");
   sleeve.dataset.index = String(index);
   sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card) + (owned ? ", owned" : ", wanted"))}"></button><span class="sleeve-tag" aria-hidden="true">${owned ? "Owned" : "Wanted"}</span><span class="shine" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span>`;
   paintArt(sleeve.querySelector(".cardhit"), card);
@@ -2863,10 +2919,26 @@ function sleeveSlot(card, index, ctx){
   got.type = "button";
   got.className = "gotbtn";
   got.dataset.for = card.id;
-  got.textContent = owned ? "Undo" : "Got it!";
+  got.innerHTML = `<span class="mark" aria-hidden="true"><i></i></span>`;
   got.setAttribute("aria-pressed", owned ? "true" : "false");
   got.setAttribute("aria-label", owned ? "Undo got it for " + (card.name || "this card") : "Got it! Mark " + (card.name || "this card") + " as owned");
-  got.onclick = e => { e.stopPropagation(); e.preventDefault(); setOwned(card, !ownedIds.has(card.id), "pocket"); };
+  got.addEventListener("pointerdown", e => {
+    if (e.button) return;
+    got._press = { t:Date.now(), x:e.clientX, y:e.clientY, d:0, suppress:false };
+  });
+  got.addEventListener("pointermove", e => {
+    const p = got._press;
+    if (!p) return;
+    p.d = Math.max(p.d || 0, Math.hypot(e.clientX - p.x, e.clientY - p.y));
+  });
+  got.onclick = e => {
+    e.stopPropagation();
+    e.preventDefault();
+    const press = got._press;
+    got._press = null;
+    if (gotPressIgnored(press, Date.now(), e.clientX, e.clientY)) return;
+    setOwned(card, !ownedIds.has(card.id), "pocket");
+  };
   sleeve.append(got);
   const more = document.createElement("button");
   more.type = "button";
@@ -3106,12 +3178,13 @@ function renderCollection(root){
     if (Math.abs(dest - flipPage) === step) finishFlip(dest > flipPage ? 1 : -1);
     else goSheet(dest);
   };
-  let mode = "", pid = null, sx = 0, sy = 0, timer = 0, ghost = null, dragIndex = -1, leaf = null, fromPointer = false;
+  let mode = "", pid = null, sx = 0, sy = 0, timer = 0, ghost = null, dragIndex = -1, leaf = null, fromPointer = false, pressBtn = null;
   const clearTimer = () => { if (timer) { clearTimeout(timer); timer = 0; } };
   const endGhost = () => { if (ghost) { ghost.remove(); ghost = null; } book.querySelectorAll(".sleeve").forEach(s => { s.style.opacity = ""; }); };
   const onMove = e => {
     if (e.pointerId !== pid) return;
     const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (pressBtn && pressBtn._press) pressBtn._press.d = Math.max(pressBtn._press.d || 0, Math.hypot(dx, dy));
     if (mode === "curl") {
       const width = Math.max(120, (leaf && leaf.clientWidth) || 200);
       const dir = leaf && leaf.classList.contains("backward") ? 1 : -1;
@@ -3157,6 +3230,7 @@ function renderCollection(root){
         else snapCurl(turning);
       }
     } else if (mode === "card") {
+      if (pressBtn) suppressGotClickUntil = Date.now() + 500;
       endGhost();
       book.classList.remove("out");
       if (!cancelled) {
@@ -3187,7 +3261,7 @@ function renderCollection(root){
         if (sleeve && !origin.closest(".iconish, .gotbtn")) liftCard(list[Number(sleeve.dataset.index)]);
       }
     }
-    mode = ""; pid = null; leaf = null;
+    mode = ""; pid = null; leaf = null; pressBtn = null;
   };
   function liftCard(card){
     if (!card) return;
@@ -3229,11 +3303,13 @@ function renderCollection(root){
   });
   book.addEventListener("pointerdown", e => {
     if (e.button) return;
-    if (e.target.closest(".iconish, .gotbtn")) return;
+    if (e.target.closest(".iconish")) return;
+    const onGot = e.target.closest(".gotbtn");
+    pressBtn = onGot || null;
     pid = e.pointerId; sx = e.clientX; sy = e.clientY; mode = "";
     const dog = e.target.closest(".dogear");
     const sleeveHit = e.target.closest(".sleeve");
-    if ((dog || sleeveHit) && e.cancelable) e.preventDefault();
+    if ((dog || sleeveHit) && !onGot && e.cancelable) e.preventDefault();
     if (dog) {
       const dir = dog.classList.contains("prev") ? -1 : 1;
       if (landed(dir) === flipPage) return;
@@ -3250,6 +3326,7 @@ function renderCollection(root){
       dragIndex = Number(sleeve.dataset.index);
       timer = setTimeout(() => {
         mode = "card";
+        if (pressBtn && pressBtn._press) pressBtn._press.suppress = true;
         if (settings.haptics) haptic(6);
         const img = sleeve.querySelector("img");
         ghost = document.createElement("img");
