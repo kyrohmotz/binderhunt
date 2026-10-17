@@ -85,6 +85,7 @@ img{max-width:100%;-webkit-user-drag:none}
 .stamp{position:absolute;top:18px;padding:4px 10px;border:3px solid;border-radius:12px;font-family:var(--display);font-weight:700;font-size:22px;background:#fff;opacity:0;pointer-events:none}
 .stamp.like{left:12px;color:var(--green-deep);border-color:var(--green-deep);transform:rotate(-8deg)}
 .stamp.nope{right:12px;color:#8d4a4a;border-color:#8d4a4a;transform:rotate(8deg)}
+.surprise{position:absolute;left:8px;bottom:8px;z-index:3;background:#fff;border:2px solid var(--ink);border-radius:999px;padding:2px 8px;font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:.01em;box-shadow:2px 2px 0 var(--ink)}
 .deckcap{flex:none;display:flex;align-items:flex-end;justify-content:space-between;gap:8px;width:min(100%,420px);margin:0 auto;padding:8px 10px 2px;background:#F8F7EF;position:relative;z-index:5;min-height:52px}
 .deckcap[hidden]{display:none !important}
 .deckcap .cap{min-width:0;flex:1}
@@ -198,6 +199,7 @@ img{max-width:100%;-webkit-user-drag:none}
 .menu[hidden]{display:none !important}
 .menu button{min-height:44px;border:0;background:transparent;text-align:left;border-radius:10px}
 .empty-state{text-align:center;padding:24px 12px}
+.empty-state .huntpicks{justify-content:center}
 @media (min-width:768px){
   #deck{max-width:420px}
 }
@@ -502,6 +504,8 @@ const MON_LIST = ["Bulbasaur","Ivysaur","Venusaur","Charmander","Charmeleon","Ch
 const COLORS = ["#86DEFF","#ABB28D","#E9D5C0","#F3EDC8","#F6C9C9","#E4E7DA"];
 const GRADES = [["PSA","10"],["PSA","9"],["CGC","10"],["BGS","9.5"]];
 const POCKET_SET = /^(?:P-A|[AB]\d+[a-z]*)$/;
+// Sets whose TCGdex payload has no card art (trainer kits, galleries, samples).
+const IMAGELESS_SETS = new Set(["2011bw","2012bw","2014xy","2015xy","2016xy","2017sm","2018sm","2019sm","2021swsh","2022swsh","2023sv","2024sv","30th-c","bog","cel25cc","ex5.5","exu","jumbo","mee","mep","mfb","miscp","rc","sm3.5","sm7.5","sp","sve","swsh10tg","swsh11tg","swsh12.5gg","swsh12tg","swsh4.5sv","swsh9tg","tk-bw-e","tk-bw-z","tk-dp-l","tk-dp-m","tk-ex-latia","tk-ex-latio","tk-ex-m","tk-ex-p","tk-hs-g","tk-hs-r","tk-sm-l","tk-sm-r","tk-xy-b","tk-xy-latia","tk-xy-latio","tk-xy-n","tk-xy-p","tk-xy-su","tk-xy-sy","tk-xy-w","wp","xya"]);
 const POCKET_RARITIES = new Set(["One Diamond","Two Diamond","Three Diamond","Four Diamond","One Star","Two Star","Three Star","One Shiny","Two Shiny","Crown"]);
 const TCGDEX = "https://api.tcgdex.net/v2/en";
 const TAP_SLOP = 6;
@@ -523,8 +527,10 @@ let generation = 0;
 let loading = false;
 let streamDone = false;
 let searchStarted = 0;
+let lastFound = 0;
 let paused = false;
 let pumpError = "";
+let catalogBusy = false;
 let effort = 0;
 let matched = 0;
 let pageNo = 1;
@@ -544,6 +550,13 @@ const mixBags = new Map();
 const namePages = new Map();
 let bulkCursor = 0;
 let gradedCursor = 0;
+let priceLane = 0;
+let pricePage = 1;
+let feedExhausted = false;
+let tailCursor = 0;
+let tailDone = false;
+const bulkBags = new Map();
+const imageless = new Set(IMAGELESS_SETS);
 const setPools = new Map();
 const setLists = new Map();
 const cardCache = new Map();
@@ -882,6 +895,9 @@ function buyLinks(card){
   return links;
 }
 
+function isBusyError(e){
+  return /HTTP 429/.test(String(e && e.message || ""));
+}
 async function getJson(url){
   let last;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -1107,7 +1123,10 @@ async function pullSet(id){
       const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
       const cards = (set.cards || []).slice().sort((a, b) => numId(a.localId) - numId(b.localId) || String(a.id).localeCompare(String(b.id)));
       setLists.set(id, { cards, release:set.releaseDate || "", name:set.name || id });
-    } catch (e) { setLists.set(id, { cards:[], release:"", name:id }); }
+    } catch (e) {
+      if (isBusyError(e)) throw e;
+      setLists.set(id, { cards:[], release:"", name:id });
+    }
   }
   const bag = setLists.get(id);
   let fresh = bag.cards.filter(c => c && c.id && c.image && !seen.has(c.id));
@@ -1214,22 +1233,32 @@ async function pullChaseAll(){
   return 0;
 }
 async function pullBulk(){
-  const ids = meta.sets.map(s => s.id).filter(id => !filters.era || eraMatches(id, filters.era));
+  const ids = meta.sets.map(s => s.id).filter(id => !imageless.has(id) && (!filters.era || eraMatches(id, filters.era)));
+  const takeN = priceHunt() ? 16 : 10;
   while (bulkCursor < ids.length) {
-    const id = ids[bulkCursor++];
-    try {
-      const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
-      let cards = shuffle(set.cards || []).filter(c => c && c.id && c.image && !seen.has(c.id));
-      if (discoveryBinder()) {
-        const saved = savedIds();
-        cards.forEach(c => { if (saved.has(c.id)) seen.add(c.id); });
-        cards = cards.filter(c => !saved.has(c.id));
+    const id = ids[bulkCursor];
+    if (!bulkBags.has(id)) {
+      try {
+        const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
+        const all = set.cards || [];
+        if (!all.some(c => c && safeImg(c.image))) imageless.add(id);
+        bulkBags.set(id, shuffle(all.filter(c => c && c.id && safeImg(c.image) && !isDigital({ id:c.id }))));
+      } catch (e) {
+        if (isBusyError(e)) throw e;
+        bulkBags.set(id, []);
       }
-      cards = cards.slice(0, 10);
-      if (!cards.length) continue;
-      cards.forEach(c => { seen.add(c.id); briefs.push({ id:c.id, name:c.name, image:c.image, localId:c.localId }); });
-      return cards.length;
-    } catch (e) {}
+    }
+    let cards = bulkBags.get(id).filter(c => !seen.has(c.id));
+    if (discoveryBinder()) {
+      const saved = savedIds();
+      cards.forEach(c => { if (saved.has(c.id)) seen.add(c.id); });
+      cards = cards.filter(c => !saved.has(c.id));
+    }
+    const take = cards.slice(0, takeN);
+    if (!take.length) { bulkCursor++; continue; }
+    if (cards.length <= takeN) bulkCursor++;
+    take.forEach(c => pushBrief(c));
+    return take.length;
   }
   return 0;
 }
@@ -1258,7 +1287,10 @@ async function pullNames(names){
   let list = [];
   try {
     list = await getJson(TCGDEX + "/cards?name=" + encodeURIComponent("like:" + species) + "&pagination:page=" + page + "&pagination:itemsPerPage=100");
-  } catch (e) { return 0; }
+  } catch (e) {
+    if (isBusyError(e)) throw e;
+    return 0;
+  }
   if (!Array.isArray(list) || !list.length) { namePages.set(species, 0); return 0; }
   namePages.set(species, list.length < 100 ? 0 : page + 1);
   let n = 0;
@@ -1273,7 +1305,7 @@ async function pullNames(names){
 async function pullMix(){
   if (mixExhausted) return 0;
   if (!meta.sets.length) { mixExhausted = true; return 0; }
-  if (!mixOrder.length) mixOrder = shuffle(meta.sets.map(s => s.id).filter(id => !isPocketId(id)));
+  if (!mixOrder.length) mixOrder = shuffle(meta.sets.map(s => s.id).filter(id => !isPocketId(id) && !imageless.has(id)));
   if (!mixOrder.length) { mixExhausted = true; return 0; }
   let spins = 0;
   while (spins < mixOrder.length) {
@@ -1284,7 +1316,10 @@ async function pullMix(){
       try {
         const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
         mixBags.set(id, (set.cards || []).filter(c => c && c.id && safeImg(c.image) && !isDigital({ id:c.id })));
-      } catch (e) { mixBags.set(id, []); }
+      } catch (e) {
+        if (isBusyError(e)) throw e;
+        mixBags.set(id, []);
+      }
     }
     const fresh = shuffle(mixBags.get(id).filter(c => !seen.has(c.id)));
     if (!fresh.length) continue;
@@ -1307,27 +1342,115 @@ async function pullUnscoped(){
   if (chase) return chase;
   return pullMix();
 }
+function priceHunt(){
+  return filters.min != null || filters.max != null || !!filters.pricePreset;
+}
+function priceyBand(){
+  if (filters.pricePreset === "mid" || filters.pricePreset === "high") return true;
+  if (filters.pricePreset === "under10") return false;
+  if (filters.min != null && filters.min >= 10) return true;
+  if (filters.max != null && filters.max <= 10 && (filters.min == null || filters.min < 10)) return false;
+  return priceHunt();
+}
+function priceLanes(){
+  const holos = ["Rare Holo","Holo Rare","Rare Holo LV.X","Rare PRIME","LEGEND","Classic Collection","Shiny rare","Shiny rare VMAX","Holo Rare VMAX","Holo Rare VSTAR"];
+  const ultra = ["Ultra Rare"];
+  const high = filters.pricePreset === "high" || (filters.min != null && filters.min >= 50 && (filters.max == null || filters.max >= 50));
+  const chase = high
+    ? ["Secret Rare","Special illustration rare","Hyper rare","Illustration rare","Mega Hyper Rare","Shiny Ultra Rare","Amazing Rare","Radiant Rare"]
+    : ["Illustration rare","Special illustration rare","Secret Rare","Ultra Rare","Hyper rare","Shiny Ultra Rare","Amazing Rare","Radiant Rare"];
+  return high ? chase.concat(holos, ultra) : chase.concat(holos);
+}
+function laneFits(rarity){
+  if (!filters.era) return true;
+  const modern = {
+    "Special illustration rare":["Scarlet & Violet","Mega Evolution"],
+    "Illustration rare":["Scarlet & Violet","Mega Evolution"],
+    "Mega Hyper Rare":["Mega Evolution"],
+    "Hyper rare":["Scarlet & Violet","Mega Evolution"],
+    "Shiny rare VMAX":["Sword & Shield"],
+    "Holo Rare VMAX":["Sword & Shield"],
+    "Holo Rare VSTAR":["Sword & Shield"],
+    "Radiant Rare":["Sword & Shield"],
+    "Amazing Rare":["Sword & Shield"],
+    "Shiny Ultra Rare":["Sun & Moon","Sword & Shield"],
+    "Shiny rare":["Sun & Moon","Sword & Shield"]
+  };
+  const allowed = modern[rarity];
+  if (!allowed) return true;
+  const group = ERA_GROUPS.find(g => g.id === filters.era);
+  const eras = group ? group.eras : [filters.era];
+  return allowed.some(era => eras.includes(era));
+}
+function acceptBrief(c){
+  if (!c || !c.id || !safeImg(c.image) || seen.has(c.id) || isDigital({ id:c.id })) return false;
+  if (imageless.has(String(c.id).split("-")[0])) return false;
+  if (filters.era && !eraMatches(String(c.id).split("-")[0], filters.era)) return false;
+  if (filters.set && String(c.id).split("-")[0] !== filters.set) return false;
+  if ((filters.names || []).length && !(filters.names || []).some(n => speciesHit(c.name, n))) return false;
+  if (discoveryBinder() && savedIds().has(c.id)) { seen.add(c.id); return false; }
+  return true;
+}
+async function pullTails(){
+  const ids = meta.sets.map(s => s.id).filter(id => !imageless.has(id) && (!filters.era || eraMatches(id, filters.era)) && (!filters.set || id === filters.set));
+  while (tailCursor < ids.length) {
+    const id = ids[tailCursor++];
+    try {
+      const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
+      const all = set.cards || [];
+      if (!all.some(c => c && safeImg(c.image))) { imageless.add(id); continue; }
+      const tail = all.filter(acceptBrief).slice(-12);
+      if (!tail.length) continue;
+      tail.forEach(c => pushBrief(c));
+      return tail.length;
+    } catch (e) {
+      if (isBusyError(e)) throw e;
+    }
+  }
+  tailDone = true;
+  feedExhausted = true;
+  return 0;
+}
+async function pullPrice(){
+  // The list endpoint hangs on pricing.* filters, so page chase rarities (then set tails) instead.
+  let hops = 0;
+  while (hops++ < 6 && !feedExhausted) {
+    const lanes = priceLanes();
+    while (priceLane < lanes.length && !laneFits(lanes[priceLane])) { priceLane++; pricePage = 1; }
+    if (priceLane >= lanes.length) return pullTails();
+    const rarity = lanes[priceLane];
+    let list;
+    try {
+      list = await getJson(TCGDEX + "/cards?rarity=eq:" + encodeURIComponent(rarity) + "&pagination:page=" + pricePage + "&pagination:itemsPerPage=24");
+    } catch (e) {
+      if (isBusyError(e)) throw e;
+      priceLane++; pricePage = 1;
+      continue;
+    }
+    if (!Array.isArray(list) || list.length < 24) { priceLane++; pricePage = 1; }
+    else pricePage++;
+    if (!Array.isArray(list) || !list.length) continue;
+    const rows = list.filter(acceptBrief);
+    rows.forEach(c => pushBrief(c));
+    if (rows.length) return rows.length;
+  }
+  return 0;
+}
 async function pullMore(){
   await loadMeta();
-  if ((filters.names || []).length) {
-    const n = await pullNames(filters.names);
-    if (!n) return 0;
-    if (spice && !discoveryBinder()) {
-      const before = briefs.length;
-      await pullMix();
-      const spawned = briefs.splice(before);
-      spawned.slice(2).forEach(c => seen.delete(c.id));
-      spawned.slice(0, 2).forEach(c => { c.spice = true; briefs.push(c); });
-    }
-    return n;
-  }
+  if ((filters.names || []).length) return pullNames(filters.names);
   if (filters.graded && !filters.set && !filters.type && !filters.rarities.length) {
     const n = await pullGraded();
     if (n) return n;
   }
-  if (filters.set) return pullSet(filters.set);
-  if (filters.type || filters.rarities.length) return pullQuery();
-  if (filters.era || filters.min != null || filters.max != null || filters.pricePreset || filters.graded) return pullBulk();
+  if (filters.set && !priceyBand()) return pullSet(filters.set);
+  if ((filters.type || filters.rarities.length) && !priceyBand()) return pullQuery();
+  if (priceyBand() && !feedExhausted) {
+    const n = await pullPrice();
+    if (n) return n;
+    if (!feedExhausted) return 0;
+  }
+  if (filters.era || priceHunt() || filters.graded) return pullBulk();
   return pullUnscoped();
 }
 function showSkeleton(){
@@ -1349,51 +1472,64 @@ async function pump(my){
   if (loading || my !== generation) return;
   loading = true;
   pumpError = "";
+  catalogBusy = false;
   try {
     let steps = 0;
     const capped = filtersActive() || !!discoveryBinder();
-    const priced = filters.min != null || filters.max != null || !!filters.pricePreset;
-    const ceiling = !capped ? Infinity : ((filters.names || []).length ? 500 : (priced ? 160 : 80));
-    while (pile.length < 5 && my === generation && steps < 12 && effort < ceiling) {
-      if (!pile.length && searchStarted && Date.now() - searchStarted >= 10000) { streamDone = true; break; }
+    const priced = priceHunt();
+    const ceiling = !capped ? Infinity : ((filters.names || []).length ? 800 : (priced ? Infinity : 80));
+    while (pile.length < 5 && my === generation && steps < 8 && effort < ceiling) {
+      if (!pile.length && matched === 0 && lastFound && Date.now() - lastFound >= 10000) { streamDone = true; break; }
       if (briefs.length < 4) {
         const added = await pullMore();
         if (my !== generation) return;
         if (!added && !briefs.length) {
-          const broad = !filters.set && !(filters.names || []).length && !filters.type && !filters.rarities.length && !filters.era && !filters.pricePreset && filters.min == null && filters.max == null && !filters.graded;
+          const broad = !filters.set && !(filters.names || []).length && !filters.type && !filters.rarities.length && !filters.era && !priceHunt() && !filters.graded;
           if (broad && (!openingDone || !chaseDone || !mixExhausted)) { steps++; continue; }
+          if (priced && !feedExhausted) break;
           streamDone = true; break;
         }
       }
       const batch = briefs.splice(0, 4);
-      if (!batch.length) { streamDone = true; break; }
+      if (!batch.length) {
+        if (priced && !feedExhausted) break;
+        streamDone = true; break;
+      }
       effort += batch.length;
       steps++;
-      const cards = await Promise.all(batch.map(b => hydrate(b).catch(() => null)));
+      const cards = await Promise.all(batch.map(b => hydrate(b).catch(err => { if (isBusyError(err)) throw err; return null; })));
       if (my !== generation) return;
       cards.forEach((card, i) => {
         if (!card) return;
         const surprise = !!(batch[i] && batch[i].spice);
         if (surprise) card.spice = true;
         const ok = keep(card);
-        if (surprise) card.spice = false;
-        if (ok) { pile.push(card); matched++; }
+        if (!ok) return;
+        if (!surprise) card.spice = false;
+        pile.push(card);
+        matched++;
+        lastFound = Date.now();
       });
       renderDeck();
       paintCount();
     }
   } catch (e) {
-    pumpError = "The card catalog didn't respond. Check your connection and try again.";
-    paused = true;
+    if (my !== generation) return;
+    if (isBusyError(e)) catalogBusy = true;
+    else { pumpError = "The card catalog didn't respond. Check your connection and try again."; paused = true; }
   } finally { if (my === generation) loading = false; }
   if (my !== generation) return;
   const capped = filtersActive() || !!discoveryBinder();
-  const ceiling = filters.min != null || filters.max != null || filters.pricePreset ? 160 : 80;
-  if (capped && !streamDone && !pile.length && (effort >= ceiling || (searchStarted && Date.now() - searchStarted >= 10000))) streamDone = true;
-  else if (capped && !streamDone && pile.length < 3 && effort >= ceiling) paused = true;
+  const priced = priceHunt();
+  const ceiling = (filters.names || []).length ? 800 : 80;
+  const quiet = lastFound && Date.now() - lastFound >= 10000;
+  if (!streamDone && !catalogBusy && !pile.length && matched === 0 && quiet) streamDone = true;
+  else if (!streamDone && !catalogBusy && !priced && capped && effort >= ceiling && matched === 0) streamDone = true;
+  else if (!streamDone && !catalogBusy && !priced && capped && effort >= ceiling && pile.length < 3 && matched > 0) paused = true;
   renderDeck();
   paintCount();
-  if (!paused && !streamDone && pile.length < 4) setTimeout(() => pump(my), 30);
+  if (catalogBusy && my === generation) { setTimeout(() => { if (my === generation) pump(my); }, 1200); return; }
+  if (!paused && !streamDone && pile.length < 4 && (priced || effort < ceiling || !capped)) setTimeout(() => pump(my), 30);
 }
 function restart(opts){
   spice = !!(opts && opts.keepSpice);
@@ -1403,8 +1539,9 @@ function restart(opts){
   pile = []; briefs = []; seen = new Set(); matched = 0; pageNo = 1; queryDone = false;
   openingOrder = []; openingCursor = 0; openingDone = false; chasePage = 1; chaseDone = false; bulkCursor = 0; gradedCursor = 0;
   mixTurn = 0; mixCursor = 0; mixExhausted = false; mixOrder = []; nameOrder = 0;
-  mixBags.clear(); namePages.clear(); setPools.clear();
-  streamDone = false; paused = false; pumpError = ""; effort = 0; loading = false; searchStarted = Date.now();
+  mixBags.clear(); namePages.clear(); setPools.clear(); bulkBags.clear();
+  priceLane = 0; pricePage = 1; feedExhausted = false; tailCursor = 0; tailDone = false;
+  streamDone = false; paused = false; pumpError = ""; catalogBusy = false; effort = 0; loading = false; searchStarted = Date.now(); lastFound = Date.now();
   pendingSwipes = []; reserved = new Set(); swipeBusy = false;
   deck.innerHTML = "";
   showSkeleton();
@@ -1465,6 +1602,13 @@ function syncActs(){
   document.getElementById("save").setAttribute("aria-label", b ? "Add to wishlist and " + b.name : "Add to wishlist");
 }
 function renderDeck(){
+  if (!pile.length && catalogBusy && !loading && !pumpError) {
+    deck.dataset.status = "busy";
+    deck.removeAttribute("aria-busy");
+    deck.innerHTML = `<div class="empty-state"><p>Card source is busy, retrying…</p>${toad()}</div>`;
+    syncActs();
+    return;
+  }
   if (!pile.length && (loading || (!streamDone && !paused && !pumpError))) { showSkeleton(); syncActs(); return; }
   deck.querySelectorAll(".skel,.empty-state").forEach(n => n.remove());
   const have = new Set([...deck.querySelectorAll(".card")].map(el => el.card && el.card.id));
@@ -1474,7 +1618,8 @@ function renderDeck(){
     el.className = "card";
     el.draggable = false;
     el.card = card;
-    el.innerHTML = `<div class="frame"><span class="stamp like">${discoveryBinder() ? "BINDER!" : "WISH!"}</span><span class="stamp nope">PASS</span></div>`;
+    const tag = card.spice ? `<span class="surprise">surprise pick</span>` : "";
+    el.innerHTML = `<div class="frame"><span class="stamp like">${discoveryBinder() ? "BINDER!" : "WISH!"}</span><span class="stamp nope">PASS</span>${tag}</div>`;
     paintArt(el.querySelector(".frame"), card);
     deck.prepend(el);
     bindDrag(el);
@@ -1482,7 +1627,8 @@ function renderDeck(){
   layoutStack();
   if (!pile.length && !deck.querySelector(".card")) {
     const openHunt = !filtersActive() && !discoveryBinder();
-    const noMatch = !pumpError && !openHunt && (streamDone || paused);
+    const exhausted = streamDone && !paused && !catalogBusy;
+    const noMatch = !pumpError && !openHunt && exhausted;
     deck.dataset.status = pumpError ? "error" : (paused && !noMatch ? "paused" : "empty");
     deck.removeAttribute("aria-busy");
     if (noMatch) {
@@ -1492,7 +1638,8 @@ function renderDeck(){
       if (priceOn) actions.push(`<button class="chip" id="widenBudget" type="button">Widen budget</button>`);
       if (eraOn) actions.push(`<button class="chip" id="anyEra" type="button">Any era</button>`);
       if (!actions.length) actions.push(`<button class="chip" id="retryDeck" type="button">Edit filters</button>`);
-      deck.innerHTML = `<div class="empty-state"><p>No cards match yet.</p>${toad()}<div class="huntpicks">${actions.join("")}</div></div>`;
+      const headline = matched > 0 ? "No more cards match." : "No cards match yet.";
+      deck.innerHTML = `<div class="empty-state"><p>${headline}</p>${toad()}<div class="huntpicks">${actions.join("")}</div></div>`;
       const widen = document.getElementById("widenBudget");
       const anyEra = document.getElementById("anyEra");
       const edit = document.getElementById("retryDeck");
@@ -1500,11 +1647,11 @@ function renderDeck(){
       if (anyEra) anyEra.onclick = () => { filters.era = ""; saveFilters(); restart(); };
       if (edit) edit.onclick = () => openFilter("pokemon", document.querySelector("[data-filter=pokemon]"));
     } else {
-      const msg = pumpError ? `<p class="warn">${esc(pumpError)}</p>` : paused ? "<p>Still matching cards.</p>" : "<p>The hunt is still shuffling the table.</p>";
+      const msg = pumpError ? `<p class="warn">${esc(pumpError)}</p>` : catalogBusy ? "<p>Card source is busy, retrying…</p>" : paused ? "<p>Still matching cards.</p>" : "<p>The hunt is still shuffling the table.</p>";
       deck.innerHTML = `<div class="empty-state">${msg}${toad()}<button class="chip" id="retryDeck" type="button">Keep looking</button></div>`;
       const btn = document.getElementById("retryDeck");
       if (btn) btn.onclick = () => {
-        paused = false; pumpError = ""; streamDone = false; effort = 0; searchStarted = Date.now();
+        paused = false; pumpError = ""; catalogBusy = false; streamDone = false; effort = 0; lastFound = Date.now(); searchStarted = Date.now();
         if (openHunt) { openingDone = false; chaseDone = false; chasePage = 1; openingCursor = 0; seen = new Set(); setPools.clear(); }
         showSkeleton(); pump(generation);
       };
@@ -1909,6 +2056,7 @@ function renderSets(){
   const q = (root.querySelector("#setFind") || {}).value || "";
   const groups = new Map();
   meta.sets.forEach(s => {
+    if (imageless.has(s.id)) return;
     if (q && !s.name.toLowerCase().includes(q.toLowerCase())) return;
     const era = eraOf(s.id);
     if (!groups.has(era)) groups.set(era, []);
@@ -1950,7 +2098,9 @@ async function openSet(id){
   renderSets();
   try {
     const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
-    setView = { id, name:set.name || known.name, release:(set.releaseDate || "").slice(0, 4), cards:(set.cards || []).slice().sort((a, b) => numId(a.localId) - numId(b.localId)), mode:"flip", loading:false };
+    const cards = (set.cards || []).slice().sort((a, b) => numId(a.localId) - numId(b.localId));
+    if (!cards.some(c => safeImg(c && c.image))) imageless.add(id);
+    setView = { id, name:set.name || known.name, release:(set.releaseDate || "").slice(0, 4), cards, mode:"flip", loading:false };
     const tile = meta.sets.find(s => s.id === id);
     if (tile) tile.year = setView.release;
   } catch (e) { setView.loading = false; setView.error = true; }
@@ -1992,6 +2142,11 @@ function renderSetPage(root){
   const body = document.getElementById("setBody");
   if (s.loading) { body.innerHTML = `<p>Shuffling ${esc(s.name)}…</p>`; return; }
   if (s.error) { body.innerHTML = `<p class="warn">This set didn't load.</p>`; return; }
+  if (!s.cards.some(c => safeImg(c && c.image))) {
+    body.innerHTML = `<p class="empty-state">No card images for this set yet. ${toad()}</p>`;
+    paintContext();
+    return;
+  }
   const pages = Math.max(1, Math.ceil(s.cards.length / 9));
   if (flipPage >= pages) flipPage = 0;
   const slice = s.cards.slice(flipPage * 9, flipPage * 9 + 9);
@@ -3321,7 +3476,7 @@ function finishOnboard(){
   saveOnboard({ done:true, skipped:!names.length && !filters.era && !filters.pricePreset, picks:[...onboardPicks], custom:onboardCustom.slice(), era:filters.era, budget:filters.pricePreset, at:Date.now() });
   closeOnboard();
   if (onboardMode !== "retake") countEvent("onboard-done");
-  restart({ keepSpice: names.length > 0 });
+  restart();
   const bits = [];
   if (names.length) bits.push(namesLabel());
   if (filters.era) bits.push(eraLabel(filters.era));

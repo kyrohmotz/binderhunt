@@ -17,6 +17,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "fx.json"
 URL = "https://api.frankfurter.dev/v1/latest?from=EUR&to=USD"
+# frankfurter.dev answers 403 to Python's default urllib user agent.
+UA = "BinderHunt/1.0 (+https://kyrohmotz.github.io/binderhunt)"
 # Last good ECB rate, used only when the file is missing and the request fails.
 FALLBACK = 1.1253
 
@@ -40,7 +42,8 @@ def parse_rate(payload):
 
 
 def fetch_payload(url=URL, timeout=8):
-    with urllib.request.urlopen(url, timeout=timeout) as res:
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as res:
         return json.load(res)
 
 
