@@ -11,10 +11,18 @@
 //    list fetch is not cached empty.
 // 4. After the set catalog loads, owned ids with no saved set id are
 //    backfilled so their set tile is not stuck at 0%.
-// 5. A hunt whose catalog request never returns shows busy/retrying within
-//    the watchdog and starts another attempt.
+// 5. A hunt whose catalog request never returns shows busy/retrying from
+//    that request's own timeout and keeps trying. The watchdog does not abort
+//    a request that is still inside its timeout, so a slow reply is no slower
+//    than a hunt with the watchdog disarmed. A missing set list retries after
+//    its backoff and then stops. A dropped batch is requeued. A hunt abort
+//    does not cancel a profile set request. A set line that joins a toast
+//    keeps that toast up.
+// 6. After Skip, focus stays on the hunt and ArrowLeft, ArrowRight, and Z
+//    still work. The same check runs at 390 and 1440.
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -108,6 +116,71 @@ await ev(`new Promise((resolve, reject) => {
     else if (Date.now() - start > 20000) { clearInterval(t); reject(new Error("catalog metadata did not load")); }
   }, 50);
 })`);
+
+const keyScript = `(() => {
+  const problems = [];
+  const note = (ok, name, extra) => { if (!ok) problems.push(name + (extra ? " — " + extra : "")); };
+  settings.haptics = true;
+  showTab("hunt");
+  generation++;
+  loading = true;
+  clearHuntWatch();
+  huntInflight.forEach(job => job.ctrl.abort());
+  huntInflight.clear();
+  streamDone = true;
+  paused = false;
+  catalogBusy = false;
+  busyHold = false;
+  busyUntil = 0;
+  pumpError = "";
+  undoStack = [];
+  wish = [];
+  saveWish();
+  reserved = new Set();
+  pendingSwipes = [];
+  swipeBusy = false;
+  const art = "https://assets.tcgdex.net/en/base/base1/58";
+  pile = [1, 2, 3, 4].map(n => ({ id:"key-" + n, name:"Key " + n, set:"Base", setId:"base1", number:String(n), rarity:"Common", img:art + "/high.webp", thumb:art + "/low.webp" }));
+  matched = pile.length;
+  deck.innerHTML = "";
+  renderDeck();
+  const skip = document.getElementById("skip");
+  const save = document.getElementById("save");
+  const box = skip.getBoundingClientRect();
+  note(box.width >= 44 && box.height >= 44 && box.top >= 0 && box.bottom <= window.innerHeight + 1, "skip is on screen", Math.round(box.width) + "x" + Math.round(box.height) + " @" + Math.round(box.top));
+  note(!skip.querySelector("label") && !save.querySelector("label"), "skip and save have no haptic label");
+  note(!skip.disabled && !save.disabled, "skip and save are enabled");
+  skip.click();
+  const focus = document.activeElement;
+  note(focus !== document.getElementById("hapticSwitch"), "skip does not focus the haptic switch", focus && (focus.id || focus.tagName));
+  note(focus === skip || focus === deck, "focus stays on skip or the deck", focus && (focus.id || focus.tagName));
+  note(pile.map(c => c.id).join(",") === "key-2,key-3,key-4", "skip click passes the top card", pile.map(c => c.id).join(","));
+  const press = key => (document.activeElement || document).dispatchEvent(new KeyboardEvent("keydown", { key, bubbles:true, cancelable:true }));
+  press("ArrowLeft");
+  note(pile.map(c => c.id).join(",") === "key-3,key-4", "ArrowLeft passes the next card", pile.map(c => c.id).join(","));
+  press("ArrowRight");
+  note(pile.map(c => c.id).join(",") === "key-4" && wish.some(c => c.id === "key-3"), "ArrowRight saves the next card", pile.map(c => c.id).join(",") + " wish " + wish.map(c => c.id).join(","));
+  press("z");
+  note(pile.map(c => c.id).join(",") === "key-3,key-4" && !wish.some(c => c.id === "key-3"), "Z undoes the save", pile.map(c => c.id).join(",") + " wish " + wish.map(c => c.id).join(","));
+  document.getElementById("hapticSwitch").focus();
+  press("ArrowLeft");
+  note(pile.map(c => c.id).join(",") === "key-4", "ArrowLeft still works while the haptic switch is focused", pile.map(c => c.id).join(",") + " focus " + ((document.activeElement && document.activeElement.id) || ""));
+  wish = [];
+  saveWish();
+  return problems;
+})()`;
+mkdirSync("/opt/cursor/artifacts/screenshots", { recursive: true });
+const keyFails = [];
+for (const [width, height] of [[390, 844], [1440, 900]]) {
+  await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 700 });
+  await sleep(80);
+  const problems = await ev(keyScript);
+  const shot = await cdp.send("Page.captureScreenshot", { format: "png" });
+  writeFileSync("/opt/cursor/artifacts/screenshots/keys-" + width + ".png", Buffer.from(shot.data, "base64"));
+  if (!Array.isArray(problems)) keyFails.push(width + " key test did not return a list");
+  else problems.forEach(p => keyFails.push(width + ": " + p));
+}
+await cdp.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
 
 const report = await ev(`(async () => {
   const fails = [];
@@ -316,6 +389,9 @@ const report = await ev(`(async () => {
   check("binder celebration is not held for a slow set list", notes.length === 1 && Date.now() - slowStart < 1500, notes.join(" || "));
   await waitNotes(2);
   check("a late set list celebrates on its own", notes.length === 2 && notes[1].indexOf("Slow Set is complete.") >= 0 && Date.now() - slowStart >= 1500, notes.join(" || ") + " @" + (Date.now() - slowStart));
+  showConfetti("Binder is complete.");
+  showSetFollowUp(["Binder is complete."], "Slow Set is complete.", Date.now());
+  check("joining a set line keeps the toast up", confettiUntil - Date.now() >= 2400 && ((document.querySelector(".confetti p") || {}).textContent || "").indexOf("Slow Set is complete.") >= 0, String(confettiUntil - Date.now()));
 
   setLists.delete("zzmiss");
   setListRetryAt.delete("zzmiss");
@@ -326,10 +402,10 @@ const report = await ev(`(async () => {
   };
   let failed = false;
   try { await ensureSetList("zzmiss"); } catch (e) { failed = true; }
-  let cooled = false;
-  try { await ensureSetList("zzmiss"); } catch (e) { cooled = !!(e && e.name === "TimeoutError"); }
+  let cooled = "";
+  try { await ensureSetList("zzmiss"); } catch (e) { cooled = e && e.setListRetry ? "retry" : (e && e.name || ""); }
   check("a failed set list stays unloaded", failed && !setLists.has("zzmiss") && misses === 1, "failed " + failed + " cached " + setLists.has("zzmiss") + " misses " + misses);
-  check("a failed set list backs off instead of caching empty", cooled && misses === 1 && !setLists.has("zzmiss"));
+  check("a failed set list backs off instead of caching empty", cooled === "retry" && misses === 1 && !setLists.has("zzmiss"), cooled);
   getJson = realGetJson;
 
   const pocket = { id:"jungle-4", name:"Charizard", setId:"base2", rarity:"Rare Holo", number:"4" };
@@ -382,7 +458,23 @@ const report = await ev(`(async () => {
   tap.dispatchEvent(new MouseEvent("click", { bubbles:true, cancelable:true, clientX:x3, clientY:y3, detail:1 }));
   check("short tap owns", ownedIds.has(pocket.id));
 
+  seen.add("lost-1");
+  briefs = briefs.filter(b => b.id !== "lost-1");
+  deferred = deferred.filter(b => b.id !== "lost-1");
+  huntBatch = [{ id:"lost-1", name:"Lost" }];
+  requeueHuntBatch();
+  check("a dropped hunt batch is requeued", briefs.some(b => b.id === "lost-1") && seen.has("lost-1") && huntBatch.length === 0, JSON.stringify(briefs.map(b => b.id)));
+
   const origFetch = window.fetch;
+  const stopHunt = () => {
+    window.fetch = origFetch;
+    generation++;
+    loading = false;
+    clearHuntWatch();
+    huntInflight.forEach(job => job.ctrl.abort());
+    huntInflight.clear();
+    huntBatch = [];
+  };
   window.fetch = (url, opts) => {
     if (String(url).indexOf("/cards") >= 0) {
       return new Promise((resolve, reject) => {
@@ -396,7 +488,8 @@ const report = await ev(`(async () => {
     }
     return origFetch(url, opts);
   };
-  HUNT_SILENT_MS = 500;
+  HUNT_FETCH_MS = 450;
+  HUNT_SILENT_MS = 20000;
   const pumpsBefore = huntPumps;
   filters = blankFilters();
   filters.names = ["Charizard", "Gengar", "Squirtle"];
@@ -405,8 +498,13 @@ const report = await ev(`(async () => {
   showTab("hunt");
   restart();
   const watchStart = Date.now();
+  let flicker = 0;
+  let lastStatus = "";
   await new Promise(resolve => {
     const t = setInterval(() => {
+      const status = deck.dataset.status || "";
+      if (lastStatus === "busy" && status === "loading") flicker++;
+      lastStatus = status;
       const p = document.querySelector("#deck .empty-state p");
       const text = p ? p.textContent : "";
       if (/busy, retrying/.test(text) || Date.now() - watchStart > 4000) { clearInterval(t); resolve(); }
@@ -414,21 +512,130 @@ const report = await ev(`(async () => {
   });
   const busyText = (document.querySelector("#deck .empty-state p") || {}).textContent || "";
   const busyAt = Date.now() - watchStart;
-  check("a stuck combo hunt shows busy within the watchdog", /busy, retrying/.test(busyText) && busyAt < 2500 && busyAt >= 400, busyText + " @" + busyAt);
-  await new Promise(r => setTimeout(r, 500));
-  check("the watchdog starts another hunt attempt", huntPumps >= pumpsBefore + 2, String(huntPumps - pumpsBefore));
-  window.fetch = origFetch;
-  generation++;
-  loading = false;
-  huntFetches = false;
-  clearHuntWatch();
-  if (huntAbort) huntAbort.abort();
+  check("a hung hunt shows busy from the request timeout", /busy, retrying/.test(busyText) && busyAt >= 400 && busyAt < 2500, busyText + " @" + busyAt);
+  await new Promise(r => setTimeout(r, 1500));
+  const stillBusy = ((document.querySelector("#deck .empty-state p") || {}).textContent || "");
+  check("busy text stays up while the hunt is still hung", /busy, retrying/.test(stillBusy) && flicker === 0, stillBusy + " flips " + flicker);
+  check("the hung hunt keeps trying", huntPumps >= pumpsBefore + 2, String(huntPumps - pumpsBefore));
+  stopHunt();
+
+  if (!meta.sets.some(s => s.id === "zzmiss")) meta.sets.push({ id:"zzmiss", name:"Missing", cardCount:{ official:1, total:1 } });
+  setLists.delete("zzmiss");
+  setListRetryAt.delete("zzmiss");
+  setListFails.delete("zzmiss");
+  let setMisses = 0;
+  window.fetch = (url, opts) => {
+    if (String(url).indexOf("/sets/zzmiss") >= 0) {
+      setMisses++;
+      return Promise.resolve(new Response("no", { status:404, statusText:"Not Found" }));
+    }
+    return origFetch(url, opts);
+  };
+  filters = blankFilters();
+  filters.set = "zzmiss";
+  showTab("hunt");
+  restart();
+  await new Promise(r => setTimeout(r, 1200));
+  const earlyText = deck.innerText || "";
+  check("a missing set list does not pretend to be stuck", setMisses === 1 && earlyText.indexOf("Keep looking") < 0 && earlyText.indexOf("retrying") < 0, setMisses + " " + earlyText.slice(0, 180));
+  await new Promise(r => setTimeout(r, 3500));
+  check("the hunt retries a missing set list after the backoff", setMisses === 2, String(setMisses));
+  await new Promise(r => setTimeout(r, 4500));
+  check("a missing set list stops after the retry cap", setMisses === 3, String(setMisses));
+  await new Promise(r => setTimeout(r, 5000));
+  const gaveUp = deck.innerText || "";
+  check("a given-up set list does not say it is retrying", setMisses === 3 && gaveUp.indexOf("retrying") < 0, setMisses + " " + gaveUp.slice(0, 180));
+  stopHunt();
+
+  let profileAborted = false;
+  window.fetch = (url, opts) => {
+    const u = String(url);
+    if (u.indexOf("/cards/hunt-hang") >= 0) {
+      return new Promise((resolve, reject) => {
+        const signal = opts && opts.signal;
+        const fail = () => reject(signal && signal.reason ? signal.reason : new DOMException("Aborted", "AbortError"));
+        if (signal) {
+          if (signal.aborted) { fail(); return; }
+          signal.addEventListener("abort", fail, { once:true });
+        }
+      });
+    }
+    if (u.indexOf("/sets/zzprofile") >= 0) {
+      return new Promise((resolve, reject) => {
+        const signal = opts && opts.signal;
+        if (signal) signal.addEventListener("abort", () => { profileAborted = true; reject(new DOMException("Aborted", "AbortError")); }, { once:true });
+        setTimeout(() => resolve(new Response(JSON.stringify({ id:"zzprofile", name:"Profile Set", cards:[{ id:"zzprofile-1", localId:"1", name:"P" }] }), { status:200, headers:{ "content-type":"application/json" } })), 250);
+      });
+    }
+    return origFetch(url, opts);
+  };
+  const hung = getJson(TCGDEX + "/cards/hunt-hang", { hunt:true });
+  hung.catch(() => {});
+  const profileSet = await getJson(TCGDEX + "/sets/zzprofile");
+  huntInflight.forEach(job => job.ctrl.abort());
+  check("a hunt abort does not cancel a profile set request", profileSet && profileSet.name === "Profile Set" && !profileAborted, profileAborted ? "aborted" : (profileSet && profileSet.name));
+  stopHunt();
+
+  async function timeFirstCard(delay, silentMs) {
+    let aborts = 0;
+    let sawBusy = false;
+    window.fetch = (url, opts) => {
+      const u = String(url);
+      if (u.indexOf("/cards") < 0) return origFetch(url, opts);
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          settled = true;
+          const body = u.indexOf("name=") >= 0
+            ? [{ id:"base1-58", name:"Pikachu", localId:"58", image:"https://assets.tcgdex.net/en/base/base1/58" }]
+            : { id:"base1-58", name:"Pikachu", localId:"58", image:"https://assets.tcgdex.net/en/base/base1/58", rarity:"Common" };
+          resolve(new Response(JSON.stringify(body), { status:200, headers:{ "content-type":"application/json" } }));
+        }, delay);
+        const signal = opts && opts.signal;
+        if (signal) {
+          const stop = () => {
+            if (settled) return;
+            aborts++;
+            clearTimeout(timer);
+            reject(signal.reason || new DOMException("Aborted", "AbortError"));
+          };
+          if (signal.aborted) { stop(); return; }
+          signal.addEventListener("abort", stop, { once:true });
+        }
+      });
+    };
+    HUNT_SILENT_MS = silentMs;
+    HUNT_FETCH_MS = 12000;
+    cardCache.delete("base1-58");
+    filters = blankFilters();
+    filters.names = ["Pikachu"];
+    showTab("hunt");
+    const start = Date.now();
+    restart();
+    const found = await new Promise(resolve => {
+      const t = setInterval(() => {
+        if (deck.dataset.status === "busy") sawBusy = true;
+        if (pile.length || Date.now() - start > delay * 6 + 5000) { clearInterval(t); resolve(pile.length > 0); }
+      }, 40);
+    });
+    const elapsed = Date.now() - start;
+    const snap = { found, elapsed, aborts, sawBusy };
+    stopHunt();
+    return snap;
+  }
+  const live7 = await timeFirstCard(7000, 1000000);
+  const watch7 = await timeFirstCard(7000, 20000);
+  check("7s delay matches a hunt with no watchdog", live7.found && watch7.found && Math.abs(live7.elapsed - watch7.elapsed) <= 1000 && watch7.aborts === 0 && !watch7.sawBusy, JSON.stringify({ live:live7, watch:watch7 }));
+  const live10 = await timeFirstCard(10000, 1000000);
+  const watch10 = await timeFirstCard(10000, 20000);
+  check("10s delay matches a hunt with no watchdog", live10.found && watch10.found && Math.abs(live10.elapsed - watch10.elapsed) <= 1000 && watch10.aborts === 0 && !watch10.sawBusy, JSON.stringify({ live:live10, watch:watch10 }));
   HUNT_SILENT_MS = 20000;
+  HUNT_FETCH_MS = 12000;
   return fails;
 })()`);
 
 if (errors.length) console.log("page exceptions:", errors.slice(0, 8).join("\n"));
-const fails = Array.isArray(report) ? report : ["test did not return a list: " + JSON.stringify(report)];
+const fails = keyFails.concat(Array.isArray(report) ? report : ["test did not return a list: " + JSON.stringify(report)]);
 if (fails.length) {
   console.log("FAILED\n" + fails.join("\n"));
   shutdown(1);
