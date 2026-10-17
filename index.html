@@ -567,7 +567,6 @@ let busyUntil = 0;
 let busyRenderTimer = 0;
 const fetchFails = new Map();
 let deferred = [];
-let deferredPass = false;
 const CARD_FETCH_RETRIES = 3;
 const bulkBags = new Map();
 const imageless = new Set(IMAGELESS_SETS);
@@ -1585,8 +1584,7 @@ function parkThrottled(brief){
   return "defer";
 }
 function reclaimDeferred(){
-  if (deferredPass || !deferred.length) return false;
-  deferredPass = true;
+  if (!deferred.length) return false;
   const pending = deferred;
   deferred = [];
   pending.forEach(b => { b.finalTry = true; briefs.push(b); });
@@ -1718,7 +1716,7 @@ function restart(opts){
   priceLane = 0; priceOrigin = 1; pricePage = 1; priceWrapped = false; laneOrder = null; laneStates = null; setWalk = null;
   feedExhausted = false; holdFeed = false; tailCursor = 0; tailDone = false;
   streamDone = false; paused = false; pumpError = ""; catalogBusy = false; busyStrike = 0; busyUntil = 0; clearTimeout(busyRenderTimer); effort = 0; loading = false; searchStarted = Date.now(); lastFound = Date.now();
-  fetchFails.clear(); deferred = []; deferredPass = false;
+  fetchFails.clear(); deferred = [];
   pendingSwipes = []; reserved = new Set(); swipeBusy = false;
   deck.innerHTML = "";
   showSkeleton();
@@ -1804,7 +1802,7 @@ function renderDeck(){
   layoutStack();
   if (!pile.length && !deck.querySelector(".card")) {
     const openHunt = !filtersActive() && !discoveryBinder();
-    const exhausted = streamDone && !paused && !busyBlock();
+    const exhausted = streamDone && !paused && (matched > 0 || !busyBlock());
     const noMatch = !pumpError && !openHunt && exhausted;
     deck.dataset.status = pumpError ? "error" : (paused && !noMatch ? "paused" : "empty");
     deck.removeAttribute("aria-busy");
