@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#F8F7EF">
 <meta name="binderhunt-price-proxy" content="">
 <meta name="apple-mobile-web-app-title" content="BinderHunt">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -36,8 +36,8 @@
 @font-face{font-family:Fraunces;src:url("fonts/fraunces-500.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap}
 :root{
   --paper:#F8F7EF;--paper-2:#F1F1E4;--sage:#E4E7DA;--line:#C4C8BE;--ink:#1F1F1E;--ink-2:#404241;
-  --sky:#86DEFF;--sky-deep:#2FA9D9;--green:#ABB28D;--green-deep:#737863;--tan:#E9D5C0;
-  --butter:#F3EDC8;--rose:#F6C9C9;--display:Fredoka,"Baloo 2",Nunito,sans-serif;
+  --sky:#86DEFF;--sky-deep:#2FA9D9;--green:#ABB28D;--green-deep:#737863;--moss:#737863;--tan:#E9D5C0;
+  --butter:#F3EDC8;--rose:#F6C9C9;--ink-soft:#5c6158;--display:Fredoka,"Baloo 2",Nunito,sans-serif;
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
@@ -78,6 +78,10 @@ img{max-width:100%;-webkit-user-drag:none}
 .frame img,.card img{width:100%;height:100%;object-fit:contain;object-position:center;background:#fff;-webkit-user-drag:none;user-select:none;pointer-events:none}
 .ph{padding:16px;text-align:center}
 .ph b{font-family:Fraunces,Georgia,serif;font-weight:500;font-size:22px;display:block}
+.cardback{width:100%;height:100%;min-height:0;display:flex;align-items:center;justify-content:center;padding:5px;background:repeating-linear-gradient(135deg,#c9d4b4 0 7px,#e4ead8 7px 14px)}
+.cardback-inner{width:100%;height:100%;min-height:0;border:2px solid var(--ink);border-radius:8px;background:rgba(255,255,255,.62);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;box-shadow:inset 0 0 0 3px rgba(255,255,255,.45)}
+.cardback .toad{width:62%;height:auto;max-height:46%}
+.cardback b{font-family:var(--display);font-weight:700;font-size:10px;line-height:1.15;text-align:center}
 .stamp{position:absolute;top:18px;padding:4px 10px;border:3px solid;border-radius:12px;font-family:var(--display);font-weight:700;font-size:22px;background:#fff;opacity:0;pointer-events:none}
 .stamp.like{left:12px;color:var(--green-deep);border-color:var(--green-deep);transform:rotate(-8deg)}
 .stamp.nope{right:12px;color:#8d4a4a;border-color:#8d4a4a;transform:rotate(8deg)}
@@ -328,7 +332,7 @@ html.reduce .sleeve.holo img{transform:none}
 .kicker{font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft);margin:0}
 .huntpicks{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .huntpick{border:2.5px solid var(--ink);background:#fff;border-radius:999px;padding:8px 14px;min-height:44px;font-family:var(--display);font-size:15px;font-weight:600;cursor:pointer;box-shadow:2px 2px 0 var(--ink)}
-.huntpick.on{background:var(--moss);color:#fff;border-color:var(--moss)}
+.huntpick.on,.huntpick[aria-pressed="true"]{background:var(--moss);color:#fff;border-color:var(--moss)}
 .huntpick.pop{animation:pickpop .28s ease}
 @keyframes pickpop{0%{transform:scale(.88)} 55%{transform:scale(1.08)} 100%{transform:scale(1)}}
 .searchrow{display:flex;gap:8px;margin-top:4px}
@@ -518,6 +522,7 @@ let undoStack = [];
 let generation = 0;
 let loading = false;
 let streamDone = false;
+let searchStarted = 0;
 let paused = false;
 let pumpError = "";
 let effort = 0;
@@ -581,10 +586,14 @@ function countEvent(name){
     fetch("https://abacus.jasoncameron.dev/hit/" + COUNT_NS + "/" + name, { method:"GET", credentials:"omit", cache:"no-store", keepalive:true }).catch(() => {});
   } catch (e) {}
 }
+function localDay(){
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
 function countPage(){
   countEvent("pageview");
   try {
-    const day = new Date().toISOString().slice(0, 10);
+    const day = localDay();
     if (localStorage.getItem("bh.visit.day") === day) return;
     localStorage.setItem("bh.visit.day", day);
   } catch (e) { return; }
@@ -598,6 +607,19 @@ function safeImg(url){
   if (typeof url !== "string") return "";
   if (url.startsWith("https://assets.tcgdex.net/") || url.startsWith("https://images.pokemontcg.io/")) return url;
   return "";
+}
+function knownArt(card){
+  const urls = [];
+  const push = value => {
+    const url = safeImg(value);
+    if (url && !urls.includes(url)) urls.push(url);
+  };
+  if (!card) return urls;
+  push(card.thumb);
+  push(card.img);
+  const base = safeImg(card.image);
+  if (base) push(base + "/low.webp");
+  return urls;
 }
 function shuffle(list){
   const a = list.slice();
@@ -1052,7 +1074,7 @@ function raritiesForSet(id){
   return list;
 }
 function keep(card){
-  if (!card || isDigital(card)) return false;
+  if (!card || isDigital(card) || !knownArt(card).length) return false;
   if (discoveryBinder() && savedIds().has(card.id)) return false;
   const surprise = !!(card.spice && !discoveryBinder());
   if (!surprise) {
@@ -1241,7 +1263,7 @@ async function pullNames(names){
   namePages.set(species, list.length < 100 ? 0 : page + 1);
   let n = 0;
   shuffle(list).forEach(c => {
-    if (!c || !c.id || seen.has(c.id) || isDigital({ id:c.id })) return;
+    if (!c || !c.id || !safeImg(c.image) || seen.has(c.id) || isDigital({ id:c.id })) return;
     if (discoveryBinder() && savedIds().has(c.id)) { seen.add(c.id); return; }
     pushBrief(c);
     n++;
@@ -1261,7 +1283,7 @@ async function pullMix(){
     if (!mixBags.has(id)) {
       try {
         const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
-        mixBags.set(id, (set.cards || []).filter(c => c && c.id && !isDigital({ id:c.id })));
+        mixBags.set(id, (set.cards || []).filter(c => c && c.id && safeImg(c.image) && !isDigital({ id:c.id })));
       } catch (e) { mixBags.set(id, []); }
     }
     const fresh = shuffle(mixBags.get(id).filter(c => !seen.has(c.id)));
@@ -1333,6 +1355,7 @@ async function pump(my){
     const priced = filters.min != null || filters.max != null || !!filters.pricePreset;
     const ceiling = !capped ? Infinity : ((filters.names || []).length ? 500 : (priced ? 160 : 80));
     while (pile.length < 5 && my === generation && steps < 12 && effort < ceiling) {
+      if (!pile.length && searchStarted && Date.now() - searchStarted >= 10000) { streamDone = true; break; }
       if (briefs.length < 4) {
         const added = await pullMore();
         if (my !== generation) return;
@@ -1365,8 +1388,9 @@ async function pump(my){
   } finally { if (my === generation) loading = false; }
   if (my !== generation) return;
   const capped = filtersActive() || !!discoveryBinder();
-  const ceiling = filters.min != null || filters.max != null ? 160 : 80;
-  if (capped && !streamDone && pile.length < 3 && effort >= ceiling) paused = true;
+  const ceiling = filters.min != null || filters.max != null || filters.pricePreset ? 160 : 80;
+  if (capped && !streamDone && !pile.length && (effort >= ceiling || (searchStarted && Date.now() - searchStarted >= 10000))) streamDone = true;
+  else if (capped && !streamDone && pile.length < 3 && effort >= ceiling) paused = true;
   renderDeck();
   paintCount();
   if (!paused && !streamDone && pile.length < 4) setTimeout(() => pump(my), 30);
@@ -1380,7 +1404,7 @@ function restart(opts){
   openingOrder = []; openingCursor = 0; openingDone = false; chasePage = 1; chaseDone = false; bulkCursor = 0; gradedCursor = 0;
   mixTurn = 0; mixCursor = 0; mixExhausted = false; mixOrder = []; nameOrder = 0;
   mixBags.clear(); namePages.clear(); setPools.clear();
-  streamDone = false; paused = false; pumpError = ""; effort = 0; loading = false;
+  streamDone = false; paused = false; pumpError = ""; effort = 0; loading = false; searchStarted = Date.now();
   pendingSwipes = []; reserved = new Set(); swipeBusy = false;
   deck.innerHTML = "";
   showSkeleton();
@@ -1390,27 +1414,20 @@ function restart(opts){
 function altText(card){ return (card.name || "Card") + " – " + (card.set || "Set") + (card.number ? " #" + card.number : ""); }
 function placeholder(card){
   const d = document.createElement("div");
-  d.className = "ph";
-  d.innerHTML = `<b>${esc(card.name || "Card")}</b><span>${esc(card.set || "")}</span>`;
+  d.className = "cardback";
+  d.innerHTML = `<div class="cardback-inner">${toad()}<b>${esc((card && card.name) || "Card")}</b></div>`;
   return d;
 }
 function paintArt(host, card){
   host.replaceChildren();
-  const urls = [];
-  if (card.img) urls.push(card.img);
-  if (card.thumb && card.thumb !== card.img) urls.push(card.thumb);
-  if (card.setId && card.number) {
-    urls.push("https://images.pokemontcg.io/" + card.setId + "/" + card.number + "_hires.png");
-    urls.push("https://images.pokemontcg.io/" + card.setId + "/" + card.number + ".png");
-  }
+  const urls = knownArt(card);
   if (!urls.length) { host.append(placeholder(card)); return; }
   const img = document.createElement("img");
-  img.alt = altText(card);
+  img.alt = altText(card || {});
   img.draggable = false;
   img.decoding = "async";
   img.addEventListener("dragstart", e => e.preventDefault());
-  let i = 0;
-  img.onerror = () => { i++; if (urls[i]) img.src = urls[i]; else { img.remove(); host.append(placeholder(card)); } };
+  img.onerror = () => { img.replaceWith(placeholder(card)); };
   img.src = urls[0];
   host.append(img);
 }
@@ -1465,18 +1482,33 @@ function renderDeck(){
   layoutStack();
   if (!pile.length && !deck.querySelector(".card")) {
     const openHunt = !filtersActive() && !discoveryBinder();
-    deck.dataset.status = pumpError ? "error" : (paused ? "paused" : "empty");
+    const noMatch = !pumpError && !openHunt && (streamDone || paused);
+    deck.dataset.status = pumpError ? "error" : (paused && !noMatch ? "paused" : "empty");
     deck.removeAttribute("aria-busy");
-    const msg = pumpError ? `<p class="warn">${esc(pumpError)}</p>` : paused ? "<p>Still matching cards.</p>" : openHunt ? "<p>The hunt is still shuffling the table.</p>" : "<p>No physical cards match these filters.</p>";
-    deck.innerHTML = `<div class="empty-state">${msg}${toad()}<button class="chip" id="retryDeck" type="button">${paused || pumpError || openHunt ? "Keep looking" : "Edit filters"}</button></div>`;
-    const btn = document.getElementById("retryDeck");
-    if (btn) btn.onclick = () => {
-      if (paused || pumpError || openHunt) {
-        paused = false; pumpError = ""; streamDone = false; effort = 0;
+    if (noMatch) {
+      const priceOn = !!(filters.pricePreset || filters.min != null || filters.max != null);
+      const eraOn = !!filters.era;
+      const actions = [];
+      if (priceOn) actions.push(`<button class="chip" id="widenBudget" type="button">Widen budget</button>`);
+      if (eraOn) actions.push(`<button class="chip" id="anyEra" type="button">Any era</button>`);
+      if (!actions.length) actions.push(`<button class="chip" id="retryDeck" type="button">Edit filters</button>`);
+      deck.innerHTML = `<div class="empty-state"><p>No cards match yet.</p>${toad()}<div class="huntpicks">${actions.join("")}</div></div>`;
+      const widen = document.getElementById("widenBudget");
+      const anyEra = document.getElementById("anyEra");
+      const edit = document.getElementById("retryDeck");
+      if (widen) widen.onclick = () => { filters.pricePreset = ""; filters.min = null; filters.max = null; saveFilters(); restart(); };
+      if (anyEra) anyEra.onclick = () => { filters.era = ""; saveFilters(); restart(); };
+      if (edit) edit.onclick = () => openFilter("pokemon", document.querySelector("[data-filter=pokemon]"));
+    } else {
+      const msg = pumpError ? `<p class="warn">${esc(pumpError)}</p>` : paused ? "<p>Still matching cards.</p>" : "<p>The hunt is still shuffling the table.</p>";
+      deck.innerHTML = `<div class="empty-state">${msg}${toad()}<button class="chip" id="retryDeck" type="button">Keep looking</button></div>`;
+      const btn = document.getElementById("retryDeck");
+      if (btn) btn.onclick = () => {
+        paused = false; pumpError = ""; streamDone = false; effort = 0; searchStarted = Date.now();
         if (openHunt) { openingDone = false; chaseDone = false; chasePage = 1; openingCursor = 0; seen = new Set(); setPools.clear(); }
         showSkeleton(); pump(generation);
-      } else openFilter("set", document.querySelector("[data-filter=set]"));
-    };
+      };
+    }
   } else {
     deck.dataset.status = "ready";
     deck.removeAttribute("aria-busy");
@@ -1757,7 +1789,7 @@ function togglePreset(pick){
 }
 function drawPokemonFilter(body){
   const extras = (filters.names || []).filter(n => !HUNT_PICKS.some(p => presetOn(p) && p.names.some(x => sameName(x, n))));
-  body.innerHTML = `<div class="searchrow"><input id="monFind" type="search" placeholder="e.g. Pikachu" aria-label="Search a Pokémon"></div><div class="suggest" id="monSuggest"></div><div class="huntpicks" id="monPicks">${HUNT_PICKS.map(p => `<button type="button" class="huntpick ${presetOn(p) ? "on" : ""}" data-pick="${p.id}">${esc(p.label)}</button>`).join("")}${extras.map(n => `<button type="button" class="huntpick on" data-extra="${esc(n)}">${esc(n)}</button>`).join("")}</div><p class="fine">Every print of a picked Pokémon stays in the hunt, including commons.</p>`;
+  body.innerHTML = `<div class="searchrow"><input id="monFind" type="search" placeholder="e.g. Pikachu" aria-label="Search a Pokémon"></div><div class="suggest" id="monSuggest"></div><div class="huntpicks" id="monPicks">${HUNT_PICKS.map(p => `<button type="button" class="huntpick ${presetOn(p) ? "on" : ""}" aria-pressed="${presetOn(p) ? "true" : "false"}" data-pick="${p.id}">${esc(p.label)}</button>`).join("")}${extras.map(n => `<button type="button" class="huntpick on" aria-pressed="true" data-extra="${esc(n)}">${esc(n)}</button>`).join("")}</div><p class="fine">Every print of a picked Pokémon stays in the hunt, including commons.</p>`;
   const refresh = () => { drawPokemonFilter(body); saveFilters(); restart(); };
   body.querySelectorAll("[data-pick]").forEach(btn => btn.onclick = () => {
     popBtn(btn);
@@ -1832,7 +1864,7 @@ function openFilter(kind, anchor){
   } else if (kind === "price") {
     const presets = [["", "Any"], ["under10", "Under $10"], ["mid", "$10–50"], ["high", "$50+"]];
     const anyOn = !filters.pricePreset && filters.min == null && filters.max == null;
-    body.innerHTML = `<div class="huntpicks">${presets.map(([id, label]) => `<button type="button" class="huntpick ${(id ? filters.pricePreset === id : anyOn) ? "on" : ""}" data-preset="${id}">${label}</button>`).join("")}</div><div class="row2"><label class="field">Min USD<input id="pMin" inputmode="decimal" value="${filters.pricePreset ? "" : (filters.min != null ? filters.min : "")}"></label><label class="field">Max USD<input id="pMax" inputmode="decimal" value="${filters.pricePreset ? "" : (filters.max != null ? filters.max : "")}"></label></div><p class="warn" id="pWarn" hidden>Min price is higher than max price. These prices were not applied.</p><p class="fine">Any keeps every price, including cards under $10.</p>`;
+    body.innerHTML = `<div class="huntpicks">${presets.map(([id, label]) => { const on = id ? filters.pricePreset === id : anyOn; return `<button type="button" class="huntpick ${on ? "on" : ""}" aria-pressed="${on ? "true" : "false"}" data-preset="${id}">${label}</button>`; }).join("")}</div><div class="row2"><label class="field">Min USD<input id="pMin" inputmode="decimal" value="${filters.pricePreset ? "" : (filters.min != null ? filters.min : "")}"></label><label class="field">Max USD<input id="pMax" inputmode="decimal" value="${filters.pricePreset ? "" : (filters.max != null ? filters.max : "")}"></label></div><p class="warn" id="pWarn" hidden>Min price is higher than max price. These prices were not applied.</p><p class="fine">Any keeps every price, including cards under $10.</p>`;
     body.querySelectorAll("[data-preset]").forEach(btn => btn.onclick = () => {
       popBtn(btn);
       filters.pricePreset = btn.dataset.preset || "";
@@ -1840,7 +1872,11 @@ function openFilter(kind, anchor){
       filters.max = null;
       document.getElementById("pMin").value = "";
       document.getElementById("pMax").value = "";
-      body.querySelectorAll("[data-preset]").forEach(other => other.classList.toggle("on", other === btn));
+      body.querySelectorAll("[data-preset]").forEach(other => {
+        const on = other === btn;
+        other.classList.toggle("on", on);
+        other.setAttribute("aria-pressed", on ? "true" : "false");
+      });
       saveFilters(); restart();
     });
     const apply = () => {
@@ -1971,10 +2007,12 @@ function renderSetPage(root){
     img.alt = c.name + " – " + s.name + " #" + (c.localId || "");
     img.draggable = false;
     img.addEventListener("dragstart", e => e.preventDefault());
-    const urls = [c.image + "/low.webp", c.image + "/high.webp"];
-    let i = 0;
-    img.onerror = () => { i++; if (urls[i]) img.src = urls[i]; else img.replaceWith(placeholder(c)); };
-    img.src = urls[0];
+    const base = safeImg(c.image);
+    if (!base) img.replaceWith(placeholder(c));
+    else {
+      img.onerror = () => img.replaceWith(placeholder(c));
+      img.src = base + "/low.webp";
+    }
     pocket.querySelector(".open").onclick = () => openProfile({ id:c.id, name:c.name, image:c.image, localId:c.localId });
     pocket.querySelector(".heart").onclick = async () => {
       let card = cardCache.get(c.id);
@@ -2037,14 +2075,6 @@ function renderBinders(){
 }
 function pagesOf(list){ return Math.max(1, Math.ceil(list.length / 9) || 1); }
 function isHolo(card){ return /holo|illustration|hyper|secret|shiny|radiant|amazing/i.test((card && card.rarity) || ""); }
-function lowUrls(card){
-  const urls = [];
-  if (card.thumb) urls.push(card.thumb);
-  if (card.image) urls.push(String(card.image) + "/low.webp");
-  if (card.img) urls.push(card.img);
-  if (card.image) urls.push(String(card.image) + "/high.webp");
-  return [...new Set(urls.filter(Boolean))];
-}
 function playPaper(){
   if (!settings.sound || reduceMotion()) return;
   playTone(150);
@@ -2137,14 +2167,8 @@ function sleeveSlot(card, index, ctx){
   const sleeve = document.createElement("div");
   sleeve.className = "sleeve" + (isHolo(card) ? " holo" : "");
   sleeve.dataset.index = String(index);
-  sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card))}"><img alt="" draggable="false" decoding="async" loading="lazy"></button><span class="shine" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span>`;
-  const img = sleeve.querySelector("img");
-  img.alt = altText(card);
-  const urls = lowUrls(card);
-  let n = 0;
-  img.addEventListener("dragstart", e => e.preventDefault());
-  img.onerror = () => { n++; if (urls[n]) img.src = urls[n]; };
-  if (urls[0]) img.src = urls[0];
+  sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card))}"></button><span class="shine" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span>`;
+  paintArt(sleeve.querySelector(".cardhit"), card);
   const more = document.createElement("button");
   more.type = "button";
   more.className = "iconish more";
@@ -2751,29 +2775,49 @@ function trendHistory(card){
   return points.filter(p => p.t && p.value && !seen.has(p.t) && seen.add(p.t)).sort((a, b) => a.t - b.t);
 }
 const FX_KEY = "bh.fx.v1";
-let fxRate = null;
+const FX_FALLBACK = 1.1253;
+let fxRate = FX_FALLBACK;
 let fxPending = null;
-function fxToday(){ return new Date().toISOString().slice(0, 10); }
 function readFx(){
   try {
     const raw = JSON.parse(localStorage.getItem(FX_KEY) || "null");
-    if (raw && raw.date === fxToday() && raw.eurUsd > 0.2 && raw.eurUsd < 5) return raw.eurUsd;
+    if (raw && raw.date === localDay() && raw.eurUsd > 0.2 && raw.eurUsd < 5) return raw.eurUsd;
   } catch (e) {}
   return null;
 }
+function useFx(rate){
+  if (!(rate > 0.2 && rate < 5)) return fxRate;
+  const changed = rate !== fxRate;
+  fxRate = rate;
+  if (changed && profileCard && !profileEl.hidden) renderProfile(cardCache.get(profileCard.id) || profileCard);
+  return fxRate;
+}
 function ensureFx(){
-  if (fxRate) return Promise.resolve(fxRate);
-  const cached = readFx();
-  if (cached) { fxRate = cached; return Promise.resolve(fxRate); }
   if (fxPending) return fxPending;
-  fxPending = getJson("https://api.frankfurter.app/latest?from=EUR&to=USD").then(j => {
-    const rate = j && j.rates ? pos(j.rates.USD) : null;
-    if (rate) {
-      fxRate = rate;
-      try { localStorage.setItem(FX_KEY, JSON.stringify({ date:fxToday(), eurUsd:rate })); } catch (e) {}
-    }
-    return fxRate;
-  }).catch(() => null).finally(() => { fxPending = null; });
+  fxPending = (async () => {
+    try {
+      const res = await fetch("data/fx.json", { cache:"no-cache", signal:AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const file = await res.json();
+        const filed = file && pos(file.eurUsd);
+        if (filed) return useFx(filed);
+      }
+    } catch (e) {}
+    const cached = readFx();
+    if (cached) return useFx(cached);
+    try {
+      const res = await fetch("https://api.frankfurter.dev/v1/latest?from=EUR&to=USD", { signal:AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const live = await res.json();
+        const rate = live && live.rates ? pos(live.rates.USD) : null;
+        if (rate) {
+          try { localStorage.setItem(FX_KEY, JSON.stringify({ date:localDay(), eurUsd:rate })); } catch (e) {}
+          return useFx(rate);
+        }
+      }
+    } catch (e) {}
+    return useFx(FX_FALLBACK);
+  })().catch(() => useFx(FX_FALLBACK)).finally(() => { fxPending = null; });
   return fxPending;
 }
 function priceSeries(card){
@@ -2782,8 +2826,8 @@ function priceSeries(card){
   const trend = trendHistory(card);
   if (trend.length >= 2) {
     if (settings.currency === "EUR") return { points:trend, source:"trend", currency:"EUR", note:"Cardmarket 30-day, 7-day, and 1-day averages, in euros. Not a daily sales history." };
-    if (!fxRate) return { points:[], source:"trend", currency:"USD", pendingFx:true, note:"" };
-    const points = trend.map(p => ({ t:p.t, label:p.label, value:Math.round(p.value * fxRate * 100) / 100 }));
+    const rate = fxRate || FX_FALLBACK;
+    const points = trend.map(p => ({ t:p.t, label:p.label, value:Math.round(p.value * rate * 100) / 100 }));
     return { points, source:"trend", currency:"USD", note:"approx. USD from Cardmarket. 30-day, 7-day, and 1-day averages, not a daily sales history." };
   }
   return { points:[], source:"", currency:"USD", note:"" };
@@ -3179,12 +3223,14 @@ function renderOnboard(){
     title.textContent = "Who are you hunting for?";
     sub.textContent = "Pick a few. You can change this anytime.";
     next.textContent = "Next";
-    body.innerHTML = `<div class="searchrow"><input id="obFind" type="search" placeholder="e.g. Pikachu" aria-label="Search a Pokémon"></div><div class="suggest" id="obSuggest"></div><div class="huntpicks">${HUNT_PICKS.map(p => `<button type="button" class="huntpick ${onboardPicks.has(p.id) ? "on" : ""}" data-ob="${p.id}">${esc(p.label)}</button>`).join("")}${onboardCustom.map(n => `<button type="button" class="huntpick on" data-obx="${esc(n)}">${esc(n)}</button>`).join("")}</div>`;
+    body.innerHTML = `<div class="searchrow"><input id="obFind" type="search" placeholder="e.g. Pikachu" aria-label="Search a Pokémon"></div><div class="suggest" id="obSuggest"></div><div class="huntpicks">${HUNT_PICKS.map(p => `<button type="button" class="huntpick ${onboardPicks.has(p.id) ? "on" : ""}" aria-pressed="${onboardPicks.has(p.id) ? "true" : "false"}" data-ob="${p.id}">${esc(p.label)}</button>`).join("")}${onboardCustom.map(n => `<button type="button" class="huntpick on" aria-pressed="true" data-obx="${esc(n)}">${esc(n)}</button>`).join("")}</div>`;
     body.querySelectorAll("[data-ob]").forEach(btn => btn.onclick = () => {
       popBtn(btn);
       const id = btn.dataset.ob;
       if (onboardPicks.has(id)) onboardPicks.delete(id); else onboardPicks.add(id);
-      btn.classList.toggle("on", onboardPicks.has(id));
+      const on = onboardPicks.has(id);
+      btn.classList.toggle("on", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
     });
     body.querySelectorAll("[data-obx]").forEach(btn => btn.onclick = () => {
       popBtn(btn);
@@ -3216,16 +3262,24 @@ function renderOnboard(){
     next.textContent = "Start hunting";
     const eras = [{ id:"", label:"All of it" }].concat(ERA_GROUPS);
     const budgets = [{ id:"", label:"Any" }, { id:"under10", label:"Under $10" }, { id:"mid", label:"$10–50" }, { id:"high", label:"$50+" }];
-    body.innerHTML = `<div class="huntpicks">${eras.map(g => `<button type="button" class="huntpick ${onboardEra === g.id ? "on" : ""}" data-era="${esc(g.id)}">${esc(g.label)}</button>`).join("")}</div><p class="fine">Budget</p><div class="huntpicks">${budgets.map(g => `<button type="button" class="huntpick ${onboardBudget === g.id ? "on" : ""}" data-budget="${esc(g.id)}">${esc(g.label)}</button>`).join("")}</div>`;
+    body.innerHTML = `<div class="huntpicks">${eras.map(g => `<button type="button" class="huntpick ${onboardEra === g.id ? "on" : ""}" aria-pressed="${onboardEra === g.id ? "true" : "false"}" data-era="${esc(g.id)}">${esc(g.label)}</button>`).join("")}</div><p class="fine">Budget</p><div class="huntpicks">${budgets.map(g => `<button type="button" class="huntpick ${onboardBudget === g.id ? "on" : ""}" aria-pressed="${onboardBudget === g.id ? "true" : "false"}" data-budget="${esc(g.id)}">${esc(g.label)}</button>`).join("")}</div>`;
     body.querySelectorAll("[data-era]").forEach(btn => btn.onclick = () => {
       popBtn(btn);
       onboardEra = btn.dataset.era || "";
-      body.querySelectorAll("[data-era]").forEach(other => other.classList.toggle("on", other === btn));
+      body.querySelectorAll("[data-era]").forEach(other => {
+        const on = other === btn;
+        other.classList.toggle("on", on);
+        other.setAttribute("aria-pressed", on ? "true" : "false");
+      });
     });
     body.querySelectorAll("[data-budget]").forEach(btn => btn.onclick = () => {
       popBtn(btn);
       onboardBudget = btn.dataset.budget || "";
-      body.querySelectorAll("[data-budget]").forEach(other => other.classList.toggle("on", other === btn));
+      body.querySelectorAll("[data-budget]").forEach(other => {
+        const on = other === btn;
+        other.classList.toggle("on", on);
+        other.setAttribute("aria-pressed", on ? "true" : "false");
+      });
     });
   }
 }
@@ -3247,8 +3301,12 @@ function openOnboard(mode){
   document.getElementById("onboard").hidden = false;
   renderOnboard();
 }
-function skipOnboard(){
+function closeOnboard(){
   document.getElementById("onboard").hidden = true;
+  syncActs();
+}
+function skipOnboard(){
+  closeOnboard();
   if (onboardMode === "retake") return;
   saveOnboard({ done:true, skipped:true, picks:[], custom:[], era:"", budget:"", at:Date.now() });
   countEvent("onboard-skip");
@@ -3261,7 +3319,7 @@ function finishOnboard(){
   filters.era = onboardEra || "";
   filters.pricePreset = onboardBudget || "";
   saveOnboard({ done:true, skipped:!names.length && !filters.era && !filters.pricePreset, picks:[...onboardPicks], custom:onboardCustom.slice(), era:filters.era, budget:filters.pricePreset, at:Date.now() });
-  document.getElementById("onboard").hidden = true;
+  closeOnboard();
   if (onboardMode !== "retake") countEvent("onboard-done");
   restart({ keepSpice: names.length > 0 });
   const bits = [];
@@ -3279,9 +3337,10 @@ paintDiscovery();
 loadScrydex();
 loadMeta().then(() => { if (tab === "sets") renderSets(); }).catch(() => {});
 restart();
-if (!(loadOnboard() || {}).done) openOnboard("first");
-countPage();
 const deepId = new URLSearchParams(location.search).get("card");
+const returning = wish.length > 0 || binderState.binders.length > 0;
+if (!deepId && !returning && !(loadOnboard() || {}).done) openOnboard("first");
+countPage();
 if (deepId) hydrate({ id:deepId }).then(card => { if (card && !card.digital) openProfile(card); }).catch(() => announce("That card link didn't load."));
 </script>
 </body>
