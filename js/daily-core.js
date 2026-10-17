@@ -12,8 +12,8 @@
   /* Closeness is relative to the raw price.
      Hit: within 5%, or within $0.50 (so a cheap card is still fair).
      Warm: within 20%. Cool: within 45%. Anything farther is cold.
-     A hit ends the round. Share squares use three glyphs: hit green,
-     warm/cool yellow, cold or unused white. */
+     A hit ends the round. Share squares: hit green, warm/cool yellow,
+     cold white, unused black. */
   const HIT_REL = 0.05;
   const HIT_ABS = 0.5;
   const WARM_REL = 0.2;
@@ -89,9 +89,157 @@
     return "Next drop in " + sec + "s";
   }
 
-  function usablePrice(value) {
+  function roundMoney(value) {
     const n = typeof value === "number" ? value : Number(value);
-    return Number.isFinite(n) && n >= 1 ? Math.round(n * 100) / 100 : 0;
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    return Math.round(n * 100) / 100;
+  }
+
+  function usablePrice(value) {
+    const n = roundMoney(value);
+    return n >= 1 ? n : 0;
+  }
+
+  function usableFx(rate) {
+    const n = Number(rate);
+    return n > 0.2 && n < 5 ? n : 0;
+  }
+
+  /* The profile's default USD price is the cheapest TCGplayer market.
+     Mid/low-only printings and Cardmarket averages do not count. */
+  function profileUsd(variants) {
+    const priced = (Array.isArray(variants) ? variants : []).filter(variant => variant && roundMoney(variant.market));
+    if (!priced.length) return null;
+    priced.sort((a, b) => roundMoney(a.market) - roundMoney(b.market) || String(a.key || "").localeCompare(String(b.key || "")));
+    const variant = priced[0];
+    return {
+      price: roundMoney(variant.market),
+      variant: variant.key || "",
+      printing: variant.label || "",
+      alts: priced.length
+    };
+  }
+
+  /* The profile's Cardmarket line is the first printing average, else cm.avg.
+     Trend and the 30/7/1-day averages are not the price. */
+  function cardmarketQuote(card) {
+    const printings = card && Array.isArray(card.printings) ? card.printings : [];
+    const printing = printings.find(row => row && roundMoney(row.avg));
+    const avg = printing ? printing.avg : card && card.cm && card.cm.avg;
+    const eur = roundMoney(avg);
+    if (!eur) return null;
+    return { eur, label: "Cardmarket average" };
+  }
+
+  function convertEur(eur, fx) {
+    const amount = roundMoney(eur);
+    const rate = usableFx(fx);
+    if (!amount || !rate) return 0;
+    return Math.round(amount * rate * 100) / 100;
+  }
+
+  function fallbackQuote(entry) {
+    if (!entry || entry.source === "cardmarket" || entry.variant === "cardmarket") return null;
+    const price = usablePrice(entry.price);
+    if (!price) return null;
+    return {
+      price,
+      variant: entry.variant || "",
+      printing: entry.printing || "",
+      alts: Number(entry.alts) || 1,
+      eur: roundMoney(entry.eur),
+      live: false
+    };
+  }
+
+  function lockQuote(day, quote) {
+    if (!day || day.locked) return day || null;
+    const price = quote && usablePrice(quote.price);
+    if (!price) return day;
+    day.price = price;
+    day.variant = quote.variant || day.variant || "";
+    day.printing = quote.printing || day.printing || "";
+    if (roundMoney(quote.eur)) day.eur = roundMoney(quote.eur);
+    if (Number(quote.alts) > 0) day.alts = Number(quote.alts);
+    day.live = !!quote.live;
+    day.locked = true;
+    return day;
+  }
+
+  function showPrinting(quote) {
+    if (!quote || !(quote.printing || quote.variant)) return false;
+    const key = String(quote.variant || "").toLowerCase().replace(/[^a-z]/g, "");
+    if (!key || key === "normal") return Number(quote.alts) > 1;
+    return true;
+  }
+
+  const SPECIES_SKIP = {
+    dark: 1, light: 1, shining: 1, shiny: 1, team: 1, rocket: 1, rockets: 1,
+    radiant: 1, amazing: 1, galarian: 1, alolan: 1, hisuian: 1, paldean: 1,
+    the: 1, an: 1, ex: 1, gx: 1, v: 1, vmax: 1, vstar: 1
+  };
+
+  function speciesName(name) {
+    const words = String(name || "").match(/[A-Za-z][A-Za-z'-]*/g) || [];
+    const kept = words.filter(word => {
+      const token = word.toLowerCase().replace(/'s$/, "");
+      return !SPECIES_SKIP[token] && token.length > 1;
+    });
+    return kept.length ? kept[kept.length - 1] : "";
+  }
+
+  function wishFields(card) {
+    const image = card && card.image || "";
+    return {
+      id: card && card.id || "",
+      name: card && card.name || "",
+      set: card && card.set || "",
+      setId: card && card.setId || "",
+      number: card && (card.number || card.num) || "",
+      rarity: card && card.rarity || "",
+      img: card && card.img || (image ? image + "/high.webp" : ""),
+      thumb: card && card.thumb || (image ? image + "/low.webp" : ""),
+      types: card && Array.isArray(card.types) ? card.types.slice() : [],
+      variants: card && Array.isArray(card.variants) ? card.variants : []
+    };
+  }
+
+  function sanitizeGuess(raw) {
+    let text = String(raw ?? "").replace(/[^0-9.,$]/g, "");
+    const dollar = text.charAt(0) === "$" || text.includes("$");
+    text = text.replace(/\$/g, "");
+    const dot = text.indexOf(".");
+    if (dot >= 0) text = text.slice(0, dot + 1) + text.slice(dot + 1).replace(/\./g, "");
+    return (dollar ? "$" : "") + text;
+  }
+
+  function parseGuess(raw) {
+    const original = String(raw ?? "").trim();
+    if (!original) return { ok: false, reason: "low", value: 0, message: "Enter a price above zero." };
+    if (/[^0-9.,$\s]/.test(original)) {
+      return { ok: false, reason: "invalid", value: 0, message: "That isn't a price. Use digits, like 12.50." };
+    }
+    let text = original.replace(/[$\s]/g, "");
+    if (!text || !/\d/.test(text)) {
+      return { ok: false, reason: "invalid", value: 0, message: "That isn't a price. Use digits, like 12.50." };
+    }
+    const commas = text.match(/,/g);
+    const european = commas && commas.length === 1 && /,\d{2}$/.test(text) && !/,\d{3}$/.test(text) && text.indexOf(".") < 0;
+    if (european) {
+      text = text.replace(",", ".");
+    } else if (commas) {
+      if (!/^\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?$/.test(text)) {
+        return { ok: false, reason: "comma", value: 0, message: "Use 12,50 for cents, or 1,250 for thousands." };
+      }
+      text = text.replace(/,/g, "");
+    }
+    if (!/^\d+(?:\.\d{1,2})?$/.test(text)) {
+      return { ok: false, reason: "invalid", value: 0, message: "That isn't a price. Use digits, like 12.50." };
+    }
+    const n = Math.round(Number(text) * 100) / 100;
+    if (!Number.isFinite(n) || n <= 0) return { ok: false, reason: "low", value: 0, message: "Enter a price above zero." };
+    if (n > 1000000) return { ok: false, reason: "high", value: 0, message: "That guess is too high." };
+    return { ok: true, reason: "", value: n, message: "" };
   }
 
   function mix(seed) {
@@ -152,8 +300,9 @@
 
   function feedbackLine(result) {
     if (!result) return "";
-    const dir = result.direction === "higher" ? "Higher" : result.direction === "lower" ? "Lower" : "Dead on";
-    const band = { hit: "On it", warm: "Warm", cool: "Cool", cold: "Cold" }[result.band] || "";
+    if (result.band === "hit") return result.direction === "spot" ? "Dead on!" : "Nailed it";
+    const dir = result.direction === "higher" ? "Higher" : result.direction === "lower" ? "Lower" : "";
+    const band = { warm: "Warm", cool: "Cool", cold: "Cold" }[result.band] || "";
     const trend = result.trend === "warmer" ? "Warmer" : result.trend === "colder" ? "Colder" : "";
     return [dir, trend, band].filter(Boolean).join(" · ");
   }
@@ -177,6 +326,7 @@
   }
 
   function shareGlyph(band) {
+    if (!band) return "▪️";
     if (band === "hit") return "🟩";
     if (band === "warm" || band === "cool") return "🟨";
     return "⬜";
@@ -196,7 +346,9 @@
     SHARE_URL, TZ, MAX_GUESSES,
     HIT_REL, HIT_ABS, WARM_REL, COOL_REL,
     addDays, daysBetween, nyDateISO, msUntilNextNyDay, formatRemain,
-    usablePrice, mix, dropNumber, pickDrop,
-    judgeGuess, feedbackLine, applyStreak, visibleStreak, shareText
+    roundMoney, usablePrice, usableFx, profileUsd, cardmarketQuote, convertEur,
+    fallbackQuote, lockQuote, showPrinting, speciesName, wishFields,
+    sanitizeGuess, parseGuess, mix, dropNumber, pickDrop,
+    judgeGuess, feedbackLine, applyStreak, visibleStreak, shareText, shareGlyph
   };
 });

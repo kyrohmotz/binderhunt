@@ -8,7 +8,9 @@ import daily from "../js/daily-core.js";
 
 const {
   addDays, daysBetween, nyDateISO, msUntilNextNyDay, formatRemain,
-  pickDrop, judgeGuess, feedbackLine, applyStreak, shareText, dropNumber
+  pickDrop, judgeGuess, feedbackLine, applyStreak, shareText, dropNumber,
+  profileUsd, cardmarketQuote, convertEur, fallbackQuote, lockQuote,
+  parseGuess, sanitizeGuess, speciesName, wishFields, showPrinting
 } = daily;
 
 function check(name, fn) {
@@ -99,11 +101,12 @@ check("guess bands are higher/lower plus closeness", () => {
   assert.equal(exact.band, "hit");
   assert.equal(exact.direction, "spot");
   assert.equal(exact.trend, "");
-  assert.equal(feedbackLine(exact), "Dead on · On it");
+  assert.equal(feedbackLine(exact), "Dead on!");
 
   const edge = judgeGuess(21, 20);
   assert.equal(edge.band, "hit");
   assert.equal(edge.direction, "lower");
+  assert.equal(feedbackLine(edge), "Nailed it");
 
   const justOut = judgeGuess(21.02, 20);
   assert.equal(justOut.band, "warm");
@@ -159,12 +162,105 @@ check("streaks count finished days and ignore replays", () => {
 check("share text is one puzzle line plus the site", () => {
   assert.equal(
     shareText({ n: 12, bands: ["hit", "warm"], solved: true, guessesUsed: 2 }),
-    "🐸 BinderHunt Daily #12 🟩🟨⬜ 2/3\nhttps://kyrohmotz.github.io/binderhunt/"
+    "🐸 BinderHunt Daily #12 🟩🟨▪️ 2/3\nhttps://kyrohmotz.github.io/binderhunt/"
   );
   assert.equal(
     shareText({ n: 3, bands: ["cold", "cool", "warm"], solved: false, guessesUsed: 3 }),
     "🐸 BinderHunt Daily #3 ⬜🟨🟨 X/3\nhttps://kyrohmotz.github.io/binderhunt/"
   );
+});
+
+check("the daily answer is the profile's cheapest printing", () => {
+  const quote = profileUsd([
+    { key: "holofoil", label: "Holofoil", market: 19.22 },
+    { key: "normal", label: "Normal", market: 3.97 },
+    { key: "reverseHolofoil", label: "Reverse Holofoil", market: 4.5, mid: 1 }
+  ]);
+  assert.equal(quote.price, 3.97);
+  assert.equal(quote.variant, "normal");
+  assert.equal(quote.alts, 3);
+  assert.equal(showPrinting(quote), true);
+  assert.equal(profileUsd([{ key: "holofoil", market: 150, low: 1 }]).price, 150);
+  assert.equal(profileUsd([{ key: "holofoil", mid: 80, low: 40 }]), null);
+  assert.equal(showPrinting(profileUsd([{ key: "normal", label: "Normal", market: 12 }])), false);
+  assert.equal(showPrinting({ variant: "reverse-holofoil", printing: "Reverse Holofoil", alts: 1 }), true);
+
+  const fromPrinting = cardmarketQuote({
+    printings: [{ label: "Holofoil", avg: 68.65, trend: 150 }],
+    cm: { avg: 10, trend: 400, avg7: 90, avg30: 80, avg1: 70 }
+  });
+  assert.equal(fromPrinting.eur, 68.65);
+  assert.equal(fromPrinting.label, "Cardmarket average");
+  const fromAvg = cardmarketQuote({
+    printings: [{ label: "Holofoil", trend: 150, avg7: 90 }],
+    cm: { avg: 68.65, trend: 400, avg7: 90 }
+  });
+  assert.equal(fromAvg.eur, 68.65);
+  assert.equal(cardmarketQuote({ cm: { trend: 400, avg7: 90 } }), null);
+
+  assert.equal(convertEur(68.65, 1.1253), 77.25);
+  assert.equal(convertEur(10, 1.5), 15);
+  assert.notEqual(convertEur(10, 1.5), convertEur(10, 1.1253));
+  assert.equal(convertEur(10, 0), 0);
+
+  const stored = fallbackQuote({ source: "tcgplayer", variant: "normal", printing: "Normal", price: 3.97, eur: 2.5, alts: 2 });
+  assert.equal(stored.price, 3.97);
+  assert.equal(stored.live, false);
+  assert.equal(fallbackQuote({ source: "cardmarket", variant: "cardmarket", price: 19.22 }), null);
+  assert.equal(fallbackQuote({ variant: "cardmarket", price: 150 }), null);
+  assert.equal(fallbackQuote({ source: "tcgplayer", price: 0 }), null);
+
+  const open = { locked: false, price: 0, printing: "" };
+  lockQuote(open, { price: 3.97, variant: "normal", printing: "Normal", eur: 2.5, alts: 2, live: true });
+  assert.equal(open.locked, true);
+  assert.equal(open.price, 3.97);
+  assert.equal(open.live, true);
+  lockQuote(open, { price: 19.22, variant: "holofoil", printing: "Holofoil", live: true });
+  assert.equal(open.price, 3.97);
+  assert.equal(open.variant, "normal");
+});
+
+check("rejected guesses say what was wrong", () => {
+  assert.equal(sanitizeGuess("abc$12.5.0x"), "$12.50");
+  assert.equal(parseGuess("12.50").value, 12.5);
+  assert.equal(parseGuess("$1,250.50").value, 1250.5);
+  assert.equal(parseGuess("12,50").value, 12.5);
+  assert.equal(parseGuess("1,250").value, 1250);
+  assert.equal(parseGuess("12,5").reason, "comma");
+  assert.match(parseGuess("12,5").message, /12,50/);
+  assert.equal(parseGuess("nope").reason, "invalid");
+  assert.match(parseGuess("nope").message, /isn't a price/);
+  assert.equal(parseGuess("0").reason, "low");
+  assert.match(parseGuess("0").message, /above zero/);
+  assert.equal(parseGuess("").reason, "low");
+  assert.equal(parseGuess("1000001").reason, "high");
+  assert.match(parseGuess("1000001").message, /too high/);
+  assert.equal(parseGuess("-4").reason, "invalid");
+});
+
+check("a daily save keeps the fields a binder matches on", () => {
+  const saved = wishFields({
+    id: "base1-1",
+    name: "Alakazam",
+    set: "Base",
+    setId: "base1",
+    num: "1",
+    rarity: "Rare Holo",
+    image: "https://assets.tcgdex.net/en/base/base1/1",
+    types: ["Psychic"],
+    variants: [{ key: "holofoil", market: 40 }]
+  });
+  assert.equal(saved.id, "base1-1");
+  assert.equal(saved.setId, "base1");
+  assert.equal(saved.number, "1");
+  assert.equal(saved.rarity, "Rare Holo");
+  assert.deepEqual(saved.types, ["Psychic"]);
+  assert.equal(saved.variants[0].key, "holofoil");
+  assert.match(saved.img, /\/high\.webp$/);
+  assert.equal(speciesName("Dark Persian"), "Persian");
+  assert.equal(speciesName("Team Rocket's Meowth"), "Meowth");
+  assert.equal(speciesName("Charizard ex"), "Charizard");
+  assert.equal(speciesName("Ho-Oh"), "Ho-Oh");
 });
 
 check("committed schedule is a priced, mixed year", () => {
@@ -174,22 +270,37 @@ check("committed schedule is a priced, mixed year", () => {
   assert.equal(data.tz, "America/New_York");
   assert.match(data.epoch, /^\d{4}-\d{2}-\d{2}$/);
   assert.ok(data.days.length >= 365, "schedule covers at least 365 days");
+  const banned = new Set(["swsh12-131", "bw11-RC21", "bw11-RC22", "bw11-RC23", "sv07-174"]);
   const byId = new Map(data.pool.map(card => [card.id, card]));
   const eras = new Set();
+  const recent = [];
   let gems = 0;
+  let ecards = 0;
   let under50 = 0;
   data.days.forEach((id, index) => {
     const card = byId.get(id);
     assert.ok(card, "day " + (index + 1) + " is in the pool");
+    assert.equal(banned.has(card.id), false, card.id + " has no profile USD price");
+    assert.equal(card.source, "tcgplayer");
+    assert.notEqual(card.variant, "cardmarket");
     assert.ok(card.price >= 1, card.id + " has a usable price");
+    assert.equal(fallbackQuote(card).price, card.price);
     assert.match(card.image || "", /^https:\/\/assets\.tcgdex\.net\//);
     assert.ok(card.name && card.setId && card.era);
+    assert.ok(Array.isArray(card.types));
     eras.add(card.era);
     if (card.setId === "ecard2" || card.setId === "ecard3") gems += 1;
+    if (String(card.setId || "").startsWith("ecard")) ecards += 1;
     if (card.price < 50) under50 += 1;
+    const species = speciesName(card.name).toLowerCase();
+    if (species) {
+      assert.equal(recent.slice(-30).includes(species), false, species + " repeated inside 30 days at " + card.id);
+      recent.push(species);
+    }
   });
   assert.ok(eras.size >= 6, "eras: " + [...eras].join(", "));
   assert.ok(gems >= 8, "expected Skyridge or Aquapolis cards, saw " + gems);
+  assert.ok(ecards / data.days.length <= 0.08, "e-card days " + ecards + "/" + data.days.length);
   assert.ok(under50 / data.days.length >= 0.35, "most days should not be chase prices");
   const opening = pickDrop(data, data.epoch);
   assert.equal(opening.card.id, data.days[0]);

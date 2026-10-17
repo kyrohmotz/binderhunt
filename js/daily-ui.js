@@ -10,6 +10,7 @@
   let justFinished = false;
   let shownISO = "";
   let revealTimer = 0;
+  const preview = new Map();
 
   function host() { return window.BHDailyHost || {}; }
 
@@ -27,6 +28,8 @@
         best: Number.isFinite(raw.best) ? raw.best : 0,
         lastPlayed: typeof raw.lastPlayed === "string" ? raw.lastPlayed : "",
         prompted: typeof raw.prompted === "string" ? raw.prompted : "",
+        fresh: typeof raw.fresh === "string" ? raw.fresh : "",
+        swipes: Number.isFinite(raw.swipes) ? raw.swipes : 0,
         days: raw.days && typeof raw.days === "object" ? raw.days : {}
       };
     } catch (e) {
@@ -54,12 +57,6 @@
     return dataPromise;
   }
 
-  function parseGuess(raw) {
-    const n = Number(String(raw || "").replace(/[$,\s]/g, ""));
-    if (!Number.isFinite(n) || n <= 0 || n > 1000000) return null;
-    return Math.round(n * 100) / 100;
-  }
-
   function startDay(drop) {
     const card = drop.card;
     return {
@@ -71,18 +68,23 @@
       rarity: card.rarity || "",
       image: card.image || "",
       printing: card.printing || "",
-      price: D.usablePrice(card.price),
+      variant: card.variant || "",
+      alts: card.alts || 1,
+      price: 0,
+      eur: D.roundMoney(card.eur),
       n: drop.n,
       guesses: [],
       done: false,
       solved: false,
-      counted: false
+      counted: false,
+      locked: false
     };
   }
 
   function dayState(drop, iso) {
     const state = loadState();
     const saved = state.days[iso];
+    if (saved && Array.isArray(saved.guesses) && saved.guesses.length && D.usablePrice(saved.price) && !saved.locked) saved.locked = true;
     if (saved && saved.id === drop.card.id && Array.isArray(saved.guesses)) return { state, day: saved };
     if (saved && saved.done && saved.id) return { state, day: saved };
     const day = startDay(drop);
@@ -175,9 +177,15 @@
       };
     }
     if (Array.isArray(card.trend) && card.trend.length >= 2) {
+      const rate = typeof fxRate === "number" ? fxRate : 0;
+      const points = card.trend.map(point => {
+        const eur = point.eur || point.value;
+        const value = point.eur ? D.convertEur(eur, rate) : D.roundMoney(point.value);
+        return { label: point.label, value };
+      }).filter(point => point.value > 0);
       return {
-        points: card.trend.map(point => ({ label: point.label, value: point.value })).filter(point => point.value > 0),
-        note: "Cardmarket averages, converted to USD. Not a daily sales history."
+        points,
+        note: "Cardmarket average, converted with today's euro rate. Not a daily sales history."
       };
     }
     return { points: [], note: "" };
@@ -201,8 +209,36 @@
       variants: variant,
       price: entry.price,
       cm: entry.eur ? { avg: entry.eur } : null,
-      types: []
+      types: Array.isArray(entry.types) ? entry.types.slice() : []
     };
+  }
+
+  function quoteFromCard(full, entry) {
+    const usd = full && D.profileUsd(full.variants);
+    if (!usd) return D.fallbackQuote(entry);
+    const cm = D.cardmarketQuote(full);
+    const printing = typeof variantLabel === "function" && usd.variant ? variantLabel(usd.variant) : (usd.printing || entry.printing || "");
+    return {
+      price: usd.price,
+      variant: usd.variant,
+      printing,
+      alts: usd.alts,
+      eur: cm ? cm.eur : D.roundMoney(entry && entry.eur),
+      live: true,
+      full
+    };
+  }
+
+  function fetchQuote(entry) {
+    const cached = preview.get(entry.id);
+    if (cached) return Promise.resolve(cached);
+    const run = typeof hydrate === "function"
+      ? hydrate({ id: entry.id, image: entry.image }).then(full => quoteFromCard(full, entry)).catch(() => D.fallbackQuote(entry))
+      : Promise.resolve(D.fallbackQuote(entry));
+    return run.then(quote => {
+      if (quote && quote.price) preview.set(entry.id, quote);
+      return quote;
+    });
   }
 
   function sharePayload(day, results) {
@@ -212,6 +248,16 @@
       solved: !!day.solved,
       guessesUsed: results.length
     };
+  }
+
+  function cardmarketLine(day, known) {
+    const eur = D.roundMoney((day && day.locked && day.eur) || (known && known.eur) || (day && day.eur));
+    if (!eur) return "";
+    const rate = typeof fxRate === "number" ? fxRate : 0;
+    const usd = D.convertEur(eur, rate);
+    const euro = typeof priceText === "function" ? priceText(eur, "EUR") : "";
+    const dollars = usd ? priceText(usd, "USD") : "";
+    return `<p class="fine">Cardmarket average ${esc(dollars ? euro + " · about " + dollars : euro)}</p>`;
   }
 
   function paint(root, data, iso) {
@@ -235,8 +281,22 @@
     const onWish = (host().wish || []).some(item => item && item.id === card.id);
     const owned = host().ownedIds ? host().ownedIds.has(card.id) : false;
     const mobileShare = typeof navigator.share === "function" && (matchMedia("(pointer: coarse)").matches || matchMedia("(max-width: 767px)").matches);
-    const series = seriesOf(card);
-    const grades = Array.isArray(card.grades) ? card.grades : [];
+    const quoted = preview.get(card.id) || null;
+    const known = day.locked ? day : quoted;
+    const full = quoted && quoted.full;
+    let series = seriesOf(card);
+    if (full && typeof priceSeries === "function") {
+      const live = priceSeries(full);
+      if (live && Array.isArray(live.points) && live.points.length >= 2) series = live;
+    }
+    let grades = Array.isArray(card.grades) ? card.grades : [];
+    if (full && typeof gradeFacts === "function") {
+      const facts = gradeFacts(full);
+      const prices = facts && Array.isArray(facts.prices) ? facts.prices : [];
+      const picked = [["PSA", "10"], ["PSA", "9"], ["CGC", "10"], ["BGS", "9.5"]].map(([company, grade]) => prices.find(row => row && row.company === company && String(row.grade) === grade && D.roundMoney(row.market))).filter(Boolean);
+      if (picked.length) grades = picked;
+    }
+    const printing = known && D.showPrinting(known) ? (known.printing || known.variant || "") : "";
     const meta = [card.set, card.num ? "#" + card.num : "", card.rarity].filter(Boolean).join(" · ");
     const guessRows = results.map(result => `<li class="band-${esc(result.band)}"><b>${esc(priceText(result.guess, "USD"))}</b><span>${esc(D.feedbackLine(result))}</span></li>`).join("");
     const gradeHtml = grades.length
@@ -251,18 +311,17 @@
       <p class="daily-count" id="dailyCount">${esc(D.formatRemain(D.msUntilNextNyDay(new Date())))}</p>
       <div class="frame daily-frame" id="dailyArt"></div>
       <p class="daily-meta"><b>${esc(card.name || "Card")}</b><br><span class="fine">${esc(meta)}</span></p>
+      ${printing ? `<p class="daily-print" id="dailyPrint">Pricing the <b>${esc(printing)}</b> printing</p>` : ""}
       <div class="ticket-scene">
         <div class="ticket${done && !animate ? " revealed" : ""}" id="priceTicket">
           <div class="ticket-face ticket-front" aria-hidden="true">${typeof toad === "function" ? toad() : ""}<span>Price sealed</span></div>
-          <div class="ticket-face ticket-back" aria-hidden="true"><span class="fine">Raw · ${esc(card.printing || "market")}</span><span class="market-price">${esc(priceText(day.price, "USD"))}</span></div>
+          <div class="ticket-face ticket-back" aria-hidden="true"><span class="fine">${esc(day.printing || printing || "Raw")}</span><span class="market-price" id="dailyAnswer">${esc(priceText(day.price, "USD"))}</span></div>
         </div>
       </div>
       ${guessRows ? `<ol class="guesses">${guessRows}</ol>` : ""}
-      ${done ? "" : `<form class="daily-form" id="dailyForm"><label>Raw price in USD<input id="dailyGuess" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0.00"></label><button class="go" type="submit">Guess</button></form><p class="daily-left fine">${esc(guessesLeft === 1 ? "1 guess left" : guessesLeft + " guesses left")}</p>`}
+      ${done ? "" : `<p class="daily-left" id="dailyLeft">${esc(guessesLeft === 1 ? "1 guess left" : guessesLeft + " guesses left")}</p><p class="daily-error" id="dailyError" role="alert" hidden></p><form class="daily-form" id="dailyForm"><label>Raw price in USD<input id="dailyGuess" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0.00"></label><button class="go" type="submit">Guess</button></form>`}
       <section class="daily-reveal" id="dailyReveal"${done && !animate ? "" : " hidden"}>
-        <p class="fine">Raw · ${esc(card.printing || "market")}</p>
-        <p class="market-price" id="dailyAnswer">${esc(priceText(day.price, "USD"))}</p>
-        ${card.eur ? `<p class="fine">Cardmarket ${esc(priceText(card.eur, "EUR"))}</p>` : ""}
+        ${cardmarketLine(day, known)}
         <p class="fine">${day.solved ? "You landed it." : "That's the raw price."} Same number for everyone.</p>
         ${gradeHtml}
         <div class="chart-wrap">${chart || `<p class="fine">Not enough price history</p>`}${series.note ? `<p class="fine">${esc(series.note)}</p>` : ""}</div>
@@ -293,10 +352,30 @@
     const native = document.getElementById("dailyNative");
     if (native) native.onclick = () => nativeShare(text);
     const input = document.getElementById("dailyGuess");
-    if (input && document.getElementById("viewDaily") && !document.getElementById("viewDaily").hidden) input.focus();
+    if (input) {
+      input.addEventListener("input", () => {
+        const raw = input.value;
+        if (/[^0-9.,$\s]/.test(raw)) showGuessError("That isn't a price. Use digits, like 12.50.");
+        const clean = D.sanitizeGuess(raw);
+        if (clean !== raw) {
+          const at = input.selectionStart;
+          input.value = clean;
+          if (at != null) input.setSelectionRange(Math.min(at, clean.length), Math.min(at, clean.length));
+        }
+      });
+      if (document.getElementById("viewDaily") && !document.getElementById("viewDaily").hidden) input.focus();
+    }
+    if (!day.locked && !preview.has(card.id)) {
+      fetchQuote(card).then(quote => {
+        if (!quote || shownISO !== iso || !D.showPrinting(quote)) return;
+        const node = document.getElementById("dailyScroll");
+        const saved = loadState().days[iso] || {};
+        if (node && !saved.locked && !document.getElementById("dailyPrint")) paint(node, data, iso);
+      });
+    }
     const showAnswer = () => {
       const answer = document.getElementById("dailyAnswer");
-      if (answer && answer.isConnected) answer.scrollIntoView({ block: "center", behavior: "auto" });
+      if (answer && answer.isConnected) answer.scrollIntoView({ block: "nearest", behavior: "auto" });
     };
     if (animate) {
       requestAnimationFrame(() => {
@@ -314,11 +393,22 @@
     paintDailyBadge();
   }
 
-  function submitGuess(event, data, iso) {
+  function showGuessError(message) {
+    const node = document.getElementById("dailyError");
+    if (!node) { announce(message); return; }
+    node.hidden = false;
+    node.textContent = message;
+    announce(message);
+  }
+
+  async function submitGuess(event, data, iso) {
     event.preventDefault();
     const input = document.getElementById("dailyGuess");
-    const guess = parseGuess(input && input.value);
-    if (guess == null) { announce("Enter a price above zero."); return; }
+    const parsed = D.parseGuess(input && input.value);
+    if (!parsed.ok) { showGuessError(parsed.message); return; }
+    const guess = parsed.value;
+    const error = document.getElementById("dailyError");
+    if (error) error.hidden = true;
     const live = D.nyDateISO(new Date());
     if (live !== iso) { renderDaily(); return; }
     const drop = D.pickDrop(data, iso);
@@ -327,6 +417,15 @@
     const state = packed.state;
     const day = packed.day;
     if (day.done || (day.guesses || []).length >= D.MAX_GUESSES) return;
+    if (!day.locked) {
+      const quote = await fetchQuote(drop.card);
+      if (!D.lockQuote(day, quote)) {
+        showGuessError("The price didn't load. Try again in a moment.");
+        return;
+      }
+      state.days[iso] = day;
+      saveState(state);
+    }
     const previous = day.guesses.length ? day.guesses[day.guesses.length - 1] : null;
     const result = D.judgeGuess(guess, day.price, previous);
     if (!result) return;
@@ -362,16 +461,29 @@
     if (root) paint(root, data, iso);
   }
 
-  function toggleWish(entry) {
-    const card = toCard(entry);
+  async function fullCard(entry) {
+    const quoted = preview.get(entry.id);
+    if (quoted && quoted.full && Array.isArray(quoted.full.types)) return quoted.full;
+    if (typeof hydrate === "function") {
+      try {
+        const full = await hydrate({ id: entry.id, image: entry.image });
+        if (full && full.id) return full;
+      } catch (e) {}
+    }
+    const shaped = D.wishFields(entry);
+    return Object.assign(toCard(entry), shaped);
+  }
+
+  async function toggleWish(entry) {
+    const card = await fullCard(entry);
     const saved = (host().wish || []).some(item => item && item.id === card.id);
     if (saved) removeFromWish(card.id);
     else addWish(card);
     renderDaily();
   }
 
-  function toggleOwned(entry) {
-    const card = toCard(entry);
+  async function toggleOwned(entry) {
+    const card = await fullCard(entry);
     const owned = host().ownedIds && host().ownedIds.has(card.id);
     setOwned(card, !owned, "daily");
     renderDaily();
@@ -379,7 +491,7 @@
 
   function huntLike(card) {
     const box = host();
-    const species = box.speciesFor ? box.speciesFor(card.name) : "";
+    const species = D.speciesName(card.name);
     box.filters = blankFilters();
     if (species) box.filters.names = [species];
     else if (card.setId) box.filters.set = card.setId;
@@ -473,6 +585,7 @@
     const day = state.days[iso];
     if (day && day.done) return;
     if (state.prompted === iso) return;
+    if (state.fresh === iso && (state.swipes || 0) < 10) return;
     state.prompted = iso;
     saveState(state);
     setShellQuiet(true);
@@ -491,18 +604,51 @@
   if (later) later.onclick = () => { dismissPrompt(); announce("Today's drop is on the Daily tab."); };
   const next = document.getElementById("onboardNext");
   const skip = document.getElementById("onboardSkip");
+  function noteArrival() {
+    const state = loadState();
+    const wish = host().wish || [];
+    const binders = (host().binderState && host().binderState.binders) || [];
+    if (!state.fresh && !wish.length && !binders.length) {
+      state.fresh = todayISO();
+      saveState(state);
+    }
+    maybePrompt();
+  }
   if (next && next.onclick) {
     const orig = next.onclick;
     next.onclick = () => {
       orig();
       const onboard = document.getElementById("onboard");
-      if (onboard && onboard.hidden) maybePrompt();
+      if (onboard && onboard.hidden) noteArrival();
     };
   }
   if (skip && skip.onclick) {
     const orig = skip.onclick;
-    skip.onclick = () => { orig(); maybePrompt(); };
+    skip.onclick = () => { orig(); noteArrival(); };
   }
+  if (typeof fly === "function") {
+    const origFly = fly;
+    fly = function (dir, from) {
+      const before = typeof pile !== "undefined" && pile ? pile.length : 0;
+      const out = origFly.apply(this, arguments);
+      if (typeof pile !== "undefined" && pile && pile.length < before) {
+        const state = loadState();
+        state.swipes = (state.swipes || 0) + 1;
+        saveState(state);
+        if (state.swipes >= 10) maybePrompt();
+      }
+      return out;
+    };
+  }
+  function fitDaily() {
+    const view = document.getElementById("viewDaily");
+    if (!view) return;
+    const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    view.classList.toggle("daily-short", height < 720);
+  }
+  fitDaily();
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", fitDaily);
+  window.addEventListener("resize", fitDaily);
   document.addEventListener("keydown", event => {
     const prompt = document.getElementById("dropPrompt");
     if (event.key === "Escape" && prompt && !prompt.hidden) {
