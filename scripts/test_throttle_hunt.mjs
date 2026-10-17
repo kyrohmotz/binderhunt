@@ -1,11 +1,20 @@
 // Simulates TCGdex refusing card-detail fetches and checks a Scyther hunt
 // still finishes with the same matches as an unthrottled run.
+// Requires Node.js 22 or newer: Chrome's debugging socket uses the global
+// WebSocket client added in that release (this harness does not depend on the `ws` package).
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
+if (typeof WebSocket !== "function") {
+  throw new Error("test_throttle_hunt.mjs requires Node.js 22+ (global WebSocket).");
+}
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 8772;
 const CDP = 9225;
-const server = spawn("python3", ["-m", "http.server", String(PORT), "--bind", "127.0.0.1"], { cwd: "/workspace", stdio: "ignore" });
+const server = spawn("python3", ["-m", "http.server", String(PORT), "--bind", "127.0.0.1"], { cwd: root, stdio: "ignore" });
 const chrome = spawn("google-chrome", [
   "--headless=new", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage",
   "--remote-debugging-port=" + CDP, "--user-data-dir=/tmp/chrome-throttle-hunt", "about:blank"
@@ -89,8 +98,8 @@ await ev(`new Promise((resolve, reject) => {
 await ev(`generation++; loading = false;`);
 
 const policy = await ev(`(() => {
-  const saved = { briefs: briefs.slice(), deferred: deferred.slice(), deferredPass, fails: [...fetchFails.entries()] };
-  briefs = []; deferred = []; deferredPass = false; fetchFails.clear();
+  const saved = { briefs: briefs.slice(), deferred: deferred.slice(), fails: [...fetchFails.entries()] };
+  briefs = []; deferred = []; fetchFails.clear();
   const card = { id: "ex7-102" };
   const again = () => { const where = parkThrottled(card); briefs = briefs.filter(b => b !== card); return where; };
   const first = [again(), again(), again()];
@@ -98,16 +107,32 @@ const policy = await ev(`(() => {
   const flushed = reclaimDeferred();
   const second = reclaimDeferred();
   const dropped = parkThrottled(card);
-  briefs = saved.briefs; deferred = saved.deferred; deferredPass = saved.deferredPass;
+  const early = { id: "early" };
+  const late = { id: "late" };
+  fetchFails.clear(); deferred = []; briefs = [];
+  const step = (c) => { const where = parkThrottled(c); briefs = briefs.filter(b => b.id !== c.id); return where; };
+  const earlyPath = [step(early), step(early), step(early), step(early)];
+  const earlyFlush = reclaimDeferred();
+  const latePath = [step(late), step(late), step(late), step(late)];
+  const lateFlush = reclaimDeferred();
+  const lateFinal = briefs.some(b => b.id === "late" && b.finalTry);
+  const lateDrop = parkThrottled(late);
+  briefs = saved.briefs; deferred = saved.deferred;
   fetchFails.clear(); saved.fails.forEach(([k, v]) => fetchFails.set(k, v));
-  return { first, parked, flushed, onQueue: card.finalTry === true, second, dropped };
+  return { first, parked, flushed, onQueue: card.finalTry === true, second, dropped, earlyPath, earlyFlush, latePath, lateFlush, lateFinal, lateDrop };
 })()`);
 if (policy.first.join(",") !== "requeue,requeue,requeue" || policy.parked !== "defer" || !policy.flushed || !policy.onQueue || policy.second || policy.dropped !== "drop") {
   throw new Error("retry policy mismatch " + JSON.stringify(policy));
 }
+if (policy.earlyPath.join(",") !== "requeue,requeue,requeue,defer" || !policy.earlyFlush) {
+  throw new Error("early card did not reach its own final attempt " + JSON.stringify(policy));
+}
+if (policy.latePath.join(",") !== "requeue,requeue,requeue,defer" || !policy.lateFlush || !policy.lateFinal || policy.lateDrop !== "drop") {
+  throw new Error("card refused after the final pass started was lost " + JSON.stringify(policy));
+}
 console.log("policy", JSON.stringify(policy));
 
-async function drain(label) {
+async function drain(label, opts = {}) {
   const kept = [];
   const seenIds = new Set();
   let lastSig = "";
@@ -128,11 +153,15 @@ async function drain(label) {
         hits: window.__throttleHits || null
       };
     })()`);
+    if (info.streamDone && /shuffling/.test(info.text)) {
+      throw new Error(label + " showed 'The hunt is still shuffling the table.' after streamDone (busy=" + info.busy + ")");
+    }
     if (info.text === "No cards match yet.") throw new Error(label + " said no cards match yet after " + info.matched);
     if (info.text === "Still matching cards.") throw new Error(label + " paused early after " + info.matched);
     if (info.text === "No more cards match.") {
       if (!info.matched) throw new Error(label + " finished with zero matches");
-      return { matched: info.matched, kept, hits: info.hits, ms: Date.now() - start };
+      if (opts.requireBusy && !info.busy) throw new Error(label + " end message appeared only after the busy window cleared");
+      return { matched: info.matched, kept, hits: info.hits, busyAtEnd: !!info.busy, ms: Date.now() - start };
     }
     if (info.card) {
       if (!seenIds.has(info.card.id)) {
@@ -145,7 +174,7 @@ async function drain(label) {
       continue;
     }
     const sig = [info.serial, info.matched, info.pile, info.briefs, info.deferred, info.text].join(":");
-    const busy = info.catalogBusy || info.busy || /busy|shuffling|Looking/i.test(info.text) || info.loading;
+    const busy = info.catalogBusy || info.busy || /busy|Looking/i.test(info.text) || info.loading;
     if (sig !== lastSig) { lastSig = sig; stillSince = Date.now(); }
     else if (!busy && Date.now() - stillSince > 4000) {
       throw new Error(label + " stalled " + JSON.stringify({ status: info.status, matched: info.matched, serial: info.serial, feedExhausted: info.feedExhausted, holdFeed: info.holdFeed, pile: info.pile, briefs: info.briefs, deferred: info.deferred, text: info.text }));
@@ -215,6 +244,75 @@ for (const id of wanted) {
   if (!throttledIds.includes(id)) throw new Error(id + " dropped out of the throttled hunt");
 }
 if (throttled.matched !== baseline.matched) throw new Error("matched " + throttled.matched + " vs baseline " + baseline.matched);
+console.log("throttled end while busy", throttled.busyAtEnd);
+
+console.log("late refusal after another card's final attempt");
+await ev(`(() => {
+  generation++;
+  loading = false;
+  streamDone = false;
+  paused = false;
+  catalogBusy = false;
+  busyStrike = 0;
+  busyUntil = 0;
+  pumpError = "";
+  pile = [];
+  briefs = [{ id: "ex7-102" }];
+  deferred = [];
+  seen = new Set(["ex7-102", "sm7-4"]);
+  fetchFails.clear();
+  matched = 0;
+  effort = 0;
+  feedExhausted = true;
+  holdFeed = false;
+  namePages.set("Scyther", 0);
+  filters = blankFilters();
+  filters.names = ["Scyther"];
+  lastFound = Date.now();
+  cardCache.delete("ex7-102");
+  cardCache.delete("sm7-4");
+  reserved = new Set();
+  pendingSwipes = [];
+  swipeBusy = false;
+  deck.innerHTML = "";
+  window.__origFetch = window.__origFetch || fetch;
+  const orig = window.__origFetch;
+  window.__throttleHits = {};
+  window.__injected = false;
+  window.fetch = (url, opts) => {
+    const match = String(url).match(/\\/cards\\/([^/?#]+)$/);
+    const id = match && decodeURIComponent(match[1]);
+    if (id === "ex7-102" || id === "sm7-4") window.__throttleHits[id] = (window.__throttleHits[id] || 0) + 1;
+    if (id === "ex7-102") {
+      if (window.__throttleHits[id] <= 12) return Promise.resolve(new Response("", { status: 429, statusText: "Too Many Requests" }));
+      if (!window.__injected) {
+        window.__injected = true;
+        fetchFails.set("sm7-4", CARD_FETCH_RETRIES);
+        cardCache.delete("sm7-4");
+        if (!briefs.some(b => b.id === "sm7-4")) briefs.push({ id: "sm7-4" });
+      }
+      return orig(url, opts);
+    }
+    if (id === "sm7-4" && window.__throttleHits[id] <= 3) {
+      busyStrike = 0;
+      return Promise.resolve(new Response("", { status: 429, statusText: "Too Many Requests" }));
+    }
+    return orig(url, opts);
+  };
+  pump(generation);
+  return true;
+})()`);
+const late = await drain("late refusal", { requireBusy: true });
+const lateIds = late.kept.map(c => c.id);
+for (const id of ["ex7-102", "sm7-4"]) {
+  if (!lateIds.includes(id)) throw new Error("late refusal dropped " + id + " from " + lateIds.join(","));
+}
+const lateHits = late.hits || {};
+if ((lateHits["ex7-102"] || 0) < 13) throw new Error("ex7-102 final attempt did not run " + JSON.stringify(lateHits));
+if ((lateHits["sm7-4"] || 0) < 4) throw new Error("sm7-4 never got its own final attempt " + JSON.stringify(lateHits));
+if (!late.busyAtEnd) throw new Error("end message was not showing while the catalog was still in its busy window");
+console.log("late refusal kept", lateIds.join(", "), "in", late.ms + "ms", "hits", JSON.stringify(lateHits), "busyAtEnd", late.busyAtEnd);
+
 if (errors.length) throw new Error("console exceptions: " + errors.join(" | "));
 console.log("ok", throttled.matched, "matches including", wanted.join(", "));
 shutdown(0);
