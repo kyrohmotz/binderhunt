@@ -80,6 +80,20 @@ class TrimTests(unittest.TestCase):
         due = sync.select_due(seed, cards, now, max_cards=2)
         self.assertEqual(due, ["new-a", "stale-a"])
 
+    def test_demand_follows_chase_and_refreshes_slowly(self):
+        now = datetime(2026, 10, 15, tzinfo=timezone.utc)
+        seed = [("A", "chase")]
+        demand = {"cheap-1": 4, "once": 1, "chase": 9}
+        self.assertEqual(sync.select_due(seed, {}, now, max_cards=1, demand=demand), ["chase"])
+        self.assertEqual(sync.select_due(seed, {}, now, max_cards=5, demand=demand), ["chase", "cheap-1"])
+        fresh = (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        recent = (now - timedelta(days=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        stale = (now - timedelta(days=91)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        cards = {"chase": {"fetched_at": fresh}, "cheap-1": {"fetched_at": recent}}
+        self.assertEqual(sync.select_due(seed, cards, now, max_cards=5, demand=demand), [])
+        cards["cheap-1"] = {"fetched_at": stale}
+        self.assertEqual(sync.select_due(seed, cards, now, max_cards=5, demand=demand), ["cheap-1"])
+
     def test_missing_secret_does_not_echo_values(self):
         old_key = os.environ.pop("SCRYDEX_API_KEY", None)
         old_team = os.environ.pop("SCRYDEX_TEAM_ID", None)

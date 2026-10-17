@@ -311,6 +311,29 @@ img{max-width:100%;-webkit-user-drag:none}
 html.reduce *{animation:none !important;transition:none !important}
 html.reduce .leaf.hot{transition:none}
 html.reduce .sleeve.holo img{transform:none}
+.onboard{position:fixed;inset:0;z-index:90;background:rgba(43,48,38,.38);display:flex;align-items:flex-end;justify-content:center;padding:12px}
+.onboard[hidden]{display:none !important}
+.onboard-card{width:min(460px,100%);max-height:min(92dvh,740px);overflow:auto;background:var(--paper);border:2.5px solid var(--ink);border-radius:28px;box-shadow:4px 4px 0 var(--ink);padding:16px 16px 14px}
+.toad-row{display:flex;gap:10px;align-items:flex-end}
+.toad-row img{width:72px;height:72px;object-fit:contain;flex:none;background:#e7f6c8;border-radius:50%;border:2.5px solid var(--ink)}
+.bubble{background:#fff;border:2.5px solid var(--ink);border-radius:18px 18px 18px 8px;padding:10px 12px;box-shadow:3px 3px 0 var(--sky)}
+.bubble h2{font-family:var(--display);font-size:22px;line-height:1.15;margin:0}
+.bubble p{margin:4px 0 0}
+.kicker{font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft);margin:0}
+.huntpicks{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.huntpick{border:2.5px solid var(--ink);background:#fff;border-radius:999px;padding:8px 14px;min-height:44px;font-family:var(--display);font-size:15px;font-weight:600;cursor:pointer;box-shadow:2px 2px 0 var(--ink)}
+.huntpick.on{background:var(--moss);color:#fff;border-color:var(--moss)}
+.huntpick.pop{animation:pickpop .28s ease}
+@keyframes pickpop{0%{transform:scale(.88)} 55%{transform:scale(1.08)} 100%{transform:scale(1)}}
+.searchrow{display:flex;gap:8px;margin-top:4px}
+.searchrow input{flex:1;min-width:0;border:2.5px solid var(--ink);border-radius:14px;padding:10px 12px;font:inherit;background:#fff}
+.suggest{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.onboard-actions{display:flex;gap:8px;align-items:center;margin-top:8px}
+.go{margin-left:auto;min-height:44px;border:2.5px solid var(--ink);background:var(--moss);color:#fff;border-radius:999px;padding:0 16px;font-family:var(--display);font-weight:700;box-shadow:2px 2px 0 var(--ink);cursor:pointer}
+.skip{background:transparent;border:0;color:var(--ink-soft);font-weight:700;min-height:44px;padding:8px 10px;cursor:pointer}
+@media (min-width:1024px){
+  .onboard{align-items:center}
+}
 </style>
 </head>
 <body>
@@ -339,6 +362,7 @@ html.reduce .sleeve.holo img{transform:none}
       <div class="chipbar" id="chipbar">
       <div class="chips" id="chips" role="toolbar" aria-label="Filters">
         <button class="chip" type="button" data-filter="set">Set</button>
+        <button class="chip" type="button" data-filter="pokemon">Pokémon</button>
         <button class="chip" type="button" data-filter="rarity">Rarity</button>
         <button class="chip" type="button" data-filter="price">Price</button>
         <button class="chip" type="button" data-filter="era">Era</button>
@@ -411,6 +435,24 @@ html.reduce .sleeve.holo img{transform:none}
   </div>
 </div>
 <div id="menu" class="menu" hidden role="menu"></div>
+<div id="onboard" class="onboard" hidden>
+  <div class="onboard-card" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
+    <div class="toad-row">
+      <img src="assets/brand/two-toads-logo.png" width="72" height="72" alt="">
+      <div class="bubble">
+        <p class="kicker" id="onboardStep">1 of 2</p>
+        <h2 id="onboardTitle">Who are you hunting for?</h2>
+        <p id="onboardSub">Pick a few. You can change this anytime.</p>
+      </div>
+    </div>
+    <div id="onboardBody"></div>
+    <div class="onboard-actions">
+      <button type="button" class="skip" id="onboardSkip">Skip</button>
+      <button type="button" class="skip" id="onboardBack" hidden>Back</button>
+      <button type="button" class="go" id="onboardNext">Next</button>
+    </div>
+  </div>
+</div>
 <script>
 const AFFILIATE = { tcgplayer:{ params:{} }, ebay:{ params:{} }, cardmarket:{ params:{} } };
 const CHASE = ["Special illustration rare","Illustration rare","Hyper rare","Mega Hyper Rare","Secret Rare","Shiny Ultra Rare","Shiny rare VMAX","Holo Rare VMAX","Holo Rare VSTAR","Radiant Rare","Amazing Rare"];
@@ -427,6 +469,23 @@ const MUST_SETS = [
   { id:"base4", name:"Base Set 2", cardCount:{ official:130, total:130 }, logo:"https://assets.tcgdex.net/en/base/base4/logo" }
 ];
 const ERA_ORDER = ["Mega Evolution","Scarlet & Violet","Sword & Shield","Sun & Moon","XY","Black & White","HeartGold & SoulSilver","Diamond & Pearl","EX","WOTC","Other"];
+const ERA_GROUPS = [
+  { id:"vintage", label:"WotC / Vintage", eras:["WOTC"] },
+  { id:"exds", label:"EX / DS", eras:["EX","Diamond & Pearl","HeartGold & SoulSilver"] },
+  { id:"bwxy", label:"BW / XY", eras:["Black & White","XY"] },
+  { id:"sm", label:"Sun & Moon", eras:["Sun & Moon"] },
+  { id:"swsh", label:"Sword & Shield", eras:["Sword & Shield"] },
+  { id:"svmega", label:"SV / Mega", eras:["Scarlet & Violet","Mega Evolution"] }
+];
+const HUNT_PICKS = [
+  { id:"pikachu", label:"Pikachu", names:["Pikachu"] },
+  { id:"charizard", label:"Charizard", names:["Charizard"] },
+  { id:"eevee", label:"Eevee & friends", names:["Eevee","Vaporeon","Jolteon","Flareon","Espeon","Umbreon","Leafeon","Glaceon","Sylveon"] },
+  { id:"gengar", label:"Gengar", names:["Gengar"] },
+  { id:"umbreon", label:"Umbreon", names:["Umbreon"] },
+  { id:"scyther", label:"Scyther", names:["Scyther"] }
+];
+const MON_LIST = ["Bulbasaur","Ivysaur","Venusaur","Charmander","Charmeleon","Charizard","Squirtle","Wartortle","Blastoise","Pikachu","Raichu","Clefairy","Jigglypuff","Meowth","Psyduck","Growlithe","Arcanine","Abra","Alakazam","Machamp","Gengar","Onix","Scyther","Magikarp","Gyarados","Lapras","Ditto","Eevee","Vaporeon","Jolteon","Flareon","Snorlax","Articuno","Zapdos","Moltres","Dragonite","Mewtwo","Mew","Typhlosion","Espeon","Umbreon","Scizor","Heracross","Tyranitar","Lugia","Ho-Oh","Celebi","Blaziken","Gardevoir","Aggron","Absol","Salamence","Metagross","Rayquaza","Jirachi","Torterra","Infernape","Empoleon","Lucario","Garchomp","Glaceon","Leafeon","Dialga","Palkia","Giratina","Darkrai","Arceus","Zoroark","Zekrom","Reshiram","Greninja","Sylveon","Mimikyu","Solgaleo","Lunala","Rillaboom","Cinderace","Inteleon","Dragapult","Zacian","Zamazenta","Eternatus","Meowscarada","Skeledirge","Quaquaval","Tinkaton","Annihilape","Kingambit","Koraidon","Miraidon","Pecharunt","Ogerpon","Ceruledge","Armarouge","Gholdengo"];
 const COLORS = ["#86DEFF","#ABB28D","#E9D5C0","#F3EDC8","#F6C9C9","#E4E7DA"];
 const GRADES = [["PSA","10"],["PSA","9"],["CGC","10"],["BGS","9.5"]];
 const POCKET_SET = /^(?:P-A|[AB]\d+[a-z]*)$/;
@@ -461,6 +520,14 @@ let openingCursor = 0;
 let openingDone = false;
 let chasePage = 1;
 let chaseDone = false;
+let spice = false;
+let mixTurn = 0;
+let mixCursor = 0;
+let mixExhausted = false;
+let mixOrder = [];
+let nameOrder = 0;
+const mixBags = new Map();
+const namePages = new Map();
 let bulkCursor = 0;
 let gradedCursor = 0;
 const setPools = new Map();
@@ -567,12 +634,17 @@ function loadBinders(){
   } catch (e) {}
   return { discoveryId:"", binders:[] };
 }
+function blankFilters(){
+  return { set:"", rarities:[], era:"", type:"", names:[], min:null, max:null, pricePreset:"", graded:false };
+}
 function loadFilters(){
-  const blank = { set:"", rarities:[], era:"", type:"", min:null, max:null, graded:false };
+  const blank = blankFilters();
   try {
     const raw = JSON.parse(localStorage.getItem("bh.filters.v3") || "null");
     if (!raw || typeof raw !== "object") return blank;
-    return { set:String(raw.set || ""), rarities:Array.isArray(raw.rarities) ? raw.rarities.map(String) : [], era:String(raw.era || ""), type:String(raw.type || ""), min:pos(raw.min) || (raw.min === 0 ? null : (typeof raw.min === "number" ? null : null)), max:pos(raw.max), graded:!!raw.graded };
+    const preset = raw.pricePreset === "under10" || raw.pricePreset === "mid" || raw.pricePreset === "high" ? raw.pricePreset : "";
+    const names = Array.isArray(raw.names) ? raw.names.map(s => String(s).trim()).filter(Boolean).slice(0, 24) : [];
+    return { set:String(raw.set || ""), rarities:Array.isArray(raw.rarities) ? raw.rarities.map(String) : [], era:String(raw.era || ""), type:String(raw.type || ""), names, min:pos(raw.min), max:pos(raw.max), pricePreset:preset, graded:!!raw.graded };
   } catch (e) { return blank; }
 }
 function loadSettings(){
@@ -600,16 +672,71 @@ function snapshot(card){
 }
 function discoveryBinder(){ return binderState.binders.find(b => b.id === binderState.discoveryId) || null; }
 function themeOf(b){ return (b && b.theme) || { kind:"none" }; }
+function speciesHit(cardName, species){
+  const n = String(cardName || "").toLowerCase();
+  const s = String(species || "").toLowerCase().trim();
+  if (!s) return false;
+  if (n === s) return true;
+  if (n.startsWith(s + " ") || n.startsWith(s + "-")) return true;
+  if (n.endsWith(" " + s)) return true;
+  if (n.includes(" " + s + " ")) return true;
+  return false;
+}
+function nameHit(card){
+  return (filters.names || []).some(species => speciesHit(card && card.name, species));
+}
+function eraMatches(setId, era){
+  if (!era) return true;
+  const group = ERA_GROUPS.find(g => g.id === era);
+  const got = eraOf(setId);
+  if (group) return group.eras.includes(got);
+  return got === era;
+}
+function eraLabel(era){
+  const group = ERA_GROUPS.find(g => g.id === era);
+  return group ? group.label : (era || "Era");
+}
+function namesLabel(){
+  const names = filters.names || [];
+  if (!names.length) return "Pokémon";
+  const covered = HUNT_PICKS.filter(p => p.names.every(n => names.some(x => x.toLowerCase() === n.toLowerCase())));
+  const explicit = covered.filter(p => !covered.some(other => other.id !== p.id && other.names.length > p.names.length && p.names.every(n => other.names.some(x => x.toLowerCase() === n.toLowerCase()))));
+  const onlyPresets = explicit.length && names.every(n => explicit.some(p => p.names.some(x => x.toLowerCase() === n.toLowerCase())));
+  if (onlyPresets && explicit.length === 1) return explicit[0].label;
+  if (onlyPresets && explicit.length === 2) return explicit[0].label + ", " + explicit[1].label;
+  if (onlyPresets) return explicit[0].label + " +" + (explicit.length - 1);
+  if (names.length === 1) return names[0];
+  return names[0] + " +" + (names.length - 1);
+}
+function priceLabel(){
+  if (filters.pricePreset === "under10") return "Under $10";
+  if (filters.pricePreset === "mid") return "$10–50";
+  if (filters.pricePreset === "high") return "$50+";
+  if (filters.min == null && filters.max == null) return "Price";
+  if (filters.min == null) return "Under " + money(filters.max);
+  if (filters.max == null) return money(filters.min) + "+";
+  return money(filters.min) + "–" + money(filters.max);
+}
+function priceOk(price){
+  if (filters.pricePreset === "under10") return price != null && price < 10;
+  if (filters.pricePreset === "mid") return price != null && price >= 10 && price <= 50;
+  if (filters.pricePreset === "high") return price != null && price >= 50;
+  if (filters.min != null && (price == null || price < filters.min)) return false;
+  if (filters.max != null && (price == null || price > filters.max)) return false;
+  return true;
+}
 function matchesTheme(card, theme){
   if (!theme || !theme.kind || theme.kind === "none") return true;
   if (theme.kind === "set") return !!theme.setId && card.setId === theme.setId;
   if (theme.kind === "type") return !!theme.type && (card.types || []).includes(theme.type);
+  if (theme.kind === "pokemon") return !!theme.name && speciesHit(card && card.name, theme.name);
   return true;
 }
 function themeLabel(theme){
   if (!theme || theme.kind === "none" || !theme.kind) return "Any card";
   if (theme.kind === "set") return "Set · " + (setName(theme.setId) || theme.setId);
   if (theme.kind === "type") return "Type · " + theme.type;
+  if (theme.kind === "pokemon") return theme.name ? theme.name + " cards" : "Pokémon cards";
   return "Any card";
 }
 function setName(id){ const s = meta.sets.find(x => x.id === id); return s ? s.name : id; }
@@ -700,9 +827,26 @@ function buyLinks(card){
 }
 
 async function getJson(url){
-  const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  return res.json();
+  let last;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+      if (res.status === 429 || res.status >= 500) {
+        last = new Error("HTTP " + res.status);
+        await new Promise(r => setTimeout(r, 280 * (attempt + 1)));
+        continue;
+      }
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    } catch (e) {
+      last = e;
+      const http = String(e && e.message || "");
+      const retry = http.startsWith("HTTP ") ? /^HTTP (429|5)/.test(http) : true;
+      if (attempt === 2 || !retry) throw e;
+      await new Promise(r => setTimeout(r, 280 * (attempt + 1)));
+    }
+  }
+  throw last;
 }
 function usdVariants(tp){
   if (!tp || typeof tp !== "object") return [];
@@ -866,37 +1010,31 @@ function scryRecord(card){
 }
 
 function filtersActive(){
-  return !!(filters.set || filters.type || filters.rarities.length || filters.era || filters.graded || filters.min != null || filters.max != null);
+  return !!(filters.set || filters.type || (filters.names || []).length || filters.rarities.length || filters.era || filters.graded || filters.min != null || filters.max != null || filters.pricePreset);
 }
 function raritiesForSet(id){
   const list = HUNT_RARITIES.slice();
   if (VINTAGE_SET.test(id || "")) list.push("Rare");
   return list;
 }
-function acceptsHunt(card){
-  const rarity = card.rarity || "";
-  if (HUNT_RARITIES.includes(rarity)) return true;
-  const setId = card.setId || String(card.id || "").split("-")[0];
-  return rarity === "Rare" && VINTAGE_SET.test(setId);
-}
 function keep(card){
   if (!card || isDigital(card)) return false;
   if (discoveryBinder() && savedIds().has(card.id)) return false;
-  if (filters.set && card.setId !== filters.set) return false;
-  if (filters.era && eraOf(card.setId) !== filters.era) return false;
-  if (filters.type && !(card.types || []).includes(filters.type)) return false;
+  const surprise = !!(card.spice && !discoveryBinder());
+  if (!surprise) {
+    if (filters.set && card.setId !== filters.set) return false;
+    if ((filters.names || []).length && !nameHit(card)) return false;
+    if (filters.type && !(card.types || []).includes(filters.type)) return false;
+  }
+  if (filters.era && !eraMatches(card.setId, filters.era)) return false;
   if (filters.rarities.length && !filters.rarities.includes(card.rarity)) return false;
-  const price = usdOf(card);
-  if (filters.min != null && (price == null || price < filters.min)) return false;
-  if (filters.max != null && (price == null || price > filters.max)) return false;
+  if (!priceOk(usdOf(card))) return false;
   if (filters.graded) {
     const rec = scrydex.cards[card.id];
     if (!rec || rec.missing || !(rec.graded || []).length) return false;
   }
-  const scoped = filtersActive() || discoveryBinder();
-  if (scoped) return true;
-  if (!acceptsHunt(card)) return false;
-  if (price != null && price < 10) return false;
+  const b = discoveryBinder();
+  if (b && !matchesTheme(card, themeOf(b))) return false;
   return true;
 }
 function enforceTheme(){
@@ -905,6 +1043,7 @@ function enforceTheme(){
   const t = themeOf(b);
   if (t.kind === "set" && t.setId) filters.set = t.setId;
   if (t.kind === "type" && t.type) filters.type = t.type;
+  if (t.kind === "pokemon" && t.name) filters.names = [t.name];
 }
 async function pullSet(id){
   if (!setLists.has(id)) {
@@ -939,7 +1078,7 @@ async function pullQuery(){
     if (!Array.isArray(list) || !list.length) { queryDone = true; return 0; }
     if (list.length < 24) queryDone = true;
     let rows = list.filter(c => c && c.id && c.image && !seen.has(c.id) && !isPocketId(String(c.id).split("-")[0]));
-    if (filters.era) rows = rows.filter(c => eraOf(String(c.id).split("-")[0]) === filters.era);
+    if (filters.era) rows = rows.filter(c => eraMatches(String(c.id).split("-")[0], filters.era));
     if (discoveryBinder()) {
       const saved = savedIds();
       rows.forEach(c => { if (saved.has(c.id)) seen.add(c.id); });
@@ -1019,7 +1158,7 @@ async function pullChaseAll(){
   return 0;
 }
 async function pullBulk(){
-  const ids = meta.sets.map(s => s.id).filter(id => !filters.era || eraOf(id) === filters.era);
+  const ids = meta.sets.map(s => s.id).filter(id => !filters.era || eraMatches(id, filters.era));
   while (bulkCursor < ids.length) {
     const id = ids[bulkCursor++];
     try {
@@ -1048,19 +1187,92 @@ async function pullGraded(){
   slice.forEach(id => { seen.add(id); briefs.push({ id }); });
   return slice.length;
 }
+function pushBrief(c, extra){
+  const brief = { id:c.id, name:c.name, image:c.image, localId:c.localId };
+  if (extra) Object.assign(brief, extra);
+  seen.add(c.id);
+  briefs.push(brief);
+}
+async function pullNames(names){
+  const pending = names.filter(n => namePages.get(n) !== 0);
+  if (!pending.length) return 0;
+  const species = pending[nameOrder % pending.length];
+  nameOrder++;
+  const page = namePages.get(species) || 1;
+  let list = [];
+  try {
+    list = await getJson(TCGDEX + "/cards?name=" + encodeURIComponent("like:" + species) + "&pagination:page=" + page + "&pagination:itemsPerPage=100");
+  } catch (e) { return 0; }
+  if (!Array.isArray(list) || !list.length) { namePages.set(species, 0); return 0; }
+  namePages.set(species, list.length < 100 ? 0 : page + 1);
+  let n = 0;
+  shuffle(list).forEach(c => {
+    if (!c || !c.id || seen.has(c.id) || isDigital({ id:c.id })) return;
+    if (discoveryBinder() && savedIds().has(c.id)) { seen.add(c.id); return; }
+    pushBrief(c);
+    n++;
+  });
+  return n;
+}
+async function pullMix(){
+  if (mixExhausted) return 0;
+  if (!meta.sets.length) { mixExhausted = true; return 0; }
+  if (!mixOrder.length) mixOrder = shuffle(meta.sets.map(s => s.id).filter(id => !isPocketId(id)));
+  if (!mixOrder.length) { mixExhausted = true; return 0; }
+  let spins = 0;
+  while (spins < mixOrder.length) {
+    const id = mixOrder[mixCursor % mixOrder.length];
+    mixCursor++;
+    spins++;
+    if (!mixBags.has(id)) {
+      try {
+        const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
+        mixBags.set(id, (set.cards || []).filter(c => c && c.id && !isDigital({ id:c.id })));
+      } catch (e) { mixBags.set(id, []); }
+    }
+    const fresh = shuffle(mixBags.get(id).filter(c => !seen.has(c.id)));
+    if (!fresh.length) continue;
+    fresh.slice(0, 8).forEach(c => pushBrief(c));
+    return Math.min(8, fresh.length);
+  }
+  mixExhausted = true;
+  return 0;
+}
+async function pullUnscoped(){
+  mixTurn++;
+  if (mixTurn % 3 === 0) {
+    const mixed = await pullMix();
+    if (mixed) return mixed;
+  }
+  const opened = await pullOpening();
+  if (opened) return opened;
+  if (!openingDone) return 0;
+  const chase = await pullChaseAll();
+  if (chase) return chase;
+  return pullMix();
+}
 async function pullMore(){
   await loadMeta();
+  if ((filters.names || []).length) {
+    const n = await pullNames(filters.names);
+    if (!n) return 0;
+    if (spice && !discoveryBinder()) {
+      const before = briefs.length;
+      await pullMix();
+      const spawned = briefs.splice(before);
+      spawned.slice(2).forEach(c => seen.delete(c.id));
+      spawned.slice(0, 2).forEach(c => { c.spice = true; briefs.push(c); });
+    }
+    return n;
+  }
   if (filters.graded && !filters.set && !filters.type && !filters.rarities.length) {
     const n = await pullGraded();
     if (n) return n;
   }
   if (filters.set) return pullSet(filters.set);
   if (filters.type || filters.rarities.length) return pullQuery();
-  if (filters.era || filters.min != null || filters.max != null || filters.graded) return pullBulk();
-  const opened = await pullOpening();
-  if (opened) return opened;
-  if (!openingDone) return 0;
-  return pullChaseAll();
+  if (filters.era || filters.min != null || filters.max != null || filters.pricePreset || filters.graded) return pullBulk();
+  return pullUnscoped();
 }
 function showSkeleton(){
   if (deck.querySelector(".card")) return;
@@ -1084,15 +1296,15 @@ async function pump(my){
   try {
     let steps = 0;
     const capped = filtersActive() || !!discoveryBinder();
-    const ceiling = !capped ? Infinity : (filters.min != null || filters.max != null ? 160 : 80);
+    const priced = filters.min != null || filters.max != null || !!filters.pricePreset;
+    const ceiling = !capped ? Infinity : ((filters.names || []).length ? 500 : (priced ? 160 : 80));
     while (pile.length < 5 && my === generation && steps < 12 && effort < ceiling) {
       if (briefs.length < 4) {
         const added = await pullMore();
         if (my !== generation) return;
         if (!added && !briefs.length) {
-          const openHunt = !filtersActive() && !discoveryBinder();
-          if (openHunt && !openingDone) { steps++; continue; }
-          if (openHunt && !chaseDone) { steps++; continue; }
+          const broad = !filters.set && !(filters.names || []).length && !filters.type && !filters.rarities.length && !filters.era && !filters.pricePreset && filters.min == null && filters.max == null && !filters.graded;
+          if (broad && (!openingDone || !chaseDone || !mixExhausted)) { steps++; continue; }
           streamDone = true; break;
         }
       }
@@ -1102,7 +1314,14 @@ async function pump(my){
       steps++;
       const cards = await Promise.all(batch.map(b => hydrate(b).catch(() => null)));
       if (my !== generation) return;
-      cards.forEach(card => { if (keep(card)) { pile.push(card); matched++; } });
+      cards.forEach((card, i) => {
+        if (!card) return;
+        const surprise = !!(batch[i] && batch[i].spice);
+        if (surprise) card.spice = true;
+        const ok = keep(card);
+        if (surprise) card.spice = false;
+        if (ok) { pile.push(card); matched++; }
+      });
       renderDeck();
       paintCount();
     }
@@ -1118,13 +1337,16 @@ async function pump(my){
   paintCount();
   if (!paused && !streamDone && pile.length < 4) setTimeout(() => pump(my), 30);
 }
-function restart(){
+function restart(opts){
+  spice = !!(opts && opts.keepSpice);
   generation++;
   enforceTheme();
   saveFilters();
   pile = []; briefs = []; seen = new Set(); matched = 0; pageNo = 1; queryDone = false;
   openingOrder = []; openingCursor = 0; openingDone = false; chasePage = 1; chaseDone = false; bulkCursor = 0; gradedCursor = 0;
-  setPools.clear(); streamDone = false; paused = false; pumpError = ""; effort = 0; loading = false;
+  mixTurn = 0; mixCursor = 0; mixExhausted = false; mixOrder = []; nameOrder = 0;
+  mixBags.clear(); namePages.clear(); setPools.clear();
+  streamDone = false; paused = false; pumpError = ""; effort = 0; loading = false;
   pendingSwipes = []; reserved = new Set(); swipeBusy = false;
   deck.innerHTML = "";
   showSkeleton();
@@ -1277,7 +1499,6 @@ function fly(dir, from){
   let addedWish = false, addedBinder = false;
   const binder = dir > 0 ? discoveryBinder() : null;
   if (dir > 0) {
-    noteDemand(card.id);
     addedWish = addWish(card);
     if (binder) addedBinder = addToBinder(binder, card);
     if (settings.haptics) haptic(10);
@@ -1346,11 +1567,13 @@ function undo(){
 function addWish(card){
   if (wish.some(w => w.id === card.id)) return false;
   wish.push(snapshot(card));
+  noteDemand(card.id);
   saveWish();
   return true;
 }
 function addToBinder(binder, card){
   if (!binder || binder.cards.some(c => c.id === card.id)) return false;
+  noteDemand(card.id);
   binder.cards.push(snapshot(card));
   if (binder.cards.length % 9 === 0) pendingSparkle = Math.floor((binder.cards.length - 1) / 9);
   saveBinders();
@@ -1368,7 +1591,7 @@ function removeFromWish(id){
 }
 
 function blocking(){
-  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || !document.getElementById("menu").hidden || (!profileEl.hidden && !wide());
+  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (!profileEl.hidden && !wide());
 }
 function haptic(pattern){
   if (!settings.haptics) return;
@@ -1376,6 +1599,13 @@ function haptic(pattern){
   if (hapticTrusted) { hapticTrusted = false; return; }
   const label = document.querySelector("label[for='hapticSwitch']");
   if (label) label.click();
+}
+function popBtn(btn){
+  if (!btn) return;
+  haptic(8);
+  btn.classList.remove("pop");
+  void btn.offsetWidth;
+  btn.classList.add("pop");
 }
 function syncHaptics(){
   document.querySelectorAll(".haptic-hit").forEach(el => { el.style.pointerEvents = settings.haptics ? "auto" : "none"; });
@@ -1404,12 +1634,14 @@ function syncChipFade(){
 function paintChips(){
   document.querySelectorAll("[data-filter]").forEach(btn => {
     const key = btn.dataset.filter;
-    const on = key === "set" ? !!filters.set : key === "rarity" ? filters.rarities.length > 0 : key === "price" ? filters.min != null || filters.max != null : key === "era" ? !!filters.era : !!filters.type;
+    const on = key === "set" ? !!filters.set : key === "rarity" ? filters.rarities.length > 0 : key === "price" ? filters.min != null || filters.max != null || !!filters.pricePreset : key === "era" ? !!filters.era : key === "pokemon" ? (filters.names || []).length > 0 : !!filters.type;
     btn.classList.toggle("on", on);
-    if (key === "set" && filters.set) btn.textContent = setName(filters.set);
-    else if (key === "type" && filters.type) btn.textContent = filters.type;
-    else if (key === "era" && filters.era) btn.textContent = filters.era;
-    else btn.textContent = key === "set" ? "Set" : key === "rarity" ? "Rarity" : key === "price" ? "Price" : key === "era" ? "Era" : "Type";
+    if (key === "set") btn.textContent = filters.set ? setName(filters.set) : "Set";
+    else if (key === "pokemon") btn.textContent = namesLabel();
+    else if (key === "type") btn.textContent = filters.type || "Type";
+    else if (key === "era") btn.textContent = filters.era ? eraLabel(filters.era) : "Era";
+    else if (key === "price") btn.textContent = priceLabel();
+    else btn.textContent = "Rarity";
     btn.title = btn.textContent;
   });
   const g = document.getElementById("gradedChip");
@@ -1424,8 +1656,9 @@ function paintContext(){
   else if (tab === "binders") label = binderView ? (binderView.kind === "wish" ? "Wishlist" : (binderState.binders.find(x => x.id === binderView.id) || {}).name || "Binders") : "Binders";
   else if (b) label = b.name;
   else if (filters.set) label = setName(filters.set);
+  else if ((filters.names || []).length) label = namesLabel();
   else if (filters.type) label = filters.type;
-  else if (filters.era) label = filters.era;
+  else if (filters.era) label = eraLabel(filters.era);
   document.getElementById("context").textContent = label;
 }
 function paintDiscovery(){
@@ -1468,8 +1701,59 @@ function closeSheet(id){
   if (restoreFocus && restoreFocus.focus) restoreFocus.focus();
   syncActs();
 }
+function sameName(a, b){ return String(a).toLowerCase() === String(b).toLowerCase(); }
+function cleanMon(value){
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 24);
+}
+function presetOn(pick){
+  return pick.names.every(n => (filters.names || []).some(x => sameName(x, n)));
+}
+function togglePreset(pick){
+  if (!filters.names) filters.names = [];
+  if (presetOn(pick)) {
+    const keep = new Set();
+    HUNT_PICKS.forEach(other => { if (other.id !== pick.id && presetOn(other)) other.names.forEach(n => keep.add(n.toLowerCase())); });
+    filters.names = filters.names.filter(n => !pick.names.some(p => sameName(p, n)) || keep.has(n.toLowerCase()));
+  } else {
+    pick.names.forEach(n => { if (!filters.names.some(x => sameName(x, n))) filters.names.push(n); });
+  }
+}
+function drawPokemonFilter(body){
+  const extras = (filters.names || []).filter(n => !HUNT_PICKS.some(p => presetOn(p) && p.names.some(x => sameName(x, n))));
+  body.innerHTML = `<div class="searchrow"><input id="monFind" type="search" placeholder="Search a Pokémon" aria-label="Search a Pokémon"></div><div class="suggest" id="monSuggest"></div><div class="huntpicks" id="monPicks">${HUNT_PICKS.map(p => `<button type="button" class="huntpick ${presetOn(p) ? "on" : ""}" data-pick="${p.id}">${esc(p.label)}</button>`).join("")}${extras.map(n => `<button type="button" class="huntpick on" data-extra="${esc(n)}">${esc(n)}</button>`).join("")}</div><p class="fine">Every print of a picked Pokémon stays in the hunt, including commons.</p>`;
+  const refresh = () => { drawPokemonFilter(body); saveFilters(); restart(); };
+  body.querySelectorAll("[data-pick]").forEach(btn => btn.onclick = () => {
+    popBtn(btn);
+    const pick = HUNT_PICKS.find(p => p.id === btn.dataset.pick);
+    if (pick) togglePreset(pick);
+    refresh();
+  });
+  body.querySelectorAll("[data-extra]").forEach(btn => btn.onclick = () => {
+    popBtn(btn);
+    filters.names = (filters.names || []).filter(n => !sameName(n, btn.dataset.extra));
+    refresh();
+  });
+  const find = document.getElementById("monFind");
+  const suggest = () => {
+    const q = cleanMon(find.value);
+    const box = document.getElementById("monSuggest");
+    if (!box) return;
+    if (!q) { box.innerHTML = ""; return; }
+    const hits = MON_LIST.filter(n => n.toLowerCase().includes(q.toLowerCase())).slice(0, 6);
+    const exact = hits.some(n => sameName(n, q));
+    box.innerHTML = hits.map(n => `<button type="button" class="huntpick" data-add="${esc(n)}">${esc(n)}</button>`).join("") + (exact ? "" : `<button type="button" class="huntpick" data-add="${esc(q)}">Hunt ${esc(q)}</button>`);
+    box.querySelectorAll("[data-add]").forEach(btn => btn.onclick = () => {
+      popBtn(btn);
+      const name = btn.dataset.add;
+      if (name && !(filters.names || []).some(n => sameName(n, name))) filters.names.push(name);
+      refresh();
+    });
+  };
+  find.oninput = suggest;
+  find.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); const name = cleanMon(find.value); if (!name) return; if (!(filters.names || []).some(n => sameName(n, name))) filters.names.push(name); refresh(); } };
+}
 function openFilter(kind, anchor){
-  const titles = { set:"Set", rarity:"Rarity", price:"Price", era:"Era", type:"Type" };
+  const titles = { set:"Set", pokemon:"Pokémon", rarity:"Rarity", price:"Price", era:"Era", type:"Type" };
   document.getElementById("filterTitle").textContent = titles[kind] || "Filters";
   const body = document.getElementById("filterBody");
   const b = discoveryBinder();
@@ -1500,11 +1784,28 @@ function openFilter(kind, anchor){
     const locked = theme.kind === "type";
     body.innerHTML = (locked ? `<p class="fine">This hunt is scoped to ${esc(theme.type)} by ${esc(b.name)}.</p>` : "") + meta.types.map(t => `<label class="choice"><input type="radio" name="typePick" value="${esc(t)}" ${filters.type === t ? "checked" : ""} ${locked && t !== theme.type ? "disabled" : ""}> ${esc(t)}</label>`).join("");
     body.querySelectorAll("input[name=typePick]").forEach(input => input.onchange = () => { filters.type = input.value; saveFilters(); restart(); });
+  } else if (kind === "pokemon") {
+    if (theme.kind === "pokemon" && theme.name) {
+      body.innerHTML = `<p class="fine">This hunt is scoped to ${esc(theme.name)} by ${esc(b.name)}. Every ${esc(theme.name)} print is included, at any price.</p>`;
+    } else drawPokemonFilter(body);
   } else if (kind === "era") {
-    body.innerHTML = ERA_ORDER.map(era => `<label class="choice"><input type="radio" name="eraPick" value="${esc(era)}" ${filters.era === era ? "checked" : ""}> ${esc(era)}</label>`).join("");
+    const groups = `<p class="fine">Quick eras</p>` + ERA_GROUPS.map(g => `<label class="choice"><input type="radio" name="eraPick" value="${esc(g.id)}" ${filters.era === g.id ? "checked" : ""}> ${esc(g.label)}</label>`).join("") + `<label class="choice"><input type="radio" name="eraPick" value="" ${filters.era ? "" : "checked"}> All of it</label><p class="fine">Or one series</p>`;
+    body.innerHTML = groups + ERA_ORDER.map(era => `<label class="choice"><input type="radio" name="eraPick" value="${esc(era)}" ${filters.era === era ? "checked" : ""}> ${esc(era)}</label>`).join("");
     body.querySelectorAll("input").forEach(input => input.onchange = () => { filters.era = input.value; saveFilters(); restart(); });
   } else if (kind === "price") {
-    body.innerHTML = `<div class="row2"><label class="field">Min USD<input id="pMin" inputmode="decimal" value="${filters.min != null ? filters.min : ""}"></label><label class="field">Max USD<input id="pMax" inputmode="decimal" value="${filters.max != null ? filters.max : ""}"></label></div><p class="warn" id="pWarn" hidden>Min price is higher than max price. These prices were not applied.</p>`;
+    const presets = [["", "Any"], ["under10", "Under $10"], ["mid", "$10–50"], ["high", "$50+"]];
+    const anyOn = !filters.pricePreset && filters.min == null && filters.max == null;
+    body.innerHTML = `<div class="huntpicks">${presets.map(([id, label]) => `<button type="button" class="huntpick ${(id ? filters.pricePreset === id : anyOn) ? "on" : ""}" data-preset="${id}">${label}</button>`).join("")}</div><div class="row2"><label class="field">Min USD<input id="pMin" inputmode="decimal" value="${filters.pricePreset ? "" : (filters.min != null ? filters.min : "")}"></label><label class="field">Max USD<input id="pMax" inputmode="decimal" value="${filters.pricePreset ? "" : (filters.max != null ? filters.max : "")}"></label></div><p class="warn" id="pWarn" hidden>Min price is higher than max price. These prices were not applied.</p><p class="fine">Any keeps every price, including cards under $10.</p>`;
+    body.querySelectorAll("[data-preset]").forEach(btn => btn.onclick = () => {
+      popBtn(btn);
+      filters.pricePreset = btn.dataset.preset || "";
+      filters.min = null;
+      filters.max = null;
+      document.getElementById("pMin").value = "";
+      document.getElementById("pMax").value = "";
+      body.querySelectorAll("[data-preset]").forEach(other => other.classList.toggle("on", other === btn));
+      saveFilters(); restart();
+    });
     const apply = () => {
       const min = pos(Number(document.getElementById("pMin").value));
       const max = pos(Number(document.getElementById("pMax").value));
@@ -1515,6 +1816,7 @@ function openFilter(kind, anchor){
       const warn = document.getElementById("pWarn");
       if (minN != null && maxN != null && Number.isFinite(minN) && Number.isFinite(maxN) && minN > maxN) { warn.hidden = false; return; }
       warn.hidden = true;
+      filters.pricePreset = "";
       filters.min = rawMin === "" ? null : min;
       filters.max = rawMax === "" ? null : max;
       saveFilters(); restart();
@@ -1606,7 +1908,8 @@ function renderSetPage(root){
   document.getElementById("swipeSet").onclick = () => {
     binderState.discoveryId = "";
     saveBinders();
-    filters = { set:s.id, rarities:[], era:"", type:"", min:null, max:null, graded:false };
+    filters = blankFilters();
+    filters.set = s.id;
     saveFilters();
     showTab("hunt");
     restart();
@@ -2239,15 +2542,17 @@ async function openBinderForm(){
   document.getElementById("binderSheetTitle").textContent = "New binder";
   const sets = meta.sets.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join("");
   const types = meta.types.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
-  document.getElementById("binderSheetBody").innerHTML = `<p class="fine">A theme preset scopes discovery. Jungle can be a set. Water can be a type. None hunts the whole catalog.</p>
+  document.getElementById("binderSheetBody").innerHTML = `<p class="fine">A theme preset scopes discovery. Jungle can be a set. Water can be a type. Scyther finds every Scyther print. None hunts the whole catalog.</p>
     <label class="field">Name<input id="bName" maxlength="40" placeholder="Jungle binder"></label>
     <fieldset><legend>Theme preset</legend>
       <label class="choice"><input type="radio" name="theme" value="none" checked> None</label>
       <label class="choice"><input type="radio" name="theme" value="set"> A set</label>
       <label class="choice"><input type="radio" name="theme" value="type"> A type</label>
+      <label class="choice"><input type="radio" name="theme" value="pokemon"> A Pokémon</label>
     </fieldset>
     <label class="field" id="setField" hidden>Set<select id="bSet">${sets}</select></label>
     <label class="field" id="typeField" hidden>Type<select id="bType">${types}</select></label>
+    <label class="field" id="monField" hidden>Pokémon<input id="bMon" maxlength="24" placeholder="Scyther"></label>
     <p class="fine">Cover</p>
     <div class="swatches" id="swatches">${COLORS.map((c, i) => `<button type="button" class="swatch" data-color="${c}" style="background:${c}" aria-label="Cover ${i + 1}" aria-pressed="${i === 0 ? "true" : "false"}"></button>`).join("")}</div>
     <fieldset><legend>Charm</legend>
@@ -2261,6 +2566,7 @@ async function openBinderForm(){
     const kind = (document.querySelector("input[name=theme]:checked") || {}).value || "none";
     document.getElementById("setField").hidden = kind !== "set";
     document.getElementById("typeField").hidden = kind !== "type";
+    document.getElementById("monField").hidden = kind !== "pokemon";
   };
   document.querySelectorAll("input[name=theme]").forEach(input => input.onchange = syncThemeFields);
   document.querySelectorAll(".swatch").forEach(btn => btn.onclick = () => {
@@ -2273,9 +2579,11 @@ async function openBinderForm(){
     const kind = (document.querySelector("input[name=theme]:checked") || {}).value || "none";
     const setId = kind === "set" ? document.getElementById("bSet").value : "";
     const type = kind === "type" ? document.getElementById("bType").value : "";
+    const mon = kind === "pokemon" ? cleanMon(document.getElementById("bMon").value) : "";
     if (kind === "set" && !setId) { announce("Pick a set for this theme."); return; }
     if (kind === "type" && !type) { announce("Pick a type for this theme."); return; }
-    const theme = { kind, setId, type };
+    if (kind === "pokemon" && !mon) { announce("Name the Pokémon for this theme."); return; }
+    const theme = { kind, setId, type, name: mon };
     const charm = (document.querySelector("input[name=charm]:checked") || {}).value || "none";
     const binder = { id:"b" + Date.now().toString(36), name, color, theme, cards:[], charm };
     binderState.binders.push(binder);
@@ -2341,11 +2649,10 @@ function startDiscovery(id){
   binderState.discoveryId = id;
   saveBinders();
   const theme = themeOf(binder);
-  filters = {
-    set: theme.kind === "set" ? theme.setId : "",
-    rarities: [], era: "", type: theme.kind === "type" ? theme.type : "",
-    min: null, max: null, graded: false
-  };
+  filters = blankFilters();
+  if (theme.kind === "set") filters.set = theme.setId;
+  if (theme.kind === "type") filters.type = theme.type;
+  if (theme.kind === "pokemon" && theme.name) filters.names = [theme.name];
   saveFilters();
   binderView = null;
   showTab("hunt");
@@ -2618,9 +2925,10 @@ document.getElementById("gear").onclick = () => {
     <label class="choice"><input type="checkbox" id="setHaptic" ${settings.haptics ? "checked" : ""}> Haptics</label>
     <label class="field">Reduce motion<select id="setMotion"><option value="auto">Follow system</option><option value="on">On</option><option value="off">Off</option></select></label>
     <label class="field">Currency<select id="setCur"><option value="USD">US dollars</option><option value="EUR">Cardmarket euros</option></select></label>
+    <button class="chip" id="retakeOnboard" type="button">Retake the hunt quiz</button>
     <h2>About</h2>
     <p class="fine">BinderHunt is not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. There is no account. Wishlists, binders, filters, and settings stay in this browser.</p>
-    <p class="fine">Card text and images come from TCGdex. US prices come from TCGplayer. European prices come from Cardmarket. Graded prices and population come from a Scrydex cache, and only for the printing on screen. Prices are estimates, not financial advice. TCGplayer, eBay, and Cardmarket links are not affiliate links yet.</p>
+    <p class="fine">Card text and images come from TCGdex. US prices come from TCGplayer. European prices come from Cardmarket. Commons and cards under $10 use those catalog prices. Graded prices and population come from a Scrydex cache for chase cards and cards you open or save often, and only for the printing on screen. Prices are estimates, not financial advice. TCGplayer, eBay, and Cardmarket links are not affiliate links yet.</p>
     <p class="fine"><img src="assets/brand/two-toads-logo.png" width="32" height="32" alt="Two Toads"> BinderHunt · made with 🐸 by Two Toads</p>`;
   document.getElementById("setMotion").value = settings.reduce;
   document.getElementById("setCur").value = settings.currency;
@@ -2628,6 +2936,7 @@ document.getElementById("gear").onclick = () => {
   document.getElementById("setHaptic").onchange = e => { settings.haptics = e.target.checked; saveSettings(); };
   document.getElementById("setMotion").onchange = e => { settings.reduce = e.target.value; saveSettings(); };
   document.getElementById("setCur").onchange = e => { settings.currency = e.target.value; saveSettings(); renderDeck(); if (profileCard && !profileEl.hidden) renderProfile(profileCard); };
+  document.getElementById("retakeOnboard").onclick = () => { closeSheet("settingsSheet"); openOnboard("retake"); };
   openSheet("settingsSheet");
 };
 document.querySelectorAll(".backdrop").forEach(btn => btn.onclick = () => btn.parentElement.hidden = true);
@@ -2635,11 +2944,12 @@ document.querySelectorAll("[data-filter]").forEach(btn => btn.onclick = () => op
 document.getElementById("gradedChip").onclick = () => { filters.graded = !filters.graded; saveFilters(); restart(); };
 document.getElementById("resetFilters").onclick = () => {
   const b = discoveryBinder();
-  filters = { set:"", rarities:[], era:"", type:"", min:null, max:null, graded:false };
+  filters = blankFilters();
   if (b) {
     const t = themeOf(b);
     if (t.kind === "set") filters.set = t.setId;
     if (t.kind === "type") filters.type = t.type;
+    if (t.kind === "pokemon" && t.name) filters.names = [t.name];
   }
   saveFilters(); restart();
 };
@@ -2651,6 +2961,7 @@ document.getElementById("stopDiscovery").onclick = () => {
     const t = themeOf(b);
     if (t.kind === "set") filters.set = "";
     if (t.kind === "type") filters.type = "";
+    if (t.kind === "pokemon") filters.names = [];
   }
   saveFilters();
   paintDiscovery();
@@ -2728,12 +3039,144 @@ window.addEventListener("deviceorientation", e => {
     });
   });
 }, { passive:true });
+const ONBOARD_KEY = "bh.onboard.v1";
+let onboardStep = 1;
+let onboardMode = "first";
+let onboardPicks = new Set();
+let onboardCustom = [];
+let onboardEra = "";
+let onboardBudget = "";
+function loadOnboard(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(ONBOARD_KEY) || "null");
+    if (raw && typeof raw === "object") return raw;
+  } catch (e) {}
+  return null;
+}
+function saveOnboard(data){
+  try { localStorage.setItem(ONBOARD_KEY, JSON.stringify(data)); } catch (e) {}
+}
+function namesFromOnboard(){
+  const names = [];
+  onboardPicks.forEach(id => {
+    const pick = HUNT_PICKS.find(p => p.id === id);
+    if (pick) pick.names.forEach(n => { if (!names.some(x => sameName(x, n))) names.push(n); });
+  });
+  onboardCustom.forEach(n => { if (!names.some(x => sameName(x, n))) names.push(n); });
+  return names.slice(0, 24);
+}
+function renderOnboard(){
+  const title = document.getElementById("onboardTitle");
+  const sub = document.getElementById("onboardSub");
+  const step = document.getElementById("onboardStep");
+  const body = document.getElementById("onboardBody");
+  const back = document.getElementById("onboardBack");
+  const next = document.getElementById("onboardNext");
+  back.hidden = onboardStep === 1;
+  if (onboardStep === 1) {
+    step.textContent = "1 of 2";
+    title.textContent = "Who are you hunting for?";
+    sub.textContent = "Pick a few. You can change this anytime.";
+    next.textContent = "Next";
+    body.innerHTML = `<div class="searchrow"><input id="obFind" type="search" placeholder="Search a Pokémon" aria-label="Search a Pokémon"></div><div class="suggest" id="obSuggest"></div><div class="huntpicks">${HUNT_PICKS.map(p => `<button type="button" class="huntpick ${onboardPicks.has(p.id) ? "on" : ""}" data-ob="${p.id}">${esc(p.label)}</button>`).join("")}${onboardCustom.map(n => `<button type="button" class="huntpick on" data-obx="${esc(n)}">${esc(n)}</button>`).join("")}</div>`;
+    body.querySelectorAll("[data-ob]").forEach(btn => btn.onclick = () => {
+      popBtn(btn);
+      const id = btn.dataset.ob;
+      if (onboardPicks.has(id)) onboardPicks.delete(id); else onboardPicks.add(id);
+      btn.classList.toggle("on", onboardPicks.has(id));
+    });
+    body.querySelectorAll("[data-obx]").forEach(btn => btn.onclick = () => {
+      popBtn(btn);
+      onboardCustom = onboardCustom.filter(n => !sameName(n, btn.dataset.obx));
+      renderOnboard();
+    });
+    const find = document.getElementById("obFind");
+    const addCustom = name => {
+      const preset = HUNT_PICKS.find(p => sameName(p.label, name) || (p.names.length === 1 && sameName(p.names[0], name)));
+      if (preset) onboardPicks.add(preset.id);
+      else if (!onboardCustom.some(n => sameName(n, name))) onboardCustom.push(name);
+      renderOnboard();
+    };
+    find.oninput = () => {
+      const q = cleanMon(find.value);
+      const box = document.getElementById("obSuggest");
+      if (!q) { box.innerHTML = ""; return; }
+      const hits = MON_LIST.filter(n => n.toLowerCase().includes(q.toLowerCase())).slice(0, 6);
+      const exact = hits.some(n => sameName(n, q));
+      box.innerHTML = hits.map(n => `<button type="button" class="huntpick" data-add="${esc(n)}">${esc(n)}</button>`).join("") + (exact ? "" : `<button type="button" class="huntpick" data-add="${esc(q)}">Hunt ${esc(q)}</button>`);
+      box.querySelectorAll("[data-add]").forEach(btn => btn.onclick = () => { popBtn(btn); addCustom(btn.dataset.add); });
+    };
+    find.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); const name = cleanMon(find.value); if (name) addCustom(name); } };
+    find.focus();
+  } else {
+    step.textContent = "2 of 2";
+    title.textContent = "Favorite era?";
+    sub.textContent = "And a budget, if you have one.";
+    next.textContent = "Start hunting";
+    const eras = [{ id:"", label:"All of it" }].concat(ERA_GROUPS);
+    const budgets = [{ id:"", label:"Any" }, { id:"under10", label:"Under $10" }, { id:"mid", label:"$10–50" }, { id:"high", label:"$50+" }];
+    body.innerHTML = `<div class="huntpicks">${eras.map(g => `<button type="button" class="huntpick ${onboardEra === g.id ? "on" : ""}" data-era="${esc(g.id)}">${esc(g.label)}</button>`).join("")}</div><p class="fine">Budget</p><div class="huntpicks">${budgets.map(g => `<button type="button" class="huntpick ${onboardBudget === g.id ? "on" : ""}" data-budget="${esc(g.id)}">${esc(g.label)}</button>`).join("")}</div>`;
+    body.querySelectorAll("[data-era]").forEach(btn => btn.onclick = () => {
+      popBtn(btn);
+      onboardEra = btn.dataset.era || "";
+      body.querySelectorAll("[data-era]").forEach(other => other.classList.toggle("on", other === btn));
+    });
+    body.querySelectorAll("[data-budget]").forEach(btn => btn.onclick = () => {
+      popBtn(btn);
+      onboardBudget = btn.dataset.budget || "";
+      body.querySelectorAll("[data-budget]").forEach(other => other.classList.toggle("on", other === btn));
+    });
+  }
+}
+function openOnboard(mode){
+  const saved = loadOnboard() || {};
+  onboardMode = mode || "first";
+  onboardStep = 1;
+  if (onboardMode === "retake") {
+    onboardPicks = new Set(Array.isArray(saved.picks) ? saved.picks : []);
+    onboardCustom = Array.isArray(saved.custom) ? saved.custom.map(cleanMon).filter(Boolean) : [];
+    onboardEra = typeof saved.era === "string" ? saved.era : "";
+    onboardBudget = typeof saved.budget === "string" ? saved.budget : "";
+  } else {
+    onboardPicks = new Set();
+    onboardCustom = [];
+    onboardEra = "";
+    onboardBudget = "";
+  }
+  document.getElementById("onboard").hidden = false;
+  renderOnboard();
+}
+function skipOnboard(){
+  document.getElementById("onboard").hidden = true;
+  if (onboardMode === "retake") return;
+  saveOnboard({ done:true, skipped:true, picks:[], custom:[], era:"", budget:"", at:Date.now() });
+}
+function finishOnboard(){
+  if (onboardStep === 1) { onboardStep = 2; renderOnboard(); return; }
+  const names = namesFromOnboard();
+  filters = blankFilters();
+  filters.names = names;
+  filters.era = onboardEra || "";
+  filters.pricePreset = onboardBudget || "";
+  saveOnboard({ done:true, skipped:!names.length && !filters.era && !filters.pricePreset, picks:[...onboardPicks], custom:onboardCustom.slice(), era:filters.era, budget:filters.pricePreset, at:Date.now() });
+  document.getElementById("onboard").hidden = true;
+  restart({ keepSpice: names.length > 0 });
+  const bits = [];
+  if (names.length) bits.push(namesLabel());
+  if (filters.era) bits.push(eraLabel(filters.era));
+  if (filters.pricePreset) bits.push(priceLabel());
+  announce(bits.length ? "Hunting " + bits.join(" · ") + ". The chips up top can change it." : "A mixed hunt. The chips up top can narrow it.");
+}
+document.getElementById("onboardSkip").onclick = skipOnboard;
+document.getElementById("onboardBack").onclick = () => { onboardStep = 1; renderOnboard(); };
+document.getElementById("onboardNext").onclick = finishOnboard;
 paintChips();
 paintContext();
 paintDiscovery();
 loadScrydex();
 loadMeta().then(() => { if (tab === "sets") renderSets(); }).catch(() => {});
 restart();
+if (!(loadOnboard() || {}).done) openOnboard("first");
 const deepId = new URLSearchParams(location.search).get("card");
 if (deepId) hydrate({ id:deepId }).then(card => { if (card && !card.digital) openProfile(card); }).catch(() => announce("That card link didn't load."));
 </script>

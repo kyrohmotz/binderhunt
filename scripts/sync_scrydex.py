@@ -19,7 +19,9 @@ credits (default 500) and SCRYDEX_RUN_CARD_CAP cards (default 100).
 
 While any seeded card has never been fetched, the run backfills the most
 valuable unfetched cards. After that, tier A (the top of the seed) refreshes
-weekly and tier B refreshes monthly.
+weekly and tier B refreshes monthly. Cards people open or save often are
+read from data/price-demand.json and refresh every 90 days, only after the
+chase seed has room. Everything else keeps the TCGdex catalog price.
 
 Catalog ids from TCGdex are mapped before the request (sv03-223 becomes
 sv3-223). The record is stored under the catalog id. Secrets are read from
@@ -43,6 +45,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SEED_PATH = ROOT / "data" / "scrydex-seed.txt"
 CACHE_PATH = ROOT / "data" / "scrydex.json"
 USAGE_PATH = ROOT / "data" / "scrydex-usage.json"
+DEMAND_PATH = ROOT / "data" / "price-demand.json"
 API = "https://api.scrydex.com/pokemon/v1/cards"
 USAGE_API = "https://api.scrydex.com/account/v1/usage"
 MAX_PER_RUN = 100
@@ -52,11 +55,14 @@ STORE_RESERVE = 15000
 HISTORY_DAYS = 90
 TIER_A_HOURS = 24 * 7
 TIER_B_HOURS = 24 * 30
+DEMAND_HOURS = 24 * 90
+DEMAND_MIN = 2
 MISSING_HOURS = 24 * 30
 REQUEST_PAUSE_SEC = 0.35
 # TCGdex zero-pads set numbers and writes special sets as ".5".
 # Scrydex uses the Pokémon TCG API form: sv03 -> sv3, sv03.5 -> sv3pt5, me02 -> me2.
 _SET_RE = re.compile(r"^([a-z]+)(\d+)(\.5)?$")
+_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 
 class ScrydexError(Exception):
@@ -307,11 +313,63 @@ def card_is_unfilled(rec: dict, card_id: str) -> bool:
     return record_needs_remap(rec, card_id)
 
 
+def load_demand(path: Path | None = None) -> dict[str, int]:
+    """Counts of cards people opened or saved. Missing file means no demand."""
+    target = path or DEMAND_PATH
+    try:
+        parsed = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    counts = parsed.get("counts") if isinstance(parsed, dict) else None
+    if not isinstance(counts, dict):
+        return {}
+    clean: dict[str, int] = {}
+    for key, value in counts.items():
+        if not isinstance(key, str) or not _ID_RE.fullmatch(key.strip()):
+            continue
+        try:
+            clean[key.strip()] = max(0, int(value))
+        except (TypeError, ValueError):
+            continue
+    return clean
+
+
+def _with_demand(
+    due: list[str],
+    seed: list[tuple[str, str]],
+    cards: dict,
+    now: datetime,
+    demand: dict[str, int] | None,
+    max_cards: int,
+) -> list[str]:
+    """Append often-opened cards after the chase list. They refresh every 90 days."""
+    if not demand or len(due) >= max_cards:
+        return due[:max_cards]
+    seed_ids = {card_id for _tier, card_id in seed}
+    ranked = []
+    for card_id, count in demand.items():
+        if count < DEMAND_MIN or card_id in seed_ids or card_id in due:
+            continue
+        rec = cards.get(card_id) if isinstance(cards.get(card_id), dict) else {}
+        if card_is_unfilled(rec, card_id):
+            ranked.append((-count, 0, card_id))
+            continue
+        fetched = parse_time(rec.get("fetched_at"))
+        age = None if fetched is None else (now - fetched).total_seconds() / 3600
+        if age is None or age < DEMAND_HOURS:
+            continue
+        ranked.append((-count, -(age or 0), card_id))
+    ranked.sort()
+    room = max_cards - len(due)
+    return due + [card_id for *_rest, card_id in ranked[:room]]
+
+
 def select_due(
     seed: list[tuple[str, str]],
     cards: dict,
     now: datetime,
     max_cards: int = MAX_PER_RUN,
+    demand: dict[str, int] | None = None,
 ) -> list[str]:
     """Backfill unfetched cards first. Then weekly tier A and monthly tier B."""
     unfilled = []
@@ -324,7 +382,7 @@ def select_due(
         if card_is_unfilled(rec, card_id):
             unfilled.append(card_id)
     if unfilled:
-        return unfilled[:max_cards]
+        return _with_demand(unfilled, seed, cards, now, demand, max_cards)
     ranked = []
     seen.clear()
     for index, (tier, card_id) in enumerate(seed):
@@ -344,7 +402,8 @@ def select_due(
             continue
         ranked.append((0 if tier == "A" else 1, -(age or 0), index, card_id))
     ranked.sort()
-    return [card_id for *_, card_id in ranked[:max_cards]]
+    due = [card_id for *_, card_id in ranked[:max_cards]]
+    return _with_demand(due, seed, cards, now, demand, max_cards)
 
 
 def max_card_credits(card_id: str) -> int:
@@ -595,7 +654,7 @@ def sync(now: datetime | None = None) -> int:
     seed = load_seed()
     cache = load_cache()
     cards = cache["cards"]
-    due = select_due(seed, cards, now, max_cards=run_card_cap)
+    due = select_due(seed, cards, now, max_cards=run_card_cap, demand=load_demand())
     if not due:
         print(f"No cards due. Cache has {len(cards)} card(s); nothing was requested.")
         print(f"credits this run: {run_credits}")
