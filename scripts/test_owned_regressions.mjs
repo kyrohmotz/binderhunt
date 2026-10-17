@@ -5,8 +5,11 @@
 // 2. A long press or a sloppy press on .gotbtn does not toggle owned, and a
 //    long press still starts a pocket drag.
 // 3. Set owned counts only include ids in the set's card list and the
-//    displayed fraction is clamped. Set celebration waits until that list
-//    is loaded, so planted ids cannot complete the set early.
+//    displayed fraction is clamped. A set celebrates once the real list
+//    proves it is complete, including when that list is fetched from a
+//    binder mark or arrives later. Planted ids do not celebrate early.
+// 4. After the set catalog loads, owned ids with no saved set id are
+//    backfilled so their set tile is not stuck at 0%.
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { dirname, resolve } from "node:path";
@@ -200,6 +203,88 @@ const report = await ev(`(async () => {
   renderSets();
   const line = (document.getElementById("setProgress") || {}).textContent || "";
   check("set page never shows owned above the total", line.indexOf("4 / 3") < 0 && line.indexOf("3 / 3") >= 0, line);
+
+  setLists.delete("base4");
+  if (setView && setView.id === "base4") setView = null;
+  ownedIds.add("base4-12");
+  ownedSetById.delete("base4-12");
+  ownedSetById.delete("base4-not-a-card");
+  const beforeFill = setCompletion(meta.sets.find(s => s.id === "base4"));
+  check("ids without a set id do not count yet", beforeFill.owned === 0, String(beforeFill.owned));
+  backfillOwnedSets();
+  const afterFill = setCompletion(meta.sets.find(s => s.id === "base4"));
+  check("backfill after the catalog assigns set ids", ownedSetById.get("base4-12") === "base4" && afterFill.owned > 0, ownedSetById.get("base4-12") + " / " + afterFill.owned);
+
+  if (!meta.sets.some(s => s.id === "zzlate")) meta.sets.push({ id:"zzlate", name:"Late Set", cardCount:{ official:3, total:3 } });
+  const lateCards = [{ id:"zzlate-1" }, { id:"zzlate-2" }, { id:"zzlate-3" }];
+  const realGetJson = getJson;
+  getJson = async url => {
+    if (String(url).indexOf("/sets/zzlate") >= 0) return { name:"Late Set", releaseDate:"", cards:lateCards.map(c => ({ id:c.id })) };
+    return realGetJson(url);
+  };
+  const waitNotes = n => new Promise(resolve => {
+    const start = Date.now();
+    const t = setInterval(() => {
+      if (notes.length >= n || Date.now() - start > 4000) { clearInterval(t); resolve(); }
+    }, 20);
+  });
+  const waitList = () => new Promise(resolve => {
+    const start = Date.now();
+    const t = setInterval(() => {
+      if (setCardList("zzlate") || Date.now() - start > 4000) { clearInterval(t); resolve(); }
+    }, 20);
+  });
+  notes.length = 0;
+  celebrated.delete("set:zzlate");
+  setLists.delete("zzlate");
+  deferSetConfetti.delete("zzlate");
+  ownedIds.clear();
+  ownedSetById.clear();
+  ownedIds.add("zzlate-1"); ownedSetById.set("zzlate-1", "zzlate");
+  ownedIds.add("zzlate-2"); ownedSetById.set("zzlate-2", "zzlate");
+  const last = { id:"zzlate-3", name:"Late 3", setId:"zzlate" };
+  binderState.binders = [{ id:"bboth", name:"Both", color:"#F3EDC8", cards:[last], theme:{ kind:"none" }, charm:"none" }];
+  tab = "hunt";
+  setOwned(last, true, "pocket");
+  await waitNotes(1);
+  check("binder and set share one celebration", notes.length === 1 && notes[0].indexOf("Both is complete.") >= 0 && notes[0].indexOf("Late Set is complete.") >= 0, notes.join(" || "));
+  check("set key is stored once", celebrated.has("set:zzlate"));
+  notes.length = 0;
+  ownedIds.delete("zzlate-3");
+  setOwned(last, true, "pocket");
+  await new Promise(r => setTimeout(r, 80));
+  check("completing again stays quiet", notes.length === 0, notes.join(" || "));
+
+  notes.length = 0;
+  celebrated.delete("set:zzlate");
+  setLists.delete("zzlate");
+  deferSetConfetti.delete("zzlate");
+  ownedIds.clear();
+  ownedSetById.clear();
+  binderState.binders = [];
+  ["zzlate-p1","zzlate-p2"].forEach(id => { ownedIds.add(id); ownedSetById.set(id, "zzlate"); });
+  setOwned({ id:"zzlate-p3", name:"Plant", setId:"zzlate" }, true, "pocket");
+  await waitList();
+  await new Promise(r => setTimeout(r, 60));
+  check("planted ids do not celebrate after the list loads", notes.length === 0 && !celebrated.has("set:zzlate"), notes.join(" || "));
+
+  notes.length = 0;
+  celebrated.add("set:zzlate");
+  setLists.delete("zzlate");
+  ownedIds.clear();
+  ownedSetById.clear();
+  lateCards.forEach(c => { ownedIds.add(c.id); ownedSetById.set(c.id, "zzlate"); });
+  rememberSetList("zzlate", { cards:lateCards, release:"", name:"Late Set" });
+  check("already celebrated set stays quiet when the list loads", notes.length === 0 && celebrated.has("set:zzlate"), notes.join(" || "));
+
+  notes.length = 0;
+  celebrated.delete("set:zzlate");
+  setLists.delete("zzlate");
+  rememberSetList("zzlate", { cards:lateCards, release:"", name:"Late Set" });
+  const lateNotes = notes.length;
+  rememberSetList("zzlate", { cards:lateCards, release:"", name:"Late Set" });
+  check("loading the list celebrates a finished set once", lateNotes === 1 && notes.length === 1 && notes[0].indexOf("Late Set is complete.") >= 0, notes.join(" || "));
+  getJson = realGetJson;
 
   const pocket = { id:"jungle-4", name:"Charizard", setId:"base2", rarity:"Rare Holo", number:"4" };
   ownedIds.delete(pocket.id);

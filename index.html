@@ -1039,6 +1039,54 @@ function noteSet(setId){
   celebrated.add(key);
   return friendlySetName(setId) + " is complete.";
 }
+const setListInflight = new Map();
+const deferSetConfetti = new Map();
+function publishSetCelebration(setId){
+  if (!setId || ownedNeedsSeed) return "";
+  const msg = noteSet(setId);
+  if (!msg) return "";
+  saveOwned();
+  if (deferSetConfetti.has(setId)) {
+    deferSetConfetti.set(setId, msg);
+    return msg;
+  }
+  showConfetti(msg);
+  return msg;
+}
+function rememberSetList(id, bag){
+  setLists.set(id, bag);
+  if (bag && bag.cards && bag.cards.length) publishSetCelebration(id);
+  return bag;
+}
+async function ensureSetList(id){
+  const ready = setCardList(id);
+  if (ready) return ready;
+  if (setLists.has(id)) return (setLists.get(id) || {}).cards || [];
+  if (setListInflight.has(id)) return setListInflight.get(id);
+  const job = (async () => {
+    try {
+      const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
+      const cards = (set.cards || []).slice().sort((a, b) => numId(a.localId) - numId(b.localId) || String(a.id).localeCompare(String(b.id)));
+      rememberSetList(id, { cards, release:set.releaseDate || "", name:set.name || id });
+      return cards;
+    } catch (e) {
+      if (isBusyError(e)) throw e;
+      setLists.set(id, { cards:[], release:"", name:id });
+      return [];
+    } finally {
+      setListInflight.delete(id);
+    }
+  })();
+  setListInflight.set(id, job);
+  return job;
+}
+function ownedResult(card, on, msgs){
+  if (msgs.length) showConfetti(msgs.join(" "));
+  else {
+    if (settings.sound && !reduceMotion()) playTone(on ? 540 : 300);
+    announce(on ? (card.name || "Card") + " is marked got it." : (card.name || "Card") + " is wanted again.");
+  }
+}
 function collectNewCompletions(card, prior){
   const msgs = [];
   if (!card) return msgs;
@@ -1136,13 +1184,32 @@ function setOwned(card, on, origin){
   else if (on) msgs = collectNewCompletions(card, prior);
   saveOwned();
   if (settings.haptics) haptic(on ? 12 : 6);
-  if (msgs.length) showConfetti(msgs.join(" "));
-  else {
-    if (settings.sound && !reduceMotion()) playTone(on ? 540 : 300);
-    announce(on ? (card.name || "Card") + " is marked got it." : (card.name || "Card") + " is wanted again.");
-  }
   refreshOwnedViews(id);
   focusOwnedControl(id, origin);
+  const sid = on ? setIdOf(card) : "";
+  const setTotalNow = sid ? setTotal(meta.sets.find(s => s.id === sid)) : 0;
+  const pendingSet = sid && !ownedNeedsSeed && !setCardList(sid) && !celebrated.has("set:" + sid) && setTotalNow && countOwnedInSet(sid) >= setTotalNow ? sid : "";
+  if (pendingSet) {
+    const binderMsgs = msgs.slice();
+    deferSetConfetti.set(pendingSet, "");
+    ensureSetList(pendingSet).then(() => {
+      const setMsg = deferSetConfetti.get(pendingSet) || "";
+      deferSetConfetti.delete(pendingSet);
+      const all = binderMsgs.slice();
+      if (setMsg && !all.includes(setMsg)) all.push(setMsg);
+      if (!setMsg) {
+        const late = noteSet(pendingSet);
+        if (late && !all.includes(late)) { saveOwned(); all.push(late); }
+      }
+      ownedResult(card, on, all);
+      if (tab === "sets") renderSets();
+    }).catch(() => {
+      deferSetConfetti.delete(pendingSet);
+      ownedResult(card, on, binderMsgs);
+    });
+    return true;
+  }
+  ownedResult(card, on, msgs);
   return true;
 }
 function snapshot(card){
@@ -1555,12 +1622,10 @@ function enforceTheme(){
 async function pullSet(id){
   if (!setLists.has(id)) {
     try {
-      const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
-      const cards = (set.cards || []).slice().sort((a, b) => numId(a.localId) - numId(b.localId) || String(a.id).localeCompare(String(b.id)));
-      setLists.set(id, { cards, release:set.releaseDate || "", name:set.name || id });
+      await ensureSetList(id);
     } catch (e) {
       if (isBusyError(e)) throw e;
-      setLists.set(id, { cards:[], release:"", name:id });
+      if (!setLists.has(id)) setLists.set(id, { cards:[], release:"", name:id });
     }
   }
   const bag = setLists.get(id);
@@ -2682,7 +2747,7 @@ async function openSet(id){
     const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
     const cards = (set.cards || []).slice().sort((a, b) => numId(a.localId) - numId(b.localId));
     if (!cards.some(c => safeImg(c && c.image))) imageless.add(id);
-    setLists.set(id, { cards, release:set.releaseDate || "", name:set.name || known.name || id });
+    rememberSetList(id, { cards, release:set.releaseDate || "", name:set.name || known.name || id });
     setView = { id, name:set.name || known.name, release:(set.releaseDate || "").slice(0, 4), cards, mode:"flip", loading:false };
     const tile = meta.sets.find(s => s.id === id);
     if (tile) tile.year = setView.release;
@@ -4138,6 +4203,7 @@ paintContext();
 paintDiscovery();
 loadScrydex();
 loadMeta().then(() => {
+  backfillOwnedSets();
   quietSeedSets();
   if (tab === "sets") renderSets();
   if (tab === "binders") renderBinders();
