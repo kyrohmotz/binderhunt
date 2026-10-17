@@ -20,7 +20,9 @@
 //    keeps that toast up.
 // 6. After Skip, focus stays on the hunt and ArrowLeft, ArrowRight, and Z
 //    still work. The same check runs at 390 and 1440. A select is a typing
-//    target, and those hunt keys do nothing while Settings is open.
+//    target, and those hunt keys do nothing while Settings is open. Digits
+//    and arrows in the daily guess field do not hunt, and hunt keys stay
+//    inert while Today's Drop or the Daily view is open.
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -106,7 +108,12 @@ localStorage.setItem("bh.filters.v3", JSON.stringify({set:"",rarities:[],era:"",
 localStorage.setItem("binderhuntWish","[]");
 localStorage.setItem("bh.binders.v1", JSON.stringify({discoveryId:"",binders:[]}));
 localStorage.setItem("bh.settings.v1", JSON.stringify({sound:false,haptics:false,reduce:"on",currency:"USD"}));
-localStorage.setItem("bh.owned.v1", JSON.stringify({v:1,ids:[],sets:{},celebrated:[],seeded:true}));`;
+localStorage.setItem("bh.owned.v1", JSON.stringify({v:1,ids:[],sets:{},celebrated:[],seeded:true}));
+(() => {
+  const bag = {};
+  new Intl.DateTimeFormat("en-CA", { timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit" }).formatToParts(new Date()).forEach(part => { bag[part.type] = part.value; });
+  localStorage.setItem("bh.daily.v1", JSON.stringify({ v:1, current:0, best:0, lastPlayed:"", prompted: bag.year + "-" + bag.month + "-" + bag.day, days:{} }));
+})();`;
 await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: boot });
 await cdp.send("Page.navigate", { url: "http://127.0.0.1:" + PORT + "/index.html" });
 await sleep(600);
@@ -118,11 +125,16 @@ await ev(`new Promise((resolve, reject) => {
   }, 50);
 })`);
 
-const keyScript = `(() => {
+const keyScript = `(async () => {
   const problems = [];
   const note = (ok, name, extra) => { if (!ok) problems.push(name + (extra ? " — " + extra : "")); };
   settings.haptics = true;
+  const prompt = document.getElementById("dropPrompt");
+  if (prompt) prompt.hidden = true;
+  const shell = document.getElementById("shell");
+  if (shell) shell.removeAttribute("inert");
   showTab("hunt");
+  syncActs();
   generation++;
   loading = true;
   clearHuntWatch();
@@ -202,6 +214,43 @@ const keyScript = `(() => {
   showTab("hunt");
   wish = [];
   saveWish();
+  const quietIds = pile.map(c => c.id).join(",");
+  const quietUndo = undoStack.length;
+  const drop = document.getElementById("dropPrompt");
+  drop.hidden = false;
+  document.getElementById("dropPlay").focus();
+  ["ArrowLeft", "ArrowRight", "ArrowUp", "f", "F", "z", "Z", "1", "2"].forEach(press);
+  note(pile.map(c => c.id).join(",") === quietIds && undoStack.length === quietUndo && document.getElementById("filterSheet").hidden, "hunt keys stay inert while Today's Drop is open", pile.map(c => c.id).join(","));
+  drop.hidden = true;
+  if (shell) shell.removeAttribute("inert");
+  syncActs();
+  showTab("daily");
+  const waitGuess = Date.now();
+  while (!document.getElementById("dailyGuess") && Date.now() - waitGuess < 5000) {
+    await new Promise(resolve => setTimeout(resolve, 40));
+  }
+  const guess = document.getElementById("dailyGuess");
+  note(!!guess && guess.type === "text" && typingTarget(guess), "the daily guess field is a typing target", guess ? guess.type : "missing");
+  tab = "hunt";
+  if (guess) {
+    guess.focus();
+    guess.value = "12.50";
+    ["1", "2", "3", "ArrowLeft", "ArrowRight", "ArrowUp", "f", "z"].forEach(press);
+    note(guess.value === "12.50", "digits stay in the guess field", guess.value);
+  }
+  deck.focus();
+  ["ArrowLeft", "ArrowRight", "ArrowUp", "f", "z"].forEach(press);
+  note(pile.map(c => c.id).join(",") === quietIds && undoStack.length === quietUndo && document.getElementById("filterSheet").hidden && document.getElementById("viewDaily") && !document.getElementById("viewDaily").hidden, "hunt keys stay inert while the Daily view is open", pile.map(c => c.id).join(","));
+  if (!profileEl.hidden && !wide()) closeProfile();
+  showTab("hunt");
+  wish = [];
+  saveWish();
+  const back = pile.map(c => c.id).join(",");
+  deck.focus();
+  press("ArrowLeft");
+  note(pile.map(c => c.id).join(",") !== back, "ArrowLeft works again after Daily closes", pile.map(c => c.id).join(","));
+  press("z");
+  note(pile.map(c => c.id).join(",") === back, "Z undoes that pass", pile.map(c => c.id).join(","));
   return problems;
 })()`;
 const screenshotDir = process.env.SCREENSHOT_DIR || resolve(root, "qa-artifacts");

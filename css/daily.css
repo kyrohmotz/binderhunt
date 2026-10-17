@@ -1,0 +1,59 @@
+/* Daily Drop. Layout and type for the tabs live in the main stylesheet. */
+.dailydot{display:inline-block;width:8px;height:8px;margin-left:4px;border-radius:50%;background:var(--rose);border:1.5px solid var(--ink);vertical-align:1px;box-shadow:1px 1px 0 var(--ink)}
+.dailydot[hidden]{display:none !important}
+.daily-wrap{width:min(100%,440px);margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.daily-top{display:flex;align-items:flex-end;justify-content:space-between;gap:8px}
+.daily-title{font-family:var(--display);font-weight:700;font-size:28px;line-height:1;margin:0}
+.daily-streak{display:flex;gap:6px;flex:none}
+.daily-streak span{background:var(--paper-2);border:2.5px solid var(--ink);border-radius:999px;padding:4px 8px;box-shadow:2px 2px 0 var(--ink);font-size:13px}
+.daily-streak b{font-family:var(--display);font-variant-numeric:tabular-nums}
+.daily-count{margin:0;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.daily-frame{width:min(168px,42vw);height:auto;aspect-ratio:63/88;flex:none;margin:0 auto}
+.daily-frame img{width:100%;height:100%;object-fit:contain;background:#fff}
+.daily-meta{margin:0;text-align:center}
+.daily-meta b{font-family:var(--display);font-size:18px}
+.ticket-scene{perspective:900px;height:84px;width:min(260px,78vw);margin:0 auto}
+.ticket{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.2,.85,.2,1)}
+.ticket.revealed{transform:rotateX(180deg)}
+.ticket-face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;backface-visibility:hidden;border:2.5px solid var(--ink);border-radius:18px;box-shadow:3px 3px 0 var(--ink);padding:8px}
+.ticket-front{background:repeating-linear-gradient(135deg,#c9d4b4 0 7px,#e4ead8 7px 14px);font-family:var(--display);font-weight:700}
+.ticket-back{transform:rotateX(180deg);background:var(--sky)}
+.ticket:not(.revealed) .ticket-back{visibility:hidden}
+.ticket-back .market-price{font-size:28px}
+.guesses{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.guesses li{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:44px;border:2.5px solid var(--ink);border-radius:14px;padding:8px 10px;box-shadow:2px 2px 0 var(--ink)}
+.guesses b{font-family:var(--display);font-variant-numeric:tabular-nums}
+.guesses span{text-align:right}
+.band-hit{background:var(--green)}
+.band-warm{background:var(--butter)}
+.band-cool{background:var(--sky)}
+.band-cold{background:var(--rose)}
+.daily-form{display:flex;gap:8px;align-items:flex-end}
+.daily-form label{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;font-family:var(--display);font-weight:700}
+.daily-form input{width:100%;border:2.5px solid var(--ink);border-radius:14px;padding:10px 12px;background:#fff;min-height:48px;font-size:16px}
+.daily-left{margin:0;font-family:var(--display);font-weight:700}
+.daily-print{margin:0;text-align:center}
+.daily-error{margin:0;background:var(--rose);border:2.5px solid var(--ink);border-radius:14px;padding:8px 10px;box-shadow:2px 2px 0 var(--ink)}
+.daily-error[hidden]{display:none !important}
+.daily-short .daily-wrap{gap:4px}
+.daily-short .daily-frame{width:min(104px,28vw)}
+.daily-short .ticket-scene{height:56px}
+.daily-short .daily-title{font-size:22px}
+.daily-short .daily-meta{font-size:13px}
+.daily-short .daily-count,.daily-short .daily-streak span,.daily-short .daily-print{font-size:12px}
+.daily-reveal{display:flex;flex-direction:column;gap:8px}
+.daily-reveal[hidden]{display:none !important}
+.daily-actions,.daily-share{display:flex;flex-wrap:wrap;gap:8px}
+.daily-actions .chip,.daily-actions .go,.daily-share .chip,.daily-form .go{min-height:44px}
+.daily-sharebox{width:100%;min-height:64px;border:2.5px solid var(--ink);border-radius:14px;padding:8px;background:#fff;font:inherit}
+.drop-prompt{position:fixed;inset:0;z-index:86;background:rgba(43,48,38,.38);display:flex;align-items:flex-end;justify-content:center;padding:12px}
+.drop-prompt[hidden]{display:none !important}
+.drop-card{width:min(420px,100%);background:var(--paper);border:2.5px solid var(--ink);border-radius:28px;box-shadow:4px 4px 0 var(--ink);padding:16px}
+@media (min-width:1024px){
+  .drop-prompt{align-items:center}
+  .daily-frame{width:min(260px,22vw)}
+}
+@media (prefers-reduced-motion:reduce){
+  html:not(.motion-on) .ticket{transition:none}
+}
+html.reduce .ticket{transition:none}

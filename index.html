@@ -104,7 +104,7 @@ img{max-width:100%;-webkit-user-drag:none}
 .foot{display:flex;gap:8px;align-items:center;justify-content:center;padding:0 12px 6px;flex:none;text-align:center}
 .foot img{width:32px;height:32px;object-fit:contain}
 .foot p{margin:0;font-size:11px;line-height:1.3;color:var(--ink-2);font-weight:600}
-.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:6px 10px calc(8px + env(safe-area-inset-bottom));border-top:2.5px solid var(--ink);background:var(--paper-2);flex:none}
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:6px 8px calc(8px + env(safe-area-inset-bottom));border-top:2.5px solid var(--ink);background:var(--paper-2);flex:none}
 .tabbtn{min-height:48px;border:2.5px solid transparent;border-radius:16px;background:transparent;font-family:var(--display);font-weight:700}
 .tabbtn[aria-current="page"]{background:var(--sky);border-color:var(--ink);box-shadow:2px 2px 0 var(--ink)}
 .scroll{flex:1;min-height:0;overflow:auto;padding:12px;-webkit-overflow-scrolling:touch}
@@ -382,6 +382,7 @@ html.reduce .sleeve.holo img{transform:none}
 .ownchip{flex:none}
 .ownchip[aria-pressed="true"]{background:var(--green);color:var(--ink)}
 </style>
+<link rel="stylesheet" href="css/daily.css">
 </head>
 <body>
 <div id="live" class="sr-only" aria-live="polite"></div>
@@ -393,6 +394,7 @@ html.reduce .sleeve.holo img{transform:none}
       <button class="tabbtn" type="button" data-tab="hunt" aria-current="page">Hunt</button>
       <button class="tabbtn" type="button" data-tab="sets">Sets</button>
       <button class="tabbtn" type="button" data-tab="binders">Binders</button>
+      <button class="tabbtn" type="button" data-tab="daily">Daily<span class="dailydot" hidden></span></button>
     </nav>
     <div class="credit">
       <img src="assets/brand/two-toads-logo.png" width="32" height="32" alt="Two Toads">
@@ -443,6 +445,9 @@ html.reduce .sleeve.holo img{transform:none}
     <div id="viewBinders" class="view" hidden>
       <div class="scroll" id="bindersScroll"></div>
     </div>
+    <div id="viewDaily" class="view" hidden>
+      <div class="scroll" id="dailyScroll"></div>
+    </div>
     <footer class="foot">
       <img src="assets/brand/two-toads-logo.png" width="32" height="32" alt="Two Toads">
       <p>BinderHunt · made with 🐸 by Two Toads<br>Not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. Wishlists and binders stay in this browser. Sources: TCGdex, TCGplayer, Cardmarket, Scrydex.</p>
@@ -453,6 +458,7 @@ html.reduce .sleeve.holo img{transform:none}
     <button class="tabbtn" type="button" data-tab="hunt" aria-current="page">Hunt</button>
     <button class="tabbtn" type="button" data-tab="sets">Sets</button>
     <button class="tabbtn" type="button" data-tab="binders">Binders</button>
+    <button class="tabbtn" type="button" data-tab="daily">Daily<span class="dailydot" hidden></span></button>
   </nav>
 </div>
 <div id="filterSheet" class="sheet" hidden>
@@ -485,6 +491,22 @@ html.reduce .sleeve.holo img{transform:none}
   </div>
 </div>
 <div id="menu" class="menu" hidden role="menu"></div>
+<div id="dropPrompt" class="drop-prompt" hidden>
+  <div class="drop-card" role="dialog" aria-modal="true" aria-labelledby="dropPromptTitle">
+    <div class="toad-row">
+      <img src="assets/brand/two-toads-logo.png" width="72" height="72" alt="">
+      <div class="bubble">
+        <p class="kicker">Today's Drop</p>
+        <h2 id="dropPromptTitle">Guess the price.</h2>
+        <p>One card for everyone. Three guesses. No packs.</p>
+      </div>
+    </div>
+    <div class="onboard-actions">
+      <button type="button" class="skip" id="dropLater">Later</button>
+      <button type="button" class="go" id="dropPlay">Play</button>
+    </div>
+  </div>
+</div>
 <div id="onboard" class="onboard" hidden>
   <div class="onboard-card" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
     <div class="toad-row">
@@ -900,7 +922,7 @@ function trimLog(log){
   (log.days || []).forEach(d => {
     if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) && !days.includes(d)) days.push(d);
   });
-  const events = (log.events || []).filter(e => e && (e.k === "save" || e.k === "own") && typeof e.id === "string" && e.id.length <= 80 && /^\d{4}-\d{2}-\d{2}$/.test(e.t)).slice(-LOG_MAX_EVENTS);
+  const events = (log.events || []).filter(e => e && (e.k === "save" || e.k === "own" || e.k === "daily") && typeof e.id === "string" && e.id.length <= 80 && /^\d{4}-\d{2}-\d{2}$/.test(e.t)).slice(-LOG_MAX_EVENTS);
   return { v:1, days:days.slice(-LOG_MAX_DAYS), events };
 }
 function saveLog(){
@@ -922,9 +944,15 @@ function logVisit(day){
 }
 function logEvent(kind, id, extra){
   const clean = cleanId(String(id || ""));
-  if (!clean || (kind !== "save" && kind !== "own")) return;
+  if (!clean || (kind !== "save" && kind !== "own" && kind !== "daily")) return;
   const row = { t:localDay(), k:kind, id:clean };
+  if (kind === "daily" && extra && /^\d{4}-\d{2}-\d{2}$/.test(extra.day || "")) row.t = extra.day;
   if (extra && typeof extra.on === "boolean") row.on = extra.on;
+  if (kind === "daily" && extra) {
+    if (Number.isFinite(extra.n)) row.n = extra.n;
+    if (Number.isFinite(extra.g)) row.g = extra.g;
+    if (typeof extra.ok === "boolean") row.ok = extra.ok;
+  }
   logState.events.push(row);
   saveLog();
 }
@@ -2660,7 +2688,9 @@ function removeFromWish(id){
 }
 
 function blocking(){
-  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (!profileEl.hidden && !wide());
+  const prompt = document.getElementById("dropPrompt");
+  const daily = document.getElementById("viewDaily");
+  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (prompt && !prompt.hidden) || (daily && !daily.hidden) || (!profileEl.hidden && !wide());
 }
 function keepSwipeFocus(trigger){
   const box = document.getElementById("hapticSwitch");
@@ -2732,6 +2762,7 @@ function paintContext(){
   let label = "All cards";
   if (tab === "sets") label = setView ? (setView.name || "Set") : "Sets";
   else if (tab === "binders") label = binderView ? (binderView.kind === "wish" ? "Wishlist" : (binderState.binders.find(x => x.id === binderView.id) || {}).name || "Binders") : "Binders";
+  else if (tab === "daily") label = "Today's Drop";
   else if (b) label = b.name;
   else if (filters.set) label = setName(filters.set);
   else if ((filters.names || []).length) label = namesLabel();
@@ -2751,10 +2782,14 @@ function showTab(name){
   document.getElementById("viewHunt").hidden = name !== "hunt";
   document.getElementById("viewSets").hidden = name !== "sets";
   document.getElementById("viewBinders").hidden = name !== "binders";
+  const dailyView = document.getElementById("viewDaily");
+  if (dailyView) dailyView.hidden = name !== "daily";
   document.querySelectorAll("[data-tab]").forEach(btn => btn.setAttribute("aria-current", btn.dataset.tab === name ? "page" : "false"));
   if (name === "sets") renderSets();
   if (name === "binders") renderBinders();
+  if (name === "daily" && typeof window.renderDaily === "function") window.renderDaily();
   paintContext(); paintDiscovery();
+  if (typeof window.paintDailyBadge === "function") window.paintDailyBadge();
   if (name === "hunt") renderDeck();
 }
 
@@ -4144,8 +4179,8 @@ document.getElementById("gear").onclick = () => {
     <label class="field">Currency<select id="setCur"><option value="USD">US dollars</option><option value="EUR">Cardmarket euros</option></select></label>
     <button class="chip" id="retakeOnboard" type="button">Retake the hunt quiz</button>
     <h2>About</h2>
-    <p class="fine">BinderHunt is not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. There is no account. Wishlists, binders, owned marks, filters, and settings stay in this browser.</p>
-    <p class="fine">A public hit counter records page views, one visit a day, and a few actions. It sets no cookies and sends no identifier, and it stays off when Do Not Track is on.</p>
+    <p class="fine">BinderHunt is not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. There is no account. Wishlists, binders, owned marks, filters, settings, and the daily streak stay in this browser.</p>
+    <p class="fine">A public hit counter records page views, one visit a day, and a few actions, including playing the daily drop. It sets no cookies and sends no identifier, and it stays off when Do Not Track is on.</p>
     <p class="fine">Card text and images come from TCGdex. US prices come from TCGplayer. European prices come from Cardmarket. Commons and cards under $10 use those catalog prices. Graded prices and population come from a Scrydex cache for chase cards and cards you open or save often, and only for the printing on screen. Prices are estimates, not financial advice. TCGplayer, eBay, and Cardmarket links are not affiliate links yet.</p>
     <p class="fine"><img src="assets/brand/two-toads-logo.png" width="32" height="32" alt="Two Toads"> BinderHunt · made with 🐸 by Two Toads</p>`;
   document.getElementById("setMotion").value = settings.reduce;
@@ -4199,9 +4234,9 @@ function typingTarget(el){
   return type === "text" || type === "search" || type === "number";
 }
 document.addEventListener("keydown", e => {
-  const open = ["fillSheet","binderSheet","settingsSheet","filterSheet"].map(id => document.getElementById(id)).find(el => el && !el.hidden);
+  const open = ["fillSheet","binderSheet","settingsSheet","filterSheet","dropPrompt"].map(id => document.getElementById(id)).find(el => el && !el.hidden);
   if (open && e.key === "Tab") {
-    const items = [...open.querySelectorAll(".sheet-card button, .sheet-card input, .sheet-card select, .sheet-card a")].filter(el => !el.disabled && el.offsetParent);
+    const items = [...open.querySelectorAll(".sheet-card button, .sheet-card input, .sheet-card select, .sheet-card a, .drop-card button, .drop-card input, .drop-card select, .drop-card a")].filter(el => !el.disabled && el.offsetParent);
     if (items.length) {
       const first = items[0], last = items[items.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -4211,6 +4246,13 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") {
     if (!document.getElementById("menu").hidden) { document.getElementById("menu").hidden = true; return; }
     ["fillSheet","binderSheet","settingsSheet","filterSheet"].forEach(id => { if (!document.getElementById(id).hidden) closeSheet(id); });
+    const prompt = document.getElementById("dropPrompt");
+    if (prompt && !prompt.hidden) {
+      prompt.hidden = true;
+      const shell = document.getElementById("shell");
+      if (shell) shell.removeAttribute("inert");
+      syncActs();
+    }
     if (!profileEl.hidden && !wide()) closeProfile();
     return;
   }
@@ -4439,6 +4481,24 @@ const returning = wish.length > 0 || binderState.binders.length > 0;
 if (!deepId && !returning && !(loadOnboard() || {}).done) openOnboard("first");
 countPage();
 if (deepId) hydrate({ id:deepId }).then(card => { if (card && !card.digital) openProfile(card); }).catch(() => announce("That card link didn't load."));
+window.BHDailyHost = {
+  get filters(){ return filters; },
+  set filters(value){ filters = value; },
+  get binderState(){ return binderState; },
+  get ownedIds(){ return ownedIds; },
+  get wish(){ return wish; },
+  speciesFor(name){
+    if (window.BinderDaily && typeof window.BinderDaily.speciesName === "function") return window.BinderDaily.speciesName(name);
+    const names = MON_LIST.slice().sort((a, b) => b.length - a.length);
+    const found = names.find(n => speciesHit(name, n));
+    if (found) return found;
+    const word = String(name || "").split(/[\s-]/)[0];
+    if (word && word.length > 2 && !/^(the|a|an|team|rocket|dark|light|shiny|mr|ms)$/i.test(word)) return word;
+    return "";
+  }
+};
 </script>
+<script src="js/daily-core.js"></script>
+<script src="js/daily-ui.js"></script>
 </body>
 </html>
