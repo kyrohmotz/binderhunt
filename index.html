@@ -753,6 +753,7 @@ let scrydex = { ready:false, cards:{} };
 let scrydexPromise = null;
 let profileCard = null;
 let profilePinned = false;
+let pinnedTopId = "";
 let summaryId = "";
 let sideKey = "";
 let deckTopId = "";
@@ -3018,7 +3019,7 @@ function showTab(name){
   const dailyView = document.getElementById("viewDaily");
   if (dailyView) dailyView.hidden = name !== "daily";
   document.querySelectorAll("[data-tab]").forEach(btn => btn.setAttribute("aria-current", btn.dataset.tab === name ? "page" : "false"));
-  if (wide()) { profilePinned = false; profileCard = null; summaryId = ""; sideKey = ""; }
+  if (wide()) { profilePinned = false; profileCard = null; pinnedTopId = ""; summaryId = ""; sideKey = ""; }
   if (name === "sets") renderSets();
   if (name === "binders") renderBinders();
   if (name === "daily" && typeof window.renderDaily === "function") window.renderDaily();
@@ -4247,9 +4248,14 @@ function paintDeckSummary(card){
   deckTopSeen = true;
   if (tab !== "hunt") return;
   if (profilePinned) {
-    if (!changed && profileCard && profileCard.id === id) return;
+    if (!pinnedTopId) {
+      if (id) pinnedTopId = id;
+      return;
+    }
+    if (id === pinnedTopId || !changed) return;
     profilePinned = false;
     profileCard = null;
+    pinnedTopId = "";
     summaryId = "";
   }
   if (id && id === summaryId && profileEl.querySelector("[data-summary='1']")) return;
@@ -4331,6 +4337,7 @@ function openProfile(card){
     hydrate(card).then(full => { if (profilePinned && profileCard && profileCard.id === card.id) renderProfile(full); }).catch(() => { if (profilePinned && profileCard && profileCard.id === card.id) renderProfile(card); });
   }
   profilePinned = true;
+  pinnedTopId = (currentTop() && currentTop().id) || "";
   summaryId = "";
   profileCard = card;
   profileEl.hidden = false;
@@ -4350,6 +4357,7 @@ function openProfile(card){
 function closeProfile(){
   profilePinned = false;
   profileCard = null;
+  pinnedTopId = "";
   summaryId = "";
   sideKey = "";
   if (wide()) paintSide();

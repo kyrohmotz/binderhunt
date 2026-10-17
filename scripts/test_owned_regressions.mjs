@@ -23,6 +23,8 @@
 //    target, and those hunt keys do nothing while Settings is open. Digits
 //    and arrows in the daily guess field do not hunt, and hunt keys stay
 //    inert while Today's Drop or the Daily view is open.
+// 7. A desktop deep link (?card=base1-4) keeps that profile pinned after the
+//    hunt deck loads. One Skip then replaces it with the new top card.
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -719,8 +721,53 @@ const report = await ev(`(async () => {
   return fails;
 })()`);
 
+await cdp.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+await cdp.send("Page.navigate", { url: "http://127.0.0.1:" + PORT + "/index.html?card=base1-4" });
+const deepLink = await ev(`(async () => {
+  const fails = [];
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const profileState = () => {
+    const titleEl = document.getElementById("profileTitle");
+    const title = titleEl ? titleEl.textContent : "";
+    const eyebrowEl = document.querySelector("#profile .eyebrow");
+    const eyebrow = eyebrowEl ? eyebrowEl.textContent : "";
+    const pinned = !!document.getElementById("closeProfile") && !document.querySelector("#profile [data-summary='1']");
+    const top = [...document.querySelectorAll("#deck .card")].reverse().find(el => el.card && !el.classList.contains("leaving"));
+    const skip = document.getElementById("skip");
+    return { title, eyebrow, pinned, top: top && top.card ? top.card.name : "", topId: top && top.card ? top.card.id : "", deck: document.getElementById("deck").dataset.status || "", skipDisabled: !skip || skip.disabled };
+  };
+  const start = Date.now();
+  let shownAt = 0;
+  while (Date.now() - start < 20000) {
+    const state = profileState();
+    if (state.pinned && state.title === "Charizard") { shownAt = Date.now(); break; }
+    await sleep(100);
+  }
+  if (!shownAt) return ["deep link did not pin Charizard — " + JSON.stringify(profileState())];
+  let deckReady = false;
+  while (Date.now() - start < 25000) {
+    const state = profileState();
+    if (state.top && !state.skipDisabled) { deckReady = true; break; }
+    await sleep(100);
+  }
+  const waited = Date.now() - shownAt;
+  if (waited < 8000) await sleep(8000 - waited);
+  const held = profileState();
+  if (!deckReady) fails.push("deck did not finish loading — " + JSON.stringify(held));
+  if (!(held.pinned && held.title === "Charizard" && held.eyebrow !== "On the table")) fails.push("Charizard unpinned after the deck loaded — " + JSON.stringify(held));
+  const beforeTop = held.topId;
+  document.getElementById("skip").click();
+  await sleep(700);
+  const after = profileState();
+  if (after.pinned || after.eyebrow !== "On the table") fails.push("Skip did not return to the live summary — " + JSON.stringify(after));
+  if (!after.title || after.title === "Charizard") fails.push("Skip left Charizard in the panel — " + JSON.stringify(after));
+  if (after.top && after.title !== after.top) fails.push("summary is not the new top card — " + JSON.stringify(after));
+  if (beforeTop && after.topId === beforeTop) fails.push("Skip did not move the deck — " + JSON.stringify(after));
+  return fails;
+})()`);
+
 if (errors.length) console.log("page exceptions:", errors.slice(0, 8).join("\n"));
-const fails = keyFails.concat(Array.isArray(report) ? report : ["test did not return a list: " + JSON.stringify(report)]);
+const fails = keyFails.concat(Array.isArray(report) ? report : ["test did not return a list: " + JSON.stringify(report)], Array.isArray(deepLink) ? deepLink : ["deep link test did not return a list: " + JSON.stringify(deepLink)]);
 if (fails.length) {
   console.log("FAILED\n" + fails.join("\n"));
   shutdown(1);
