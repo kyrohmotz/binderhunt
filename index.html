@@ -565,6 +565,10 @@ let pullSerial = 0;
 let busyStrike = 0;
 let busyUntil = 0;
 let busyRenderTimer = 0;
+const fetchFails = new Map();
+let deferred = [];
+let deferredPass = false;
+const CARD_FETCH_RETRIES = 3;
 const bulkBags = new Map();
 const imageless = new Set(IMAGELESS_SETS);
 const setPools = new Map();
@@ -1572,6 +1576,22 @@ async function pullMore(){
   }
   return pullUnscoped();
 }
+function parkThrottled(brief){
+  const fails = (fetchFails.get(brief.id) || 0) + 1;
+  fetchFails.set(brief.id, fails);
+  if (brief.finalTry) return "drop";
+  if (fails <= CARD_FETCH_RETRIES) { briefs.push(brief); return "requeue"; }
+  if (!deferred.some(d => d.id === brief.id)) deferred.push(brief);
+  return "defer";
+}
+function reclaimDeferred(){
+  if (deferredPass || !deferred.length) return false;
+  deferredPass = true;
+  const pending = deferred;
+  deferred = [];
+  pending.forEach(b => { b.finalTry = true; briefs.push(b); });
+  return true;
+}
 function showSkeleton(){
   if (deck.querySelector(".card")) return;
   deck.dataset.status = "loading";
@@ -1599,7 +1619,10 @@ async function pump(my){
     const priced = priceHunt();
     const ceiling = !capped ? Infinity : ((filters.names || []).length ? 800 : (priced ? Infinity : 80));
     while (pile.length < 5 && my === generation && steps < 8 && effort < ceiling) {
-      if (!pile.length && matched === 0 && !busyBlock() && lastFound && Date.now() - lastFound >= 10000) { streamDone = true; break; }
+      if (!pile.length && matched === 0 && !briefs.length && !busyBlock() && lastFound && Date.now() - lastFound >= 10000) {
+        if (reclaimDeferred()) { steps++; continue; }
+        streamDone = true; break;
+      }
       if (briefs.length < 4) {
         const mark = pullSerial;
         const added = await pullMore();
@@ -1611,21 +1634,39 @@ async function pump(my){
           if (broadOpen && requested) { steps++; continue; }
           if (holdFeed) break;
           if (!feedExhausted && requested) { steps++; continue; }
+          if (reclaimDeferred()) { steps++; continue; }
           streamDone = true; break;
         }
       }
       const batch = briefs.splice(0, 4);
-      if (!batch.length) { streamDone = true; break; }
-      effort += batch.length;
+      if (!batch.length) {
+        if (reclaimDeferred()) { steps++; continue; }
+        streamDone = true; break;
+      }
       steps++;
-      const cards = await Promise.all(batch.map(b => hydrate(b).catch(err => { if (isBusyError(err)) throw err; return null; })));
+      const outcomes = await Promise.all(batch.map(async b => {
+        try {
+          const card = await hydrate(b);
+          if (my !== generation) return { brief:b, stale:true };
+          fetchFails.delete(b.id);
+          return { brief:b, card };
+        } catch (err) {
+          if (my !== generation) return { brief:b, stale:true };
+          if (isBusyError(err)) return { brief:b, throttled:true, card:null };
+          return { brief:b, card:null };
+        }
+      }));
       if (my !== generation) return;
-      cards.forEach((card, i) => {
+      let throttled = false;
+      outcomes.forEach(o => {
+        if (o.stale) return;
+        if (o.throttled) { throttled = true; parkThrottled(o.brief); return; }
+        effort++;
+        const card = o.card;
         if (!card) return;
-        const surprise = !!(batch[i] && batch[i].spice);
+        const surprise = !!(o.brief && o.brief.spice);
         if (surprise) card.spice = true;
-        const ok = keep(card);
-        if (!ok) return;
+        if (!keep(card)) return;
         if (!surprise) card.spice = false;
         pile.push(card);
         matched++;
@@ -1633,6 +1674,7 @@ async function pump(my){
       });
       renderDeck();
       paintCount();
+      if (throttled) { noteBusy(); break; }
     }
   } catch (e) {
     if (my !== generation) return;
@@ -1644,10 +1686,16 @@ async function pump(my){
   const priced = priceHunt();
   const ceiling = (filters.names || []).length ? 800 : 80;
   const quiet = lastFound && Date.now() - lastFound >= 10000;
-  if (!streamDone && !busyBlock() && !pile.length && matched === 0 && quiet) streamDone = true;
-  else if (!streamDone && !busyBlock() && !priced && capped && effort >= ceiling && matched === 0) streamDone = true;
-  else if (!streamDone && !busyBlock() && !priced && capped && effort >= ceiling && pile.length < 3 && matched > 0) paused = true;
-  if (!streamDone && !paused && !holdFeed && !briefs.length && pile.length < 4 && pile.length === pileAtStart && pullSerial === serialAtStart) streamDone = true;
+  if (!streamDone && !busyBlock() && !pile.length && !briefs.length && matched === 0 && quiet) {
+    if (!reclaimDeferred()) streamDone = true;
+  } else if (!streamDone && !busyBlock() && !briefs.length && !priced && capped && effort >= ceiling && matched === 0) {
+    if (!reclaimDeferred()) streamDone = true;
+  } else if (!streamDone && !busyBlock() && !briefs.length && !priced && capped && effort >= ceiling && pile.length < 3 && matched > 0) {
+    if (!reclaimDeferred()) paused = true;
+  }
+  if (!streamDone && !paused && !holdFeed && !briefs.length && pile.length < 4 && pile.length === pileAtStart && pullSerial === serialAtStart) {
+    if (!reclaimDeferred()) streamDone = true;
+  }
   renderDeck();
   paintCount();
   if (catalogBusy && !streamDone && my === generation) { setTimeout(() => { if (my === generation) pump(my); }, busyDelay()); return; }
@@ -1670,6 +1718,7 @@ function restart(opts){
   priceLane = 0; priceOrigin = 1; pricePage = 1; priceWrapped = false; laneOrder = null; laneStates = null; setWalk = null;
   feedExhausted = false; holdFeed = false; tailCursor = 0; tailDone = false;
   streamDone = false; paused = false; pumpError = ""; catalogBusy = false; busyStrike = 0; busyUntil = 0; clearTimeout(busyRenderTimer); effort = 0; loading = false; searchStarted = Date.now(); lastFound = Date.now();
+  fetchFails.clear(); deferred = []; deferredPass = false;
   pendingSwipes = []; reserved = new Set(); swipeBusy = false;
   deck.innerHTML = "";
   showSkeleton();
