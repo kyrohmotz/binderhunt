@@ -27,7 +27,18 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/sniglet-800.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/nunito.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/lato-700-italic.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/nunito-bold.woff2" as="font" type="font/woff2" crossorigin>
+<script>
+if (matchMedia("(min-width: 1024px)").matches) {
+  var latoPreload = document.createElement("link");
+  latoPreload.rel = "preload";
+  latoPreload.as = "font";
+  latoPreload.type = "font/woff2";
+  latoPreload.crossOrigin = "anonymous";
+  latoPreload.href = "fonts/lato-700-italic.woff2";
+  document.head.appendChild(latoPreload);
+}
+</script>
 <link rel="preconnect" href="https://api.tcgdex.net">
 <link rel="preconnect" href="https://assets.tcgdex.net">
 <style>
@@ -38,7 +49,6 @@
 @font-face{font-family:"Baloo 2";src:url("fonts/baloo-600.ttf") format("truetype");font-weight:600;font-style:normal;font-display:swap}
 @font-face{font-family:Nunito;src:url("fonts/nunito.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap}
 @font-face{font-family:Nunito;src:url("fonts/nunito-bold.woff2") format("woff2");font-weight:800;font-style:normal;font-display:swap}
-@font-face{font-family:Lato;src:url("fonts/lato-700-italic.woff2") format("woff2");font-weight:700;font-style:italic;font-display:swap}
 @font-face{font-family:Fraunces;src:url("fonts/fraunces-500.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap}
 :root{
   --paper:#F8F7EF;--paper-2:#F1F1E4;--sage:#E4E7DA;--line:#C4C8BE;--ink:#1F1F1E;--ink-2:#404241;
@@ -60,6 +70,9 @@ img{max-width:100%;-webkit-user-drag:none}
 h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 .word{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-.02em;line-height:1.15;margin:0}
 .eyebrow,.kicker,.fact span,.grade span,.surprise,.sleeve-tag{font-family:var(--label);font-style:italic;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+@media (max-width:1023px){
+  .rail .eyebrow,.rail .kicker{font-family:var(--display);font-style:normal;letter-spacing:0;text-transform:none}
+}
 .context{justify-self:center;max-width:100%;background:var(--paper-2);border:2.5px solid var(--ink);border-radius:999px;padding:6px 12px;font-family:var(--display);font-weight:600;box-shadow:3px 3px 0 var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .iconbtn{width:44px;height:44px;border-radius:14px;border:2.5px solid var(--ink);background:var(--paper-2);box-shadow:3px 3px 0 var(--ink);font-size:20px;display:grid;place-items:center}
 .iconbtn:active,.chip:active,.act:active,.tabbtn:active{transform:scale(.96)}
@@ -71,6 +84,7 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 .chips{display:flex;flex-wrap:nowrap;gap:6px;min-width:0;padding:8px 12px 0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:none;white-space:nowrap;max-width:148px;overflow:hidden;text-overflow:ellipsis;min-height:44px;border:2.5px solid var(--ink);background:#fff;border-radius:999px;padding:0 12px;font-family:var(--display);font-weight:600;box-shadow:2px 2px 0 var(--ink)}
+.sheet-card .chip{max-width:none}
 .chip[aria-pressed="true"],.chip.on{background:var(--sky)}
 .discovery{margin:8px 12px 0;flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--butter);border:2.5px solid var(--ink);border-radius:16px;padding:8px 10px;box-shadow:3px 3px 0 var(--ink)}
 .discovery b{font-family:var(--display);font-weight:700}
@@ -83,6 +97,7 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 #deck{position:relative;flex:1;min-height:0;margin:6px auto 0;width:min(100%,420px);touch-action:none;overflow:hidden;background:var(--paper);container-type:size}
 .card{position:absolute;left:0;right:0;bottom:18px;margin-inline:auto;width:min(calc(100% - 12px),calc((100cqh - 26px) * 63 / 88));aspect-ratio:63/88;height:auto;max-height:calc(100% - 22px);display:flex;flex-direction:column;user-select:none;touch-action:none;transform-origin:center bottom}
 .frame{flex:1;min-height:0;margin:0 auto;width:100%;height:100%;aspect-ratio:63/88;background:var(--paper-2);border:2.5px solid var(--ink);border-radius:22px;box-shadow:3px 3px 0 var(--ink);overflow:hidden;position:relative;display:grid;place-items:center}
+.frame .art{position:absolute;inset:0;display:grid;place-items:center;min-width:0;min-height:0}
 .frame img,.card img{width:100%;height:100%;object-fit:contain;object-position:center;background:#fff;-webkit-user-drag:none;user-select:none;pointer-events:none}
 .ph{padding:16px;text-align:center}
 .ph b{font-family:Fraunces,Georgia,serif;font-weight:500;font-size:22px;display:block}
@@ -90,7 +105,7 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 .cardback-inner{width:100%;height:100%;min-height:0;border:2px solid var(--ink);border-radius:8px;background:rgba(255,255,255,.62);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;box-shadow:inset 0 0 0 3px rgba(255,255,255,.45)}
 .cardback .toad{width:62%;height:auto;max-height:46%}
 .cardback b{font-family:var(--display);font-weight:700;font-size:10px;line-height:1.25;text-align:center}
-.stamp{position:absolute;top:18px;padding:4px 10px;border:3px solid;border-radius:12px;font-family:var(--display);font-weight:700;font-size:22px;background:#fff;opacity:0;pointer-events:none}
+.stamp{position:absolute;top:18px;z-index:2;padding:4px 10px;border:3px solid;border-radius:12px;font-family:var(--display);font-weight:700;font-size:22px;background:#fff;opacity:0;pointer-events:none}
 .stamp.like{left:12px;color:var(--ink);background:var(--green);border-color:var(--green-deep);transform:rotate(-8deg)}
 .stamp.nope{right:12px;color:#8d4a4a;border-color:#8d4a4a;transform:rotate(8deg)}
 .surprise{position:absolute;left:8px;bottom:8px;z-index:3;background:#fff;border:2px solid var(--ink);border-radius:999px;padding:2px 8px;font-size:11px;box-shadow:2px 2px 0 var(--ink);line-height:1.3}
@@ -211,7 +226,15 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 @media (min-width:768px){
   #deck{max-width:420px}
 }
-.hunt-cluster,.deck-slot{display:contents}
+.hunt-cluster,.deck-slot,.hunt-align{display:contents}
+.side-progress{display:flex;align-items:center;gap:12px;margin:12px 0}
+.side-progress .ring{width:72px;height:72px;flex:none}
+.side-progress .market-price{margin:0}
+.side-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.side-list .rail-binder{pointer-events:none}
+@media (min-width:1024px){
+  @font-face{font-family:Lato;src:url("fonts/lato-700-italic.woff2") format("woff2");font-weight:700;font-style:italic;font-display:swap}
+}
 @media (min-width:1024px){
   .shell,.shell.no-profile{display:grid;grid-template-columns:248px minmax(0,1fr) minmax(320px,400px);height:100dvh}
   .rail{display:flex;flex-direction:column;gap:8px;padding:14px 12px 12px;border-right:2.5px solid var(--ink);background:var(--sage);min-height:0;overflow:hidden}
@@ -242,17 +265,30 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
   .cardsearch{padding:6px 16px 0}
   .countline{margin:2px 18px 0}
   .discovery{margin:6px 16px 0}
-  #viewHunt{min-height:0}
-  .hunt-cluster{display:flex;flex-direction:column;justify-content:center;align-items:center;flex:1 1 auto;min-height:0;min-width:0;width:100%;padding:2px 12px 10px}
-  .deck-slot{display:flex;align-items:center;justify-content:center;flex:1 1 auto;min-height:0;width:100%;max-height:min(70vh,640px)}
-  #deck{width:auto;height:100%;max-height:min(70vh,640px);max-width:100%;aspect-ratio:63/88;margin:0;flex:0 1 auto}
+  #viewHunt{min-height:0;container-type:size;container-name:hunt}
+  .hunt-align{--card-h:min(76vh,760px,calc(100cqh - 248px));display:flex;flex-direction:column;align-items:center;flex:1 1 auto;min-height:0;width:min(100%,calc(var(--card-h) * 63 / 88));margin-inline:auto}
+  .hunt-align .chipbar,.hunt-align .cardsearch,.hunt-align .countline,.hunt-align .discovery,.deckcap,#viewHunt .actions{width:var(--deck-w,100%);max-width:100%;padding-left:0;padding-right:0;margin-left:0;margin-right:0}
+  .hunt-align .chips{width:100%;padding-left:0;padding-right:0}
+  .hunt-cluster{display:flex;flex-direction:column;justify-content:center;align-items:center;flex:1 1 auto;min-height:0;min-width:0;width:100%;padding:2px 0 10px}
+  .deck-slot{display:flex;align-items:center;justify-content:center;flex:1 1 auto;min-height:0;width:100%;max-height:var(--card-h)}
+  #deck{width:auto;height:min(100%,var(--card-h));max-height:var(--card-h);max-width:100%;aspect-ratio:63/88;margin:0;flex:0 1 auto}
   #deck .card{top:0;bottom:0;left:0;right:0;width:100%;height:100%;max-height:none;aspect-ratio:auto;margin:0}
-  .deckcap{width:min(100%, calc(min(70vh, 640px) * 63 / 88));margin:0;padding:6px 2px 0}
-  #viewHunt .actions{width:min(100%, calc(min(70vh, 640px) * 63 / 88));padding:6px 0 0}
+  .deckcap{width:var(--deck-w,100%);margin:0;padding:6px 0 0}
+  #viewHunt .actions{width:var(--deck-w,100%);padding:6px 0 0}
   #profile{position:static;z-index:auto;border-left:2.5px solid var(--ink);background:var(--paper);min-height:0;overflow:hidden}
   .sheet.popover .sheet-card{left:var(--pop-x);top:var(--pop-y);bottom:auto;right:auto;width:min(360px,calc(100vw - 24px));max-height:55vh;border-bottom:2.5px solid var(--ink);border-radius:22px}
   .spread-row{grid-template-columns:1fr 1fr}
   .spread-row.single{grid-template-columns:minmax(0,520px);justify-content:center}
+}
+@media (min-width:1024px) and (max-height:800px){
+  .rail{gap:4px;padding:8px 10px 8px}
+  .rail-stats{gap:4px}
+  .rail-wish,.rail-binder{min-height:40px;padding:4px 8px}
+  .credit{gap:2px;padding-top:6px}
+  .credit img{width:36px;height:36px;border-radius:10px;padding:2px}
+  .credit-brand{font-size:14px}
+  .credit .eyebrow{font-size:10px}
+  .credit-legal{font-size:10px;line-height:1.25}
 }
 .summary-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
 .summary-note{margin:0}
@@ -459,6 +495,7 @@ html.reduce .sleeve.holo img{transform:none}
       <button class="iconbtn" id="gear" data-gear type="button" aria-label="Settings">⚙</button>
     </header>
     <div id="viewHunt" class="view">
+      <div class="hunt-align">
       <div class="chipbar" id="chipbar">
       <div class="chips" id="chips" role="toolbar" aria-label="Filters">
         <button class="chip" type="button" data-filter="set">Set</button>
@@ -491,6 +528,7 @@ html.reduce .sleeve.holo img{transform:none}
         <button class="act" id="skip" type="button" aria-label="Skip" disabled>✕</button>
         <button class="act undo" id="undo" type="button" aria-label="Undo last swipe" disabled>↺</button>
         <button class="act add" id="save" type="button" aria-label="Add to wishlist" disabled>♥</button>
+      </div>
       </div>
       </div>
     </div>
@@ -716,6 +754,9 @@ let scrydexPromise = null;
 let profileCard = null;
 let profilePinned = false;
 let summaryId = "";
+let sideKey = "";
+let deckTopId = "";
+let deckTopSeen = false;
 let variantChoice = new Map();
 let chartRange = "3M";
 let compareGrade = "";
@@ -806,6 +847,13 @@ function compactMoney(n, currency){
 }
 function variantLabel(key){ return String(key).replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase()); }
 function wide(){ return matchMedia("(min-width: 1024px)").matches; }
+function ensureLabelFont(){
+  if (wide() || document.getElementById("latoFace")) return;
+  const style = document.createElement("style");
+  style.id = "latoFace";
+  style.textContent = '@font-face{font-family:Lato;src:url("fonts/lato-700-italic.woff2") format("woff2");font-weight:700;font-style:italic;font-display:swap}';
+  document.head.appendChild(style);
+}
 function isPocketId(id){ return POCKET_SET.test(id || ""); }
 function isDigital(card){
   if (!card) return false;
@@ -878,7 +926,7 @@ function loadSettings(){
   } catch (e) { return blank; }
 }
 function saveWish(){ try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {} paintContext(); if (tab === "binders") renderBinders(); }
-function saveBinders(){ try { localStorage.setItem("bh.binders.v1", JSON.stringify(binderState)); } catch (e) {} if (tab === "binders") renderBinders(); paintDiscovery(); }
+function saveBinders(){ try { localStorage.setItem("bh.binders.v1", JSON.stringify(binderState)); } catch (e) {} if (tab === "binders") renderBinders(); paintDiscovery(); paintRail(); }
 function saveFilters(){ try { localStorage.setItem("bh.filters.v3", JSON.stringify(filters)); } catch (e) {} paintChips(); }
 function saveSettings(){ try { localStorage.setItem("bh.settings.v1", JSON.stringify(settings)); } catch (e) {} applyMotion(); }
 
@@ -954,6 +1002,7 @@ function saveOwned(){
   ownedIds.forEach(id => { const sid = ownedSetById.get(id); if (sid) sets[id] = sid; });
   const payload = { v:1, ids:[...ownedIds], sets, celebrated:[...celebrated].slice(-500), seeded:!ownedNeedsSeed };
   try { localStorage.setItem(OWNED_KEY, JSON.stringify(payload)); } catch (e) {}
+  paintRail();
 }
 function blankLog(){ return { v:1, days:[], events:[] }; }
 function loadLog(){
@@ -1290,6 +1339,8 @@ function refreshOwnedViews(id){
   if (tab === "binders") renderBinders();
   if (tab === "sets") renderSets();
   if (profileCard && profileCard.id === id && !profileEl.hidden) renderProfile(cardCache.get(id) || profileCard);
+  paintRail();
+  if (wide() && !profilePinned && tab !== "hunt") { sideKey = ""; paintSide(); }
 }
 function focusOwnedControl(id, origin){
   if (origin === "profile") {
@@ -2511,6 +2562,15 @@ function layoutStack(){
     el.style.transform = depth ? `translateY(${6 + depth * 3}px) scale(${1 - depth * 0.035})` : "";
   });
   paintCaption();
+  alignHuntColumn();
+}
+function alignHuntColumn(){
+  const root = document.getElementById("viewHunt");
+  if (!root) return;
+  if (!wide()) { root.style.removeProperty("--deck-w"); return; }
+  const box = document.getElementById("deck");
+  const w = box ? box.getBoundingClientRect().width : 0;
+  if (w > 40) root.style.setProperty("--deck-w", Math.round(w) + "px");
 }
 function paintCaption(){
   const row = document.getElementById("deckCaption");
@@ -2558,8 +2618,9 @@ function renderDeck(){
     el.draggable = false;
     el.card = card;
     const tag = card.spice ? `<span class="surprise">surprise pick</span>` : "";
-    el.innerHTML = `<div class="frame"><span class="stamp like">${discoveryBinder() ? "BINDER!" : "WISH!"}</span><span class="stamp nope">PASS</span>${tag}</div>`;
-    paintArt(el.querySelector(".frame"), card);
+    if (card.spice) ensureLabelFont();
+    el.innerHTML = `<div class="frame"><div class="art"></div><span class="stamp like">${discoveryBinder() ? "BINDER!" : "WISH!"}</span><span class="stamp nope">PASS</span>${tag}</div>`;
+    paintArt(el.querySelector(".art"), card);
     deck.prepend(el);
     bindDrag(el);
   });
@@ -2830,6 +2891,84 @@ function paintContext(){
   else if (filters.era) label = eraLabel(filters.era);
   document.getElementById("context").textContent = label;
   paintRail();
+  paintSide();
+}
+function paintSide(){
+  if (!wide() || profilePinned) return;
+  if (tab === "sets") renderSetSide();
+  else if (tab === "binders") renderBinderSide();
+  else paintDeckSummary(currentTop());
+}
+function setSideStats(){
+  if (!setView) return null;
+  const metaSet = (meta.sets || []).find(s => s.id === setView.id) || null;
+  const prog = metaSet ? setCompletion(metaSet) : { owned:0, total:0, pct:null };
+  const loaded = (setView.cards || []).length;
+  const total = prog.total || loaded;
+  const owned = prog.total ? prog.owned : clampedOwned(countOwnedInSet(setView.id, setView.cards), total);
+  const pct = total ? Math.max(0, Math.min(100, Math.round((owned / total) * 100))) : null;
+  return { name:setView.name || "Set", owned, total, pct, release:setView.release || "" };
+}
+function renderSetSide(){
+  const stats = setSideStats();
+  const key = stats ? "set:" + setView.id + ":" + stats.owned + ":" + stats.total : "sets:" + ((meta.sets || []).length) + ":" + ownedIds.size;
+  if (key === sideKey && profileEl.querySelector("[data-side='sets']")) return;
+  sideKey = key;
+  summaryId = "";
+  profileEl.hidden = false;
+  shell.classList.remove("no-profile");
+  profileEl.removeAttribute("aria-modal");
+  if (!stats) {
+    const n = (meta.sets || []).length;
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="sets"><p class="eyebrow">Sets</p><h2 class="pname" id="profileTitle">Browse sets</h2><p class="fine">${n ? n + " sets in the catalog." : "The catalog is still loading."}</p><p class="fine">Open a set and its owned progress stays in this panel.</p></div>`;
+    return;
+  }
+  const pct = stats.pct == null ? "" : stats.pct + "% owned";
+  const count = stats.total ? stats.owned + " / " + stats.total : "Card count still loading";
+  profileEl.innerHTML = `<div class="profile-scroll" data-side="sets"><p class="eyebrow">Set</p><h2 class="pname" id="profileTitle">${esc(stats.name)}</h2><div class="side-progress">${ringMarkup(stats.owned, stats.total)}<div><p class="market-price">${esc(count)}</p><p class="fine">${esc(pct || "Owned progress shows once this set has a card count.")}</p></div></div>${stats.release ? `<p class="fine">${esc(stats.release)}</p>` : ""}</div>`;
+}
+function binderSideKey(){
+  if (!binderView) return "shelf:" + wish.length + ":" + binderState.binders.length + ":" + ownedIds.size;
+  if (binderView.kind === "wish") return "wish:" + wish.length + ":" + ownedIds.size;
+  const b = binderState.binders.find(x => x.id === binderView.id);
+  return "binder:" + binderView.id + ":" + ((b && b.cards) || []).length + ":" + ownedIds.size + ":" + (b ? b.name : "");
+}
+function binderSideMeter(list){
+  const p = progressOf(list);
+  const val = valueOf(list || []);
+  const money = val == null ? "" : priceText(val, "USD");
+  return `<div class="side-progress">${ringMarkup(p.owned, p.total)}<div><p class="market-price">${esc(p.total ? p.owned + " / " + p.total : "0")}</p><p class="fine">${esc(p.label)}${money ? " · " + esc(money) : ""}</p></div></div>`;
+}
+function binderSideRow(name, list){
+  const p = progressOf(list);
+  const val = valueOf(list || []);
+  const money = val == null ? "" : priceText(val, "USD");
+  return `<div class="rail-binder"><span class="rail-binder-copy"><b>${esc(name)}</b><span class="fine">${esc(p.label)}${money ? " · " + esc(money) : ""}</span></span>${ringMarkup(p.owned, p.total)}</div>`;
+}
+function renderBinderSide(){
+  const key = binderSideKey();
+  if (key === sideKey && profileEl.querySelector("[data-side='binders']")) return;
+  sideKey = key;
+  summaryId = "";
+  profileEl.hidden = false;
+  shell.classList.remove("no-profile");
+  profileEl.removeAttribute("aria-modal");
+  if (!binderView) {
+    const rows = binderState.binders.slice(0, 5).map(b => binderSideRow(b.name, b.cards)).join("");
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Binders</p><h2 class="pname" id="profileTitle">Your shelf</h2>${binderSideRow("Wishlist", wish)}<div class="side-list">${rows || `<p class="fine">No binders yet. Create one and its progress lands here.</p>`}</div></div>`;
+    return;
+  }
+  if (binderView.kind === "wish") {
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Wishlist</p><h2 class="pname" id="profileTitle">Saved cards</h2>${binderSideMeter(wish)}<p class="fine">${wish.length === 1 ? "1 card saved." : wish.length + " cards saved."}</p></div>`;
+    return;
+  }
+  const binder = binderState.binders.find(x => x.id === binderView.id);
+  if (!binder) {
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Binders</p><h2 class="pname" id="profileTitle">Binder</h2><p class="fine">This binder is gone.</p></div>`;
+    return;
+  }
+  const pages = Math.max(1, Math.ceil(((binder.cards || []).length || 1) / 9));
+  profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Binder</p><h2 class="pname" id="profileTitle">${esc(binder.name)}</h2>${binderSideMeter(binder.cards)}<p class="fine">${(binder.cards || []).length} cards · ${pages} ${pages === 1 ? "page" : "pages"}</p></div>`;
 }
 function paintRail(){
   const count = document.getElementById("railWishCount");
@@ -2879,6 +3018,7 @@ function showTab(name){
   const dailyView = document.getElementById("viewDaily");
   if (dailyView) dailyView.hidden = name !== "daily";
   document.querySelectorAll("[data-tab]").forEach(btn => btn.setAttribute("aria-current", btn.dataset.tab === name ? "page" : "false"));
+  if (wide()) { profilePinned = false; profileCard = null; summaryId = ""; sideKey = ""; }
   if (name === "sets") renderSets();
   if (name === "binders") renderBinders();
   if (name === "daily" && typeof window.renderDaily === "function") window.renderDaily();
@@ -3329,6 +3469,7 @@ function sleeveSlot(card, index, ctx){
   sleeve.className = "sleeve " + (owned ? "owned" : "wanted") + (isHolo(card) ? " holo" : "");
   sleeve.dataset.index = String(index);
   sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card) + (owned ? ", owned" : ", wanted"))}"></button><span class="sleeve-tag" aria-hidden="true">${owned ? "Owned" : "Wanted"}</span><span class="shine" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span>`;
+  ensureLabelFont();
   paintArt(sleeve.querySelector(".cardhit"), card);
   const got = document.createElement("button");
   got.type = "button";
@@ -3795,6 +3936,7 @@ function renderCollection(root){
       };
     };
   }
+  paintContext();
 }
 
 function openMenu(anchor, card, binder){
@@ -4098,11 +4240,22 @@ function currentTop(){
   return top ? top.card : null;
 }
 function paintDeckSummary(card){
-  if (!wide() || profilePinned) return;
+  if (!wide()) return;
   const id = card && card.id ? card.id : "";
+  const changed = deckTopSeen && id !== deckTopId;
+  deckTopId = id;
+  deckTopSeen = true;
+  if (tab !== "hunt") return;
+  if (profilePinned) {
+    if (!changed && profileCard && profileCard.id === id) return;
+    profilePinned = false;
+    profileCard = null;
+    summaryId = "";
+  }
   if (id && id === summaryId && profileEl.querySelector("[data-summary='1']")) return;
   if (!id && summaryId === "" && profileEl.querySelector("[data-summary-empty]")) return;
   summaryId = id;
+  sideKey = "";
   if (!card) paintSummaryEmpty();
   else renderSummary(card);
 }
@@ -4173,6 +4326,7 @@ function renderSummary(card){
   });
 }
 function openProfile(card){
+  ensureLabelFont();
   if (card && card.id && !card.variants) {
     hydrate(card).then(full => { if (profilePinned && profileCard && profileCard.id === card.id) renderProfile(full); }).catch(() => { if (profilePinned && profileCard && profileCard.id === card.id) renderProfile(card); });
   }
@@ -4197,7 +4351,8 @@ function closeProfile(){
   profilePinned = false;
   profileCard = null;
   summaryId = "";
-  if (wide()) paintDeckSummary(currentTop());
+  sideKey = "";
+  if (wide()) paintSide();
   else { profileEl.hidden = true; shell.classList.add("no-profile"); }
   syncActs();
 }
@@ -4212,7 +4367,8 @@ function syncProfilePane(){
       profileEl.removeAttribute("aria-modal");
     } else {
       summaryId = "";
-      paintDeckSummary(currentTop());
+      sideKey = "";
+      paintSide();
     }
   } else if (!(profilePinned && profileCard)) {
     profileEl.hidden = true;
@@ -4484,6 +4640,7 @@ deck.addEventListener("dragstart", e => e.preventDefault());
 let resizeTick = 0;
 window.addEventListener("resize", () => {
   syncChipFade();
+  alignHuntColumn();
   clearTimeout(resizeTick);
   resizeTick = setTimeout(() => {
     if (tab === "binders" && binderView) renderBinders();
@@ -4606,6 +4763,7 @@ function renderOnboard(){
   }
 }
 function openOnboard(mode){
+  ensureLabelFont();
   const saved = loadOnboard() || {};
   onboardMode = mode || "first";
   onboardStep = 1;
