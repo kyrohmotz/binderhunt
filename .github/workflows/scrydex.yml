@@ -43,10 +43,17 @@ jobs:
             exit 1
           fi
 
+      - name: Refresh euro rate
+        run: python3 scripts/fetch_fx.py
+
       - name: Refresh cached cards
         env:
           SCRYDEX_API_KEY: ${{ secrets.SCRYDEX_API_KEY }}
           SCRYDEX_TEAM_ID: ${{ secrets.SCRYDEX_TEAM_ID }}
+          SCRYDEX_MONTHLY_CAP: ${{ vars.SCRYDEX_MONTHLY_CAP || '15000' }}
+          SCRYDEX_STORE_RESERVE: ${{ vars.SCRYDEX_STORE_RESERVE || '15000' }}
+          SCRYDEX_RUN_CAP: ${{ vars.SCRYDEX_RUN_CAP || '500' }}
+          SCRYDEX_RUN_CARD_CAP: ${{ vars.SCRYDEX_RUN_CARD_CAP || '100' }}
         run: python3 scripts/sync_scrydex.py
 
       - name: Commit cache
@@ -55,7 +62,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/scrydex.json
+          git add data/scrydex.json data/scrydex-usage.json data/fx.json
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else

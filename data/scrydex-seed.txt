@@ -1,33 +1,2007 @@
-# Cards refreshed by scripts/sync_scrydex.py.
-# Column 1 is the tier: A is refreshed about every 2 days, B about every 7 days.
-# Column 2 is the catalog id (TCGdex). The sync maps it to the Scrydex id
-# (sv03-223 -> sv3-223, sv03.5-199 -> sv3pt5-199, me02-125 -> me2-125)
-# and stores the result under the catalog id. At most 10 cards per run.
+# Ranked physical chase cards for scripts/sync_scrydex.py.
+# Built from TCGdex TCGplayer market prices. Cardmarket EUR average is the
+# rank only when a card has no TCGplayer market price. EUR is not converted.
+# A is the top 300, refreshed weekly. B is the rest, refreshed monthly.
+# Cards outside this list are not fetched by the daily job.
+# 2000 cards. Pocket and digital sets are excluded.
 
-A base1-4
-A swsh7-215
-A swsh7-214
-A sv03.5-199
-A sv08-238
-A swsh7-218
-A swsh11-186
-A swsh12-211
-A sv03-223
-A me02-125
-A gym2-2
-A neo1-9
-
-B base1-2
-B base1-6
-B base1-10
-B base1-15
-B sv03.5-006
-B sv03.5-173
-B sv04.5-234
-B swsh7-95
-B swsh7-217
-B swsh12-186
-B swsh12.5-102
-B swsh11-201
-B swsh9tg-TG23
-B sv04-199
+A neo4-111  # Shining Raichu · Rare · 14999.00 USD
+A ecard3-H30  # Umbreon · Holo Rare · 11000.00 USD
+A ecard3-146  # Charizard · Rare · 10000.00 USD
+A ex13-103  # Mewtwo Star · Rare · 9200.00 USD
+A neo4-107  # Shining Charizard · Rare · 7583.00 USD
+A lc-3  # Charizard · Holo Rare · 6999.00 USD
+A neo4-113  # Shining Tyranitar · Rare · 4099.05 USD
+A ex11-112  # Kyogre Star · Rare · 4000.00 USD
+A sm9-170  # Latias & Latios GX · Ultra Rare · 3916.85 USD
+A lc-29  # Mewtwo · Rare · 3300.00 USD
+A ecard3-148  # Golem · Rare · 2600.48 USD
+A ex10-105  # Lugia ex · Rare · 2500.00 USD
+A ex11-111  # Groudon Star · Rare · 2339.99 USD
+A ex8-108  # Rocket's Raikou ex · Rare · 2300.00 USD
+A swsh7-215  # Umbreon VMAX · Secret Rare · 2264.70 USD
+A lc-11  # Gengar · Holo Rare · 2224.99 USD
+A sm9-165  # Gengar & Mimikyu GX · Ultra Rare · 2155.56 USD
+A ex13-104  # Pikachu Star · Rare · 1899.99 USD
+A neo4-106  # Shining Celebi · Rare · 1801.00 USD
+A ex16-101  # Jolteon ☆ · Rare · 1750.00 USD
+A ex16-100  # Flareon ☆ · Rare · 1700.00 USD
+A ex8-105  # Latias ☆ · Rare · 1700.00 USD
+A ex10-114  # Raikou ☆ · Rare · 1600.00 USD
+A ecard2-H11  # Houndoom · Holo Rare · 1571.99 USD
+A xy2-108  # M Charizard EX · Secret Rare · 1501.23 USD
+A ex8-106  # Latios ☆ · Rare · 1500.00 USD
+A ex7-99  # Rocket's Mewtwo ex · Rare · 1499.99 USD
+A ex14-99  # Alakazam ☆ · Rare · 1429.50 USD
+A ex6-108  # Gengar ex · Rare · 1399.99 USD
+A ex16-102  # Vaporeon ☆ · Rare · 1399.95 USD
+A neo4-108  # Shining Kabutops · Rare · 1399.95 USD
+A neo1-9  # Lugia · Rare · 1300.00 USD
+A sv08.5-161  # Umbreon ex · Special illustration rare · 1269.69 USD
+A swsh7-218  # Rayquaza VMAX · Secret Rare · 1268.52 USD
+A ecard2-H29  # Umbreon · Holo Rare · 1252.62 USD
+A ecard3-H01  # Alakazam · Holo Rare · 1200.97 USD
+A ecard2-150  # Nidoking · Rare · 1200.00 USD
+A ecard3-10  # Gengar · Rare · 1199.75 USD
+A bw9-122  # Ultra Ball · Secret Rare · 1199.51 USD
+A ex8-22  # Rayquaza · Rare · 1196.50 USD
+A ex7-15  # Dark Dragonite · Rare · 1150.00 USD
+A xy7-98  # M Rayquaza EX · Secret Rare · 1147.27 USD
+A ex10-115  # Suicune ☆ · Rare · 1100.00 USD
+A ex7-106  # Rocket's Zapdos ex · Rare · 1099.00 USD
+A ex9-9  # Rayquaza · Rare · 1078.45 USD
+A neo4-6  # Dark Gengar · Rare · 1076.00 USD
+A ex10-113  # Entei ☆ · Rare · 1067.00 USD
+A ex15-97  # Rayquaza ex δ · Rare · 1050.00 EUR
+A swsh8-271  # Gengar VMAX · Secret Rare · 1027.32 USD
+A lc-5  # Dark Dragonite · Holo Rare · 1025.00 USD
+A xy4-122  # Dialga EX · Secret Rare · 1022.31 USD
+A col1-20  # Rayquaza · Holo Rare · 1013.27 USD
+A ecard3-150  # Kabutops · Rare · 1000.00 USD
+A pl2-111  # Snorlax LV.X · Rare Holo LV.X · 999.99 USD
+A ecard3-11  # Gyarados · Rare · 999.75 USD
+A ex8-102  # Rayquaza ex · Rare · 999.00 USD
+A neo4-110  # Shining Noctowl · Rare · 985.00 USD
+A lc-4  # Dark Blastoise · Holo Rare · 975.00 USD
+A base1-4  # Charizard · Rare · 954.65 USD
+A ex11-113  # Metagross Star · Rare · 951.99 USD
+A ecard1-9  # Dragonite · Holo Rare · 949.79 USD
+A bw5-109  # Gardevoir · Secret Rare · 946.33 USD
+A sm9-161  # Magikarp & Wailord GX · Ultra Rare · 904.13 USD
+A ecard3-149  # Ho-oh · Rare · 900.00 USD
+A pop4-1  # Chimecho δ · Rare · 900.00 USD
+A sv04.5-232  # Mew ex · Special illustration rare · 863.85 USD
+A swsh11-186  # Giratina V · Ultra Rare · 851.13 USD
+A lc-1  # Alakazam · Holo Rare · 849.99 USD
+A sm3-150  # Charizard GX · Secret Rare · 840.75 USD
+A col1-SL5  # Ho-Oh · Holo Rare · 833.32 USD
+A sm3.5-78  # Mewtwo GX · Secret Rare · 828.69 USD
+A neo2-13  # Umbreon · Rare · 817.16 USD
+A me02.5-284  # Mega Gengar ex · Special illustration rare · 816.38 USD
+A ex9-96  # Milotic ex · Rare · 799.99 USD
+A lc-18  # Venusaur · Holo Rare · 799.99 USD
+A ex12-91  # Regirock ☆ · Rare · 799.00 USD
+A neo3-65  # Shining Gyarados · Rare · 793.16 USD
+A xy4-114  # Gengar EX · Ultra Rare · 761.04 USD
+A col1-SL10  # Rayquaza · Holo Rare · 750.00 USD
+A ecard3-32  # Umbreon · Rare · 750.00 USD
+A ex14-100  # Celebi ☆ · Rare · 750.00 USD
+A lc-2  # Articuno · Holo Rare · 749.99 USD
+A me02.5-276  # Pikachu ex · Special illustration rare · 732.19 USD
+A pl4-97  # Gengar LV.X · Rare Holo LV.X · 730.50 USD
+A base3-5  # Gengar · Rare · 725.00 USD
+A sm10-205  # Gardevoir & Sylveon GX · Ultra Rare · 700.80 USD
+A ecard1-13  # Gengar · Holo Rare · 700.00 USD
+A ecard3-H11  # Houndoom · Holo Rare · 699.99 USD
+A gym2-2  # Blaine's Charizard · Holo Rare · 699.99 USD
+A neo1-18  # Typhlosion · Rare · 699.99 USD
+A neo4-14  # Light Dragonite · Rare · 699.99 USD
+A ecard1-20  # Mewtwo · Holo Rare · 699.97 USD
+A ex7-111  # Here Comes Team Rocket! · Rare · 699.50 USD
+A col1-SL9  # Raikou · Holo Rare · 698.99 USD
+A ecard2-H28  # Tyranitar · Holo Rare · 698.00 USD
+A ex1-101  # Mewtwo ex · Rare · 677.43 USD
+A ex4-94  # Suicune ex · Rare · 675.99 USD
+A hgss3-86  # Umbreon · Rare PRIME · 667.70 USD
+A ex6-104  # Blastoise ex · Rare · 650.45 USD
+A gym2-4  # Erika's Venusaur · Holo Rare · 650.00 USD
+A neo4-4  # Dark Espeon · Rare · 649.99 USD
+A bw8-136  # Charizard · Secret Rare · 649.98 USD
+A ex12-90  # Regice ☆ · Rare · 649.98 USD
+A dc1-6  # Team Aqua's Kyogre EX · Ultra Rare · 645.09 USD
+A me02-125  # Mega Charizard X ex · Special illustration rare · 623.20 USD
+A ex7-101  # Rocket's Scizor ex · Rare · 600.00 USD
+A neo4-112  # Shining Steelix · Rare · 600.00 USD
+A hgss3-90  # Rayquaza & Deoxys LEGEND · LEGEND · 599.99 USD
+A hgss3-89  # Rayquaza & Deoxys LEGEND · LEGEND · 599.14 USD
+A ex3-97  # Rayquaza ex · Rare · 595.55 USD
+A sm12-221  # Arceus & Dialga & Palkia GX · Ultra Rare · 595.06 USD
+A ecard3-H07  # Flareon · Holo Rare · 589.89 USD
+A neo4-109  # Shining Mewtwo · Rare · 577.00 USD
+A ecard3-H28  # Starmie · Holo Rare · 575.75 USD
+A pop4-17  # Deoxys ex · Rare · 575.00 EUR
+A hgss4-94  # Gengar · Rare PRIME · 560.92 USD
+A sm9-186  # Gengar & Mimikyu GX · Secret Rare · 555.47 USD
+A ecard3-H05  # Crobat · Holo Rare · 549.99 USD
+A gym1-14  # Sabrina's Gengar · Holo Rare · 549.50 USD
+A xy6-105  # M Rayquaza EX · Ultra Rare · 544.27 USD
+A pop5-3  # Mew δ · Rare · 542.97 USD
+A ex4-3  # Team Aqua's Kyogre · Holo Rare · 542.60 USD
+A ecard2-H25  # Suicune · Holo Rare · 539.99 USD
+A ex10-17  # Typhlosion · Rare · 539.91 USD
+A dp5-98  # Glaceon · Rare Holo LV.X · 537.50 USD
+A base5-5  # Dark Dragonite · Rare · 531.53 USD
+A ex13-100  # Mew ex · Rare · 525.31 USD
+A ecard1-19  # Mew · Holo Rare · 525.00 USD
+A ex3-90  # Dragonite ex · Rare · 524.89 USD
+A lc-12  # Gyarados · Holo Rare · 522.89 USD
+A base5-3  # Dark Blastoise · Rare · 518.00 USD
+A base3-4  # Dragonite · Rare · 514.87 USD
+A col1-SL4  # Groudon · Holo Rare · 514.16 USD
+A swsh7-192  # Dragonite V · Ultra Rare · 505.93 USD
+A neo3-8  # Houndoom · Rare · 504.99 USD
+A ex7-97  # Rocket's Entei ex · Rare · 503.99 USD
+A xy4-121  # M Gengar EX · Secret Rare · 503.58 USD
+A ex10-112  # Umbreon ex · Rare · 500.50 USD
+A bw8-137  # Blastoise · Secret Rare · 500.00 USD
+A col1-SL1  # Deoxys · Holo Rare · 500.00 USD
+A ecard2-149  # Lugia · Rare · 500.00 USD
+A ex6-105  # Charizard ex · Rare · 500.00 USD
+A ex7-105  # Rocket's Suicune ex · Rare · 500.00 USD
+A ex7-98  # Rocket's Hitmonchan ex · Rare · 500.00 USD
+A neo3-6  # Entei · Rare · 500.00 USD
+A neo4-7  # Dark Houndoom · Rare · 500.00 USD
+A ex10-111  # Tyranitar ex · Rare · 499.99 USD
+A ex5-4  # Dark Celebi · Holo Rare · 499.99 USD
+A hgss1-123  # Gyarados · Holo Rare · 499.99 USD
+A ecard1-4  # Blastoise · Holo Rare · 499.95 USD
+A neo3-13  # Raikou · Rare · 496.24 USD
+A ex4-93  # Sceptile ex · Rare · 494.99 USD
+A ex3-100  # Charizard · Rare · 489.99 USD
+A neo3-7  # Ho-oh · Rare · 488.52 USD
+A swsh12-186  # Lugia V · Ultra Rare · 488.36 USD
+A ex12-83  # Arcanine ex · Rare · 482.49 USD
+A sm12-215  # Blastoise & Piplup GX · Ultra Rare · 482.35 USD
+A swsh7-194  # Rayquaza V · Ultra Rare · 480.92 USD
+A ex6-112  # Venusaur ex · Rare · 480.01 USD
+A neo4-12  # Light Arcanine · Rare · 479.99 USD
+A dc1-15  # Team Magma's Groudon EX · Ultra Rare · 477.48 USD
+A ecard2-H02  # Arcanine · Holo Rare · 475.00 USD
+A neo1-17  # Typhlosion · Rare · 475.00 USD
+A me02.5-290  # Mega Dragonite ex · Special illustration rare · 474.19 USD
+A sm5-151  # Lillie · Ultra Rare · 468.18 USD
+A bw9-120  # Garchomp · Secret Rare · 468.00 USD
+A ex15-91  # Dragonite ex δ · Rare · 466.33 EUR
+A gym2-29  # Sabrina's Gengar · Rare · 463.75 USD
+A ecard2-148  # Kingdra · Rare · 457.00 USD
+A pl3-143  # Charizard G LV.X · Rare Holo LV.X · 450.72 USD
+A neo2-12  # Tyranitar · Rare · 450.00 USD
+A ex14-2  # Blastoise δ · Rare · 450.00 EUR
+A ecard1-40  # Charizard · Rare · 449.99 USD
+A ex9-8  # Milotic · Rare · 448.49 USD
+A ecard3-147  # Crobat · Rare · 447.50 USD
+A neo3-66  # Shining Magikarp · Rare · 445.00 USD
+A lc-19  # Zapdos · Holo Rare · 443.99 USD
+A lc-10  # Flareon · Holo Rare · 439.99 USD
+A ecard1-6  # Charizard · Holo Rare · 436.08 USD
+A gym2-14  # Rocket's Mewtwo · Holo Rare · 433.35 USD
+A hgss3-81  # Espeon · Rare PRIME · 431.87 USD
+A sm11-242  # Mewtwo & Mew GX · Secret Rare · 428.91 USD
+A ex13-16  # Rayquaza δ · Rare · 428.45 EUR
+A ex13-26  # Rayquaza δ · Rare · 428.45 EUR
+A gym2-13  # Misty's Gyarados · Holo Rare · 425.00 USD
+A ecard3-H31  # Vaporeon · Holo Rare · 423.00 USD
+A hgss1-113  # Lugia LEGEND · LEGEND · 422.85 USD
+A sv08.5-156  # Sylveon ex · Special illustration rare · 422.46 USD
+A hgss3-88  # Kyogre & Groudon LEGEND · LEGEND · 422.20 USD
+A xy7-96  # Primal Kyogre EX · Secret Rare · 420.61 USD
+A ecard3-H09  # Gengar · Holo Rare · 420.00 EUR
+A ecard3-H15  # Machamp · Holo Rare · 419.99 USD
+A base4-4  # Charizard · Rare · 417.78 USD
+A ex11-3  # Dragonite δ · Rare · 417.74 EUR
+A bw11-115  # Zekrom · Secret Rare · 411.19 USD
+A sm12-222  # Reshiram & Zekrom GX · Ultra Rare · 410.68 USD
+A ecard1-39  # Charizard · Rare · 405.93 USD
+A sm7-177  # Rayquaza GX · Secret Rare · 402.87 USD
+A sm9-164  # Gengar & Mimikyu GX · Ultra Rare · 401.70 USD
+A ex10-29  # Lugia · Rare · 400.00 USD
+A ex7-104  # Rocket's Snorlax ex · Rare · 400.00 USD
+A ex13-12  # Latios δ · Rare · 400.00 EUR
+A bw4-102  # Zoroark · Secret Rare · 399.99 USD
+A ecard2-H19  # Ninetales · Holo Rare · 399.99 USD
+A ecard3-H13  # Kabutops · Holo Rare · 399.99 USD
+A lc-7  # Dark Raichu · Holo Rare · 399.99 USD
+A sm11-226  # Mega Sableye & Tyranitar GX · Ultra Rare · 396.34 USD
+A hgss4-97  # Mew · Rare PRIME · 394.47 USD
+A gym1-4  # Erika's Dragonair · Holo Rare · 388.58 USD
+A ecard3-H22  # Piloswine · Holo Rare · 388.45 USD
+A swsh12.5gg-GG69  # Giratina VSTAR · Secret Rare · 388.33 EUR
+A gym2-1  # Blaine's Arcanine · Holo Rare · 386.48 USD
+A ex7-103  # Rocket's Sneasel ex · Rare · 386.33 USD
+A sm9-53  # Gengar & Mimikyu GX · Ultra Rare · 386.23 USD
+A base5-4  # Dark Charizard · Rare · 385.44 USD
+A swsh7-212  # Sylveon VMAX · Secret Rare · 384.06 USD
+A swsh6-201  # Blaziken VMAX · Secret Rare · 382.23 USD
+A swsh7-205  # Leafeon VMAX · Secret Rare · 381.74 USD
+A ecard3-145  # Celebi · Rare · 379.99 USD
+A swsh7-189  # Umbreon V · Ultra Rare · 378.95 USD
+A pop5-2  # Lugia · Rare · 378.02 USD
+A col1-SL6  # Kyogre · Holo Rare · 377.49 USD
+A dp3-14  # Lugia · Rare Holo · 376.20 USD
+A sm11-221  # Raichu & Alolan Raichu GX · Ultra Rare · 375.31 USD
+A bw9-117  # Empoleon · Secret Rare · 375.00 USD
+A ecard3-H26  # Raikou · Holo Rare · 375.00 USD
+A neo4-5  # Dark Feraligatr · Rare · 374.99 USD
+A neo3-14  # Suicune · Rare · 373.30 USD
+A ex10-117  # Celebi ex · Rare · 370.00 USD
+A ex10-4  # Feraligatr · Rare · 369.50 USD
+A base2-11  # Snorlax · Rare · 369.25 USD
+A ex16-6  # Charizard · Rare · 365.95 USD
+A neo2-1  # Espeon · Rare · 365.17 USD
+A ex14-4  # Charizard δ · Rare · 363.56 EUR
+A xy5-149  # Primal Kyogre EX · Ultra Rare · 363.35 USD
+A col1-SL2  # Dialga · Holo Rare · 362.99 USD
+A ex10-102  # Espeon ex · Rare · 362.62 USD
+A sv10-231  # Team Rocket's Mewtwo ex · Special illustration rare · 361.97 USD
+A base5-83  # Dark Raichu · Rare · 360.29 USD
+A lc-9  # Dark Vaporeon · Holo Rare · 360.00 USD
+A ecard3-H03  # Articuno · Holo Rare · 359.99 USD
+A sm11-218  # Slowpoke & Psyduck GX · Ultra Rare · 357.50 USD
+A sm10-201  # Greninja & Zoroark GX · Ultra Rare · 354.92 USD
+A dp6-14  # Rayquaza · Rare Holo · 352.87 USD
+A sv02-203  # Magikarp · Illustration rare · 352.72 USD
+A ex7-102  # Rocket's Scyther ex · Rare · 351.99 USD
+A col1-SL7  # Lugia · Holo Rare · 350.74 USD
+A col1-SL8  # Palkia · Holo Rare · 350.00 USD
+A ecard2-H01  # Ampharos · Holo Rare · 350.00 USD
+A ex9-98  # Regice ex · Rare · 350.00 USD
+A neo4-15  # Light Togetic · Rare · 350.00 USD
+A pl2-108  # Infernape E4 LV.X · Rare Holo LV.X · 350.00 USD
+A pop4-2  # Deoxys δ · Rare · 350.00 USD
+A ecard3-H20  # Moltres · Holo Rare · 349.99 USD
+A ex14-95  # Kyogre ex · Rare · 349.99 USD
+A ex7-9  # Dark Slowking · Rare · 349.25 USD
+A neo3-3  # Celebi · Rare · 347.65 USD
+A ex8-16  # Deoxys · Rare · 347.50 USD
+A bw11-114  # Reshiram · Secret Rare · 347.37 USD
+A sm9-191  # Eevee & Snorlax GX · Secret Rare · 345.05 USD
+A ex15-99  # Tyranitar ex δ · Rare · 343.75 EUR
+A ex2-98  # Raichu ex · Rare · 342.74 USD
+A swsh8-270  # Espeon VMAX · Secret Rare · 341.35 USD
+A hgss2-94  # Suicune & Entei LEGEND · LEGEND · 340.00 USD
+A ecard2-H23  # Steelix · Holo Rare · 339.95 USD
+A ex10-104  # Ho-Oh ex · Rare · 338.08 USD
+A base2-3  # Flareon · Rare · 337.50 USD
+A pl2-103  # Alakazam E4 LV.X · Rare Holo LV.X · 336.25 USD
+A ex13-111  # Mew · Rare · 335.54 USD
+A xy7-97  # Primal Groudon EX · Secret Rare · 331.43 USD
+A ex12-93  # Pikachu δ · Rare · 331.27 EUR
+A ex10-107  # Politoed ex · Rare · 330.00 USD
+A lc-8  # Dark Slowbro · Holo Rare · 329.99 USD
+A ex11-108  # Flareon ex · Rare · 329.31 USD
+A ex3-98  # Charmander · Rare · 327.19 USD
+A ex3-10  # Salamence · Holo Rare · 326.99 USD
+A hgss1-114  # Lugia LEGEND · LEGEND · 326.66 USD
+A pop1-3  # Rayquaza · Rare · 325.30 USD
+A ex7-2  # Dark Ampharos · Rare · 325.00 USD
+A ex13-10  # Kingdra δ · Rare · 325.00 EUR
+A ex11-4  # Espeon δ · Rare · 324.97 EUR
+A sv03.5-199  # Charizard ex · Special illustration rare · 324.63 USD
+A sm12-216  # Solgaleo & Lunala GX · Ultra Rare · 322.80 USD
+A dp6-11  # Mewtwo · Rare Holo · 322.67 USD
+A lc-17  # Ninetales · Holo Rare · 322.62 USD
+A gym2-5  # Giovanni's Gyarados · Holo Rare · 321.99 USD
+A sv06-214  # Greninja ex · Special illustration rare · 317.44 USD
+A col1-SL11  # Suicune · Holo Rare · 315.90 USD
+A ex11-17  # Umbreon δ · Rare · 315.59 EUR
+A hgss3-82  # Houndoom · Rare PRIME · 315.32 USD
+A ex11-110  # Vaporeon ex · Rare · 315.24 USD
+A xy2-107  # M Charizard EX · Secret Rare · 313.61 USD
+A ex5-93  # Groudon ex · Rare · 313.01 USD
+A ecard1-48  # Gengar · Rare · 312.82 USD
+A hgss2-90  # Entei & Raikou LEGEND · LEGEND · 312.65 USD
+A sm8-226  # Mimikyu GX · Secret Rare · 311.65 USD
+A sv08.5-144  # Leafeon ex · Special illustration rare · 311.16 USD
+A ecard1-29  # Tyranitar · Holo Rare · 311.00 USD
+A dp3-3  # Charizard · Rare Holo · 310.62 USD
+A swsh7-209  # Glaceon VMAX · Secret Rare · 307.86 USD
+B ecard1-22  # Pichu · Holo Rare · 305.00 USD
+B ex5-97  # Regice ex · Rare · 303.75 USD
+B ex5-99  # Registeel ex · Rare · 300.50 USD
+B ecard3-3  # Arcanine · Rare · 300.00 USD
+B ecard3-H27  # Rhydon · Holo Rare · 300.00 USD
+B ex8-17  # Deoxys · Rare · 300.00 USD
+B ex8-8  # Gyarados · Rare · 300.00 USD
+B ex8-98  # Deoxys ex · Rare · 300.00 USD
+B ex9-97  # Raichu ex · Rare · 300.00 USD
+B neo2-32  # Umbreon · Rare · 300.00 USD
+B ex7-14  # Togetic · Rare · 299.99 USD
+B ex9-90  # Altaria ex · Rare · 299.99 USD
+B lc-20  # Beedrill · Rare · 299.99 USD
+B bw7-152  # Altaria · Secret Rare · 299.95 USD
+B me02.5-277  # Pikachu ex · Special illustration rare · 299.87 USD
+B neo4-11  # Dark Tyranitar · Rare · 298.22 USD
+B pl1-122  # Dialga G LV.X · Rare Holo LV.X · 297.87 USD
+B neo3-2  # Blissey · Rare · 297.49 USD
+B ex5-96  # Ninetales ex · Rare · 296.79 USD
+B xy2-100  # Charizard EX · Ultra Rare · 295.26 USD
+B ex6-15  # Snorlax · Rare · 294.09 USD
+B ex4-92  # Raikou ex · Rare · 293.32 USD
+B gym2-8  # Giovanni's Persian · Holo Rare · 292.47 USD
+B hgss3-87  # Kyogre & Groudon LEGEND · LEGEND · 290.77 USD
+B col1-SL3  # Entei · Holo Rare · 290.00 USD
+B ecard2-H32  # Zapdos · Holo Rare · 290.00 USD
+B neo4-10  # Dark Typhlosion · Rare · 290.00 USD
+B ecard2-H09  # Espeon · Holo Rare · 289.99 USD
+B xy2-69  # M Charizard EX · Ultra Rare · 289.80 USD
+B gym2-16  # Sabrina's Alakazam · Holo Rare · 289.49 USD
+B ecard1-25  # Raichu · Holo Rare · 285.99 USD
+B ecard2-H08  # Entei · Holo Rare · 285.04 USD
+B ex10-27  # Ho-Oh · Rare · 285.00 USD
+B sv08.5-155  # Espeon ex · Special illustration rare · 284.88 USD
+B sm12-226  # Mega Lopunny & Jigglypuff GX · Ultra Rare · 283.98 USD
+B ex7-100  # Rocket's Moltres ex · Rare · 283.75 USD
+B me02.5-294  # Mega Charizard Y ex · Mega Hyper Rare · 283.75 USD
+B neo1-6  # Heracross · Rare · 280.55 USD
+B ex9-14  # Groudon · Rare · 279.99 USD
+B hgss2-88  # Tyranitar · Rare PRIME · 278.37 USD
+B swsh9-154  # Charizard V · Ultra Rare · 277.85 USD
+B hgss4-99  # Darkrai & Cresselia LEGEND · LEGEND · 276.04 USD
+B sv08-238  # Pikachu ex · Special illustration rare · 274.44 USD
+B neo1-5  # Feraligatr · Rare · 272.64 USD
+B base2-4  # Jolteon · Rare · 272.28 USD
+B ex2-96  # Gardevoir ex · Rare · 271.66 USD
+B ex6-116  # Zapdos ex · Rare · 270.42 USD
+B ecard2-41  # Umbreon · Rare · 269.99 USD
+B ecard3-12  # Houndoom · Rare · 268.21 USD
+B dp3-131  # Gardevoir · Rare Holo LV.X · 267.59 USD
+B ex7-20  # Dark Tyranitar · Rare · 265.00 USD
+B ex9-93  # Deoxys ex · Rare · 264.94 USD
+B sm12-236  # Rosa · Ultra Rare · 264.22 USD
+B sv10.5b-166  # Zekrom ex · Special illustration rare · 263.89 USD
+B dp4-104  # Darkrai · Rare Holo LV.X · 263.38 USD
+B lc-31  # Nidoking · Rare · 262.50 USD
+B gym2-3  # Brock's Ninetales · Holo Rare · 260.50 USD
+B ex2-99  # Typhlosion ex · Rare · 259.63 USD
+B neo1-11  # Meganium · Rare · 258.10 USD
+B neo1-12  # Pichu · Rare · 257.57 USD
+B sm12-259  # Reshiram & Zekrom GX · Secret Rare · 257.54 USD
+B sv08.5-150  # Glaceon ex · Special illustration rare · 257.53 USD
+B swsh3.5-79  # Charizard V · Secret Rare · 257.47 USD
+B sv04.5-234  # Charizard ex · Special illustration rare · 256.92 USD
+B ecard2-H17  # Muk · Holo Rare · 256.33 USD
+B pl3-8  # Rayquaza C · Holo Rare · 255.84 USD
+B ex14-98  # Swampert ex · Rare · 255.33 USD
+B sv08.5-149  # Vaporeon ex · Special illustration rare · 254.24 USD
+B dp5-5  # Glaceon · Rare Holo · 253.67 USD
+B ex8-9  # Jirachi · Rare · 253.33 USD
+B pl3-146  # Rayquaza C LV.X · Rare Holo LV.X · 253.00 USD
+B xy6-104  # Rayquaza EX · Ultra Rare · 252.66 USD
+B ecard2-H12  # Hypno · Holo Rare · 252.50 USD
+B bw4-101  # Chandelure · Secret Rare · 250.00 USD
+B ecard1-1  # Alakazam · Holo Rare · 250.00 USD
+B ecard3-8  # Flareon · Rare · 250.00 USD
+B ecard3-H23  # Politoed · Holo Rare · 250.00 USD
+B ex12-5  # Gengar · Rare · 250.00 USD
+B ex5-94  # Kyogre ex · Rare · 250.00 USD
+B ex8-101  # Manectric ex · Rare · 250.00 USD
+B neo2-5  # Houndour · Rare · 249.99 USD
+B hgss1-111  # Ho-Oh LEGEND · LEGEND · 249.54 USD
+B neo2-16  # Wobbuffet · Rare · 248.67 USD
+B sm9-184  # Pikachu & Zekrom GX · Secret Rare · 248.01 USD
+B dp6-144  # Mewtwo · Rare Holo LV.X · 247.65 USD
+B sm5-148  # Cynthia · Ultra Rare · 246.14 USD
+B ex3-89  # Ampharos ex · Rare · 245.62 USD
+B sm9-171  # Eevee & Snorlax GX · Ultra Rare · 244.83 USD
+B ex16-96  # Salamence ex · Rare · 244.80 USD
+B sm11-239  # Slowpoke & Psyduck GX · Secret Rare · 244.73 USD
+B gym1-1  # Blaine's Moltres · Holo Rare · 243.32 USD
+B me02.5-281  # Team Rocket's Mewtwo ex · Special illustration rare · 243.21 USD
+B gym1-13  # Rocket's Scyther · Holo Rare · 242.56 USD
+B swsh12.5gg-GG44  # Mewtwo VSTAR · Ultra Rare · 242.51 EUR
+B neo2-4  # Houndoom · Rare · 242.50 USD
+B sm10-217  # Reshiram & Charizard GX · Secret Rare · 242.48 USD
+B gym2-6  # Giovanni's Machamp · Holo Rare · 241.89 USD
+B dp3-15  # Mew · Rare Holo · 241.32 USD
+B ex3-94  # Latios ex · Rare · 241.07 USD
+B sm12-234  # Red & Blue · Ultra Rare · 240.48 USD
+B sm8-227  # Lugia GX · Secret Rare · 240.16 USD
+B lc-28  # Magneton · Rare · 239.99 USD
+B swsh8-269  # Mew VMAX · Secret Rare · 239.37 USD
+B swsh7-180  # Espeon V · Ultra Rare · 238.52 USD
+B neo1-14  # Slowking · Rare · 238.26 USD
+B base3-10  # Lapras · Rare · 237.61 USD
+B swsh5-155  # Tyranitar V · Ultra Rare · 237.54 USD
+B ex9-2  # Deoxys · Rare · 237.50 USD
+B bw11-RC22  # Reshiram · Ultra Rare · 237.39 EUR
+B ecard1-12  # Feraligatr · Holo Rare · 234.88 USD
+B bw9-119  # Garbodor · Secret Rare · 234.09 USD
+B sm10-199  # Marshadow & Machamp GX · Ultra Rare · 234.01 USD
+B swsh6-177  # Galarian Moltres V · Ultra Rare · 233.69 USD
+B hgss2-92  # Raikou & Suicune LEGEND · LEGEND · 233.50 USD
+B hgss2-93  # Raikou & Suicune LEGEND · LEGEND · 233.36 USD
+B ex4-91  # Entei ex · Rare · 233.33 USD
+B bw3-101  # N · Ultra Rare · 233.09 USD
+B ecard2-H18  # Nidoking · Holo Rare · 230.98 USD
+B ecard3-H32  # Xatu · Holo Rare · 230.37 USD
+B ecard3-2  # Alakazam · Rare · 229.99 USD
+B ecard3-H08  # Forretress · Holo Rare · 229.99 USD
+B neo3-11  # Misdreavus · Rare · 229.99 USD
+B pop4-5  # Sceptile · Rare · 229.96 USD
+B ex16-92  # Absol ex · Rare · 229.67 USD
+B lc-14  # Jolteon · Holo Rare · 228.77 USD
+B ex12-10  # Mew · Rare · 228.32 USD
+B gym1-12  # Rocket's Moltres · Holo Rare · 228.32 USD
+B ex5-98  # Regirock ex · Rare · 227.98 USD
+B ex7-19  # Dark Tyranitar · Rare · 226.76 USD
+B base1-2  # Blastoise · Rare · 226.58 USD
+B gym2-15  # Rocket's Zapdos · Holo Rare · 226.11 USD
+B hgss2-95  # Suicune & Entei LEGEND · LEGEND · 225.66 USD
+B me01-188  # Mega Lucario ex · Mega Hyper Rare · 225.54 USD
+B ex8-97  # Deoxys ex · Rare · 225.49 USD
+B ecard2-33  # Slowbro · Rare · 225.00 USD
+B lc-16  # Muk · Holo Rare · 225.00 USD
+B swsh12.5gg-GG70  # Arceus VSTAR · Secret Rare · 225.00 EUR
+B ex8-23  # Sableye · Rare · 224.48 USD
+B ecard2-34  # Slowking · Rare · 224.05 USD
+B sm12-241  # Pikachu · Secret Rare · 223.18 USD
+B ecard1-56  # Mewtwo · Rare · 222.49 USD
+B base5-8  # Dark Gyarados · Rare · 222.18 USD
+B ex2-15  # Arcanine · Rare · 221.68 USD
+B dp6-2  # Dragonite · Rare Holo · 221.34 USD
+B bw7-149  # Skyla · Ultra Rare · 221.29 USD
+B cel25cc-CC002  # Charizard · Classic Collection · 221.25 EUR
+B ecard3-H16  # Magcargo · Holo Rare · 220.00 USD
+B gym2-7  # Giovanni's Nidoking · Holo Rare · 219.99 USD
+B neo3-1  # Ampharos · Rare · 219.90 USD
+B ex10-110  # Typhlosion ex · Rare · 219.85 USD
+B ex9-6  # Kyogre · Rare · 219.00 USD
+B lc-21  # Butterfree · Rare · 218.94 USD
+B xy7-94  # Lugia EX · Ultra Rare · 217.97 USD
+B pop3-1  # Blastoise · Rare · 217.50 USD
+B xy5-151  # Primal Groudon EX · Ultra Rare · 217.14 USD
+B pl3-145  # Garchomp C LV.X · Rare Holo LV.X · 217.12 USD
+B dp2-122  # Lucario · Rare Holo LV.X · 216.04 USD
+B ex3-93  # Latias ex · Rare · 215.91 USD
+B ex5-95  # Metagross ex · Rare · 215.50 USD
+B col1-22  # Umbreon · Holo Rare · 215.38 USD
+B dp4-106  # Palkia · Rare Holo LV.X · 215.36 USD
+B ex14-14  # Blastoise · Rare · 215.00 USD
+B ex9-5  # Groudon · Rare · 215.00 USD
+B ecard2-H14  # Kingdra · Holo Rare · 214.44 USD
+B base3-14  # Raichu · Rare · 213.70 USD
+B ecard3-H21  # Nidoqueen · Holo Rare · 212.49 USD
+B sm12-228  # Cynthia & Caitlin · Ultra Rare · 212.05 USD
+B ex10-116  # Rocket's Persian ex · Rare · 210.83 USD
+B bw7-147  # Bianca · Ultra Rare · 210.01 USD
+B ecard1-43  # Dragonite · Rare · 210.00 USD
+B bw11-RC24  # Mew-EX · Ultra Rare · 210.00 EUR
+B ecard3-6  # Crobat · Rare · 209.99 USD
+B xy8-164  # Mewtwo EX · Secret Rare · 209.60 USD
+B ecard1-30  # Venusaur · Holo Rare · 209.54 USD
+B ex4-97  # Jirachi · Rare · 209.19 USD
+B gym2-11  # Lt. Surge's Raichu · Holo Rare · 209.00 USD
+B xy8-163  # Mewtwo EX · Secret Rare · 208.15 USD
+B sm9-190  # Latias & Latios GX · Secret Rare · 208.08 USD
+B sm7-164  # Lisia · Ultra Rare · 208.03 USD
+B sv10.5b-105  # Seismitoad · Illustration rare · 207.84 USD
+B xy9-123  # Gyarados EX · Secret Rare · 207.59 USD
+B sm11-222  # Mewtwo & Mew GX · Ultra Rare · 205.48 USD
+B bw7-150  # Golurk · Secret Rare · 205.22 USD
+B me02-130  # Mega Charizard X ex · Mega Hyper Rare · 205.11 USD
+B neo1-4  # Feraligatr · Rare · 204.46 USD
+B ex11-109  # Jolteon ex · Rare · 204.16 USD
+B ecard1-28  # Typhlosion · Holo Rare · 203.33 USD
+B swsh11-180  # Aerodactyl V · Ultra Rare · 203.23 USD
+B swsh3.5-74  # Charizard VMAX · Secret Rare · 202.68 USD
+B sm3.5-40  # Shining Mew · Ultra Rare · 202.67 USD
+B gym1-18  # Misty · Holo Rare · 202.66 USD
+B ex4-95  # Swampert ex · Rare · 202.45 USD
+B bw3-98  # Victini · Ultra Rare · 202.42 USD
+B ecard2-H10  # Exeggutor · Holo Rare · 200.98 USD
+B base3-2  # Articuno · Rare · 200.81 USD
+B ex6-109  # Gyarados ex · Rare · 200.68 USD
+B ex10-106  # Meganium ex · Rare · 200.52 USD
+B bw4-100  # Emboar · Secret Rare · 200.00 USD
+B dp5-99  # Leafeon · Rare Holo LV.X · 200.00 USD
+B ecard3-5  # Beedrill · Rare · 200.00 USD
+B ecard3-H14  # Ledian · Holo Rare · 200.00 USD
+B ecard3-H17  # Magcargo · Holo Rare · 200.00 USD
+B ecard3-H19  # Magneton · Holo Rare · 200.00 USD
+B ex2-24  # Umbreon · Rare · 200.00 USD
+B ex9-10  # Sceptile · Rare · 200.00 USD
+B gym1-7  # Lt. Surge's Fearow · Holo Rare · 200.00 USD
+B ex13-14  # Pidgeot δ · Rare · 200.00 EUR
+B ecard3-34  # Wigglytuff · Rare · 199.99 USD
+B ecard3-H04  # Beedrill · Holo Rare · 199.99 USD
+B ex4-89  # Blaziken ex · Rare · 199.99 USD
+B ex6-107  # Electrode ex · Rare · 199.99 USD
+B ex7-16  # Dark Muk · Rare · 199.99 USD
+B ex9-4  # Gardevoir · Rare · 199.99 USD
+B hgss3-10  # Umbreon · Holo Rare · 199.99 USD
+B lc-34  # Pidgeotto · Rare · 199.99 USD
+B ex6-114  # Articuno ex · Rare · 199.06 USD
+B neo2-10  # Scizor · Rare · 199.00 USD
+B base3-15  # Zapdos · Rare · 198.67 USD
+B swsh7-184  # Sylveon V · Ultra Rare · 198.08 USD
+B hgss1-112  # Ho-Oh LEGEND · LEGEND · 197.68 USD
+B lc-13  # Hitmonlee · Holo Rare · 196.97 USD
+B base3-12  # Moltres · Rare · 196.62 USD
+B ex14-94  # Jirachi ex · Rare · 195.49 USD
+B neo2-8  # Politoed · Rare · 193.31 USD
+B ecard3-21  # Moltres · Rare · 192.48 USD
+B bw10-105  # Rare Candy · Secret Rare · 191.88 USD
+B swsh10-172  # Machamp V · Ultra Rare · 191.87 USD
+B lc-33  # Pidgeot · Rare · 191.60 USD
+B neo4-9  # Dark Scizor · Rare · 190.76 USD
+B ex4-10  # Team Magma's Houndoom · Holo Rare · 190.17 USD
+B ex8-103  # Salamence ex · Rare · 190.16 USD
+B ex13-20  # Blaziken · Rare · 189.99 USD
+B col1-15  # Lugia · Holo Rare · 189.67 USD
+B gym1-33  # Rocket's Snorlax · Rare · 188.65 USD
+B dp7-98  # Machamp · Rare Holo LV.X · 187.84 USD
+B ecard2-H27  # Togetic · Holo Rare · 187.67 USD
+B ex2-6  # Jolteon · Holo Rare · 187.19 USD
+B base2-10  # Scyther · Rare · 187.08 USD
+B dp5-97  # Garchomp · Rare Holo LV.X · 187.00 USD
+B ecard2-H21  # Scizor · Holo Rare · 186.86 USD
+B gym2-20  # Sabrina · Holo Rare · 186.64 USD
+B sv10-232  # Cynthia's Garchomp ex · Special illustration rare · 186.47 USD
+B pl4-95  # Arceus LV.X · Rare Holo LV.X · 186.25 USD
+B bw5-110  # Archeops · Secret Rare · 185.90 USD
+B sm10-225  # Gardevoir & Sylveon GX · Secret Rare · 185.21 USD
+B sm2-158  # Sylveon GX · Secret Rare · 185.11 USD
+B ex9-1  # Blaziken · Rare · 185.00 USD
+B ex10-19  # Vaporeon · Rare · 184.99 USD
+B ex7-96  # Rocket's Articuno ex · Rare · 184.99 USD
+B ex10-108  # Scizor ex · Rare · 183.44 USD
+B ex2-94  # Aerodactyl ex · Rare · 182.50 USD
+B ex10-8  # Jolteon · Rare · 181.69 USD
+B ex10-109  # Steelix ex · Rare · 181.25 USD
+B sv08-239  # Latias ex · Special illustration rare · 180.32 USD
+B ecard1-18  # Meganium · Holo Rare · 180.01 USD
+B bw6-127  # Krookodile · Secret Rare · 180.00 USD
+B ecard2-32  # Scizor · Rare · 180.00 USD
+B ex6-115  # Moltres ex · Rare · 180.00 USD
+B ecard2-2  # Arcanine · Rare · 179.99 USD
+B ex9-99  # Regirock ex · Rare · 179.99 USD
+B base5-1  # Dark Alakazam · Rare · 178.88 USD
+B bw1-115  # Pikachu · Secret Rare · 177.82 USD
+B base5-21  # Dark Charizard · Rare · 177.63 USD
+B ex7-7  # Dark Marowak · Rare · 177.61 USD
+B sv10.5w-166  # Reshiram ex · Special illustration rare · 176.93 USD
+B ex8-99  # Deoxys ex · Rare · 176.40 USD
+B sm12-253  # Blastoise & Piplup GX · Secret Rare · 176.13 USD
+B neo4-2  # Dark Crobat · Rare · 175.91 USD
+B base3-6  # Haunter · Rare · 175.73 USD
+B ex7-3  # Dark Crobat · Rare · 175.58 USD
+B ecard1-2  # Ampharos · Holo Rare · 175.00 USD
+B ex14-90  # Blaziken ex · Rare · 175.00 USD
+B ex14-93  # Groudon ex · Rare · 175.00 USD
+B ecard1-23  # Pidgeot · Holo Rare · 174.97 USD
+B xy5-148  # Kyogre EX · Ultra Rare · 174.82 USD
+B ex1-102  # Scyther ex · Rare · 174.43 USD
+B sm9-162  # Pikachu & Zekrom GX · Ultra Rare · 174.28 USD
+B ecard2-H26  # Tentacruel · Holo Rare · 173.90 USD
+B ex1-99  # Lapras ex · Rare · 172.78 USD
+B ecard2-H24  # Sudowoodo · Holo Rare · 172.50 USD
+B swsh12tg-TG20  # Rayquaza VMAX · Holo Rare VMAX · 171.46 EUR
+B xy5-150  # Groudon EX · Ultra Rare · 171.08 USD
+B me01-178  # Mega Gardevoir ex · Special illustration rare · 171.05 USD
+B dp4-105  # Dialga · Rare Holo LV.X · 170.68 USD
+B xy10-125  # Alakazam EX · Secret Rare · 170.67 USD
+B base4-2  # Blastoise · Rare · 170.64 USD
+B hgss4-102  # Palkia & Dialga LEGEND · LEGEND · 170.39 USD
+B ecard3-H29  # Steelix · Holo Rare · 170.00 USD
+B ecard1-5  # Butterfree · Holo Rare · 169.99 USD
+B ex3-1  # Absol · Holo Rare · 169.99 USD
+B neo2-17  # Yanma · Rare · 169.99 USD
+B base2-8  # Pidgeot · Rare · 169.43 USD
+B swsh4-188  # Pikachu VMAX · Secret Rare · 169.36 USD
+B ecard1-55  # Mew · Rare · 169.02 USD
+B ex16-94  # Flygon ex · Rare · 168.94 USD
+B ex8-104  # Sharpedo ex · Rare · 168.88 USD
+B me01-187  # Mega Gardevoir ex · Mega Hyper Rare · 168.86 USD
+B ecard2-H07  # Electrode · Holo Rare · 168.77 USD
+B ex11-13  # Rayquaza δ · Rare · 168.43 EUR
+B ex6-4  # Ditto · Rare · 168.41 USD
+B me01-179  # Mega Lucario ex · Special illustration rare · 168.24 USD
+B ex4-96  # Absol · Rare · 168.20 USD
+B base1-15  # Venusaur · Rare · 168.18 USD
+B ecard1-36  # Blastoise · Rare · 167.49 USD
+B sm7-160  # Rayquaza GX · Ultra Rare · 167.05 USD
+B dp5-14  # Zapdos · Rare Holo · 166.92 USD
+B hgss2-91  # Entei & Raikou LEGEND · LEGEND · 166.87 USD
+B sv08.5-146  # Flareon ex · Special illustration rare · 166.79 USD
+B ecard2-H30  # Victreebel · Holo Rare · 166.65 USD
+B sv08.5-167  # Eevee ex · Special illustration rare · 166.44 USD
+B lc-32  # Nidoqueen · Rare · 166.32 USD
+B dp1-121  # Infernape · Rare Holo LV.X · 165.82 USD
+B ecard2-11  # Espeon · Rare · 165.66 USD
+B sv04.5-233  # Gardevoir ex · Special illustration rare · 165.59 USD
+B ex12-85  # Banette ex · Rare · 165.49 USD
+B ex9-100  # Registeel ex · Rare · 165.11 USD
+B bw6-126  # Reuniclus · Secret Rare · 165.00 USD
+B bw4-103  # Hydreigon · Secret Rare · 164.99 USD
+B ex7-5  # Dark Houndoom · Rare · 164.99 USD
+B sm5-153  # Lusamine · Ultra Rare · 163.06 USD
+B sv08.5-153  # Jolteon ex · Special illustration rare · 162.83 USD
+B base2-6  # Mr. Mime · Rare · 162.81 USD
+B xy1-142  # Blastoise EX · Ultra Rare · 162.50 USD
+B ex7-24  # Magby · Rare · 162.49 USD
+B ex16-19  # Ninetales · Rare · 162.48 USD
+B sv08.5-162  # Roaring Moon ex · Special illustration rare · 162.03 USD
+B neo2-3  # Hitmontop · Rare · 161.45 USD
+B neo4-1  # Dark Ampharos · Rare · 161.37 USD
+B ex12-87  # Flygon ex · Rare · 161.00 USD
+B ecard2-H20  # Octillery · Holo Rare · 160.99 USD
+B xy6-61  # M Rayquaza EX · Ultra Rare · 160.99 USD
+B swsh12.5gg-GG68  # Origin Forme Dialga VSTAR · Secret Rare · 160.99 EUR
+B xy3-113  # M Lucario EX · Secret Rare · 160.27 USD
+B sv06-220  # Perrin · Special illustration rare · 160.22 USD
+B neo1-10  # Meganium · Rare · 160.17 USD
+B swsh12.5gg-GG67  # Origin Forme Palkia VSTAR · Secret Rare · 160.00 EUR
+B ecard3-14  # Kabutops · Rare · 159.99 USD
+B ecard3-H02  # Arcanine · Holo Rare · 159.98 USD
+B pl3-142  # Blaziken FB LV.X · Rare Holo LV.X · 159.54 USD
+B g1-12  # M Charizard EX · Ultra Rare · 159.46 USD
+B me02.5-295  # Mega Dragonite ex · Mega Hyper Rare · 159.40 USD
+B ex2-10  # Sableye · Holo Rare · 159.00 USD
+B hgss3-THREE  # Alph Lithograph · Ultra Rare · 158.86 USD
+B ex10-103  # Feraligatr ex · Rare · 158.32 USD
+B hgss4-100  # Darkrai & Cresselia LEGEND · LEGEND · 157.41 USD
+B sm3.5-56  # Shining Rayquaza · Ultra Rare · 157.07 USD
+B sm11-217  # Slowpoke & Psyduck GX · Ultra Rare · 156.98 USD
+B ex15-93  # Gardevoir ex δ · Rare · 156.95 EUR
+B ex10-5  # Flareon · Rare · 156.55 USD
+B base2-12  # Vaporeon · Rare · 155.49 USD
+B ecard1-7  # Clefable · Holo Rare · 155.37 USD
+B hgss4-91  # Absol · Rare PRIME · 155.04 USD
+B neo2-15  # Ursaring · Rare · 154.99 USD
+B sm11-248  # Dragonite GX · Secret Rare · 152.71 USD
+B swsh7-175  # Glaceon V · Ultra Rare · 152.40 USD
+B xy4-35  # M Gengar EX · Ultra Rare · 152.19 USD
+B lc-24  # Golem · Rare · 151.65 USD
+B ex10-101  # Blissey ex · Rare · 151.11 USD
+B ex4-9  # Team Magma's Groudon · Holo Rare · 150.83 USD
+B sm11-71  # Mewtwo & Mew GX · Ultra Rare · 150.39 USD
+B sm11-241  # Raichu & Alolan Raichu GX · Secret Rare · 150.33 USD
+B ecard1-37  # Blastoise · Rare · 150.00 USD
+B ecard2-14  # Houndoom · Rare · 150.00 USD
+B ex5-100  # Vileplume ex · Rare · 150.00 USD
+B ex6-110  # Mr. Mime ex · Rare · 150.00 USD
+B ecard3-27  # Raichu · Rare · 149.99 USD
+B ex10-21  # Cleffa · Rare · 149.99 USD
+B ex11-16  # Tyranitar δ · Rare · 149.90 EUR
+B neo1-15  # Steelix · Rare · 149.75 USD
+B ex11-7  # Jolteon δ · Rare · 149.51 EUR
+B bw6-125  # Serperior · Secret Rare · 149.20 USD
+B ex7-21  # Delibird · Rare · 149.00 USD
+B dp5-9  # Mewtwo · Rare Holo · 148.98 USD
+B ex15-95  # Latias ex δ · Rare · 148.90 EUR
+B bw10-102  # Exeggcute · Secret Rare · 148.66 USD
+B xy7-93  # Giratina EX · Ultra Rare · 148.16 USD
+B xy8-160  # M Mewtwo EX · Ultra Rare · 148.01 USD
+B ex7-10  # Dark Steelix · Rare · 147.93 USD
+B ex14-10  # Sableye · Rare · 147.78 USD
+B neo3-20  # Lugia · Rare · 147.66 USD
+B ecard1-64  # Typhlosion · Rare · 147.50 USD
+B ecard2-H31  # Vileplume · Holo Rare · 147.50 USD
+B ex2-97  # Kabutops ex · Rare · 147.25 USD
+B base5-10  # Dark Machamp · Rare · 146.83 USD
+B neo1-16  # Togetic · Rare · 146.65 USD
+B ex2-100  # Wailord ex · Rare · 146.52 USD
+B pl1-10  # Giratina · Holo Rare · 146.23 USD
+B ex15-92  # Flygon ex δ · Rare · 146.12 EUR
+B ecard2-13  # Exeggutor · Rare · 145.98 USD
+B sm9-182  # Celebi & Venusaur GX · Secret Rare · 145.65 USD
+B sm9-183  # Magikarp & Wailord GX · Secret Rare · 145.43 USD
+B bw10-104  # Dusknoir · Secret Rare · 145.22 USD
+B xy3-107  # Lucario EX · Ultra Rare · 144.97 USD
+B cel25cc-CC015  # Umbreon ☆ · Classic Collection · 144.82 EUR
+B gym2-9  # Koga's Beedrill · Holo Rare · 144.73 USD
+B dp5-100  # Porygon-Z · Rare Holo LV.X · 144.00 USD
+B bw7-151  # Terrakion · Secret Rare · 143.80 USD
+B swsh7-167  # Leafeon V · Ultra Rare · 143.22 USD
+B xy3-108  # Dragonite EX · Ultra Rare · 143.15 USD
+B swsh4.5sv-SV107  # Charizard VMAX · Shiny rare VMAX · 142.45 EUR
+B ex7-26  # Quagsire · Rare · 142.24 USD
+B sm11-35  # Slowpoke & Psyduck GX · Ultra Rare · 142.14 USD
+B swsh6-224  # Snorlax · Secret Rare · 142.02 USD
+B ecard3-H06  # Dewgong · Holo Rare · 141.99 USD
+B sm10-218  # Blastoise GX · Secret Rare · 141.38 USD
+B sm12-211  # Vileplume GX · Ultra Rare · 141.31 USD
+B sv10-230  # Ethan's Ho-Oh ex · Special illustration rare · 140.57 USD
+B xy10-119  # Umbreon EX · Ultra Rare · 140.29 USD
+B neo4-20  # Dark Slowking · Rare · 140.14 USD
+B bw10-103  # Virizion · Secret Rare · 140.06 USD
+B ecard2-H15  # Lanturn · Holo Rare · 140.00 USD
+B lc-6  # Dark Persian · Holo Rare · 140.00 USD
+B ecard2-H05  # Bellossom · Holo Rare · 139.99 USD
+B ecard3-28  # Raikou · Rare · 139.99 USD
+B exu-%3F  # Unown · Rare · 139.99 USD
+B gym1-9  # Misty's Seadra · Holo Rare · 139.56 USD
+B ecard2-15  # Houndoom · Rare · 138.91 USD
+B hgss1-ONE  # Alph Lithograph · Ultra Rare · 138.76 USD
+B ex15-90  # Altaria ex δ · Rare · 138.70 EUR
+B ecard3-16  # Machamp · Rare · 138.65 USD
+B sm11-215  # Rowlet & Alolan Exeggutor GX · Ultra Rare · 138.61 USD
+B hgss3-83  # Raichu · Rare PRIME · 138.33 USD
+B ex12-7  # Kabutops · Rare · 137.99 USD
+B ex12-84  # Armaldo ex · Rare · 137.98 USD
+B xy8-159  # M Mewtwo EX · Ultra Rare · 137.26 USD
+B sm12-251  # Charizard & Braixen GX · Secret Rare · 137.23 USD
+B me05-116  # Mega Darkrai ex · Special illustration rare · 136.89 USD
+B sm9-160  # Magikarp & Wailord GX · Ultra Rare · 136.81 USD
+B gym1-11  # Rocket's Hitmonchan · Holo Rare · 136.66 USD
+B hgss4-101  # Palkia & Dialga LEGEND · LEGEND · 136.12 USD
+B me01-177  # Mega Venusaur ex · Special illustration rare · 135.90 USD
+B me02.5-286  # N's Zoroark ex · Special illustration rare · 135.87 USD
+B dp6-140  # Azelf · Rare Holo LV.X · 135.79 USD
+B ecard3-1  # Aerodactyl · Rare · 135.74 USD
+B me05-120  # Mega Darkrai ex · Mega Hyper Rare · 135.53 USD
+B base3-3  # Ditto · Rare · 135.44 USD
+B ecard1-21  # Ninetales · Holo Rare · 134.99 USD
+B ecard3-25  # Politoed · Rare · 134.99 USD
+B ecard2-40  # Tyranitar · Rare · 134.48 USD
+B ecard2-H04  # Azumarill · Holo Rare · 133.74 USD
+B ecard1-16  # Machamp · Holo Rare · 133.59 USD
+B pl1-124  # Giratina LV.X · Rare Holo LV.X · 133.50 USD
+B gym1-2  # Brock's Rhydon · Holo Rare · 133.36 USD
+B ecard1-26  # Rapidash · Holo Rare · 133.14 USD
+B neo2-6  # Kabutops · Rare · 132.47 USD
+B neo3-4  # Crobat · Rare · 132.47 USD
+B ex11-12  # Mewtwo δ · Rare · 132.29 EUR
+B ex2-5  # Flareon · Holo Rare · 131.66 USD
+B ex1-3  # Blaziken · Holo Rare · 131.42 USD
+B sm1-154  # Umbreon GX · Secret Rare · 131.41 USD
+B ex8-3  # Breloom · Rare · 130.00 USD
+B ecard2-H13  # Jumpluff · Holo Rare · 129.99 USD
+B ecard3-33  # Vaporeon · Rare · 129.99 USD
+B ex8-1  # Altaria · Rare · 129.99 USD
+B sm6-135  # Lucario GX · Secret Rare · 129.81 USD
+B base4-10  # Mewtwo · Rare · 129.77 USD
+B hgss3-84  # Scizor · Rare PRIME · 129.38 USD
+B ex10-7  # Houndoom · Rare · 128.99 USD
+B me04-116  # Mega Greninja ex · Special illustration rare · 127.82 USD
+B hgss2-TWO  # Alph Lithograph · Ultra Rare · 127.52 USD
+B dp7-100  # Regigigas · Rare Holo LV.X · 127.49 USD
+B ex2-25  # Vaporeon · Rare · 127.48 USD
+B sm11-247  # Garchomp & Giratina GX · Secret Rare · 126.32 USD
+B ecard3-4  # Articuno · Rare · 125.75 USD
+B ex1-98  # Hitmonchan ex · Rare · 125.32 USD
+B xy9-115  # M Gyarados EX · Ultra Rare · 125.14 USD
+B xy12-101  # M Charizard EX · Ultra Rare · 125.09 USD
+B ecard1-3  # Arbok · Holo Rare · 125.00 USD
+B ex12-1  # Aerodactyl · Rare · 125.00 USD
+B gym2-18  # Giovanni · Holo Rare · 125.00 USD
+B hgss2-87  # Steelix · Rare PRIME · 125.00 USD
+B lc-30  # Moltres · Rare · 125.00 USD
+B pop3-17  # Ho-Oh ex · Rare · 125.00 USD
+B ex15-96  # Latios ex δ · Rare · 125.00 EUR
+B ecard1-47  # Feraligatr · Rare · 124.99 USD
+B sm8-207  # Lugia GX · Ultra Rare · 124.85 USD
+B hgss1-108  # Feraligatr · Rare PRIME · 124.55 USD
+B neo1-8  # Kingdra · Rare · 124.00 USD
+B sm6-133  # Greninja GX · Secret Rare · 123.53 USD
+B sm8-206  # Mimikyu GX · Ultra Rare · 123.17 USD
+B ecard2-30  # Quagsire · Rare · 123.02 USD
+B sm7.5-78  # Ultra Necrozma GX · Secret Rare · 122.86 USD
+B swsh11tg-TG16  # Pikachu V · Ultra Rare · 122.84 EUR
+B ex9-11  # Swampert · Rare · 121.93 USD
+B sm9-169  # Latias & Latios GX · Ultra Rare · 121.72 USD
+B ex10-11  # Poliwrath · Rare · 121.66 USD
+B ex7-6  # Dark Hypno · Rare · 121.66 USD
+B base2-7  # Nidoqueen · Rare · 121.59 USD
+B bw10-101  # Iris · Ultra Rare · 121.31 USD
+B ex2-95  # Aggron ex · Rare · 121.14 USD
+B me04-122  # Mega Greninja ex · Mega Hyper Rare · 121.10 USD
+B ex5-12  # Milotic · Holo Rare · 120.97 USD
+B neo2-11  # Smeargle · Rare · 120.83 USD
+B ecard1-67  # Venusaur · Rare · 120.66 USD
+B pl2-109  # Luxray GL LV.X · Rare Holo LV.X · 120.58 USD
+B ecard1-68  # Venusaur · Rare · 120.00 USD
+B ex12-15  # Absol · Rare · 120.00 USD
+B ex12-86  # Dustox ex · Rare · 120.00 USD
+B neo3-12  # Porygon2 · Rare · 120.00 USD
+B ecard2-H16  # Magneton · Holo Rare · 119.99 USD
+B ex13-15  # Raichu δ · Rare · 119.63 EUR
+B xy7-85  # M Sceptile EX · Ultra Rare · 119.56 USD
+B cel25cc-CC024  # M Rayquaza EX · Classic Collection · 119.51 EUR
+B base2-14  # Victreebel · Rare · 119.49 USD
+B base3-9  # Kabutops · Rare · 119.43 USD
+B sm12-254  # Solgaleo & Lunala GX · Secret Rare · 119.43 USD
+B ex6-18  # Arcanine · Rare · 119.36 USD
+B bw1-114  # Zekrom · Ultra Rare · 119.14 USD
+B base2-1  # Clefable · Rare · 119.10 USD
+B ecard3-22  # Nidoqueen · Rare · 119.05 USD
+B xy1-146  # Xerneas EX · Ultra Rare · 118.84 USD
+B me02.5-280  # Lillie's Clefairy ex · Special illustration rare · 118.80 USD
+B sm10-222  # Greninja & Zoroark GX · Secret Rare · 118.33 USD
+B base1-8  # Machamp · Rare · 118.27 EUR
+B ex3-99  # Charmeleon · Rare · 118.18 USD
+B neo3-18  # Ho-oh · Rare · 117.89 USD
+B sm10-204  # Gardevoir & Sylveon GX · Ultra Rare · 117.69 USD
+B neo2-31  # Tyranitar · Rare · 117.58 USD
+B pop1-17  # Tyranitar ex · Rare · 117.55 USD
+B neo4-3  # Dark Donphan · Rare · 117.50 USD
+B ex15-98  # Salamence ex δ · Rare · 116.59 EUR
+B hgss4-92  # Celebi · Rare PRIME · 116.48 USD
+B ex5-8  # Jirachi · Holo Rare · 116.45 USD
+B base4-18  # Venusaur · Rare · 116.40 USD
+B bw9-116  # Professor Juniper · Ultra Rare · 116.35 USD
+B pl2-106  # Gallade E4 LV.X · Rare Holo LV.X · 116.35 USD
+B swsh6-179  # Galarian Slowking V · Ultra Rare · 116.30 USD
+B hgss3-85  # Slowking · Rare PRIME · 116.21 USD
+B neo2-20  # Espeon · Rare · 116.09 USD
+B xy7-92  # M Tyranitar EX · Ultra Rare · 115.02 USD
+B pl1-126  # Shaymin LV.X · Rare Holo LV.X · 114.99 USD
+B ex5-102  # Groudon · Rare · 114.93 USD
+B lc-23  # Exeggutor · Rare · 114.75 USD
+B ex7-110  # Charmeleon · Rare · 114.74 USD
+B gym2-12  # Misty's Golduck · Holo Rare · 114.49 USD
+B pl4-98  # Salamence LV.X · Rare Holo LV.X · 114.38 USD
+B sv03.5-200  # Blastoise ex · Special illustration rare · 114.00 USD
+B neo1-2  # Azumarill · Rare · 113.58 USD
+B ex16-21  # Pichu · Rare · 113.53 USD
+B ecard2-39  # Togetic · Rare · 113.49 USD
+B ex10-1  # Ampharos · Rare · 113.08 USD
+B ex3-96  # Muk ex · Rare · 113.01 USD
+B base3-20  # Gengar · Rare · 112.58 USD
+B ex7-18  # Dark Sandslash · Rare · 112.50 USD
+B xy1-141  # Venusaur EX · Ultra Rare · 112.46 USD
+B bw3-102  # Meowth · Secret Rare · 111.80 USD
+B bw11-RC21  # Shaymin-EX · Ultra Rare · 110.61 EUR
+B swsh12-131  # Dragonite · Holo Rare · 110.00 EUR
+B ecard2-25  # Ninetales · Rare · 109.99 USD
+B xy6-76  # M Rayquaza EX · Ultra Rare · 109.75 USD
+B ecard2-44  # Zapdos · Rare · 109.60 USD
+B gym1-16  # Erika · Holo Rare · 109.37 USD
+B swsh10tg-TG13  # Starmie V · Ultra Rare · 108.50 EUR
+B xy11-116  # Gardevoir EX · Secret Rare · 108.48 USD
+B ecard2-37  # Suicune · Rare · 108.47 USD
+B swsh7-217  # Rayquaza VMAX · Secret Rare · 108.38 USD
+B ecard1-66  # Tyranitar · Rare · 108.23 USD
+B sm12-231  # Mallow & Lana · Ultra Rare · 107.77 USD
+B ex13-8  # Gyarados δ · Rare · 107.69 EUR
+B ex9-107  # Farfetch'd · Rare · 107.47 USD
+B sm10-197  # Muk & Alolan Muk GX · Ultra Rare · 107.00 USD
+B pl4-1  # Charizard · Holo Rare · 106.39 USD
+B ex12-8  # Lapras · Rare · 106.35 USD
+B ex1-7  # Gardevoir · Holo Rare · 106.30 USD
+B xy5-156  # M Gardevoir EX · Ultra Rare · 105.88 USD
+B swsh1-206  # Snorlax VMAX · Secret Rare · 105.80 USD
+B xy7-91  # Tyranitar EX · Ultra Rare · 105.80 USD
+B ex3-7  # Minun · Holo Rare · 105.78 USD
+B sm8-215  # Shuckle GX · Secret Rare · 105.38 USD
+B base3-8  # Hypno · Rare · 105.35 USD
+B sm8-223  # Tyranitar GX · Secret Rare · 105.04 USD
+B ex11-114  # Azumarill · Rare · 104.95 USD
+B sv08-237  # Milotic ex · Special illustration rare · 104.72 USD
+B dp7-99  # Raichu · Rare Holo LV.X · 104.50 USD
+B ecard3-26  # Poliwrath · Rare · 104.00 USD
+B sm8-220  # Suicune GX · Secret Rare · 103.98 USD
+B ecard2-10  # Entei · Rare · 103.86 USD
+B base5-12  # Dark Slowbro · Rare · 103.62 USD
+B pl3-5  # Garchomp · Holo Rare · 103.47 USD
+B base3-19  # Dragonite · Rare · 103.00 USD
+B ecard2-29  # Primeape · Rare · 103.00 USD
+B ecard1-34  # Ampharos · Rare · 102.99 USD
+B swsh8-251  # Mew V · Ultra Rare · 102.81 USD
+B sm12-224  # Naganadel & Guzzlord GX · Ultra Rare · 102.58 USD
+B sm12-258  # Arceus & Dialga & Palkia GX · Secret Rare · 102.03 USD
+B sv04-199  # Groudon · Illustration rare · 102.00 USD
+B xy6-102  # M Latios EX · Ultra Rare · 101.89 USD
+B neo1-1  # Ampharos · Rare · 101.59 USD
+B sm12-214  # Blastoise & Piplup GX · Ultra Rare · 101.53 USD
+B bw1-113  # Reshiram · Ultra Rare · 100.91 USD
+B ecard1-11  # Fearow · Holo Rare · 100.74 USD
+B ex7-17  # Dark Raticate · Rare · 100.44 USD
+B dp1-122  # Torterra · Rare Holo LV.X · 100.21 USD
+B ex10-31  # Smoochum · Rare · 100.00 USD
+B ex9-15  # Kyogre · Rare · 100.00 USD
+B ex9-92  # Camerupt ex · Rare · 100.00 USD
+B gym2-10  # Koga's Ditto · Holo Rare · 100.00 USD
+B pl2-104  # Floatzel GL LV.X · Rare Holo LV.X · 100.00 USD
+B pl2-105  # Flygon LV.X · Rare Holo LV.X · 100.00 USD
+B pop4-4  # Mew · Rare · 100.00 USD
+B pop5-4  # Double Rainbow Energy · Rare · 100.00 USD
+B ecard2-19  # Kingdra · Rare · 99.99 USD
+B ecard2-4  # Azumarill · Rare · 99.99 USD
+B ecard3-17  # Magcargo · Rare · 99.99 USD
+B ecard3-7  # Dewgong · Rare · 99.99 USD
+B ex14-28  # Venusaur · Rare · 99.99 USD
+B ex6-106  # Clefable ex · Rare · 99.99 USD
+B hgss1-1  # Arcanine · Holo Rare · 99.99 USD
+B pl2-110  # Mismagius GL LV.X · Rare Holo LV.X · 99.99 USD
+B ex12-13  # Victreebel · Rare · 99.98 USD
+B base3-7  # Hitmonlee · Rare · 99.74 USD
+B ex16-95  # Metagross ex · Rare · 99.69 USD
+B bw9-118  # Sigilyph · Secret Rare · 99.49 USD
+B ecard1-8  # Cloyster · Holo Rare · 99.45 USD
+B dp6-146  # Uxie · Rare Holo LV.X · 99.25 USD
+B swsh11-076  # Hisuian Zoroark · Holo Rare · 99.00 EUR
+B ex8-96  # Crobat ex · Rare · 98.98 USD
+B ex6-29  # Scyther · Rare · 98.78 USD
+B gym1-6  # Lt. Surge's Electabuzz · Holo Rare · 98.54 USD
+B sm12-157  # Reshiram & Zekrom GX · Ultra Rare · 98.44 USD
+B neo1-13  # Skarmory · Rare · 98.24 USD
+B ecard2-28  # Porygon2 · Rare · 98.23 USD
+B dp5-7  # Leafeon · Rare Holo · 98.01 USD
+B base5-11  # Dark Magneton · Rare · 98.00 USD
+B xy1-144  # Yveltal EX · Ultra Rare · 97.84 USD
+B ecard2-1  # Ampharos · Rare · 97.50 USD
+B pl1-127  # Shaymin LV.X · Rare Holo LV.X · 97.50 USD
+B ex7-22  # Furret · Rare · 97.49 USD
+B gym1-8  # Lt. Surge's Magneton · Holo Rare · 97.29 USD
+B dp6-1  # Deoxys Normal Forme · Rare Holo · 97.26 USD
+B ex8-21  # Pelipper · Rare · 97.00 USD
+B sm3-169  # Fairy Energy · Secret Rare · 96.86 USD
+B sm11-125  # Umbreon & Darkrai GX · Ultra Rare · 96.83 USD
+B sv08.5-165  # Dragapult ex · Special illustration rare · 96.72 USD
+B swsh11tg-TG17  # Pikachu VMAX · Ultra Rare · 96.61 EUR
+B base5-9  # Dark Hypno · Rare · 96.58 USD
+B sm3.5-76  # Mewtwo GX · Secret Rare · 96.51 USD
+B hgss1-110  # Typhlosion · Rare PRIME · 96.50 USD
+B sv02-211  # Raichu · Illustration rare · 96.45 USD
+B gym1-3  # Erika's Clefable · Holo Rare · 96.41 USD
+B ex14-96  # Sceptile ex δ · Rare · 96.41 EUR
+B pl2-3  # Darkrai G · Holo Rare · 96.38 USD
+B lc-25  # Hypno · Rare · 96.24 USD
+B swsh8-268  # Mew VMAX · Secret Rare · 96.24 USD
+B sm10-194  # Reshiram & Charizard GX · Ultra Rare · 96.16 USD
+B pl4-94  # Arceus LV.X · Rare Holo LV.X · 96.07 USD
+B ex10-14  # Slowking · Rare · 96.00 USD
+B neo3-9  # Jumpluff · Rare · 96.00 USD
+B sm7-175  # Scizor GX · Secret Rare · 95.99 USD
+B ex3-8  # Plusle · Holo Rare · 95.93 USD
+B swsh12.5gg-GG50  # Darkrai VSTAR · Ultra Rare · 95.84 EUR
+B ex5-11  # Metagross · Holo Rare · 95.82 USD
+B neo4-8  # Dark Porygon2 · Rare · 95.80 USD
+B gym1-15  # Brock · Holo Rare · 95.65 USD
+B lc-26  # Jynx · Rare · 95.48 USD
+B sv07-148  # Squirtle · Illustration rare · 95.02 USD
+B ex13-101  # Mightyena ex · Rare · 94.99 USD
+B base2-13  # Venomoth · Rare · 94.96 USD
+B base3-1  # Aerodactyl · Rare · 94.89 USD
+B me03-124  # Mega Zygarde ex · Mega Hyper Rare · 94.87 USD
+B sm5-157  # Leafeon GX · Secret Rare · 94.46 USD
+B swsh6-166  # Zeraora V · Ultra Rare · 94.39 USD
+B base5-6  # Dark Dugtrio · Rare · 94.33 USD
+B ex12-21  # Magmar · Rare · 94.18 USD
+B ex1-97  # Electabuzz ex · Rare · 94.02 USD
+B lc-27  # Kabutops · Rare · 94.00 USD
+B sv03-223  # Charizard ex · Special illustration rare · 93.92 USD
+B sv08.5-147  # Ceruledge ex · Special illustration rare · 93.92 USD
+B xy5-154  # M Aggron EX · Ultra Rare · 93.85 USD
+B ecard2-35  # Steelix · Rare · 93.64 USD
+B ex6-14  # Slowbro · Rare · 93.52 USD
+B sm8-225  # Alolan Ninetales GX · Secret Rare · 93.47 USD
+B dp6-141  # Gliscor · Rare Holo LV.X · 93.33 USD
+B pl2-1  # Arcanine · Holo Rare · 93.21 USD
+B sm9-120  # Eevee & Snorlax GX · Ultra Rare · 92.86 USD
+B ex9-94  # Dusclops ex · Rare · 92.56 USD
+B gym1-10  # Misty's Tentacruel · Holo Rare · 92.49 USD
+B sm10-192  # Pheromosa & Buzzwole GX · Ultra Rare · 92.46 USD
+B sv03.5-198  # Venusaur ex · Special illustration rare · 92.29 USD
+B ex1-103  # Sneasel ex · Rare · 91.68 USD
+B sv05-177  # Gastly · Illustration rare · 91.56 USD
+B ecard1-58  # Pichu · Rare · 91.50 USD
+B sv03.5-170  # Squirtle · Illustration rare · 91.43 USD
+B col1-7  # Gyarados · Holo Rare · 91.40 USD
+B neo1-3  # Bellossom · Rare · 91.32 USD
+B ex6-6  # Kangaskhan · Rare · 91.31 USD
+B ex13-11  # Latias δ · Rare · 91.14 EUR
+B ex7-4  # Dark Electrode · Rare · 91.00 USD
+B sm8-214  # Whitney · Ultra Rare · 90.80 USD
+B base2-9  # Pinsir · Rare · 90.73 USD
+B ex1-96  # Chansey ex · Rare · 90.62 USD
+B ecard2-H06  # Blissey · Holo Rare · 90.61 USD
+B swsh6-168  # Galarian Rapidash V · Ultra Rare · 90.53 USD
+B bw8-135  # Colress · Ultra Rare · 90.30 USD
+B xy8-158  # Mewtwo EX · Ultra Rare · 90.24 USD
+B g1-RC28  # Flareon EX · Ultra Rare · 90.24 EUR
+B g1-RC6  # Flareon EX · Ultra Rare · 90.24 EUR
+B ecard3-35  # Xatu · Rare · 90.00 USD
+B pl2-107  # Hippowdon LV.X · Rare Holo LV.X · 90.00 USD
+B dp1-120  # Empoleon · Rare Holo LV.X · 89.99 USD
+B ex7-28  # Yanma · Rare · 89.99 USD
+B ex8-100  # Hariyama ex · Rare · 89.95 USD
+B dp2-121  # Electivire · Rare Holo LV.X · 89.71 USD
+B gym1-17  # Lt. Surge · Holo Rare · 89.68 USD
+B ex13-3  # Deoxys δ · Rare · 89.64 EUR
+B ex13-4  # Deoxys δ · Rare · 89.64 EUR
+B ex13-5  # Deoxys δ · Rare · 89.64 EUR
+B ex13-6  # Deoxys δ · Rare · 89.64 EUR
+B ex6-111  # Mr. Mime ex · Rare · 89.39 USD
+B ex6-7  # Marowak · Rare · 89.37 USD
+B neo4-22  # Light Dragonair · Rare · 89.36 USD
+B ex16-98  # Skarmory ex · Rare · 89.34 USD
+B sm11-245  # Mega Sableye & Tyranitar GX · Secret Rare · 89.09 USD
+B sm12-212  # Charizard & Braixen GX · Ultra Rare · 89.05 USD
+B ecard2-31  # Rapidash · Rare · 89.00 USD
+B ex5-9  # Machamp · Holo Rare · 88.99 USD
+B gym1-5  # Erika's Vileplume · Holo Rare · 88.60 USD
+B sm12-261  # Mega Lopunny & Jigglypuff GX · Secret Rare · 88.30 USD
+B ex6-12  # Raichu · Rare · 88.27 USD
+B pl1-125  # Palkia G LV.X · Rare Holo LV.X · 87.87 USD
+B ex11-28  # Slowking · Rare · 87.59 USD
+B ecard1-10  # Dugtrio · Holo Rare · 87.50 USD
+B base2-15  # Vileplume · Rare · 87.38 USD
+B ex1-13  # Swampert · Holo Rare · 87.13 USD
+B sv09-184  # Lillie's Clefairy ex · Special illustration rare · 87.06 USD
+B neo3-10  # Magneton · Rare · 86.77 USD
+B sv02-226  # Maushold · Illustration rare · 86.48 USD
+B ex3-92  # Kingdra ex · Rare · 86.33 USD
+B me03-121  # Meowth ex · Special illustration rare · 86.29 USD
+B base1-10  # Mewtwo · Rare · 86.16 USD
+B ex3-12  # Torkoal · Holo Rare · 86.03 USD
+B sv03.5-168  # Charmander · Illustration rare · 85.98 USD
+B bw11-RC23  # Emolga · Ultra Rare · 85.93 EUR
+B sv07-143  # Bulbasaur · Illustration rare · 85.86 USD
+B ex3-95  # Magcargo ex · Rare · 85.79 USD
+B ex11-5  # Flareon δ · Rare · 85.71 EUR
+B sm8-211  # Mina · Ultra Rare · 85.68 USD
+B ex7-1  # Azumarill · Rare · 85.65 USD
+B bw9-115  # Ghetsis · Ultra Rare · 85.61 USD
+B ex10-23  # Elekid · Rare · 85.37 USD
+B base2-5  # Kangaskhan · Rare · 85.12 USD
+B ecard1-17  # Magby · Holo Rare · 85.06 USD
+B ex2-16  # Espeon · Rare · 85.02 USD
+B ecard3-19  # Magneton · Rare · 85.00 USD
+B ecard3-24  # Piloswine · Rare · 85.00 USD
+B ex7-8  # Dark Octillery · Rare · 85.00 USD
+B ex15-94  # Kingdra ex δ · Rare · 85.00 EUR
+B ex14-91  # Delcatty ex · Rare · 84.99 USD
+B neo2-14  # Unown [A] · Rare · 84.99 USD
+B base2-16  # Wigglytuff · Rare · 84.95 USD
+B sm9-177  # Jasmine · Ultra Rare · 84.53 USD
+B dp4-9  # Swampert · Rare Holo · 84.24 USD
+B sm10-224  # Lucario & Melmetal GX · Secret Rare · 84.19 USD
+B swsh10-167  # Origin Forme Palkia V · Ultra Rare · 84.15 USD
+B hgss1-105  # Ampharos · Rare PRIME · 84.11 USD
+B swsh7-214  # Umbreon VMAX · Secret Rare · 84.03 USD
+B ex10-13  # Slowbro · Rare · 84.00 USD
+B sm2-150  # Alolan Ninetales GX · Secret Rare · 83.99 USD
+B gym2-17  # Blaine · Holo Rare · 83.77 USD
+B pl3-141  # Absol G LV.X · Rare Holo LV.X · 83.67 USD
+B swsh8-245  # Celebi V · Ultra Rare · 83.58 USD
+B sm8-221  # Zeraora GX · Secret Rare · 83.44 USD
+B hgss3-2  # Espeon · Holo Rare · 83.24 USD
+B lc-35  # Rhydon · Rare · 83.17 USD
+B sm12-38  # Blastoise & Piplup GX · Ultra Rare · 82.98 USD
+B xy10-118  # M Alakazam EX · Ultra Rare · 82.96 USD
+B sm10-130  # Gardevoir & Sylveon GX · Ultra Rare · 82.83 USD
+B sv03.5-202  # Zapdos ex · Special illustration rare · 82.74 USD
+B ex12-14  # Wailord · Rare · 82.11 USD
+B neo3-5  # Delibird · Rare · 81.94 USD
+B base5-7  # Dark Golbat · Rare · 81.87 USD
+B swsh9tg-TG23  # Umbreon VMAX · Ultra Rare · 81.87 EUR
+B ex8-18  # Deoxys · Rare · 81.84 USD
+B ex1-11  # Sceptile · Holo Rare · 81.71 USD
+B sm5-159  # Glaceon GX · Secret Rare · 81.68 USD
+B ex6-8  # Nidoking · Rare · 81.54 USD
+B me02.5-274  # Mega Feraligatr ex · Special illustration rare · 81.47 USD
+B ecard1-31  # Vileplume · Holo Rare · 81.30 USD
+B dp1-5  # Infernape · Rare Holo · 81.24 USD
+B sm4-112  # Gyarados GX · Secret Rare · 81.13 USD
+B xy4-34  # Gengar EX · Ultra Rare · 81.02 USD
+B sm9-113  # Latias & Latios GX · Ultra Rare · 80.87 USD
+B dp6-145  # Rhyperior · Rare Holo LV.X · 80.84 USD
+B swsh12.5gg-GG35  # Leafeon VSTAR · Ultra Rare · 80.69 EUR
+B ex16-97  # Shiftry ex · Rare · 80.08 USD
+B dp6-142  # Magnezone · Rare Holo LV.X · 80.00 USD
+B ex11-9  # Latios δ · Rare · 80.00 EUR
+B ex15-7  # Nidoqueen δ · Rare · 80.00 EUR
+B ex14-27  # Swampert · Rare · 79.99 USD
+B ecard3-H25  # Raichu · Holo Rare · 79.99 EUR
+B xy9-114  # Gyarados EX · Ultra Rare · 79.51 USD
+B sv10.5w-105  # Oshawott · Illustration rare · 79.50 USD
+B ex6-113  # Charmander · Rare · 79.46 USD
+B ex3-91  # Golem ex · Rare · 79.35 USD
+B ex8-7  # Dusclops · Rare · 79.25 USD
+B xy7-88  # M Ampharos EX · Ultra Rare · 78.80 USD
+B ex12-28  # Wobbuffet · Rare · 78.64 USD
+B ecard3-31  # Steelix · Rare · 78.47 USD
+B base2-27  # Snorlax · Rare · 78.46 USD
+B xy9-117  # Espeon EX · Ultra Rare · 78.38 USD
+B sm11-243  # Latios GX · Secret Rare · 77.73 USD
+B ecard2-12  # Exeggutor · Rare · 77.69 USD
+B ex1-100  # Magmar ex · Rare · 77.58 USD
+B dp2-123  # Magmortar · Rare Holo LV.X · 77.42 USD
+B ecard3-9  # Forretress · Rare · 77.35 USD
+B swsh5-170  # Rapid Strike Urshifu VMAX · Secret Rare · 77.32 USD
+B ex13-18  # Absol · Rare · 77.31 USD
+B ecard1-33  # Alakazam · Rare · 77.11 USD
+B neo3-17  # Entei · Rare · 77.06 USD
+B ex5-101  # Wigglytuff ex · Rare · 76.66 USD
+B sm6-138  # Dialga GX · Secret Rare · 76.64 USD
+B col1-13  # Leafeon · Holo Rare · 76.62 USD
+B ex14-92  # Exploud ex · Rare · 76.56 USD
+B ex10-20  # Chansey · Rare · 76.49 USD
+B ex11-6  # Gardevoir δ · Rare · 76.49 EUR
+B ex12-89  # Walrein ex · Rare · 76.40 USD
+B ex16-93  # Claydol ex · Rare · 76.32 USD
+B ecard3-H18  # Magneton · Holo Rare · 76.28 USD
+B ex16-12  # Raichu · Rare · 76.24 USD
+B cel25cc-CC010  # Shining Magikarp · Classic Collection · 76.17 EUR
+B ex10-30  # Murkrow · Rare · 75.97 USD
+B swsh12.5gg-GG38  # Suicune V · Ultra Rare · 75.85 EUR
+B swsh7-196  # Noivern V · Ultra Rare · 75.53 USD
+B ex7-12  # Kingdra · Rare · 75.42 USD
+B sm7-170  # Blaziken GX · Secret Rare · 75.29 USD
+B dp4-3  # Darkrai · Rare Holo · 75.00 USD
+B ex13-9  # Kabutops δ · Rare · 75.00 EUR
+B ex4-90  # Cradily ex · Rare · 74.99 USD
+B ecard2-H03  # Ariados · Holo Rare · 74.96 USD
+B ex7-25  # Misdreavus · Rare · 74.84 USD
+B col1-4  # Espeon · Holo Rare · 74.77 USD
+B sm12-249  # Venusaur & Snivy GX · Secret Rare · 74.72 USD
+B sv10.5w-143  # Zoroark · Illustration rare · 74.72 USD
+B hgss1-109  # Meganium · Rare PRIME · 74.62 USD
+B hgss4-95  # Machamp · Rare PRIME · 74.19 USD
+B ecard1-32  # Weezing · Holo Rare · 74.11 USD
+B sm5-166  # Crushing Hammer · Secret Rare · 74.11 USD
+B dp6-143  # Mesprit · Rare Holo LV.X · 73.81 USD
+B dp5-11  # Palkia · Rare Holo · 73.69 USD
+B ex14-89  # Aggron ex · Rare · 73.62 USD
+B sv10-233  # Team Rocket's Nidoking ex · Special illustration rare · 73.59 USD
+B swsh10-161  # Beedrill V · Ultra Rare · 73.47 USD
+B xy5-155  # Gardevoir EX · Ultra Rare · 73.44 USD
+B sv08-247  # Pikachu ex · Hyper rare · 73.22 USD
+B sv04.5-131  # Pikachu · Shiny rare · 73.21 USD
+B sv10.5w-169  # Hydreigon ex · Special illustration rare · 73.16 USD
+B lc-22  # Electrode · Rare · 73.07 USD
+B sm10-221  # Marshadow & Machamp GX · Secret Rare · 72.93 USD
+B swsh6-170  # Galarian Articuno V · Ultra Rare · 72.84 USD
+B sv10-229  # Team Rocket's Moltres ex · Special illustration rare · 72.82 USD
+B ex13-99  # Crawdaunt ex · Rare · 72.70 USD
+B pl1-2  # Blastoise · Holo Rare · 72.59 USD
+B xy8-157  # Mewtwo EX · Ultra Rare · 72.51 USD
+B sv10.5w-167  # Keldeo ex · Special illustration rare · 72.41 USD
+B base5-22  # Dark Dragonite · Rare · 72.17 USD
+B sm115-68  # Jessie & James · Ultra Rare · 72.14 USD
+B sv06.5-078  # Persian · Illustration rare · 71.87 USD
+B sm7-167  # TV Reporter · Ultra Rare · 71.70 USD
+B ex15-10  # Snorlax δ · Rare · 71.62 EUR
+B sm2-140  # Sylveon GX · Ultra Rare · 71.47 USD
+B xy2-13  # M Charizard EX · Ultra Rare · 71.47 USD
+B sm7-171  # Articuno GX · Secret Rare · 71.30 USD
+B base5-13  # Dark Vileplume · Rare · 71.10 USD
+B sm7.5-67  # Dragonite GX · Ultra Rare · 71.08 USD
+B hgss1-106  # Blissey · Rare PRIME · 71.03 USD
+B col1-17  # Ninetales · Holo Rare · 71.00 USD
+B sv02-222  # Tyranitar · Illustration rare · 70.93 USD
+B ex7-27  # Qwilfish · Rare · 70.88 USD
+B me01-181  # Mega Latias ex · Special illustration rare · 70.88 USD
+B ecard3-30  # Starmie · Rare · 70.85 USD
+B base1-1  # Alakazam · Rare · 70.82 USD
+B sm12-245  # Mimikyu · Secret Rare · 70.74 USD
+B pop5-1  # Ho-Oh · Rare · 70.40 USD
+B sv07-169  # Dachsbun ex · Special illustration rare · 70.31 USD
+B dp7-96  # Dusknoir · Rare Holo LV.X · 70.10 USD
+B xy2-109  # M Kangaskhan EX · Secret Rare · 70.06 USD
+B ecard1-53  # Meganium · Rare · 69.99 USD
+B ecard2-36  # Sudowoodo · Rare · 69.99 USD
+B ex7-23  # Ledian · Rare · 69.99 USD
+B lc-102  # Pokémon Breeder · Rare · 69.99 USD
+B hgss1-4  # Gyarados · Holo Rare · 69.98 USD
+B neo3-27  # Suicune · Rare · 69.96 USD
+B ex16-5  # Blaziken · Rare · 69.85 USD
+B sv06-188  # Eevee · Illustration rare · 69.67 USD
+B neo4-16  # Miracle Energy · Rare · 69.50 USD
+B base2-2  # Electrode · Rare · 69.45 USD
+B ex11-18  # Vaporeon δ · Rare · 69.27 EUR
+B ex3-4  # Flygon · Holo Rare · 69.24 USD
+B sv10.5b-165  # Kyurem ex · Special illustration rare · 69.05 USD
+B lc-104  # Scoop Up · Rare · 69.01 USD
+B ecard2-43  # Vileplume · Rare · 69.00 USD
+B neo2-9  # Poliwrath · Rare · 69.00 USD
+B sm10-200  # Greninja & Zoroark GX · Ultra Rare · 68.93 USD
+B swsh12.5gg-GG40  # Glaceon VSTAR · Ultra Rare · 68.38 EUR
+B ecard2-16  # Hypno · Rare · 68.31 USD
+B ex10-22  # Electabuzz · Rare · 68.31 USD
+B base5-20  # Dark Blastoise · Rare · 68.28 USD
+B swsh9tg-TG22  # Umbreon V · Ultra Rare · 68.25 EUR
+B base5-15  # Here Comes Team Rocket! · Rare · 68.24 USD
+B dp3-7  # Gardevoir · Rare Holo · 68.24 USD
+B sv01-245  # Gardevoir ex · Special illustration rare · 68.02 USD
+B me02.5-272  # Mega Meganium ex · Special illustration rare · 67.95 USD
+B ex10-12  # Porygon2 · Rare · 67.67 USD
+B ecard1-15  # Kingler · Holo Rare · 67.66 USD
+B ecard1-57  # Ninetales · Rare · 67.49 USD
+B gym2-103  # Erika's Kindness · Rare · 67.44 USD
+B swsh9-174  # Charizard VSTAR · Secret Rare · 67.42 USD
+B sm5-172  # Lunala GX · Secret Rare · 67.39 USD
+B neo1-7  # Jumpluff · Rare · 67.37 USD
+B ex4-5  # Team Aqua's Sharpedo · Holo Rare · 67.36 USD
+B swsh7-193  # Rayquaza V · Ultra Rare · 67.26 USD
+B ex10-9  # Meganium · Rare · 67.24 USD
+B base3-11  # Magneton · Rare · 67.15 USD
+B ex3-11  # Shedinja · Holo Rare · 67.08 USD
+B dp2-17  # Tyranitar · Rare Holo · 67.03 USD
+B swsh10tg-TG23  # Garchomp V · Ultra Rare · 66.99 EUR
+B pop9-1  # Garchomp · Rare · 66.80 USD
+B base5-2  # Dark Arbok · Rare · 66.77 USD
+B hgss3-7  # Scizor · Holo Rare · 66.77 USD
+B hgss2-84  # Crobat · Rare PRIME · 66.68 USD
+B ex10-25  # Hitmonlee · Rare · 66.66 USD
+B sm7.5-71  # Reshiram GX · Secret Rare · 66.61 USD
+B pop2-17  # Celebi ex · Rare · 66.48 USD
+B xy10-55  # Umbreon EX · Ultra Rare · 66.39 USD
+B sm7-153  # Blaziken GX · Ultra Rare · 66.18 USD
+B bw3-100  # Cobalion · Ultra Rare · 66.03 USD
+B ex16-9  # Gardevoir · Rare · 66.00 USD
+B pl3-12  # Swampert · Holo Rare · 65.99 USD
+B sv03.5-173  # Pikachu · Illustration rare · 65.99 USD
+B swsh6-205  # Shadow Rider Calyrex VMAX · Secret Rare · 65.93 USD
+B sm12-227  # Silvally GX · Ultra Rare · 65.78 USD
+B sv10.5w-103  # Chandelure · Illustration rare · 65.77 USD
+B dp4-103  # Cresselia · Rare Holo LV.X · 65.75 USD
+B xy6-101  # Latios EX · Ultra Rare · 65.63 USD
+B sm7.5-70  # Zinnia · Ultra Rare · 65.60 USD
+B dp7-97  # Heatran · Rare Holo LV.X · 65.59 USD
+B sm6-139  # Xerneas GX · Secret Rare · 65.59 USD
+B ecard1-27  # Skarmory · Holo Rare · 65.57 USD
+B sm8-209  # Judge · Ultra Rare · 65.46 USD
+B xy12-102  # M Blastoise EX · Ultra Rare · 65.36 USD
+B pop7-3  # Latias · Rare · 65.29 USD
+B xy7-84  # Sceptile EX · Ultra Rare · 65.26 USD
+B ex9-91  # Cacturne ex · Rare · 65.11 USD
+B dp7-10  # Sceptile · Rare Holo · 65.03 USD
+B ecard1-14  # Golem · Holo Rare · 65.00 USD
+B ecard2-18  # Jynx · Rare · 65.00 USD
+B ex2-9  # Mawile · Holo Rare · 65.00 USD
+B ex7-11  # Jumpluff · Rare · 65.00 USD
+B pop3-3  # Jolteon · Rare · 65.00 USD
+B swsh6-174  # Galarian Zapdos V · Ultra Rare · 64.84 USD
+B ex5-22  # Ninetales · Rare · 64.65 USD
+B dp1-6  # Lucario · Rare Holo · 64.57 USD
+B sm6-136  # Zygarde GX · Secret Rare · 64.57 USD
+B dp5-3  # Darkrai · Rare Holo · 64.47 USD
+B sm12-239  # Piplup · Secret Rare · 64.40 USD
+B sm12-143  # Togepi & Cleffa & Igglybuff GX · Ultra Rare · 64.39 USD
+B sm12-250  # Vileplume GX · Secret Rare · 64.37 USD
+B sv08.5-166  # Raging Bolt ex · Special illustration rare · 64.37 USD
+B me02.5-289  # Steven's Metagross ex · Special illustration rare · 64.32 USD
+B cel25-25  # Mew · Secret Rare · 64.09 USD
+B base4-16  # Raichu · Rare · 64.05 USD
+B ecard1-46  # Feraligatr · Rare · 63.95 USD
+B xy9-118  # Darkrai EX · Ultra Rare · 63.84 USD
+B ex3-14  # Dragonair · Rare · 63.75 USD
+B sm9-159  # Celebi & Venusaur GX · Ultra Rare · 63.61 USD
+B swsh5-146  # Empoleon V · Ultra Rare · 63.57 USD
+B base1-14  # Raichu · Rare · 63.54 USD
+B sm3-147  # Wicke · Ultra Rare · 63.45 USD
+B ex8-10  # Ludicolo · Rare · 63.32 USD
+B ex15-2  # Feraligatr δ · Rare · 63.14 EUR
+B ex6-13  # Rapidash · Rare · 63.10 USD
+B sm11-228  # Garchomp & Giratina GX · Ultra Rare · 63.03 USD
+B dp3-132  # Honchkrow · Rare Holo LV.X · 62.91 USD
+B swsh10-177  # Origin Forme Dialga V · Ultra Rare · 62.80 USD
+B hgss2-85  # Kingdra · Rare PRIME · 62.72 USD
+B sm9-185  # Ampharos GX · Secret Rare · 62.68 USD
+B ex13-27  # Regice · Rare · 62.66 USD
+B me02.5-275  # Mega Froslass ex · Special illustration rare · 62.63 USD
+B ex3-2  # Altaria · Holo Rare · 62.55 USD
+B neo4-13  # Light Azumarill · Rare · 62.49 USD
+B base3-13  # Muk · Rare · 62.43 USD
+B pl1-123  # Drapion LV.X · Rare Holo LV.X · 62.24 USD
+B sm6-120  # Greninja GX · Ultra Rare · 62.19 USD
+B xy5-55  # Primal Kyogre EX · Ultra Rare · 62.18 USD
+B sm9-1  # Celebi & Venusaur GX · Ultra Rare · 62.14 USD
+B sv05-208  # Raging Bolt ex · Special illustration rare · 62.11 USD
+B sv04-206  # Morpeko · Illustration rare · 62.02 USD
+B ex4-23  # Team Magma's Zangoose · Rare · 61.90 USD
+B exu-G  # Unown · Rare · 61.85 USD
+B neo2-2  # Forretress · Rare · 61.66 USD
+B sm11-229  # Dragonite GX · Ultra Rare · 61.37 USD
+B sv10.5b-147  # Haxorus · Illustration rare · 61.24 USD
+B me05-117  # Morpeko ex · Special illustration rare · 61.21 USD
+B ex13-31  # Sableye · Rare · 61.20 USD
+B ex2-20  # Pichu · Rare · 61.19 USD
+B sv03.5-166  # Bulbasaur · Illustration rare · 61.17 USD
+B sm9-175  # Evelyn · Ultra Rare · 60.99 USD
+B hgss1-7  # Ninetales · Holo Rare · 60.96 USD
+B sm5-173  # Solgaleo GX · Secret Rare · 60.95 USD
+B sv10.5b-170  # N's Plan · Special illustration rare · 60.80 USD
+B sm7-173  # Mr. Mime GX · Secret Rare · 60.74 USD
+B sm12-220  # Arceus & Dialga & Palkia GX · Ultra Rare · 60.67 USD
+B sm8-224  # Genesect GX · Secret Rare · 60.64 USD
+B ecard3-13  # Jolteon · Rare · 60.50 USD
+B pop2-1  # Entei · Rare · 60.49 USD
+B swsh9-166  # Arceus V · Ultra Rare · 60.40 USD
+B ex6-5  # Exeggutor · Rare · 60.39 USD
+B swsh12.5gg-GG46  # Deoxys VSTAR · Ultra Rare · 60.32 EUR
+B swsh9tg-TG15  # Sylveon VMAX · Ultra Rare · 60.13 EUR
+B ex13-1  # Armaldo δ · Rare · 60.00 EUR
+B bw7-148  # Cheren · Ultra Rare · 59.92 USD
+B ex7-13  # Piloswine · Rare · 59.59 USD
+B ex10-18  # Ursaring · Rare · 59.53 USD
+B ex13-23  # Mawile · Rare · 59.48 USD
+B pl3-144  # Electivire FB LV.X · Rare Holo LV.X · 59.44 USD
+B ex8-11  # Metagross · Rare · 59.25 USD
+B ex2-7  # Ludicolo · Holo Rare · 59.12 USD
+B pl2-7  # Jirachi · Holo Rare · 59.07 USD
+B hgss1-12  # Slowking · Holo Rare · 58.93 USD
+B sv03.5-175  # Psyduck · Illustration rare · 58.85 USD
+B sm10-20  # Reshiram & Charizard GX · Ultra Rare · 58.80 USD
+B ex12-2  # Aggron · Rare · 58.52 USD
+B ex5-16  # Bellossom · Rare · 58.51 USD
+B sm5-149  # Gardenia · Ultra Rare · 58.48 USD
+B ex12-6  # Golem · Rare · 58.32 USD
+B ex10-15  # Sudowoodo · Rare · 58.26 USD
+B sm8-210  # Kahili · Ultra Rare · 58.24 USD
+B col1-2  # Deoxys · Holo Rare · 58.15 USD
+B ex8-14  # Shedinja · Rare · 58.14 USD
+B ex8-13  # Ninjask · Rare · 58.09 USD
+B sv03.5-201  # Alakazam ex · Special illustration rare · 58.08 USD
+B dp4-7  # Rotom · Rare Holo · 58.01 USD
+B ecard2-23  # Muk · Rare · 58.00 USD
+B sv06.5-098  # Basic Darkness Energy · Hyper rare · 57.96 USD
+B ex1-15  # Blaziken · Rare · 57.90 USD
+B dp3-19  # Suicune · Rare Holo · 57.86 USD
+B swsh12.5gg-GG41  # Raikou V · Ultra Rare · 57.79 EUR
+B xy5-147  # Wailord EX · Ultra Rare · 57.65 USD
+B xy11-112  # M Gardevoir EX · Ultra Rare · 57.62 USD
+B base4-7  # Gyarados · Rare · 57.44 USD
+B swsh7-211  # Sylveon VMAX · Secret Rare · 57.36 USD
+B hgss4-96  # Magnezone · Rare PRIME · 57.26 USD
+B sm6-137  # Yveltal GX · Secret Rare · 57.13 USD
+B sm5-154  # Mars · Ultra Rare · 57.09 USD
+B pl3-147  # Staraptor FB LV.X · Rare Holo LV.X · 57.05 USD
+B xy8-154  # M Houndoom EX · Ultra Rare · 57.03 USD
+B exu-M  # Unown · Rare · 56.99 USD
+B lc-15  # Machamp · Holo Rare · 56.98 USD
+B ex9-20  # Seviper · Rare · 56.92 USD
+B sv06.5-066  # Houndoom · Illustration rare · 56.82 USD
+B sm1-142  # Umbreon GX · Ultra Rare · 56.74 USD
+B base1-3  # Chansey · Rare · 56.48 USD
+B ex11-20  # Azurill · Rare · 56.48 USD
+B ecard1-60  # Poliwrath · Rare · 56.30 USD
+B sm11-220  # Raichu & Alolan Raichu GX · Ultra Rare · 56.26 USD
+B exu-X  # Unown · Rare · 56.12 USD
+B ex11-8  # Latias δ · Rare · 56.05 EUR
+B swsh7-188  # Umbreon V · Ultra Rare · 56.00 USD
+B ex16-1  # Aggron · Rare · 55.99 USD
+B ecard3-23  # Omastar · Rare · 55.95 USD
+B swsh12.5gg-GG36  # Entei V · Ultra Rare · 55.71 EUR
+B gym1-28  # Lt. Surge's Raichu · Rare · 55.69 USD
+B exu-K  # Unown · Rare · 55.66 USD
+B sm3-158  # Darkrai GX · Secret Rare · 55.65 USD
+B sv02-196  # Sprigatito · Illustration rare · 55.55 USD
+B xy1-143  # Emolga EX · Ultra Rare · 55.21 USD
+B xy5-86  # Primal Groudon EX · Ultra Rare · 55.17 USD
+B base2-20  # Jolteon · Rare · 55.07 USD
+B gym2-19  # Koga · Holo Rare · 54.99 USD
+B ex15-12  # Typhlosion δ · Rare · 54.91 EUR
+B sv08.5-168  # Bloodmoon Ursaluna ex · Special illustration rare · 54.89 USD
+B swsh10.5-072  # Mewtwo V · Ultra Rare · 54.81 USD
+B pop1-5  # Swampert · Rare · 54.79 USD
+B ex4-12  # Team Magma's Torkoal · Holo Rare · 54.71 USD
+B col1-6  # Groudon · Holo Rare · 54.67 USD
+B pl3-1  # Absol G · Holo Rare · 54.65 USD
+B dp3-20  # Venusaur · Rare Holo · 54.51 USD
+B exu-I  # Unown · Rare · 54.49 USD
+B ecard2-20  # Lanturn · Rare · 54.44 USD
+B sv03.5-169  # Charmeleon · Illustration rare · 54.40 USD
+B sm10-107  # Greninja & Zoroark GX · Ultra Rare · 54.37 USD
+B sm3-168  # Darkness Energy · Secret Rare · 54.32 USD
+B ex5-7  # Heracross · Holo Rare · 54.29 USD
+B sm1-152  # Espeon GX · Secret Rare · 54.21 USD
+B neo4-25  # Light Machamp · Rare · 54.01 USD
+B sm11-146  # Garchomp & Giratina GX · Ultra Rare · 54.01 USD
+B ex8-26  # Skarmory · Rare · 54.00 USD
+B base4-1  # Alakazam · Rare · 53.94 USD
+B ex14-97  # Shiftry ex · Rare · 53.86 USD
+B ex13-7  # Flygon δ · Rare · 53.85 EUR
+B g1-RC21  # Sylveon EX · Ultra Rare · 53.85 EUR
+B g1-RC32  # Sylveon EX · Ultra Rare · 53.85 EUR
+B sv10.5b-100  # Volcarona · Illustration rare · 53.57 USD
+B sm3-142  # Acerola · Ultra Rare · 53.55 USD
+B swsh2-189  # Boss's Orders (Giovanni) · Ultra Rare · 53.55 USD
+B xy7-89  # Hoopa EX · Ultra Rare · 53.55 USD
+B ex12-11  # Muk · Rare · 53.49 USD
+B sm3-159  # Gardevoir GX · Secret Rare · 53.38 USD
+B g1-29  # Zapdos · Ultra Rare · 53.14 USD
+B sm9-33  # Pikachu & Zekrom GX · Ultra Rare · 53.04 USD
+B exu-D  # Unown · Rare · 53.02 USD
+B ecard2-38  # Tentacruel · Rare · 52.99 USD
+B sv02-262  # Tinkaton ex · Special illustration rare · 52.98 USD
+B xy9-27  # M Gyarados EX · Ultra Rare · 52.96 USD
+B xy9-122  # Skyla · Ultra Rare · 52.83 USD
+B exu-Y  # Unown · Rare · 52.79 USD
+B ecard3-H10  # Gyarados · Holo Rare · 52.73 EUR
+B base2-18  # Electrode · Rare · 52.68 USD
+B sm5-165  # Palkia GX · Secret Rare · 52.68 USD
+B xy3-112  # M Heracross EX · Secret Rare · 52.65 USD
+B neo3-22  # Raikou · Rare · 52.49 USD
+B gym1-19  # The Rocket's Trap · Holo Rare · 52.48 USD
+B sm9-178  # Morgan · Ultra Rare · 52.43 USD
+B xy6-100  # M Gallade EX · Ultra Rare · 52.42 USD
+B xy7-87  # Ampharos EX · Ultra Rare · 52.42 USD
+B xy4-120  # M Manectric EX · Secret Rare · 52.40 USD
+B sv10-234  # Team Rocket's Crobat ex · Special illustration rare · 52.30 USD
+B me01-182  # Mega Kangaskhan ex · Special illustration rare · 52.15 USD
+B swsh10.5-079  # Mewtwo VSTAR · Secret Rare · 52.15 USD
+B sm9-173  # Dana · Ultra Rare · 51.71 USD
+B sm10-214  # Welder · Ultra Rare · 51.59 USD
+B sm7.5-74  # White Kyurem GX · Secret Rare · 51.54 USD
+B ex1-23  # Swampert · Rare · 51.50 USD
+B hgss2-89  # Ursaring · Rare PRIME · 51.49 USD
+B lc-103  # Pokémon Trader · Rare · 51.47 USD
+B me01-184  # Lillie's Determination · Special illustration rare · 51.34 USD
+B swsh12.5gg-GG42  # Zeraora VMAX · Ultra Rare · 51.25 EUR
+B pl4-99  # Tangrowth LV.X · Rare Holo LV.X · 51.22 USD
+B sm11-256  # Viridian Forest · Secret Rare · 51.22 USD
+B gym2-21  # Blaine's Ninetales · Rare · 51.11 USD
+B sv05-166  # Sawsbuck · Illustration rare · 51.04 USD
+B xy12-106  # Dragonite EX · Ultra Rare · 51.03 USD
+B ecard2-5  # Bellossom · Rare · 50.99 USD
+B sv05-206  # Iron Crown ex · Special illustration rare · 50.84 USD
+B sm12-225  # Mega Lopunny & Jigglypuff GX · Ultra Rare · 50.78 USD
+B dp2-7  # Celebi · Rare Holo · 50.77 USD
+B dp3-5  # Flygon · Rare Holo · 50.68 USD
+B ecard2-144  # Rainbow Energy · Rare · 50.64 USD
+B hgss4-93  # Electrode · Rare PRIME · 50.63 USD
+B ex15-6  # Nidoking δ · Rare · 50.62 EUR
+B sm11-72  # Espeon & Deoxys GX · Ultra Rare · 50.61 USD
+B sm8-149  # Mimikyu GX · Ultra Rare · 50.60 USD
+B sv10.5w-107  # Samurott · Illustration rare · 50.55 USD
+B ex10-33  # Tyrogue · Rare · 50.39 USD
+B sv05-193  # Gengar ex · Ultra Rare · 50.39 USD
+B exu-R  # Unown · Rare · 50.36 USD
+B pl1-8  # Gardevoir · Holo Rare · 50.24 USD
+B ex1-14  # Wailord · Holo Rare · 50.14 USD
+B ex5-6  # Exploud · Holo Rare · 50.11 USD
+B ecard2-6  # Blissey · Rare · 50.10 USD
+B ecard3-18  # Magcargo · Rare · 50.00 USD
+B ecard3-29  # Rhydon · Rare · 50.00 USD
+B pop3-4  # Minun · Rare · 50.00 USD
+B neo2-26  # Magnemite · Rare · 50.00 EUR
+B ecard2-21  # Lanturn · Rare · 49.99 USD
+B ecard2-26  # Octillery · Rare · 49.99 USD
+B ecard2-8  # Electrode · Rare · 49.99 USD
+B exu-B  # Unown · Rare · 49.99 USD
+B base1-6  # Gyarados · Rare · 49.96 USD
+B ex8-6  # Crawdaunt · Rare · 49.95 USD
+B dp4-1  # Blaziken · Rare Holo · 49.93 USD
+B sv05-204  # Gouging Fire ex · Special illustration rare · 49.91 USD
+B pop2-3  # Raikou · Rare · 49.86 USD
+B bw11-RC25  # Meloetta-EX · Ultra Rare · 49.81 EUR
+B pop2-4  # Suicune · Rare · 49.51 USD
+B exu-Z  # Unown · Rare · 49.49 USD
+B ex9-7  # Manectric · Rare · 49.48 USD
+B sm7-174  # Banette GX · Secret Rare · 49.31 USD
+B ex16-99  # Walrein ex · Rare · 49.20 USD
+B g1-RC30  # Gardevoir EX · Ultra Rare · 49.20 EUR
+B sv08.5-157  # Iron Valiant ex · Special illustration rare · 49.12 USD
+B ex4-18  # Team Aqua's Sharpedo · Rare · 48.99 USD
+B sv05-211  # Morty's Conviction · Special illustration rare · 48.95 USD
+B me01-180  # Mega Absol ex · Special illustration rare · 48.73 USD
+B sm5-141  # Glaceon GX · Ultra Rare · 48.73 USD
+B base1-5  # Clefairy · Rare · 48.69 USD
+B sv02-204  # Marill · Illustration rare · 48.67 USD
+B pop3-2  # Flareon · Rare · 48.66 USD
+B xy9-120  # M Scizor EX · Ultra Rare · 48.65 USD
+B base2-19  # Flareon · Rare · 48.62 USD
+B sv03.5-171  # Wartortle · Illustration rare · 48.61 USD
+B ex11-11  # Metagross δ · Rare · 48.40 EUR
+B sv10-240  # Team Rocket's Mewtwo ex · Hyper rare · 48.26 USD
+B sv06-217  # Carmine · Special illustration rare · 48.12 USD
+B dp5-10  # Moltres · Rare Holo · 48.10 USD
+B pl1-9  # Giratina · Holo Rare · 48.06 USD
+B sm115-44  # Moltres & Zapdos & Articuno GX · Ultra Rare · 48.02 USD
+B ex2-14  # Zangoose · Holo Rare · 48.00 USD
+B ex4-4  # Team Aqua's Manectric · Holo Rare · 47.99 USD
+B exu-A  # Unown · Rare · 47.99 USD
+B exu-V  # Unown · Rare · 47.99 USD
+B sv10.5b-092  # Lilligant · Illustration rare · 47.97 USD
+B dp2-9  # Garchomp · Rare Holo · 47.96 USD
+B base1-16  # Zapdos · Rare · 47.94 USD
+B gym2-28  # Lt. Surge's Jolteon · Rare · 47.86 USD
+B sm10-219  # Dedenne GX · Secret Rare · 47.82 USD
+B sv04.5-160  # Mimikyu · Shiny rare · 47.78 USD
+B sv04.5-202  # Snorlax · Shiny rare · 47.77 USD
+B ex9-21  # Zangoose · Rare · 47.75 USD
+B dp3-4  # Entei · Rare Holo · 47.53 USD
+B swsh12.5gg-GG56  # Hisuian Zoroark VSTAR · Ultra Rare · 47.38 EUR
+B sv10-193  # Misty's Psyduck · Illustration rare · 47.22 USD
+B swsh1-142  # Snorlax VMAX · Holo Rare VMAX · 47.22 USD
+B ecard1-63  # Skarmory · Rare · 47.12 USD
+B dp7-SH1  # Drifloon · Rare Holo LV.X · 47.00 EUR
+B ecard1-62  # Rapidash · Rare · 46.98 USD
+B swsh7-207  # Gyarados VMAX · Secret Rare · 46.98 USD
+B sm12-229  # Guzma & Hala · Ultra Rare · 46.96 USD
+B swsh5-148  # Mimikyu V · Ultra Rare · 46.93 USD
+B sv10.5b-129  # Dwebble · Illustration rare · 46.91 USD
+B sv02-269  # Iono · Special illustration rare · 46.85 USD
+B neo3-21  # Raichu · Rare · 46.83 USD
+B neo4-19  # Dark Omastar · Rare · 46.82 USD
+B xy3-55  # M Lucario EX · Ultra Rare · 46.80 USD
+B dp7-SH2  # Duskull · Rare Holo LV.X · 46.78 EUR
+B ecard2-7  # Donphan · Rare · 46.63 USD
+B xy5-153  # Aggron EX · Ultra Rare · 46.59 USD
+B dp2-16  # Typhlosion · Rare Holo · 46.58 USD
+B sv06.5-068  # Duskull · Illustration rare · 46.47 USD
+B sv02-259  # Chi-Yu ex · Special illustration rare · 46.34 USD
+B sm10-203  # Lucario & Melmetal GX · Ultra Rare · 46.24 USD
+B swsh10.5-081  # Dragonite VSTAR · Secret Rare · 46.21 USD
+B ecard3-20  # Magneton · Rare · 46.12 USD
+B sm11-237  # Rowlet & Alolan Exeggutor GX · Secret Rare · 46.09 USD
+B neo4-92  # Broken Ground Gym · Rare · 45.98 USD
+B col1-12  # Kyogre · Holo Rare · 45.88 USD
+B xy9-121  # Ho-Oh EX · Ultra Rare · 45.86 USD
+B sv06.5-067  # Horsea · Illustration rare · 45.81 USD
+B sm5-139  # Leafeon GX · Ultra Rare · 45.79 USD
+B sm11-225  # Mega Sableye & Tyranitar GX · Ultra Rare · 45.77 USD
+B ex12-22  # Magneton · Rare · 45.75 USD
+B sm7.5-73  # Salamence GX · Secret Rare · 45.71 USD
+B sm9-187  # Hoopa GX · Secret Rare · 45.68 USD
+B sv01-210  # Drowzee · Illustration rare · 45.66 USD
+B sm5-164  # Dialga GX · Secret Rare · 45.63 USD
+B sv04-193  # Plusle · Illustration rare · 45.58 USD
+B exu-C  # Unown · Rare · 45.56 USD
+B pl3-13  # Venusaur · Holo Rare · 45.55 USD
+B sm11-126  # Mega Sableye & Tyranitar GX · Ultra Rare · 45.53 USD
+B swsh12.5gg-GG45  # Deoxys VMAX · Ultra Rare · 45.52 EUR
+B ex1-1  # Aggron · Holo Rare · 45.50 USD
+B ex16-22  # Sableye · Rare · 45.49 USD
+B g1-10  # Leafeon EX · Ultra Rare · 45.38 USD
+B dp3-1  # Ampharos · Rare Holo · 45.36 USD
+B pop3-5  # Plusle · Rare · 45.28 USD
+B xy12-103  # Mewtwo EX · Ultra Rare · 45.28 USD
+B sv06-216  # Bloodmoon Ursaluna ex · Special illustration rare · 45.23 USD
+B sm5-150  # Lana · Ultra Rare · 45.22 USD
+B bw3-97  # Virizion · Ultra Rare · 45.20 USD
+B base5-14  # Dark Weezing · Rare · 45.18 USD
+B sm115-66  # Moltres & Zapdos & Articuno GX · Ultra Rare · 45.08 USD
+B ecard1-35  # Arbok · Rare · 45.00 USD
+B ecard1-44  # Dugtrio · Rare · 45.00 USD
+B exu-!  # Unown · Rare · 45.00 USD
+B ecard1-24  # Poliwrath · Holo Rare · 44.99 USD
+B swsh9tg-TG14  # Sylveon V · Ultra Rare · 44.98 EUR
+B sm2-149  # Primarina GX · Secret Rare · 44.96 USD
+B hgss2-86  # Lanturn · Rare PRIME · 44.92 USD
+B ex12-16  # Girafarig · Rare · 44.91 USD
+B neo4-28  # Unown [H] · Rare · 44.83 USD
+B exu-S  # Unown · Rare · 44.79 USD
+B sm4-110  # Lusamine · Ultra Rare · 44.76 USD
+B xy3-105  # Heracross EX · Ultra Rare · 44.71 USD
+B sv04-253  # Altaria ex · Special illustration rare · 44.67 USD
+B sv04-194  # Minun · Illustration rare · 44.62 USD
+B sm8-216  # Sceptile GX · Secret Rare · 44.59 USD
+B ecard2-27  # Parasect · Rare · 44.49 USD
+B base5-16  # Rocket's Sneak Attack · Rare · 44.16 USD
+B neo2-24  # Houndour · Rare · 44.16 USD
+B sm3.5-75  # Raichu GX · Secret Rare · 44.16 USD
+B dp3-10  # Ho-Oh · Rare Holo · 44.07 USD
+B ex12-9  # Machamp · Rare · 44.04 USD
+B sv08.5-179  # Pikachu ex · Hyper rare · 44.02 USD
+B sm7-109  # Rayquaza GX · Ultra Rare · 44.01 USD
+B ex12-24  # Pinsir · Rare · 44.00 USD
+B ex3-5  # Golem · Holo Rare · 43.99 USD
+B xy10-79  # Lugia BREAK · Ultra Rare · 43.85 USD
+B me02.5-226  # Psyduck · Illustration rare · 43.79 USD
+B me02.5-285  # Mega Scrafty ex · Special illustration rare · 43.78 USD
+B swsh4-170  # Pikachu V · Ultra Rare · 43.77 USD
+B swsh7-204  # Leafeon VMAX · Secret Rare · 43.71 USD
+B sm10-233  # Pokégear 3.0 · Secret Rare · 43.67 EUR
+B sm10-198  # Marshadow & Machamp GX · Ultra Rare · 43.64 USD
+B ex10-26  # Hitmontop · Rare · 43.57 USD
+B sm9-176  # Ingo & Emmet · Ultra Rare · 43.52 USD
+B ex12-4  # Delcatty · Rare · 43.44 USD
+B exu-E  # Unown · Rare · 43.43 USD
+B ecard1-45  # Fearow · Rare · 43.42 USD
+B sv10.5b-096  # Amoonguss · Illustration rare · 43.42 USD
+B ex6-16  # Tauros · Rare · 43.35 USD
+B ex15-5  # Milotic δ · Rare · 43.33 EUR
+B ex8-24  # Seaking · Rare · 43.24 USD
+B sv10.5b-151  # Audino · Illustration rare · 43.16 USD
+B sm9-180  # Nita · Ultra Rare · 43.15 USD
+B bw3-99  # Terrakion · Ultra Rare · 43.10 USD
+B col1-11  # Jirachi · Holo Rare · 43.08 USD
+B sv10.5b-137  # Krookodile · Illustration rare · 43.08 USD
+B sv10.5w-171  # Hilda · Special illustration rare · 43.07 USD
+B sv02-201  # Fuecoco · Illustration rare · 43.06 USD
+B ex6-10  # Pidgeot · Rare · 43.05 USD
+B sv10.5b-169  # Genesect ex · Special illustration rare · 43.03 USD
+B ex8-20  # Magcargo · Rare · 43.00 USD
+B xy8-63  # M Mewtwo EX · Ultra Rare · 43.00 USD
+B sm115-69  # Moltres & Zapdos & Articuno GX · Secret Rare · 42.99 USD
+B sv08.5-164  # Gholdengo ex · Special illustration rare · 42.98 USD
+B neo4-21  # Dark Ursaring · Rare · 42.94 USD
+B sm6-140  # Ultra Necrozma GX · Secret Rare · 42.83 USD
+B hgss4-98  # Yanmega · Rare PRIME · 42.81 USD
+B me02.5-279  # Iono's Bellibolt ex · Special illustration rare · 42.79 USD
+B swsh2-200  # Boss's Orders (Giovanni) · Secret Rare · 42.78 USD
+B sv05-165  # Deerling · Illustration rare · 42.76 USD
+B sv09-187  # Salamence ex · Special illustration rare · 42.75 USD
+B bw6-128  # Rayquaza · Secret Rare · 42.72 EUR
+B ex6-2  # Butterfree · Rare · 42.71 USD
+B neo4-26  # Light Piloswine · Rare · 42.69 USD
+B sm1-147  # Lillie · Ultra Rare · 42.62 USD
+B ex11-25  # Porygon2 · Rare · 42.45 USD
+B ex5-1  # Banette · Holo Rare · 42.41 USD
+B sm6-132  # Palkia GX · Secret Rare · 42.40 USD
+B sm7-183  # Rainbow Energy · Secret Rare · 42.31 USD
+B swsh8-157  # Gengar VMAX · Holo Rare VMAX · 42.24 USD
+B sm8-199  # Blacephalon GX · Ultra Rare · 42.21 USD
+B sm7.5-72  # Altaria GX · Secret Rare · 42.04 USD
+B ex1-20  # Sceptile · Rare · 42.01 USD
+B exu-W  # Unown · Rare · 42.00 USD
+B ex2-8  # Lunatone · Holo Rare · 41.94 USD
+B neo3-16  # Celebi · Rare · 41.94 USD
+B exu-L  # Unown · Rare · 41.92 USD
+B base2-28  # Vaporeon · Rare · 41.85 USD
+B ex6-11  # Poliwrath · Rare · 41.74 USD
+B ex8-12  # Mightyena · Rare · 41.72 USD
+B sv01-211  # Ralts · Illustration rare · 41.70 USD
+B ex12-26  # Spinda · Rare · 41.64 USD
+B ex6-30  # Tangela · Rare · 41.61 USD
+B xy6-75  # Rayquaza EX · Ultra Rare · 41.53 USD
+B sv06-187  # Chansey · Illustration rare · 41.49 USD
+B hgss1-107  # Donphan · Rare PRIME · 41.46 USD
+B xy10-116  # Glaceon EX · Ultra Rare · 41.29 USD
+B neo2-29  # Scizor · Rare · 41.23 USD
+B ex2-17  # Golduck · Rare · 41.20 USD
+B xy1-145  # Skarmory EX · Ultra Rare · 41.10 USD
+B me04-119  # Cinccino ex · Special illustration rare · 41.09 USD
+B sm6-130  # Diantha · Ultra Rare · 41.08 USD
+B sv06.5-094  # Cassiopeia · Special illustration rare · 41.04 USD
+B neo4-29  # Unown [W] · Rare · 41.01 USD
+B neo2-7  # Magnemite · Rare · 41.00 USD
+B bw8-138  # Random Receiver · Secret Rare · 40.99 USD
+B ecard2-9  # Elekid · Rare · 40.99 USD
+B sm12-22  # Charizard & Braixen GX · Ultra Rare · 40.98 USD
+B sv10.5w-137  # Liepard · Illustration rare · 40.85 USD
+B base4-20  # Zapdos · Rare · 40.83 USD
+B ecard1-42  # Cloyster · Rare · 40.82 USD
+B sv10.5b-164  # Serperior ex · Special illustration rare · 40.80 USD
+B sm12-75  # Solgaleo & Lunala GX · Ultra Rare · 40.77 USD
+B ex3-21  # Skarmory · Rare · 40.76 USD
+B ex6-3  # Dewgong · Rare · 40.75 USD
+B sm10-215  # Pheromosa & Buzzwole GX · Secret Rare · 40.70 USD
+B base5-17  # Rainbow Energy · Rare · 40.67 USD
+B ecard2-24  # Nidoking · Rare · 40.65 USD
+B ecard3-15  # Ledian · Rare · 40.65 USD
+B ex10-3  # Bellossom · Rare · 40.65 USD
+B sv10.5w-142  # Zorua · Illustration rare · 40.62 USD
+B xy3-111  # Korrina · Ultra Rare · 40.51 USD
+B xy7-95  # Steven · Ultra Rare · 40.50 USD
+B base4-11  # Nidoking · Rare · 40.47 USD
+B sm7-166  # Tate & Liza · Ultra Rare · 40.46 USD
+B sm8-203  # Tyranitar GX · Ultra Rare · 40.45 USD
+B me03-120  # Mega Zygarde ex · Special illustration rare · 40.42 USD
+B col1-3  # Dialga · Holo Rare · 40.40 USD
+B hgss4-3  # Celebi · Holo Rare · 40.40 USD
+B swsh2-177  # Ninetales V · Ultra Rare · 40.40 USD
+B me02.5-283  # Mega Hawlucha ex · Special illustration rare · 40.38 USD
+B pl3-2  # Blaziken FB · Holo Rare · 40.26 USD
+B sm12-210  # Venusaur & Snivy GX · Ultra Rare · 40.24 USD
+B ex5-23  # Rain Castform · Rare · 40.23 USD
+B ex1-22  # Sharpedo · Rare · 40.15 USD
+B g1-25  # Articuno · Ultra Rare · 40.15 USD
+B me02.5-288  # Fezandipiti ex · Special illustration rare · 40.14 USD
+B base4-12  # Nidoqueen · Rare · 40.13 USD
+B pop1-16  # Armaldo ex · Rare · 40.12 USD
+B base1-11  # Nidoking · Rare · 40.09 USD
+B swsh7-191  # Dragonite V · Ultra Rare · 40.06 USD
+B ex6-17  # Victreebel · Rare · 40.02 USD
+B ex2-26  # Wobbuffet · Rare · 40.00 USD
+B ex4-2  # Team Aqua's Crawdaunt · Holo Rare · 40.00 USD
+B ex15-11  # Togetic δ · Rare · 40.00 EUR
+B ecard1-41  # Clefable · Rare · 39.99 USD
+B ecard1-59  # Pidgeot · Rare · 39.99 USD
+B ex12-19  # Lanturn · Rare · 39.99 USD
+B ex12-23  # Omastar · Rare · 39.99 USD
+B ex3-17  # Magneton · Rare · 39.99 USD
+B ex8-15  # Slaking · Rare · 39.99 USD
+B ex9-18  # Relicanth · Rare · 39.99 USD
+B ex9-95  # Medicham ex · Rare · 39.99 USD
+B xy12-13  # M Charizard EX · Ultra Rare · 39.90 USD
+B sv05-205  # Walking Wake ex · Special illustration rare · 39.82 USD
+B swsh12.5-160  # Pikachu · Secret Rare · 39.76 USD
+B sm2-157  # Metagross GX · Secret Rare · 39.71 USD
+B hgss1-10  # Raichu · Holo Rare · 39.62 USD
+B sv08.5-151  # Palafin ex · Special illustration rare · 39.62 USD
+B exu-P  # Unown · Rare · 39.57 USD
+B ecard1-65  # Typhlosion · Rare · 39.49 USD
+B ex9-3  # Exploud · Rare · 39.33 USD
+B dp6-8  # Luxray · Rare Holo · 39.32 USD
+B ecard2-17  # Jumpluff · Rare · 39.26 USD
+B me02.5-287  # Marnie's Grimmsnarl ex · Special illustration rare · 39.26 USD
+B col1-9  # Ho-Oh · Holo Rare · 39.25 USD
+B gym2-108  # Misty's Wish · Rare · 39.24 USD
+B swsh6-203  # Ice Rider Calyrex VMAX · Secret Rare · 39.24 USD
+B sm8-201  # Zeraora GX · Ultra Rare · 39.23 USD
+B ex4-8  # Team Magma's Claydol · Holo Rare · 39.22 USD
+B sv03.5-167  # Ivysaur · Illustration rare · 39.21 USD
+B sm12-256  # Flygon GX · Secret Rare · 39.17 USD
+B xy8-153  # Houndoom EX · Ultra Rare · 39.17 USD
+B bw9-121  # Max Potion · Secret Rare · 39.13 USD
+B sm7-163  # Copycat · Ultra Rare · 39.12 USD
+B base4-14  # Pidgeot · Rare · 39.08 USD
+B sm8-205  # Alolan Ninetales GX · Ultra Rare · 39.00 USD
+B ex6-25  # Hypno · Rare · 38.99 USD
+B ex9-13  # Glalie · Rare · 38.99 USD
+B pl4-96  # Arceus LV.X · Rare Holo LV.X · 38.99 USD
+B base1-12  # Ninetales · Rare · 38.96 USD
+B sm10-220  # Muk & Alolan Muk GX · Secret Rare · 38.92 USD
+B sv10.5w-089  # Leavanny · Illustration rare · 38.89 USD
+B ecard1-51  # Machamp · Rare · 38.87 USD
+B sm11-54  # Raichu & Alolan Raichu GX · Ultra Rare · 38.83 USD
+B exu-U  # Unown · Rare · 38.80 USD
+B exu-T  # Unown · Rare · 38.76 USD
+B sm3-154  # Machamp GX · Secret Rare · 38.73 USD
+B swsh12-202  # Lugia VSTAR · Secret Rare · 38.70 USD
+B ex14-13  # Wigglytuff · Rare · 38.68 USD
+B sv04.5-109  # Charmander · Shiny rare · 38.67 USD
+B ex14-9  # Mawile · Rare · 38.61 USD
+B ex8-29  # Xatu · Rare · 38.61 USD
+B swsh3-20  # Charizard VMAX · Holo Rare VMAX · 38.55 USD
+B sm7-168  # Underground Expedition · Ultra Rare · 38.54 USD
+B xy6-103  # Hydreigon EX · Ultra Rare · 38.47 USD
+B exu-F  # Unown · Rare · 38.45 USD
+B sv03.5-181  # Dragonair · Illustration rare · 38.40 USD
+B xy8-64  # M Mewtwo EX · Ultra Rare · 38.40 USD
+B exu-N  # Unown · Rare · 38.39 USD
+B swsh12.5gg-GG54  # Zamazenta V · Ultra Rare · 38.32 EUR
+B dp3-18  # Salamence · Rare Holo · 38.31 USD
+B swsh6-183  # Blissey V · Ultra Rare · 38.30 USD
+B xy5-152  # Sharpedo EX · Ultra Rare · 38.29 USD
+B dp5-6  # Kabutops · Rare Holo · 38.26 USD
+B sv03.5-183  # Charizard ex · Ultra Rare · 38.25 USD
+B me03-123  # Rosa's Encouragement · Special illustration rare · 38.21 USD
+B dp1-17  # Torterra · Rare Holo · 38.13 USD
+B xy3-110  # Fossil Researcher · Ultra Rare · 38.09 USD
+B sv10.5w-113  # Vanilluxe · Illustration rare · 38.02 USD
+B bw7-153  # Rocky Helmet · Secret Rare · 38.00 USD
+B ecard2-42  # Victreebel · Rare · 38.00 USD
+B hgss3-5  # Houndoom · Holo Rare · 38.00 USD
+B gym1-31  # Misty's Poliwrath · Rare · 37.93 USD
+B sm12-243  # Koffing · Secret Rare · 37.93 USD
+B ex14-21  # Igglybuff · Rare · 37.91 USD
+B me02.5-273  # Mega Emboar ex · Special illustration rare · 37.88 USD
+B sv07-167  # Hydrapple ex · Special illustration rare · 37.87 USD
+B sv05-167  # Litten · Illustration rare · 37.84 USD
+B ex4-11  # Team Magma's Rhydon · Holo Rare · 37.78 USD
+B sv04.5-201  # Ditto · Shiny rare · 37.75 USD
+B ex3-19  # Salamence · Rare · 37.63 USD
+B sm6-128  # Bonnie · Ultra Rare · 37.60 USD
+B sv01-204  # Slowpoke · Illustration rare · 37.55 USD
+B sm8-159  # Lugia GX · Ultra Rare · 37.51 USD
+B ecard1-61  # Raichu · Rare · 37.50 USD
+B exu-Q  # Unown · Rare · 37.50 USD
+B ex6-20  # Cloyster · Rare · 37.48 USD
+B sv08-236  # Durant ex · Special illustration rare · 37.46 USD
+B ex13-29  # Registeel · Rare · 37.43 USD
+B dp2-8  # Feraligatr · Rare Holo · 37.28 USD
+B xy6-108  # Winona · Ultra Rare · 37.18 USD
+B ex2-18  # Kecleon · Rare · 37.10 USD
+B ex4-7  # Team Magma's Aggron · Holo Rare · 37.08 USD
+B xy8-161  # Brigette · Ultra Rare · 37.05 USD
+B ex16-11  # Machamp · Rare · 37.00 USD
+B ex11-29  # Snow-cloud Castform · Rare · 36.99 USD
+B pop1-4  # Sceptile · Rare · 36.90 USD
+B me02.5-282  # Mega Diancie ex · Special illustration rare · 36.83 USD
+B xy7-86  # Kyurem EX · Ultra Rare · 36.82 USD
+B sv04-208  # Steelix · Illustration rare · 36.80 USD
+B neo2-25  # Kabutops · Rare · 36.78 USD
+B sv10.5w-098  # Emboar · Illustration rare · 36.74 USD
+B base3-17  # Articuno · Rare · 36.67 USD
+B neo2-23  # Houndoom · Rare · 36.67 USD
+B col1-14  # Lucario · Holo Rare · 36.66 USD
+B ex8-4  # Camerupt · Rare · 36.66 USD
+B ecard2-22  # Magneton · Rare · 36.59 USD
+B sm2-146  # Decidueye GX · Secret Rare · 36.59 USD
+B swsh7-208  # Glaceon VMAX · Secret Rare · 36.55 USD
+B sm3-139  # Darkrai GX · Ultra Rare · 36.54 USD
+B me03-119  # Mega Clefable ex · Special illustration rare · 36.52 USD
+B ecard1-50  # Kingler · Rare · 36.50 USD
+B ex10-2  # Ariados · Rare · 36.50 USD
+B ex15-8  # Ninetales δ · Rare · 36.50 EUR
+B cel25cc-CC008  # _____'s Pikachu · Classic Collection · 36.46 EUR
+B pop3-6  # Vaporeon · Rare · 36.38 USD
+B ex5-15  # Walrein · Holo Rare · 36.31 USD
+B bw5-111  # Pokémon Catcher · Secret Rare · 36.31 EUR
+B pl1-14  # Shaymin · Holo Rare · 36.25 USD
+B pop4-3  # Flygon · Rare · 36.16 USD
+B base4-5  # Clefable · Rare · 36.06 USD
+B sv10.5w-092  # Sawsbuck · Illustration rare · 36.01 USD
+B swsh12.5gg-GG55  # Regigigas VSTAR · Ultra Rare · 36.00 EUR
+B neo4-96  # Thought Wave Machine (Rocket's Secret Machine) · Rare · 35.97 USD
+B ex2-23  # Steelix · Rare · 35.90 USD
+B swsh7-182  # Golurk V · Ultra Rare · 35.89 USD
+B ex10-32  # Stantler · Rare · 35.88 USD
+B sm2-145  # Mallow · Ultra Rare · 35.73 USD
+B xy11-115  # Volcanion EX · Secret Rare · 35.73 USD
+B swsh10-175  # Hisuian Sneasler V · Ultra Rare · 35.72 USD
+B xy9-41  # Greninja BREAK · Ultra Rare · 35.69 USD
+B sm12-260  # Naganadel & Guzzlord GX · Secret Rare · 35.67 USD
+B neo4-24  # Light Ledian · Rare · 35.64 USD
+B sv01-212  # Kirlia · Illustration rare · 35.64 USD
+B ex6-9  # Nidoqueen · Rare · 35.58 USD
+B sm6-143  # Energy Recycler · Secret Rare · 35.57 USD
+B sm5-160  # Xurkitree GX · Secret Rare · 35.45 USD
+B sv09-185  # N's Zoroark ex · Special illustration rare · 35.45 USD
+B dp2-15  # Raichu · Rare Holo · 35.43 USD
+B sm7-154  # Articuno GX · Ultra Rare · 35.34 USD
+B ex10-6  # Forretress · Rare · 35.32 USD
+B ex9-17  # Nosepass · Rare · 35.30 USD
+B hgss1-13  # Wobbuffet · Holo Rare · 35.29 USD
+B base1-13  # Poliwrath · Rare · 35.14 USD
+B ex8-27  # Tropius · Rare · 35.09 USD
+B ex2-2  # Cacturne · Holo Rare · 35.08 USD
+B sm6-122  # Lucario GX · Ultra Rare · 35.02 USD
+B sv03-228  # Charizard ex · Hyper rare · 35.00 USD
+B ex10-10  # Octillery · Rare · 34.99 USD
+B xy12-100  # M Venusaur EX · Ultra Rare · 34.95 USD
+B pop8-3  # Luxray · Rare · 34.94 USD
+B sv05-183  # Cinccino · Illustration rare · 34.91 USD
+B ex2-12  # Shiftry · Holo Rare · 34.88 USD
+B me02.5-269  # Mega Gengar ex · Ultra Rare · 34.86 USD
+B sv06-210  # Sinistcha ex · Special illustration rare · 34.82 USD
+B sm3.5-57  # Shining Arceus · Ultra Rare · 34.77 USD
+B sm6-125  # Dialga GX · Ultra Rare · 34.76 USD
+B sv03-199  # Ninetales · Illustration rare · 34.72 USD
+B swsh7-183  # Sylveon V · Ultra Rare · 34.65 USD
+B sv03-202  # Cleffa · Illustration rare · 34.63 USD
+B me05-114  # Mega Zeraora ex · Special illustration rare · 34.53 USD
+B pl4-12  # Zapdos G · Holo Rare · 34.43 USD
+B base4-13  # Ninetales · Rare · 34.41 USD
+B sv02-258  # Skeledirge ex · Special illustration rare · 34.40 USD
+B sv06.5-092  # Fezandipiti ex · Special illustration rare · 34.40 USD
+B sv07-170  # Terapagos ex · Special illustration rare · 34.39 USD
+B ex14-5  # Dugtrio · Rare · 34.38 USD
+B ex5-5  # Electrode · Holo Rare · 34.34 USD
+B ex14-1  # Banette · Rare · 34.32 USD
+B gym1-20  # Brock's Golem · Rare · 34.32 USD
+B sv10.5b-167  # Meloetta ex · Special illustration rare · 34.30 USD
+B sv02-212  # Mismagius · Illustration rare · 34.28 USD
+B ex4-13  # Raichu · Rare · 34.25 USD
+B ex9-12  # Chimecho · Rare · 34.25 USD
+B xy12-108  # Misty's Determination · Ultra Rare · 34.24 USD
+B swsh8-250  # Mew V · Ultra Rare · 34.20 USD
+B neo3-15  # Aerodactyl · Rare · 34.08 USD
+B ex5-26  # Sunny Castform · Rare · 34.04 USD
+B sm7.5-65  # Reshiram GX · Ultra Rare · 34.02 USD
+B ex5-25  # Snow-cloud Castform · Rare · 33.99 USD
+B ex6-23  # Farfetch'd · Rare · 33.99 USD
+B swsh12.5gg-GG43  # Zeraora VSTAR · Ultra Rare · 33.99 EUR
+B pl1-1  # Ampharos · Holo Rare · 33.76 USD
+B swsh1-200  # Marnie · Ultra Rare · 33.76 USD
+B exu-J  # Unown · Rare · 33.75 USD
+B pop2-6  # Venusaur · Rare · 33.68 USD
+B sv10.5b-141  # Klinklang · Illustration rare · 33.68 USD
+B base1-9  # Magneton · Rare · 33.66 USD
+B sm3.5-42  # Shining Jirachi · Ultra Rare · 33.66 USD
+B sv03.5-176  # Poliwhirl · Illustration rare · 33.66 USD
+B sm8-219  # Blacephalon GX · Secret Rare · 33.63 USD
+B swsh1-197  # Snorlax V · Ultra Rare · 33.63 USD
+B swsh10.5-086  # Mewtwo VSTAR · Secret Rare · 33.63 USD
+B ex16-18  # Mightyena · Rare · 33.49 USD
+B dp6-12  # Politoed · Rare Holo · 33.46 USD
+B sv06-219  # Lana's Aid · Special illustration rare · 33.43 USD
+B g1-28  # Jolteon EX · Ultra Rare · 33.37 USD
+B sv08-240  # Hydreigon ex · Special illustration rare · 33.32 USD
+B ex2-13  # Solrock · Holo Rare · 33.30 USD
+B pop7-4  # Latios · Rare · 33.30 USD
+B sv10.5w-154  # Lillipup · Illustration rare · 33.29 USD
+B ex4-1  # Team Aqua's Cacturne · Holo Rare · 33.23 USD
+B ex11-23  # Hypno · Rare · 33.19 USD
+B xy2-104  # Lysandre · Ultra Rare · 33.09 USD
+B sm2-147  # Incineroar GX · Secret Rare · 33.07 USD
+B sv02-217  # Tinkatuff · Illustration rare · 33.05 USD
+B ex8-28  # Whiscash · Rare · 33.00 USD
+B hgss3-6  # Magcargo · Holo Rare · 33.00 USD
+B gym2-30  # Sabrina's Golduck · Rare · 32.99 USD
+B hgss1-11  # Shuckle · Holo Rare · 32.98 USD
+B pop6-2  # Lucario · Rare · 32.94 USD
+B sm5-156  # Volkner · Ultra Rare · 32.94 USD
+B base5-25  # Dark Gyarados · Rare · 32.84 USD
+B ecard1-54  # Meganium · Rare · 32.79 USD
+B sm3.5-74  # Entei GX · Secret Rare · 32.78 USD
+B base4-17  # Scyther · Rare · 32.75 USD
+B exu-H  # Unown · Rare · 32.75 USD
+B pl1-12  # Palkia G · Holo Rare · 32.75 USD
+B xy1-30  # M Blastoise EX · Ultra Rare · 32.74 USD
+B sm7-158  # Scizor GX · Ultra Rare · 32.66 USD
+B ex11-14  # Salamence δ · Rare · 32.62 EUR
+B sm10-82  # Marshadow & Machamp GX · Ultra Rare · 32.61 USD
+B ex14-24  # Marshtomp · Rare · 32.55 USD
+B ex8-19  # Ludicolo · Rare · 32.51 USD
+B base3-27  # Moltres · Rare · 32.48 USD
+B col1-10  # Houndoom · Holo Rare · 32.47 USD
+B ex1-5  # Delcatty · Holo Rare · 32.40 USD
+B neo4-30  # Unown [X] · Rare · 32.40 USD
+B me05-115  # Mega Chandelure ex · Special illustration rare · 32.39 USD
+B neo2-27  # Politoed · Rare · 32.39 USD
+B sv04-245  # Garchomp ex · Special illustration rare · 32.37 USD
+B pl1-13  # Rampardos · Holo Rare · 32.27 USD
+B ecard1-38  # Butterfree · Rare · 32.20 USD
+B swsh9-153  # Charizard V · Ultra Rare · 32.17 USD
+B ex16-2  # Altaria · Rare · 32.14 USD
+B sv08.5-158  # Iron Crown ex · Special illustration rare · 32.13 USD
+B sm10-120  # Lucario & Melmetal GX · Ultra Rare · 32.06 USD
+B ex2-11  # Seviper · Holo Rare · 32.03 USD
+B sv10.5b-148  # Pidove · Illustration rare · 32.02 USD
+B sm10-195  # Dedenne GX · Ultra Rare · 32.01 USD
+B pop7-2  # Gallade · Rare · 32.00 USD
+B pop7-1  # Ampharos · Rare · 31.94 USD
+B base5-18  # Dark Alakazam · Rare · 31.89 USD
+B ex14-12  # Tauros · Rare · 31.79 USD
+B xy10-117  # Alakazam EX · Ultra Rare · 31.79 USD
+B sv02-216  # Tinkatink · Illustration rare · 31.72 USD
+B sv02-194  # Heracross · Illustration rare · 31.71 USD
+B gym1-25  # Erika's Clefairy · Rare · 31.67 USD
+B col1-19  # Palkia · Holo Rare · 31.66 USD
+B base4-30  # Snorlax · Rare · 31.63 USD
+B sv02-210  # Baxcalibur · Illustration rare · 31.56 USD
+B ex13-28  # Regirock · Rare · 31.50 USD
+B ex10-24  # Hitmonchan · Rare · 31.49 USD
+B sv02-219  # Sudowoodo · Illustration rare · 31.44 USD
+B neo3-23  # Skarmory · Rare · 31.39 USD
+B ex11-33  # Weezing · Rare · 31.37 USD
+B sv06.5-070  # Dusknoir · Illustration rare · 31.35 USD
+B ex16-24  # Wobbuffet · Rare · 31.32 USD
+B sm10-196  # Muk & Alolan Muk GX · Ultra Rare · 31.28 USD
+B base3-25  # Lapras · Rare · 31.20 USD
+B ex16-10  # Kabutops · Rare · 31.18 USD
+B sv04-189  # Mantyke · Illustration rare · 31.09 USD
+B swsh6-200  # Blaziken VMAX · Secret Rare · 31.03 USD
+B xy5-160  # Teammates · Ultra Rare · 31.03 USD
+B ex4-15  # Team Aqua's Mightyena · Rare · 30.98 USD
+B sv05-203  # Iron Leaves ex · Special illustration rare · 30.97 USD
+B sm6-126  # Xerneas GX · Ultra Rare · 30.92 USD
+B sv04-251  # Roaring Moon ex · Special illustration rare · 30.89 USD
+B sv05-178  # Metagross · Illustration rare · 30.87 USD
+B sm1-140  # Espeon GX · Ultra Rare · 30.86 USD
+B g1-18  # M Blastoise EX · Ultra Rare · 30.82 USD
+B gym2-23  # Giovanni's Nidoqueen · Rare · 30.82 USD
+B swsh12.5gg-GG48  # Zacian V · Ultra Rare · 30.82 EUR
+B base4-3  # Chansey · Rare · 30.79 USD
+B sm1-161  # Ultra Ball · Secret Rare · 30.78 USD
+B ex6-22  # Dugtrio · Rare · 30.77 USD
+B sv05-152  # Hero's Cape · ACE SPEC Rare · 30.68 USD
+B neo2-19  # Butterfree · Rare · 30.65 USD
+B cel25cc-CC022  # Mewtwo EX · Classic Collection · 30.65 EUR
+B dp6-3  # Froslass · Rare Holo · 30.58 USD
+B sv10.5b-146  # Fraxure · Illustration rare · 30.57 USD
+B base2-26  # Scyther · Rare · 30.53 USD
+B dp1-11  # Palkia · Rare Holo · 30.51 USD
+B xy2-103  # Kangaskhan EX · Ultra Rare · 30.50 USD
+B ex11-22  # Holon's Magneton · Rare · 30.49 USD
+B sm3-156  # Marshadow GX · Secret Rare · 30.49 USD
+B sv04-252  # Gholdengo ex · Special illustration rare · 30.47 USD
+B sm11-214  # Rowlet & Alolan Exeggutor GX · Ultra Rare · 30.45 USD
+B ex11-10  # Marowak δ · Rare · 30.42 EUR
+B sv01-215  # Riolu · Illustration rare · 30.40 USD
+B sm3.5-72  # Mewtwo GX · Ultra Rare · 30.39 USD
+B xy6-60  # Rayquaza EX · Ultra Rare · 30.39 USD
+B ex10-28  # Jynx · Rare · 30.38 USD
+B ex11-31  # Sunny Castform · Rare · 30.36 USD
+B sv09-183  # Iono's Bellibolt ex · Special illustration rare · 30.34 USD
+B sv04.5-210  # Maushold · Shiny rare · 30.30 USD
+B swsh5-168  # Single Strike Urshifu VMAX · Secret Rare · 30.30 USD
+B sm12-165  # Mega Lopunny & Jigglypuff GX · Ultra Rare · 30.25 USD
+B base3-30  # Zapdos · Rare · 30.00 USD
+B ex10-16  # Sunflora · Rare · 30.00 USD
+B ex13-30  # Relicanth · Rare · 30.00 USD
+B sm1-151  # Lapras GX · Secret Rare · 30.00 USD
+B ex11-15  # Starmie δ · Rare · 30.00 EUR
+B ex11-30  # Starmie δ · Rare · 30.00 EUR
+B ex13-2  # Cradily δ · Rare · 30.00 EUR
+B ex14-16  # Combusken · Rare · 29.99 USD
+B hgss2-7  # Politoed · Holo Rare · 29.99 USD
+B pl3-7  # Metagross · Holo Rare · 29.99 USD
+B swsh12-177  # Unown V · Ultra Rare · 29.94 USD
+B sv06.5-099  # Basic Metal Energy · Hyper rare · 29.86 USD
+B ex13-34  # Zangoose · Rare · 29.79 USD
+B ex1-10  # Mightyena · Holo Rare · 29.75 USD
+B sv10.5w-096  # Tepig · Illustration rare · 29.73 USD
+B xy5-106  # M Gardevoir EX · Ultra Rare · 29.72 USD
+B swsh6-185  # Tornadus V · Ultra Rare · 29.63 USD
+B pl2-8  # Lucario GL · Holo Rare · 29.58 USD
+B dp2-18  # Uxie · Rare Holo · 29.53 USD
+B ex5-27  # Tropius · Rare · 29.52 USD

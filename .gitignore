@@ -1,0 +1,4 @@
+__pycache__/
+*.py[cod]
+data/price-demand.json
+data/price-demand.json.tmp
