@@ -9,10 +9,14 @@ in order, so the file is the puzzle: the site does not re-roll a day that is
 already scheduled.
 
 The committed price is a fallback for when the live card cannot be loaded.
-Playing the drop asks TCGdex again and locks that answer on the first guess.
+A daily snapshot asks TCGdex for the next two days and stores that profile
+price, so every player shares one answer. A day that has started is not
+rewritten. Playing without a snapshot still locks the live price on the
+first guess. The snapshot does not call Scrydex.
 
     python3 scripts/build_daily.py           # new year from today
     python3 scripts/build_daily.py --extend  # append days once fewer than 60 remain
+    python3 scripts/build_daily.py --quote   # snapshot the next two NY days
 """
 
 from __future__ import annotations
@@ -210,6 +214,7 @@ SPECIES_SKIP = {
     "dark", "light", "shining", "shiny", "team", "rocket", "rockets",
     "radiant", "amazing", "galarian", "alolan", "hisuian", "paldean",
     "the", "an", "ex", "gx", "v", "vmax", "vstar",
+    "break", "legend", "star", "prism", "lv", "lvx",
 }
 
 
@@ -217,10 +222,15 @@ def species_of(name: str) -> str:
     words = re.findall(r"[A-Za-z][A-Za-z'-]*", name or "")
     kept = []
     for word in words:
-        token = word.lower().replace("'s", "").replace("’s", "")
+        display = re.sub(r"['’]s$", "", word, flags=re.IGNORECASE)
+        token = display.lower()
+        dash = token.rfind("-")
+        if dash > 0 and token[dash + 1:] in SPECIES_SKIP:
+            display = display[:display.rfind("-")]
+            token = token[:dash]
         if token in SPECIES_SKIP or len(token) <= 1:
             continue
-        kept.append(word)
+        kept.append(display)
     return kept[-1].lower() if kept else ""
 
 
@@ -695,7 +705,131 @@ def fetch_rows(cache: dict) -> list[dict]:
     return rows
 
 
-def write_doc(epoch: str, days: list[str], pool: list[dict]) -> None:
+def quote_window(today: str, iso: str) -> bool:
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", today or "") or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", iso or ""):
+        return False
+    delta = days_between(today, iso)
+    return 1 <= delta <= 2
+
+
+def quote_from_card(card: dict) -> dict | None:
+    """Cheapest TCGplayer market, the same printing the profile selects."""
+    quoted = choose_price(card)
+    if not quoted:
+        return None
+    price, variant, alts = quoted
+    if price < 1:
+        return None
+    row = {
+        "id": card.get("id") or "",
+        "price": price,
+        "variant": variant,
+        "printing": variant_label(variant),
+        "alts": alts,
+        "source": "tcgplayer",
+    }
+    eur = quote_eur(card)
+    if eur:
+        row["eur"] = eur
+    return row
+
+
+def same_quote(left: dict, right: dict) -> bool:
+    keys = ("id", "price", "variant", "printing", "alts", "eur", "source")
+    return all(left.get(key) == right.get(key) for key in keys)
+
+
+def merge_quotes(existing: dict, today: str, incoming: dict) -> dict:
+    """Keep past and started days. Refresh only the next two dates."""
+    out = {}
+    if isinstance(existing, dict):
+        for iso, row in existing.items():
+            out[iso] = row
+    if not isinstance(incoming, dict):
+        return out
+    for iso, row in incoming.items():
+        if not quote_window(today, iso) or not isinstance(row, dict) or not row.get("id"):
+            continue
+        if row.get("source") == "cardmarket" or row.get("variant") == "cardmarket":
+            continue
+        price = round(positive(row.get("price")), 2)
+        if price < 1:
+            continue
+        built = {
+            "id": row["id"],
+            "price": price,
+            "variant": row.get("variant") or "",
+            "printing": row.get("printing") or "",
+            "alts": int(row.get("alts") or 1),
+            "source": "tcgplayer",
+        }
+        eur = round(positive(row.get("eur")), 2)
+        if eur:
+            built["eur"] = eur
+        if row.get("at"):
+            built["at"] = row["at"]
+        prior = out.get(iso)
+        if isinstance(prior, dict) and same_quote(prior, built):
+            continue
+        out[iso] = built
+    return out
+
+
+def scheduled_id(doc: dict, iso: str) -> str:
+    epoch = doc.get("epoch") or ""
+    days = doc.get("days") or []
+    if not epoch or not days:
+        return ""
+    try:
+        index = days_between(epoch, iso)
+    except Exception:
+        return ""
+    if index < 0 or index >= len(days):
+        return ""
+    card_id = days[index]
+    return card_id if isinstance(card_id, str) else ""
+
+
+def snapshot_next(doc: dict, today: str) -> dict:
+    existing = doc.get("quotes") if isinstance(doc.get("quotes"), dict) else {}
+    incoming = {}
+    for offset in (1, 2):
+        iso = add_iso(today, offset)
+        card_id = scheduled_id(doc, iso)
+        if not card_id:
+            continue
+        try:
+            payload = get_json(API + "/cards/" + urllib.parse.quote(card_id, safe=""))
+        except Exception as error:
+            print(f"quote {iso} {card_id} failed: {error}", flush=True)
+            continue
+        if not isinstance(payload, dict):
+            continue
+        row = quote_from_card(payload)
+        if not row:
+            print(f"quote {iso} {card_id} has no TCGplayer market", flush=True)
+            continue
+        row["id"] = card_id
+        row["at"] = datetime.now(ZoneInfo("UTC")).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        incoming[iso] = row
+        print(f"quote {iso} {card_id} {row['price']} {row['printing']}", flush=True)
+    return merge_quotes(existing, today, incoming)
+
+
+def write_quotes(doc: dict) -> int:
+    today = ny_today()
+    merged = snapshot_next(doc, today)
+    previous = doc.get("quotes") if isinstance(doc.get("quotes"), dict) else {}
+    if merged == previous:
+        print("quotes unchanged")
+        return 0
+    doc["quotes"] = merged
+    OUT.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+    print(f"snapshotted {add_iso(today, 1)} and {add_iso(today, 2)}")
+    return 0
+
+
+def write_doc(epoch: str, days: list[str], pool: list[dict], quotes: dict | None = None) -> None:
     today = ny_today()
     document = {
         "v": 1,
@@ -705,6 +839,8 @@ def write_doc(epoch: str, days: list[str], pool: list[dict]) -> None:
         "days": days,
         "pool": pool,
     }
+    if quotes:
+        document["quotes"] = quotes
     OUT.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
     eras = sorted({card["era"] for card in pool})
     gems = sum(1 for card in pool if card.get("setId") in GEM_SETS)
@@ -718,6 +854,10 @@ def write_doc(epoch: str, days: list[str], pool: list[dict]) -> None:
 
 
 def main() -> int:
+    if "--quote" in sys.argv:
+        if not OUT.exists():
+            raise SystemExit("data/daily.json is missing")
+        return write_quotes(json.loads(OUT.read_text(encoding="utf-8")))
     extend = "--extend" in sys.argv
     today = ny_today()
     old = None
@@ -771,7 +911,8 @@ def main() -> int:
                 pool.append(public_card(by_id[card_id]))
             else:
                 raise SystemExit(f"missing card {card_id}")
-        write_doc(epoch, days, pool)
+        kept_quotes = old.get("quotes") if isinstance(old.get("quotes"), dict) else None
+        write_doc(epoch, days, pool, kept_quotes)
         print(f"extended by {len(added)} days through {add_iso(epoch, len(days) - 1)}")
         return 0
     days, _, _ = schedule(rows, DAYS)

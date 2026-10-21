@@ -176,14 +176,23 @@
   const SPECIES_SKIP = {
     dark: 1, light: 1, shining: 1, shiny: 1, team: 1, rocket: 1, rockets: 1,
     radiant: 1, amazing: 1, galarian: 1, alolan: 1, hisuian: 1, paldean: 1,
-    the: 1, an: 1, ex: 1, gx: 1, v: 1, vmax: 1, vstar: 1
+    the: 1, an: 1, ex: 1, gx: 1, v: 1, vmax: 1, vstar: 1,
+    break: 1, legend: 1, star: 1, prism: 1, lv: 1, lvx: 1
   };
 
   function speciesName(name) {
     const words = String(name || "").match(/[A-Za-z][A-Za-z'-]*/g) || [];
-    const kept = words.filter(word => {
-      const token = word.toLowerCase().replace(/'s$/, "");
-      return !SPECIES_SKIP[token] && token.length > 1;
+    const kept = [];
+    words.forEach(word => {
+      let display = word.replace(/['’]s$/i, "");
+      let token = display.toLowerCase();
+      const dash = token.lastIndexOf("-");
+      if (dash > 0 && SPECIES_SKIP[token.slice(dash + 1)]) {
+        display = display.slice(0, display.lastIndexOf("-"));
+        token = token.slice(0, dash);
+      }
+      if (SPECIES_SKIP[token] || token.length <= 1) return;
+      kept.push(display);
     });
     return kept.length ? kept[kept.length - 1] : "";
   }
@@ -213,10 +222,24 @@
     return (dollar ? "$" : "") + text;
   }
 
+  /* Keep a letters-only attempt in the field. Sanitizing it first would
+     leave an empty box, and an empty box is "above zero," not "not a price." */
+  function readGuess(raw) {
+    const original = String(raw ?? "");
+    const disallowed = /[^0-9.,$\s]/.test(original);
+    if (disallowed && !/\d/.test(original)) {
+      return { text: original, message: "That isn't a price. Use digits, like 12.50." };
+    }
+    return {
+      text: sanitizeGuess(original),
+      message: disallowed ? "That isn't a price. Use digits, like 12.50." : ""
+    };
+  }
+
   function parseGuess(raw) {
     const original = String(raw ?? "").trim();
     if (!original) return { ok: false, reason: "low", value: 0, message: "Enter a price above zero." };
-    if (/[^0-9.,$\s]/.test(original)) {
+    if (/[^0-9.,$\s]/.test(original) || !/\d/.test(original)) {
       return { ok: false, reason: "invalid", value: 0, message: "That isn't a price. Use digits, like 12.50." };
     }
     let text = original.replace(/[$\s]/g, "");
@@ -233,7 +256,7 @@
       }
       text = text.replace(/,/g, "");
     }
-    if (!/^\d+(?:\.\d{1,2})?$/.test(text)) {
+    if (!/^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(text)) {
       return { ok: false, reason: "invalid", value: 0, message: "That isn't a price. Use digits, like 12.50." };
     }
     const n = Math.round(Number(text) * 100) / 100;
@@ -332,6 +355,99 @@
     return "⬜";
   }
 
+  /* The next two New York dates are still unplayed. Today and earlier have started. */
+  function quoteWindow(today, iso) {
+    const delta = daysBetween(today, iso);
+    if (!delta || !parseISO(today) || !parseISO(iso)) return false;
+    return delta >= 1 && delta <= 2;
+  }
+
+  function quoteFields(row) {
+    const price = usablePrice(row && row.price);
+    if (!row || !row.id || !price) return null;
+    if (row.source === "cardmarket" || row.variant === "cardmarket") return null;
+    const out = {
+      id: String(row.id),
+      price,
+      variant: row.variant || "",
+      printing: row.printing || "",
+      alts: Number(row.alts) > 0 ? Number(row.alts) : 1,
+      source: "tcgplayer"
+    };
+    const eur = roundMoney(row.eur);
+    if (eur) out.eur = eur;
+    if (row.at) out.at = String(row.at);
+    return out;
+  }
+
+  function sameQuote(left, right) {
+    if (!left || !right) return false;
+    return left.id === right.id
+      && left.price === right.price
+      && left.variant === right.variant
+      && left.printing === right.printing
+      && left.alts === right.alts
+      && (left.eur || 0) === (right.eur || 0)
+      && (left.source || "tcgplayer") === (right.source || "tcgplayer");
+  }
+
+  /* Copy every stored quote through. Only the next two days may change,
+     and a past or already-started date is left as the same object. */
+  function mergeQuotes(existing, today, incoming) {
+    const out = {};
+    const prior = existing && typeof existing === "object" ? existing : {};
+    Object.keys(prior).forEach(iso => { out[iso] = prior[iso]; });
+    const rows = incoming && typeof incoming === "object" ? incoming : {};
+    Object.keys(rows).forEach(iso => {
+      if (!quoteWindow(today, iso)) return;
+      const built = quoteFields(rows[iso]);
+      if (!built) return;
+      if (sameQuote(out[iso], built)) return;
+      out[iso] = built;
+    });
+    return out;
+  }
+
+  function snapshotQuote(data, iso) {
+    const snap = data && data.quotes && data.quotes[iso];
+    const built = quoteFields(snap);
+    if (!built) return null;
+    const drop = pickDrop(data, iso);
+    if (!drop || !drop.card || built.id !== drop.card.id) return null;
+    return {
+      price: built.price,
+      variant: built.variant,
+      printing: built.printing,
+      alts: built.alts,
+      eur: built.eur || 0,
+      live: false,
+      snapshot: true,
+      locked: false,
+      id: built.id
+    };
+  }
+
+  /* A started day keeps the price it already locked. Otherwise the shared
+     snapshot wins. Null means the caller should load TCGdex and lock that. */
+  function quoteForPlay(data, iso, day) {
+    const started = day && (day.locked || (Array.isArray(day.guesses) && day.guesses.length));
+    const price = started ? usablePrice(day.price) || roundMoney(day.price) : 0;
+    if (started && price) {
+      return {
+        price,
+        variant: day.variant || "",
+        printing: day.printing || "",
+        alts: Number(day.alts) > 0 ? Number(day.alts) : 1,
+        eur: roundMoney(day.eur),
+        live: !!day.live,
+        snapshot: false,
+        locked: true,
+        id: day.id || ""
+      };
+    }
+    return snapshotQuote(data, iso);
+  }
+
   function shareText(play) {
     const n = play && Number.isFinite(play.n) ? play.n : 0;
     const bands = play && Array.isArray(play.bands) ? play.bands : [];
@@ -348,7 +464,8 @@
     addDays, daysBetween, nyDateISO, msUntilNextNyDay, formatRemain,
     roundMoney, usablePrice, usableFx, profileUsd, cardmarketQuote, convertEur,
     fallbackQuote, lockQuote, showPrinting, speciesName, wishFields,
-    sanitizeGuess, parseGuess, mix, dropNumber, pickDrop,
+    sanitizeGuess, readGuess, parseGuess, mix, dropNumber, pickDrop,
+    quoteWindow, mergeQuotes, snapshotQuote, quoteForPlay,
     judgeGuess, feedbackLine, applyStreak, visibleStreak, shareText, shareGlyph
   };
 });

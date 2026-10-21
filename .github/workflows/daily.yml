@@ -4,34 +4,103 @@ on:
   schedule:
     # Monday morning, New York. Append days only when fewer than 60 remain.
     - cron: "30 13 * * 1"
+    # About 4:00 AM America/New_York. GitHub cron is UTC, and the offset
+    # switches with daylight time, so both hours run. 08:00 UTC is 4:00 AM
+    # during EDT and 3:00 AM during EST. 09:00 UTC is 4:00 AM during EST
+    # and 5:00 AM during EDT. The quote step only fills the next two days
+    # and leaves today and earlier untouched, so the extra run is a no-op
+    # once those snapshots are already stored.
+    - cron: "0 8 * * *"
+    - cron: "0 9 * * *"
   workflow_dispatch:
+    inputs:
+      task:
+        description: extend the schedule, or snapshot the next two days
+        type: choice
+        options:
+          - quote
+          - extend
+        default: quote
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: daily-drop
   cancel-in-progress: false
 
 jobs:
-  extend:
+  publish:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
       - name: Extend the schedule
+        if: (github.event_name == 'workflow_dispatch' && github.event.inputs.task == 'extend') || github.event.schedule == '30 13 * * 1'
         run: python3 scripts/build_daily.py --extend
 
-      - name: Commit new days
+      - name: Snapshot the next two days
+        if: (github.event_name == 'workflow_dispatch' && github.event.inputs.task != 'extend') || github.event.schedule == '0 8 * * *' || github.event.schedule == '0 9 * * *'
+        run: python3 scripts/build_daily.py --quote
+
+      - name: Commit and push
+        id: commit
         if: github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/daily.json
           if git diff --cached --quiet; then
-            echo "No new days."
-          else
-            git commit -m "Extend the Daily Drop schedule"
-            git push origin HEAD:main
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          git commit -m "Update the Daily Drop schedule"
+          base=$(git rev-parse HEAD)
+          ok=0
+          for delay in 0 4 8 16 32; do
+            if [ "$delay" -ne 0 ]; then
+              echo "pull --rebase and push retry in ${delay}s"
+              sleep "$delay"
+              git reset --hard "$base"
+            fi
+            git fetch origin main
+            if ! git pull --rebase origin main; then
+              git rebase --abort || true
+              continue
+            fi
+            if git push origin HEAD:main; then
+              ok=1
+              break
+            fi
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "push failed after retries"
+            exit 1
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Pages
+        if: github.ref == 'refs/heads/main' && steps.commit.outputs.changed == 'true'
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload site
+        if: github.ref == 'refs/heads/main' && steps.commit.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        if: github.ref == 'refs/heads/main' && steps.commit.outputs.changed == 'true'
+        uses: actions/deploy-pages@v4
