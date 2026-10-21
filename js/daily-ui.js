@@ -10,6 +10,7 @@
   let justFinished = false;
   let shownISO = "";
   let revealTimer = 0;
+  let holdAnswer = false;
   const preview = new Map();
 
   function host() { return window.BHDailyHost || {}; }
@@ -276,6 +277,7 @@
     const done = !!day.done;
     const animate = justFinished && done && typeof reduceMotion === "function" && !reduceMotion();
     justFinished = false;
+    holdAnswer = !!animate;
     clearTimeout(revealTimer);
     const guessesLeft = Math.max(0, D.MAX_GUESSES - (day.guesses || []).length);
     const onWish = (host().wish || []).some(item => item && item.id === card.id);
@@ -386,11 +388,14 @@
         const reveal = document.getElementById("dailyReveal");
         if (reveal && reveal.isConnected) reveal.hidden = false;
         showAnswer();
+        holdAnswer = false;
+        if (typeof paintSide === "function" && typeof tab !== "undefined" && tab === "daily") paintSide();
       }, 720);
     } else if (done) {
       showAnswer();
     }
     paintDailyBadge();
+    if (typeof paintSide === "function" && typeof tab !== "undefined" && tab === "daily") paintSide();
   }
 
   function showGuessError(message) {
@@ -597,6 +602,34 @@
 
   window.renderDaily = renderDaily;
   window.paintDailyBadge = paintDailyBadge;
+  window.dailySideModel = function () {
+    const iso = todayISO();
+    const state = loadState();
+    const streak = D.visibleStreak(state, iso);
+    const countdown = D.formatRemain(D.msUntilNextNyDay(new Date()));
+    const base = { ready: !!cache, empty: false, n: 0, streak: streak.current, best: streak.best, countdown, done: false, solved: false, guesses: 0, price: 0 };
+    if (!cache) return base;
+    const drop = D.pickDrop(cache, iso);
+    if (!drop) return Object.assign(base, { ready: true, empty: true });
+    const saved = state.days[iso];
+    const same = saved && saved.id === drop.card.id && Array.isArray(saved.guesses);
+    const kept = saved && saved.done && saved.id;
+    const day = same || kept ? saved : null;
+    const done = !!(day && day.done);
+    const revealed = done && !holdAnswer;
+    return {
+      ready: true,
+      empty: false,
+      n: (day && day.n) || drop.n,
+      streak: streak.current,
+      best: streak.best,
+      countdown,
+      done: revealed,
+      solved: !!(revealed && day.solved),
+      guesses: day && Array.isArray(day.guesses) ? day.guesses.length : 0,
+      price: revealed && D.usablePrice(day.price) ? day.price : 0
+    };
+  };
 
   const play = document.getElementById("dropPlay");
   const later = document.getElementById("dropLater");
@@ -660,7 +693,10 @@
   });
   setInterval(() => {
     const el = document.getElementById("dailyCount");
-    if (el) el.textContent = D.formatRemain(D.msUntilNextNyDay(new Date()));
+    const remain = D.formatRemain(D.msUntilNextNyDay(new Date()));
+    if (el) el.textContent = remain;
+    const sideCount = document.getElementById("dailySideCount");
+    if (sideCount) sideCount.textContent = remain;
     const iso = todayISO();
     if (shownISO && iso !== shownISO) {
       shownISO = iso;

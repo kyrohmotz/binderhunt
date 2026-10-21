@@ -232,6 +232,11 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 .side-progress .market-price{margin:0}
 .side-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
 .side-list .rail-binder{pointer-events:none}
+.daily-side{display:flex;gap:8px;margin:12px 0}
+.daily-side .stat{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;background:#fff;border:2.5px solid var(--ink);border-radius:16px;padding:8px 10px;box-shadow:2px 2px 0 var(--ink)}
+.daily-side .stat span{font-family:var(--label);font-style:italic;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:12px}
+.daily-side .stat b{font-family:var(--display);font-size:28px;line-height:1}
+.tabs .tabbtn{font-size:15px}
 @media (min-width:1024px){
   @font-face{font-family:Lato;src:url("fonts/lato-700-italic.woff2") format("woff2");font-weight:700;font-style:italic;font-display:swap}
 }
@@ -241,7 +246,7 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
   .rail-brand{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none}
   .rail-brand .word{font-size:20px;min-width:0}
   .rail nav{display:flex;flex-direction:column;gap:6px;flex:none}
-  .rail .tabbtn{text-align:left;padding:0 12px}
+  .rail .tabbtn{text-align:left;padding:0 12px;font-size:16px;overflow:hidden}
   .rail-stats{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:6px;padding:4px 0}
   .rail-wish,.rail-binder{width:100%;text-align:left;display:flex;align-items:center;gap:8px;background:#fff;border:2.5px solid var(--ink);border-radius:14px;padding:7px 8px;box-shadow:2px 2px 0 var(--ink);min-height:44px;min-width:0}
   .rail-wish b{font-family:var(--display);font-size:20px;line-height:1.1}
@@ -2898,6 +2903,7 @@ function paintSide(){
   if (!wide() || profilePinned) return;
   if (tab === "sets") renderSetSide();
   else if (tab === "binders") renderBinderSide();
+  else if (tab === "daily") renderDailySide();
   else paintDeckSummary(currentTop());
 }
 function setSideStats(){
@@ -2970,6 +2976,32 @@ function renderBinderSide(){
   }
   const pages = Math.max(1, Math.ceil(((binder.cards || []).length || 1) / 9));
   profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Binder</p><h2 class="pname" id="profileTitle">${esc(binder.name)}</h2>${binderSideMeter(binder.cards)}<p class="fine">${(binder.cards || []).length} cards · ${pages} ${pages === 1 ? "page" : "pages"}</p></div>`;
+}
+function renderDailySide(){
+  const model = typeof window.dailySideModel === "function" ? window.dailySideModel() : null;
+  const n = model && model.n ? model.n : 0;
+  const streak = model ? model.streak : 0;
+  const best = model ? model.best : 0;
+  const countdown = model && model.countdown ? model.countdown : "Next drop is in";
+  const done = !!(model && model.done);
+  const solved = !!(model && model.solved);
+  const guesses = model && model.guesses ? model.guesses : 0;
+  const key = ["daily", n, streak, best, done ? 1 : 0, solved ? 1 : 0, guesses, model && model.ready ? 1 : 0, model && model.empty ? 1 : 0].join(":");
+  if (key === sideKey && profileEl.querySelector("[data-side='daily']")) {
+    const count = document.getElementById("dailySideCount");
+    if (count && count.textContent !== countdown) count.textContent = countdown;
+    return;
+  }
+  sideKey = key;
+  summaryId = "";
+  profileEl.hidden = false;
+  shell.classList.remove("no-profile");
+  profileEl.removeAttribute("aria-modal");
+  let result = `<p class="fine">Opening today's drop…</p>`;
+  if (model && model.ready && model.empty) result = `<p class="fine">No priced card for today.</p>`;
+  else if (model && model.ready && done) result = `<p class="market-price">${esc(priceText(model.price, "USD"))}</p><p class="fine">${solved ? "You landed it." : "That's the raw price."} Same number for everyone.</p>`;
+  else if (model && model.ready) result = `<p class="fine">${guesses ? guesses + " of 3 guesses in. " : ""}The price stays sealed until the round ends.</p>`;
+  profileEl.innerHTML = `<div class="profile-scroll" data-side="daily"><p class="eyebrow">Daily</p><h2 class="pname" id="profileTitle">${n ? "Drop #" + esc(String(n)) : "Today's drop"}</h2><div class="daily-side"><div class="stat"><span>Streak</span><b>${esc(String(streak))}</b></div><div class="stat"><span>Best</span><b>${esc(String(best))}</b></div></div><p class="fine" id="dailySideCount">${esc(countdown)}</p>${result}</div>`;
 }
 function paintRail(){
   const count = document.getElementById("railWishCount");
