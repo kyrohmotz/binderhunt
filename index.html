@@ -585,8 +585,8 @@ html.reduce .book.opening{animation:none}
 .empty-note{flex:none;margin:0 4px 2px;font-size:12px;line-height:1.3}
 .slot{position:relative;min-width:0;min-height:0}
 .slot > .sleeve{position:absolute;inset:0;container-type:size}
-.sleeve .cardhit{inset:auto;left:50%;top:calc(50% - 18px);right:auto;bottom:auto;width:min(84cqi,calc((100cqb - 44px) * 63 / 88));height:auto;max-height:none;aspect-ratio:63/88;transform:translate(-50%,-50%);border-radius:2px}
-.sleeve .cardhit:active{transform:translate(-50%,-50%) scale(.985)}
+.sleeve .cardhit{inset:auto;left:50%;top:22px;right:auto;bottom:auto;width:min(84cqi,calc((100cqb - 60px) * 63 / 88));height:auto;max-height:none;aspect-ratio:63/88;transform:translate(-50%,0);border-radius:2px}
+.sleeve .cardhit:active{transform:translate(-50%,0) scale(.985)}
 .sleeve.empty{background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.16) 38%,rgba(255,255,255,.34));box-shadow:inset 0 0 0 1px rgba(255,255,255,.82),inset 0 0 0 1px rgba(40,32,24,.12),inset 0 8px 12px rgba(40,32,24,.05)}
 .sleeve.empty .ghost-card{display:none}
 .sleeve.wanted{background:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,.12) 40%,rgba(255,255,255,.28));box-shadow:inset 0 0 0 1px rgba(255,255,255,.7),inset 0 0 0 1px rgba(40,32,24,.1),inset 0 8px 12px rgba(40,32,24,.05)}
@@ -3800,6 +3800,11 @@ function binderSpread(root){
   return Math.min(byW, byH) >= 74;
 }
 const CURL_STRIPS = 12;
+let peelWarmGen = 0;
+function scheduleIdle(fn){
+  if (typeof requestIdleCallback === "function") requestIdleCallback(() => fn(), { timeout: 280 });
+  else setTimeout(fn, 0);
+}
 function curlWorld(t){
   const turn = Math.max(0, Math.min(1, t));
   const flat = Math.pow(turn, 2.6) * 176;
@@ -3862,19 +3867,20 @@ function applyCurl(leaf, t){
   }
   leaf._curlApex = apex;
 }
-function mountPeel(leaf, dir){
-  if (reduceMotion() || !leaf) return;
+function mountPeel(leaf, dir, done){
+  const idle = typeof done === "function";
+  if (reduceMotion() || !leaf) { if (idle) done(); return; }
   const front = leaf.querySelector(":scope > .face.front");
-  if (!front) return;
+  if (!front) { if (idle) done(); return; }
   const backward = dir < 0;
   const imgs = front.querySelectorAll("img");
   let painted = 0;
   imgs.forEach(img => { if (img.complete && img.naturalWidth) painted++; });
   const prefix = backward ? "b" : "f";
-  if (leaf.dataset.peel && leaf.dataset.peel.charAt(0) === prefix && leaf.dataset.peel.endsWith(":" + painted) && leaf._curlStrips && leaf.querySelector(".peel")) return;
+  if (leaf.dataset.peel && leaf.dataset.peel.charAt(0) === prefix && leaf.dataset.peel.endsWith(":" + painted) && leaf._curlStrips && leaf.querySelector(".peel")) { if (idle) done(); return; }
   const w = Math.round(leaf.clientWidth);
   const h = Math.round(leaf.clientHeight);
-  if (w < 40 || h < 40) return;
+  if (w < 40 || h < 40) { if (idle) done(); return; }
   const key = prefix + w + "x" + h + ":" + painted;
   const host = front.getBoundingClientRect();
   const bits = [];
@@ -3926,6 +3932,8 @@ function mountPeel(leaf, dir){
     });
     return node;
   };
+  const gen = (leaf._peelGen || 0) + 1;
+  leaf._peelGen = gen;
   const peel = document.createElement("div");
   peel.className = "peel";
   peel.setAttribute("aria-hidden", "true");
@@ -3937,35 +3945,50 @@ function mountPeel(leaf, dir){
   gloss.style.width = Math.round(w * 0.1) + "px";
   const edge = document.createElement("div");
   edge.className = "curl-edge";
-  const made = [];
-  for (let i = 0; i < CURL_STRIPS; i++) {
-    let sx = 0;
-    for (let k = 0; k < i; k++) sx += widths[k];
-    if (backward) sx = w - sx - widths[i];
-    const faceSlice = sheet(sx, false);
-    const backSlice = sheet(sx, true);
-    const strip = document.createElement("div");
-    strip.className = "strip";
-    strip.dataset.i = String(i);
-    strip.style.width = widths[i] + "px";
-    strip.style.height = h + "px";
-    strip.style.zIndex = String(8 + i);
-    strip.append(faceSlice, backSlice);
-    strip._w = widths[i];
-    strip._front = faceSlice;
-    strip._back = backSlice;
-    made.push(strip);
-  }
-  peel.append(shadow, gloss, edge, ...made);
+  peel.append(shadow, gloss, edge);
   leaf.querySelectorAll(".peel").forEach(old => old.remove());
   leaf.append(peel);
-  leaf._curlW = w;
-  leaf._curlH = h;
-  leaf._curlStrips = made;
-  leaf.classList.add("armed");
-  leaf.dataset.peel = key;
-  leaf.dataset.curlDir = backward ? "-1" : "1";
-  applyCurl(leaf, leaf.classList.contains("hot") ? (Number(leaf.style.getPropertyValue("--turn")) || 0) : 0);
+  const made = [];
+  let built = 0;
+  const chunk = idle ? 3 : CURL_STRIPS;
+  const stop = () => {
+    if (idle && leaf.isConnected && !leaf.classList.contains("hot")) done();
+  };
+  const step = () => {
+    if (leaf._peelGen !== gen || !leaf.isConnected) { stop(); return; }
+    const end = Math.min(CURL_STRIPS, built + chunk);
+    for (; built < end; built++) {
+      let sx = 0;
+      for (let k = 0; k < built; k++) sx += widths[k];
+      if (backward) sx = w - sx - widths[built];
+      const faceSlice = sheet(sx, false);
+      const backSlice = sheet(sx, true);
+      const strip = document.createElement("div");
+      strip.className = "strip";
+      strip.dataset.i = String(built);
+      strip.style.width = widths[built] + "px";
+      strip.style.height = h + "px";
+      strip.style.zIndex = String(8 + built);
+      strip.append(faceSlice, backSlice);
+      strip._w = widths[built];
+      strip._front = faceSlice;
+      strip._back = backSlice;
+      made.push(strip);
+      peel.append(strip);
+    }
+    if (built < CURL_STRIPS) { scheduleIdle(step); return; }
+    if (leaf._peelGen !== gen || !leaf.isConnected) { stop(); return; }
+    leaf._curlW = w;
+    leaf._curlH = h;
+    leaf._curlStrips = made;
+    leaf.classList.add("armed");
+    leaf.dataset.peel = key;
+    leaf.dataset.curlDir = backward ? "-1" : "1";
+    applyCurl(leaf, leaf.classList.contains("hot") ? (Number(leaf.style.getPropertyValue("--turn")) || 0) : 0);
+    if (idle) done();
+  };
+  if (idle) scheduleIdle(step);
+  else step();
 }
 function renderCollection(root){
   const wishMode = binderView.kind === "wish";
@@ -4164,7 +4187,7 @@ function renderCollection(root){
       leaf.style.setProperty("--turn", turn.toFixed(4));
       applyCurl(leaf, turn);
       if (p < 1) requestAnimationFrame(frame);
-      else go();
+      else requestAnimationFrame(go);
     };
     requestAnimationFrame(frame);
     setTimeout(go, 700);
@@ -4457,18 +4480,23 @@ function renderCollection(root){
   }
   paintContext();
   const warmBook = book;
-  requestAnimationFrame(() => {
-    if (!warmBook.isConnected || reduceMotion()) return;
-    const warm = dir => {
-      const leaf = warmBook.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right"));
-      if (!leaf || leaf.classList.contains("hot")) return;
-      fillUnder(dir);
-      mountPeel(leaf, dir);
-      applyCurl(leaf, 0);
-    };
-    warm(1);
-    if (twoPage) warm(-1);
-  });
+  const warmGen = ++peelWarmGen;
+  const warmDirs = [1];
+  if (twoPage) warmDirs.push(-1);
+  const warmDir = () => {
+    if (warmGen !== peelWarmGen || !warmBook.isConnected || reduceMotion()) return;
+    const dir = warmDirs.shift();
+    if (dir == null) return;
+    const leaf = warmBook.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right"));
+    if (!leaf || leaf.classList.contains("hot")) { scheduleIdle(warmDir); return; }
+    fillUnder(dir);
+    scheduleIdle(() => {
+      if (warmGen !== peelWarmGen || !warmBook.isConnected || reduceMotion()) return;
+      if (!leaf.isConnected || leaf.classList.contains("hot")) { scheduleIdle(warmDir); return; }
+      mountPeel(leaf, dir, () => scheduleIdle(warmDir));
+    });
+  };
+  scheduleIdle(warmDir);
 }
 
 function openMenu(anchor, card, binder){
