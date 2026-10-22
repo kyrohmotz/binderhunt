@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BinderHunt – swipe to find the cards your binder is missing</title>
 <meta name="description" content="BinderHunt: swipe through physical Pokémon TCG cards, keep a wishlist, and fill themed binders. No packs, no gambling.">
 <meta property="og:title" content="BinderHunt">
@@ -20,6 +20,8 @@
 <meta name="twitter:image:alt" content="BinderHunt wordmark on a lavender, mint, and peach background.">
 <meta name="theme-color" content="#F8F7EF">
 <meta name="binderhunt-price-proxy" content="">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="BinderHunt">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
@@ -381,6 +383,22 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 @keyframes pop{to{transform:translateY(-18px) scale(.2);opacity:0}}
 .toast{position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:70;display:flex;gap:8px;align-items:center;background:#fff;border:2.5px solid var(--ink);border-radius:999px;padding:8px 10px 8px 14px;box-shadow:3px 3px 0 var(--ink);max-width:min(92vw,420px)}
 .toast[hidden]{display:none !important}
+.update-toast{background:var(--butter);z-index:72}
+.update-toast button{flex:none;min-height:36px;border:2px solid var(--ink);border-radius:999px;background:var(--green);font-family:var(--display);font-weight:700;padding:0 12px}
+.offline-note,.install-hint{margin:8px 12px 0;flex:none;display:flex;gap:8px;align-items:center;border:2.5px solid var(--ink);border-radius:16px;padding:8px 10px;box-shadow:3px 3px 0 var(--ink);max-width:100%}
+.offline-note{background:var(--sage)}
+.install-hint{background:var(--paper-2)}
+.offline-note[hidden],.install-hint[hidden],.install-hint button[hidden]{display:none !important}
+.offline-note p,.install-hint p{margin:0;min-width:0;font-family:var(--display);font-weight:700;font-size:14px;line-height:1.25}
+.install-hint button{flex:none;min-height:36px;border:2px solid var(--ink);border-radius:999px;background:#fff;font-family:var(--display);font-weight:700;padding:0 10px}
+.install-hint .goish{background:var(--green)}
+.shell{padding-top:env(safe-area-inset-top);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+#profile{top:env(safe-area-inset-top);right:env(safe-area-inset-right);bottom:env(safe-area-inset-bottom);left:env(safe-area-inset-left)}
+.sheet{padding-top:env(safe-area-inset-top);padding-right:env(safe-area-inset-right);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left)}
+.onboard,.drop-prompt{padding-top:calc(12px + env(safe-area-inset-top));padding-right:calc(12px + env(safe-area-inset-right));padding-bottom:calc(12px + env(safe-area-inset-bottom));padding-left:calc(12px + env(safe-area-inset-left))}
+@media (display-mode: standalone){
+  .shell{padding-top:env(safe-area-inset-top);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+}
 @media (min-width:1024px){
   .toast{bottom:22px}
 }
@@ -694,6 +712,12 @@ html.reduce .peel{display:none}
       <button class="context" id="context" type="button">All cards</button>
       <button class="iconbtn" id="gear" data-gear type="button" aria-label="Settings">⚙</button>
     </header>
+    <p id="offlineNote" class="offline-note" hidden role="status">You're offline. Your deck, wishlist, and binders are still here.</p>
+    <div id="installHint" class="install-hint" hidden>
+      <p id="installHintText">Add BinderHunt to your home screen</p>
+      <button type="button" id="installGo" class="goish">Add</button>
+      <button type="button" id="installDismiss">Not now</button>
+    </div>
     <div id="viewHunt" class="view">
       <div class="hunt-align">
       <div class="chipbar" id="chipbar">
@@ -818,7 +842,14 @@ html.reduce .peel{display:none}
     </div>
   </div>
 </div>
+<div id="updateToast" class="toast update-toast" hidden role="status">
+  <span>New version, tap to refresh</span>
+  <button type="button" id="updateRefresh">Refresh</button>
+</div>
 <script>
+try {
+  if (navigator.serviceWorker && navigator.serviceWorker.controller && navigator.onLine === false) navigator.serviceWorker.controller.postMessage("bh-offline");
+} catch (e) {}
 const AFFILIATE = { tcgplayer:{ params:{} }, ebay:{ params:{} }, cardmarket:{ params:{} } };
 const CHASE = ["Special illustration rare","Illustration rare","Hyper rare","Mega Hyper Rare","Secret Rare","Shiny Ultra Rare","Shiny rare VMAX","Holo Rare VMAX","Holo Rare VSTAR","Radiant Rare","Amazing Rare"];
 const VINTAGE_RARITIES = ["Rare Holo","Holo Rare","Rare Holo LV.X","Rare PRIME","LEGEND","Classic Collection","Shiny rare","Ultra Rare"];
@@ -988,6 +1019,7 @@ function countEvent(name){
     if (doNotTrack()) return;
     if (!/^[a-z0-9-]{3,32}$/.test(name)) return;
     if (typeof fetch !== "function") return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
     fetch("https://abacus.jasoncameron.dev/hit/" + COUNT_NS + "/" + name, { method:"GET", credentials:"omit", cache:"no-store", keepalive:true }).catch(() => {});
   } catch (e) {}
 }
@@ -2624,6 +2656,15 @@ function pumpStale(epoch, my){
 }
 async function pump(my){
   if (loading || my !== generation) return;
+  if (navigator.onLine === false) {
+    loading = true;
+    serveOfflineDeck();
+    loading = false;
+    renderDeck();
+    paintCount();
+    syncOfflineNote();
+    return;
+  }
   const epoch = ++pumpEpoch;
   huntPumps++;
   loading = true;
@@ -2691,6 +2732,7 @@ async function pump(my){
         if (!surprise) card.spice = false;
         pile.push(card);
         matched++;
+        rememberRecent(card);
         lastFound = Date.now();
         armHuntWatch(my);
       });
@@ -2701,6 +2743,7 @@ async function pump(my){
   } catch (e) {
     if (pumpStale(epoch, my)) return;
     if (isBusyError(e)) noteBusy();
+    else if (navigator.onLine === false) serveOfflineDeck();
     else { pumpError = "The card catalog didn't respond. Check your connection and try again."; paused = true; }
   } finally {
     if (!pumpStale(epoch, my)) loading = false;
@@ -2894,7 +2937,7 @@ function renderDeck(){
       if (anyEra) anyEra.onclick = () => { filters.era = ""; saveFilters(); restart(); };
       if (edit) edit.onclick = () => openFilter("pokemon", document.querySelector("[data-filter=pokemon]"));
     } else {
-      const msg = pumpError ? `<p class="warn">${esc(pumpError)}</p>` : catalogBusy ? "<p>Card source is busy, retrying…</p>" : paused ? "<p>Still matching cards.</p>" : "<p>The hunt is still shuffling the table.</p>";
+      const msg = navigator.onLine === false ? "<p>You're offline. Your wishlist and binders are still in this browser.</p>" : pumpError ? `<p class="warn">${esc(pumpError)}</p>` : catalogBusy ? "<p>Card source is busy, retrying…</p>" : paused ? "<p>Still matching cards.</p>" : "<p>The hunt is still shuffling the table.</p>";
       deck.innerHTML = `<div class="empty-state">${msg}${toad()}<button class="chip" id="retryDeck" type="button">Keep looking</button></div>`;
       const btn = document.getElementById("retryDeck");
       if (btn) btn.onclick = () => {
@@ -2979,6 +3022,7 @@ function fly(dir, from){
   syncActs();
   runSwipe();
   keepSwipeFocus(trigger);
+  noteSwipeEngagement();
 }
 function runSwipe(){
   if (swipeBusy) return;
@@ -4647,6 +4691,7 @@ async function openBinderForm(){
     binderState.binders.push(binder);
     saveBinders();
     countEvent("binder-created");
+    noteBinderEngagement();
     closeSheet("binderSheet");
     binderView = { kind:"binder", id:binder.id };
     flipPage = 0;
@@ -4842,6 +4887,7 @@ function ensureFx(){
     } catch (e) {}
     const cached = readFx();
     if (cached) return useFx(cached);
+    if (navigator.onLine === false) return useFx(fxRate);
     try {
       const res = await fetch("https://api.frankfurter.dev/v1/latest?from=EUR&to=USD", { signal:AbortSignal.timeout(3000) });
       if (res.ok) {
@@ -5486,6 +5532,7 @@ function skipOnboard(){
   if (onboardMode === "retake") return;
   saveOnboard({ done:true, skipped:true, picks:[], custom:[], era:"", budget:"", at:Date.now() });
   countEvent("onboard-skip");
+  maybeInstallHint();
 }
 function finishOnboard(){
   if (onboardStep === 1) { onboardStep = 2; renderOnboard(); return; }
@@ -5503,6 +5550,7 @@ function finishOnboard(){
   if (filters.era) bits.push(eraLabel(filters.era));
   if (filters.pricePreset) bits.push(priceLabel());
   announce(bits.length ? "Hunting " + bits.join(" · ") + ". The chips up top can change it." : "A mixed hunt. The chips up top can narrow it.");
+  maybeInstallHint();
 }
 document.getElementById("onboardSkip").onclick = skipOnboard;
 document.getElementById("onboardBack").onclick = () => { onboardStep = 1; renderOnboard(); };
@@ -5522,12 +5570,196 @@ loadMeta().then(() => {
   if (tab === "sets") renderSets();
   if (tab === "binders") renderBinders();
 }).catch(() => {});
+const RECENT_KEY = "bh.recent.v1";
+const PWA_KEY = "bh.pwa.v1";
+let offlineSeeded = false;
+let deferredInstall = null;
+function recentCards(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+    return Array.isArray(raw) ? raw.filter(c => c && c.id) : [];
+  } catch (e) { return []; }
+}
+function rememberRecent(card){
+  try {
+    if (!card || !card.id || navigator.onLine === false) return;
+    const snap = snapshot(card);
+    delete snap.flavor; delete snap.legal; delete snap.printings; delete snap.cm;
+    const list = recentCards().filter(c => c.id !== snap.id);
+    list.unshift(snap);
+    if (list.length > 18) list.length = 18;
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+  } catch (e) {}
+}
+function serveOfflineDeck(){
+  offlineSeeded = true;
+  pumpError = "";
+  paused = false;
+  if (!pile.length) {
+    const recent = recentCards().filter(c => knownArt(c).length && !isDigital(c));
+    let use = recent.filter(c => { try { return keep(c); } catch (e) { return false; } });
+    if (!use.length) use = recent;
+    use.slice(0, 12).forEach(card => { pile.push(card); matched++; });
+  }
+  streamDone = true;
+  syncOfflineNote();
+}
+function syncOfflineNote(){
+  const note = document.getElementById("offlineNote");
+  if (note) note.hidden = navigator.onLine !== false;
+}
+function loadPwa(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(PWA_KEY) || "null");
+    return raw && typeof raw === "object" ? raw : {};
+  } catch (e) { return {}; }
+}
+function savePwa(data){
+  try { localStorage.setItem(PWA_KEY, JSON.stringify(data)); } catch (e) {}
+}
+function inStandalone(){
+  try { return matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; }
+  catch (e) { return false; }
+}
+function isIos(){
+  const ua = navigator.userAgent || "";
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+function onboardFinished(){
+  const saved = loadOnboard();
+  return !!(saved && saved.done);
+}
+function engagedEnough(data){
+  if ((data.swipes || 0) >= 10) return true;
+  if (data.binder) return true;
+  return !!(binderState && binderState.binders && binderState.binders.length);
+}
+function maybeInstallHint(){
+  const hint = document.getElementById("installHint");
+  if (!hint) return;
+  const onboard = document.getElementById("onboard");
+  const drop = document.getElementById("dropPrompt");
+  const data = loadPwa();
+  const ios = isIos();
+  const blocked = (onboard && !onboard.hidden) || (drop && !drop.hidden);
+  const ready = !inStandalone() && !data.dismissed && onboardFinished() && !blocked && engagedEnough(data) && (ios || deferredInstall);
+  if (!ready) { hint.hidden = true; return; }
+  const text = document.getElementById("installHintText");
+  const go = document.getElementById("installGo");
+  if (ios) {
+    text.textContent = "Add BinderHunt to your home screen. Tap Share, then Add to Home Screen.";
+    if (go) go.hidden = true;
+  } else {
+    text.textContent = "Add BinderHunt to your home screen";
+    if (go) go.hidden = false;
+  }
+  hint.hidden = false;
+}
+function dismissInstall(){
+  const data = loadPwa();
+  data.dismissed = true;
+  savePwa(data);
+  const hint = document.getElementById("installHint");
+  if (hint) hint.hidden = true;
+}
+function noteSwipeEngagement(){
+  const data = loadPwa();
+  data.swipes = (data.swipes || 0) + 1;
+  savePwa(data);
+  maybeInstallHint();
+}
+function noteBinderEngagement(){
+  const data = loadPwa();
+  data.binder = true;
+  savePwa(data);
+  maybeInstallHint();
+}
+function showUpdateToast(){
+  const toast = document.getElementById("updateToast");
+  if (!toast || !toast.hidden) return;
+  toast.hidden = false;
+}
+function bootPwa(){
+  const tell = () => {
+    const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (sw) sw.postMessage(navigator.onLine === false ? "bh-offline" : "bh-online");
+  };
+  tell();
+  syncOfflineNote();
+  window.addEventListener("online", () => {
+    tell();
+    syncOfflineNote();
+    if (offlineSeeded && tab === "hunt") { offlineSeeded = false; restart(); }
+  });
+  window.addEventListener("offline", () => {
+    tell();
+    syncOfflineNote();
+    if (tab === "hunt") serveOfflineDeck();
+    renderDeck();
+    paintCount();
+  });
+  const dismiss = document.getElementById("installDismiss");
+  if (dismiss) dismiss.onclick = dismissInstall;
+  const go = document.getElementById("installGo");
+  if (go) go.onclick = async () => {
+    const prompt = deferredInstall;
+    deferredInstall = null;
+    if (!prompt) { dismissInstall(); return; }
+    try {
+      prompt.prompt();
+      await prompt.userChoice;
+    } catch (e) {}
+    dismissInstall();
+  };
+  const refresh = document.getElementById("updateRefresh");
+  if (refresh) refresh.onclick = () => location.reload();
+  window.addEventListener("beforeinstallprompt", event => {
+    event.preventDefault();
+    deferredInstall = event;
+    maybeInstallHint();
+  });
+  window.addEventListener("appinstalled", () => { deferredInstall = null; dismissInstall(); });
+  maybeInstallHint();
+  if (!("serviceWorker" in navigator)) return;
+  let currentGen = 0;
+  try { currentGen = Number(sessionStorage.getItem("bh.sw.gen") || "0") || 0; } catch (e) {}
+  const noteGen = gen => {
+    gen = Number(gen) || 0;
+    if (!gen) return;
+    const prev = currentGen;
+    currentGen = gen;
+    try { sessionStorage.setItem("bh.sw.gen", String(gen)); } catch (e) {}
+    if (prev && gen !== prev) showUpdateToast();
+  };
+  const askGen = sw => new Promise(resolve => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => resolve(0), 1500);
+    channel.port1.onmessage = event => { clearTimeout(timer); resolve(event.data && event.data.gen || 0); };
+    try { sw.postMessage("bh-version", [channel.port2]); }
+    catch (e) { clearTimeout(timer); resolve(0); }
+  });
+  navigator.serviceWorker.addEventListener("message", event => {
+    if (event.data && event.data.type === "bh-updated") noteGen(event.data.gen);
+  });
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    const sw = navigator.serviceWorker.controller;
+    if (sw) askGen(sw).then(noteGen);
+  });
+  navigator.serviceWorker.register("sw.js", { scope: "./", updateViaCache: "none" }).then(reg => {
+    if (reg.active) askGen(reg.active).then(noteGen);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") reg.update().catch(() => {});
+    });
+  }).catch(() => {});
+}
 restart();
 const deepId = new URLSearchParams(location.search).get("card");
 const returning = wish.length > 0 || binderState.binders.length > 0;
 if (!deepId && !returning && !(loadOnboard() || {}).done) openOnboard("first");
 countPage();
+bootPwa();
 if (deepId) hydrate({ id:deepId }).then(card => { if (card && !card.digital) openProfile(card); }).catch(() => announce("That card link didn't load."));
+
 window.BHDailyHost = {
   get filters(){ return filters; },
   set filters(value){ filters = value; },
