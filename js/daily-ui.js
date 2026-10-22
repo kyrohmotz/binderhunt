@@ -230,9 +230,15 @@
     };
   }
 
-  function fetchQuote(entry) {
+  function fetchQuote(entry, iso, data, day) {
+    const chosen = D.quoteForPlay(data || cache, iso, day);
+    if (chosen && chosen.locked) return Promise.resolve(chosen);
+    if (chosen && chosen.snapshot && entry && chosen.id === entry.id) {
+      preview.set(entry.id, chosen);
+      return Promise.resolve(chosen);
+    }
     const cached = preview.get(entry.id);
-    if (cached) return Promise.resolve(cached);
+    if (cached && !cached.snapshot) return Promise.resolve(cached);
     const run = typeof hydrate === "function"
       ? hydrate({ id: entry.id, image: entry.image }).then(full => quoteFromCard(full, entry)).catch(() => D.fallbackQuote(entry))
       : Promise.resolve(D.fallbackQuote(entry));
@@ -356,19 +362,18 @@
     const input = document.getElementById("dailyGuess");
     if (input) {
       input.addEventListener("input", () => {
-        const raw = input.value;
-        if (/[^0-9.,$\s]/.test(raw)) showGuessError("That isn't a price. Use digits, like 12.50.");
-        const clean = D.sanitizeGuess(raw);
-        if (clean !== raw) {
+        const draft = D.readGuess(input.value);
+        if (draft.message) showGuessError(draft.message);
+        if (draft.text !== input.value) {
           const at = input.selectionStart;
-          input.value = clean;
-          if (at != null) input.setSelectionRange(Math.min(at, clean.length), Math.min(at, clean.length));
+          input.value = draft.text;
+          if (at != null) input.setSelectionRange(Math.min(at, draft.text.length), Math.min(at, draft.text.length));
         }
       });
       if (document.getElementById("viewDaily") && !document.getElementById("viewDaily").hidden) input.focus();
     }
     if (!day.locked && !preview.has(card.id)) {
-      fetchQuote(card).then(quote => {
+      fetchQuote(card, iso, data, day).then(quote => {
         if (!quote || shownISO !== iso || !D.showPrinting(quote)) return;
         const node = document.getElementById("dailyScroll");
         const saved = loadState().days[iso] || {};
@@ -423,7 +428,7 @@
     const day = packed.day;
     if (day.done || (day.guesses || []).length >= D.MAX_GUESSES) return;
     if (!day.locked) {
-      const quote = await fetchQuote(drop.card);
+      const quote = await fetchQuote(drop.card, iso, data, day);
       if (!D.lockQuote(day, quote)) {
         showGuessError("The price didn't load. Try again in a moment.");
         return;

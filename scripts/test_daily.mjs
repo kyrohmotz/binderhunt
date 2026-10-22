@@ -10,7 +10,8 @@ const {
   addDays, daysBetween, nyDateISO, msUntilNextNyDay, formatRemain,
   pickDrop, judgeGuess, feedbackLine, applyStreak, shareText, dropNumber,
   profileUsd, cardmarketQuote, convertEur, fallbackQuote, lockQuote,
-  parseGuess, sanitizeGuess, speciesName, wishFields, showPrinting
+  parseGuess, sanitizeGuess, readGuess, speciesName, wishFields, showPrinting,
+  mergeQuotes, snapshotQuote, quoteForPlay
 } = daily;
 
 function check(name, fn) {
@@ -230,12 +231,24 @@ check("rejected guesses say what was wrong", () => {
   assert.match(parseGuess("12,5").message, /12,50/);
   assert.equal(parseGuess("nope").reason, "invalid");
   assert.match(parseGuess("nope").message, /isn't a price/);
+  assert.equal(parseGuess(".5").value, 0.5);
+  assert.equal(parseGuess("$.5").value, 0.5);
+  assert.equal(parseGuess(".50").value, 0.5);
+  assert.equal(parseGuess(".").reason, "invalid");
   assert.equal(parseGuess("0").reason, "low");
   assert.match(parseGuess("0").message, /above zero/);
   assert.equal(parseGuess("").reason, "low");
   assert.equal(parseGuess("1000001").reason, "high");
   assert.match(parseGuess("1000001").message, /too high/);
   assert.equal(parseGuess("-4").reason, "invalid");
+  const letters = readGuess("nope");
+  assert.equal(letters.text, "nope");
+  assert.match(letters.message, /isn't a price/);
+  assert.match(parseGuess(letters.text).message, /isn't a price/);
+  assert.doesNotMatch(parseGuess(letters.text).message, /above zero/);
+  assert.equal(readGuess(".5").text, ".5");
+  assert.equal(parseGuess(readGuess(".5").text).value, 0.5);
+  assert.equal(readGuess("abc$12.5.0x").text, "$12.50");
 });
 
 check("a daily save keeps the fields a binder matches on", () => {
@@ -261,6 +274,22 @@ check("a daily save keeps the fields a binder matches on", () => {
   assert.equal(speciesName("Team Rocket's Meowth"), "Meowth");
   assert.equal(speciesName("Charizard ex"), "Charizard");
   assert.equal(speciesName("Ho-Oh"), "Ho-Oh");
+  assert.equal(speciesName("Pyroar BREAK"), "Pyroar");
+  assert.equal(speciesName("Noivern BREAK"), "Noivern");
+  assert.equal(speciesName("Golduck BREAK"), "Golduck");
+  assert.equal(speciesName("Espeon Prism Star"), "Espeon");
+  assert.equal(speciesName("Umbreon Star"), "Umbreon");
+  assert.equal(speciesName("Raikou & Entei LEGEND"), "Entei");
+  assert.equal(speciesName("Mewtwo LV.X"), "Mewtwo");
+  assert.equal(speciesName("Garchomp LVX"), "Garchomp");
+  assert.equal(speciesName("Charizard-EX"), "Charizard");
+  assert.equal(speciesName("Pikachu-GX"), "Pikachu");
+  assert.equal(speciesName("Charizard V"), "Charizard");
+  assert.equal(speciesName("Gyarados VMAX"), "Gyarados");
+  assert.equal(speciesName("Inteleon VSTAR"), "Inteleon");
+  assert.equal(speciesName("Staraptor"), "Staraptor");
+  assert.equal(speciesName("Starmie GX"), "Starmie");
+  assert.notEqual(speciesName("Pyroar BREAK"), "BREAK");
 });
 
 check("committed schedule is a priced, mixed year", () => {
@@ -307,6 +336,61 @@ check("committed schedule is a priced, mixed year", () => {
   assert.equal(opening.n, 1);
   assert.equal(pickDrop(data, addDays(data.epoch, 11)).n, 12);
   assert.equal(pickDrop(data, data.epoch).card.id, opening.card.id);
+});
+
+check("a shared snapshot is the answer until the day starts", () => {
+  const today = "2026-10-21";
+  const data = {
+    v: 1,
+    tz: "America/New_York",
+    epoch: today,
+    days: ["card-a", "card-b", "card-c", "card-d"],
+    pool: [
+      { id: "card-a", name: "A", price: 2, source: "tcgplayer", variant: "normal", printing: "Normal" },
+      { id: "card-b", name: "B", price: 3, source: "tcgplayer", variant: "normal", printing: "Normal" },
+      { id: "card-c", name: "C", price: 4, source: "tcgplayer", variant: "holofoil", printing: "Holofoil" },
+      { id: "card-d", name: "D", price: 5, source: "tcgplayer", variant: "normal", printing: "Normal" }
+    ],
+    quotes: {
+      "2026-10-21": { id: "card-a", price: 2.25, variant: "normal", printing: "Normal", alts: 1, source: "tcgplayer", at: "yesterday" },
+      "2026-10-22": { id: "card-b", price: 9.5, variant: "reverseHolofoil", printing: "Reverse Holofoil", alts: 2, eur: 8, source: "tcgplayer", at: "yesterday" }
+    }
+  };
+  const todayQuote = data.quotes["2026-10-21"];
+  const tomorrowQuote = data.quotes["2026-10-22"];
+  const snap = snapshotQuote(data, "2026-10-22");
+  assert.equal(snap.snapshot, true);
+  assert.equal(snap.price, 9.5);
+  assert.equal(snap.variant, "reverseHolofoil");
+  assert.notEqual(snap.price, data.pool[1].price);
+  assert.equal(snapshotQuote(data, "2026-10-23"), null);
+  const wrong = snapshotQuote({ ...data, quotes: { "2026-10-22": { ...tomorrowQuote, id: "card-z" } } }, "2026-10-22");
+  assert.equal(wrong, null);
+  const open = quoteForPlay(data, "2026-10-22", { locked: false, guesses: [], price: 0 });
+  assert.equal(open.price, 9.5);
+  assert.equal(open.snapshot, true);
+  const started = quoteForPlay(data, "2026-10-22", {
+    id: "card-b", locked: true, guesses: [4], price: 3.1, variant: "normal", printing: "Normal", live: true
+  });
+  assert.equal(started.locked, true);
+  assert.equal(started.price, 3.1);
+  assert.equal(started.snapshot, false);
+  const merged = mergeQuotes(data.quotes, today, {
+    "2026-10-20": { id: "card-a", price: 99, variant: "holofoil", printing: "Holofoil", alts: 1, source: "tcgplayer" },
+    "2026-10-21": { id: "card-a", price: 88, variant: "holofoil", printing: "Holofoil", alts: 3, source: "tcgplayer", at: "now" },
+    "2026-10-22": { id: "card-b", price: 9.5, variant: "reverseHolofoil", printing: "Reverse Holofoil", alts: 2, eur: 8, source: "tcgplayer", at: "now" },
+    "2026-10-23": { id: "card-c", price: 11.25, variant: "holofoil", printing: "Holofoil", alts: 2, source: "tcgplayer", at: "now" },
+    "2026-10-24": { id: "card-d", price: 40, variant: "normal", printing: "Normal", alts: 1, source: "tcgplayer", at: "now" }
+  });
+  assert.equal(merged["2026-10-21"], todayQuote);
+  assert.equal(merged["2026-10-21"].price, 2.25);
+  assert.equal(merged["2026-10-22"], tomorrowQuote);
+  assert.equal(merged["2026-10-23"].price, 11.25);
+  assert.equal(merged["2026-10-23"].id, "card-c");
+  assert.equal(merged["2026-10-24"], undefined);
+  assert.equal(merged["2026-10-20"], undefined);
+  assert.equal(data.pool[0].price, 2);
+  assert.equal(quoteForPlay(data, "2026-10-23", null), null);
 });
 
 console.log("daily tests passed");
