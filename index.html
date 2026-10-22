@@ -1707,6 +1707,12 @@ function shownMoney(card){
   const amount = usdOf(card);
   return amount ? { amount, currency:"USD" } : null;
 }
+function printingMoney(card, variant){
+  if (settings.currency === "EUR") return shownMoney(card);
+  const v = variant === undefined ? selectedVariant(card) : variant;
+  if (v && pos(v.market)) return { amount:v.market, currency:"USD" };
+  return shownMoney(card);
+}
 function valueOf(list){
   const nums = list.map(usdOf).filter(Boolean);
   if (!nums.length) return null;
@@ -2801,7 +2807,7 @@ function paintCaption(){
   const top = [...deck.querySelectorAll(".card")].reverse().find(el => el.card && !el.classList.contains("leaving"));
   if (!top) { row.hidden = true; paintDeckSummary(null); return; }
   const card = top.card;
-  const shown = shownMoney(card);
+  const shown = printingMoney(card);
   row.hidden = false;
   document.getElementById("capName").textContent = card.name || "Card";
   document.getElementById("capSub").textContent = [card.set, card.number ? "#" + card.number : "", card.rarity].filter(Boolean).join(" · ");
@@ -4943,7 +4949,7 @@ function renderSummary(card){
   shell.classList.remove("no-profile");
   profileEl.removeAttribute("aria-modal");
   const variant = selectedVariant(card);
-  const shown = settings.currency === "EUR" ? shownMoney(card) : (variant && pos(variant.market) ? { amount:variant.market, currency:"USD" } : shownMoney(card));
+  const shown = printingMoney(card, variant);
   const rawSeries = priceSeries(card);
   const thinTrend = rawSeries.source === "trend" && !rawSeries.pendingFx && trendIsThin(rawSeries.points);
   const series = thinTrend ? { points:[], source:"", currency:"USD" } : rawSeries;
@@ -4982,7 +4988,7 @@ function renderSummary(card){
   </div>`;
   const thumb = document.getElementById("summaryThumb");
   if (thumb) paintArt(thumb, card);
-  profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => { variantChoice.set(card.id, btn.dataset.variant); summaryId = ""; renderSummary(card); });
+  profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => { variantChoice.set(card.id, btn.dataset.variant); summaryId = ""; renderSummary(card); summaryId = card.id; paintCaption(); });
   profileEl.querySelectorAll("[data-range]").forEach(btn => btn.onclick = () => { chartRange = btn.dataset.range; summaryId = ""; renderSummary(card); });
   const full = document.getElementById("openFullProfile");
   if (full) full.onclick = () => openProfile(card);
@@ -5056,7 +5062,7 @@ function syncProfilePane(){
 function renderProfile(card){
   profileCard = card;
   const variant = selectedVariant(card);
-  const shown = settings.currency === "EUR" ? shownMoney(card) : (variant && pos(variant.market) ? { amount:variant.market, currency:"USD" } : shownMoney(card));
+  const shown = printingMoney(card, variant);
   const rawSeries = priceSeries(card);
   const thinTrend = rawSeries.source === "trend" && !rawSeries.pendingFx && trendIsThin(rawSeries.points);
   const series = thinTrend ? { points:[], source:"", currency:"USD" } : rawSeries;
@@ -5117,7 +5123,7 @@ function renderProfile(card){
   const thumb = document.getElementById("profileThumb");
   paintArt(thumb, card);
   document.getElementById("closeProfile").onclick = closeProfile;
-  profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => { variantChoice.set(card.id, btn.dataset.variant); renderProfile(card); });
+  profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => { variantChoice.set(card.id, btn.dataset.variant); renderProfile(card); paintCaption(); });
   profileEl.querySelectorAll("[data-range]").forEach(btn => btn.onclick = () => { chartRange = btn.dataset.range; renderProfile(card); });
   profileEl.querySelectorAll("[data-compare]").forEach(btn => btn.onclick = () => { compareGrade = btn.dataset.compare; renderProfile(card); });
   if (series.pendingFx) ensureFx().then(rate => { if (rate && profileCard && profileCard.id === card.id) renderProfile(cardCache.get(card.id) || card); });
