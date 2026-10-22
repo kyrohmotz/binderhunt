@@ -1,6 +1,11 @@
-/* BinderHunt service worker. Bump VERSION when the caching strategy changes.
-   Any edit to this file is a new deploy: skipWaiting lets it take over,
-   and the page asks before it reloads. */
+/* BinderHunt service worker.
+   VERSION only names the caches. Bump it when the caching strategy changes
+   so activate can drop the previous caches. Shell files are network-first,
+   and a navigation falls back to the cached shell after a short timeout,
+   so a deploy still reaches people when VERSION was not bumped alongside
+   index.html, js, or css. Any change to this file is a new worker: it
+   calls skipWaiting immediately and takes over, and the page asks before
+   it reloads. */
 const VERSION = "bh-1";
 const SHELL = "bh-shell-" + VERSION;
 const DATA = "bh-data-" + VERSION;
@@ -31,28 +36,65 @@ const SHELL_FILES = [
 ];
 
 const KEEP = new Set([SHELL, DATA, IMG, API]);
+const NAV_TIMEOUT = 4000;
 let forceOffline = false;
 
+function withTimeout(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout")), ms);
+    promise.then(value => {
+      clearTimeout(timer);
+      resolve(value);
+    }, error => {
+      clearTimeout(timer);
+      reject(error);
+    });
+  });
+}
+
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(SHELL).then(cache => cache.addAll(SHELL_FILES)).then(() => self.skipWaiting()));
+  // Call skipWaiting before any await. Gating it on a finished precache left
+  // the worker in waiting when one shell file hung, and the next navigation
+  // never finished.
+  self.skipWaiting();
+  event.waitUntil(precacheShell());
 });
+
+async function precacheShell() {
+  let cache;
+  try { cache = await caches.open(SHELL); }
+  catch (e) { return; }
+  await Promise.all(SHELL_FILES.map(async path => {
+    try {
+      const url = new URL(path, self.registration.scope);
+      const response = await withTimeout(fetch(url, { cache: "no-store" }), NAV_TIMEOUT);
+      if (!good(response)) return;
+      await cache.put(url, await materialize(response));
+    } catch (e) {}
+  }));
+}
 
 self.addEventListener("activate", event => {
   event.waitUntil((async () => {
-    const names = await caches.keys();
-    await Promise.all(names.filter(name => name.startsWith("bh-") && !KEEP.has(name)).map(name => caches.delete(name)));
-    await purgeUnusable();
+    try {
+      const names = await caches.keys();
+      await Promise.all(names.filter(name => name.startsWith("bh-") && !KEEP.has(name)).map(name => caches.delete(name)));
+      await purgeUnusable();
+    } catch (e) {}
     await self.clients.claim();
-    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    for (const client of windows) client.postMessage({ type: "bh-updated", version: VERSION, gen: self.__BH_GEN || 1 });
   })());
 });
 
 self.addEventListener("message", event => {
-  if (event.data === "bh-offline") { forceOffline = true; return; }
-  if (event.data === "bh-online") { forceOffline = false; return; }
-  if (event.data !== "bh-version") return;
-  const payload = { version: VERSION, gen: self.__BH_GEN || 1 };
+  const data = event.data;
+  if (data === "SKIP_WAITING" || (data && data.type === "SKIP_WAITING")) {
+    self.skipWaiting();
+    return;
+  }
+  if (data === "bh-offline") { forceOffline = true; return; }
+  if (data === "bh-online") { forceOffline = false; return; }
+  if (data !== "bh-version") return;
+  const payload = { version: VERSION };
   const port = event.ports && event.ports[0];
   if (port) port.postMessage(payload);
   else if (event.source) event.source.postMessage(payload);
@@ -165,10 +207,10 @@ async function cached(cacheName, request) {
   return null;
 }
 
-async function networkFirst(cacheName, request, cap) {
+async function networkFirst(cacheName, request, cap, timeoutMs) {
   if (!offlineNow()) {
     try {
-      const response = await fetch(request);
+      const response = timeoutMs ? await withTimeout(fetch(request), timeoutMs) : await fetch(request);
       if (good(response)) {
         await putLimited(cacheName, request, response.clone(), cap || 0);
         return response;
@@ -182,27 +224,46 @@ async function networkFirst(cacheName, request, cap) {
   return new Response("offline", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
 }
 
-async function navigation(request) {
+function offlineDocument() {
+  return new Response("<!doctype html><title>BinderHunt</title><p>You're offline. The hunt will be here when you reconnect.</p>", {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" }
+  });
+}
+
+async function cachedShell(request) {
+  try {
+    const cache = await caches.open(SHELL);
+    const exact = await cache.match(request, { ignoreSearch: true });
+    if (exact && good(exact)) return exact;
+    const shell = await cache.match(new URL("index.html", self.registration.scope));
+    if (shell && good(shell)) return shell;
+  } catch (e) {}
+  return null;
+}
+
+async function navigation(event, request) {
   if (!offlineNow()) {
     try {
-      const response = await fetch(request);
+      const response = await withTimeout(fetch(request), NAV_TIMEOUT);
       if (good(response)) {
-        const cache = await caches.open(SHELL);
+        const copy = response.clone();
         try {
-          const copy = await materialize(response);
-          await cache.put(request, copy.clone());
-          await cache.put(new URL("index.html", self.registration.scope), copy);
+          event.waitUntil((async () => {
+            try {
+              const cache = await caches.open(SHELL);
+              const body = await materialize(copy);
+              await cache.put(request, body.clone());
+              await cache.put(new URL("index.html", self.registration.scope), body);
+            } catch (e) {}
+          })());
         } catch (e) {}
         return response;
       }
+      return (await cachedShell(request)) || response || offlineDocument();
     } catch (e) {}
   }
-  const cache = await caches.open(SHELL);
-  const exact = await cache.match(request, { ignoreSearch: true });
-  if (exact && good(exact)) return exact;
-  const shell = await cache.match(new URL("index.html", self.registration.scope));
-  if (shell && good(shell)) return shell;
-  return new Response("Offline", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  return (await cachedShell(request)) || offlineDocument();
 }
 
 async function staleWhileRevalidate(request) {
@@ -264,7 +325,7 @@ self.addEventListener("fetch", event => {
   if (sameOrigin(url) && relPath(url) === "sw.js") return;
 
   if (request.mode === "navigate") {
-    event.respondWith(navigation(request).catch(() => new Response("Offline", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } })));
+    event.respondWith(navigation(event, request).catch(() => offlineDocument()));
     return;
   }
   if (isData(url)) {
@@ -272,7 +333,7 @@ self.addEventListener("fetch", event => {
     return;
   }
   if (isShell(url)) {
-    event.respondWith(networkFirst(SHELL, request, 0).catch(() => cached(SHELL, request).then(hit => hit || new Response("Offline", { status: 503 }))));
+    event.respondWith(networkFirst(SHELL, request, 0, NAV_TIMEOUT).catch(() => cached(SHELL, request).then(hit => hit || new Response("Offline", { status: 503, headers: { "Cache-Control": "no-store" } }))));
     return;
   }
   if (isCardImage(url)) {

@@ -5721,35 +5721,31 @@ function bootPwa(){
   window.addEventListener("appinstalled", () => { deferredInstall = null; dismissInstall(); });
   maybeInstallHint();
   if (!("serviceWorker" in navigator)) return;
-  let currentGen = 0;
-  try { currentGen = Number(sessionStorage.getItem("bh.sw.gen") || "0") || 0; } catch (e) {}
-  const noteGen = gen => {
-    gen = Number(gen) || 0;
-    if (!gen) return;
-    const prev = currentGen;
-    currentGen = gen;
-    try { sessionStorage.setItem("bh.sw.gen", String(gen)); } catch (e) {}
-    if (prev && gen !== prev) showUpdateToast();
+  // Toast only when a worker replaces one that was already controlling this
+  // page. The first claim, on a fresh visit, has nothing to refresh.
+  let hadController = !!navigator.serviceWorker.controller;
+  const askSkip = worker => {
+    try { if (worker) worker.postMessage("SKIP_WAITING"); } catch (e) {}
   };
-  const askGen = sw => new Promise(resolve => {
-    const channel = new MessageChannel();
-    const timer = setTimeout(() => resolve(0), 1500);
-    channel.port1.onmessage = event => { clearTimeout(timer); resolve(event.data && event.data.gen || 0); };
-    try { sw.postMessage("bh-version", [channel.port2]); }
-    catch (e) { clearTimeout(timer); resolve(0); }
-  });
-  navigator.serviceWorker.addEventListener("message", event => {
-    if (event.data && event.data.type === "bh-updated") noteGen(event.data.gen);
-  });
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    const sw = navigator.serviceWorker.controller;
-    if (sw) askGen(sw).then(noteGen);
+    tell();
+    if (hadController) showUpdateToast();
+    hadController = true;
   });
   navigator.serviceWorker.register("sw.js", { scope: "./", updateViaCache: "none" }).then(reg => {
-    if (reg.active) askGen(reg.active).then(noteGen);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") reg.update().catch(() => {});
+    reg.addEventListener("updatefound", () => {
+      const worker = reg.installing;
+      if (!worker) return;
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "installed") askSkip(worker);
+      });
     });
+    askSkip(reg.waiting);
+    const look = () => { reg.update().catch(() => {}); };
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") look();
+    });
+    setInterval(look, 30 * 60 * 1000);
   }).catch(() => {});
 }
 restart();

@@ -37,8 +37,23 @@ const TYPES = {
   ".svg": "image/svg+xml"
 };
 
-let swGen = 1;
+let swVersion = null;
+let stallShell = false;
+let stallNav = false;
+const hung = new Set();
 const server = http.createServer((req, res) => {
+  const fetchMode = req.headers["sec-fetch-mode"];
+  const fetchDest = req.headers["sec-fetch-dest"];
+  if (stallNav && (fetchMode === "navigate" || fetchDest === "document")) {
+    hung.add(res);
+    setTimeout(() => {
+      hung.delete(res);
+      if (res.writableEnded) return;
+      res.writeHead(504, { "Content-Type": "text/plain", "Cache-Control": "no-store" });
+      res.end("navigation stalled");
+    }, 20000);
+    return;
+  }
   const url = new URL(req.url, "http://127.0.0.1");
   let pathname = decodeURIComponent(url.pathname);
   if (pathname === "/binderhunt") pathname = "/binderhunt/";
@@ -55,6 +70,10 @@ const server = http.createServer((req, res) => {
     res.end("forbidden");
     return;
   }
+  if (stallShell && rel === "fonts/fraunces-500.woff2") {
+    hung.add(res);
+    return;
+  }
   if (!existsSync(file) || !statSync(file).isFile()) {
     res.writeHead(404, { "Content-Type": "text/plain" });
     res.end("missing");
@@ -66,8 +85,17 @@ const server = http.createServer((req, res) => {
     "Content-Type": TYPES[ext] || "application/octet-stream",
     "Cache-Control": rel === "sw.js" ? "no-store" : "no-cache"
   };
-  if (rel === "sw.js") {
-    body = Buffer.concat([body, Buffer.from("\nself.__BH_GEN = " + swGen + ";\n")]);
+  if (rel === "sw.js" && swVersion) {
+    let text = body.toString("utf8");
+    const marker = 'const VERSION = "bh-1"';
+    if (!text.includes(marker)) {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("sw.js VERSION marker missing");
+      return;
+    }
+    text = text.replace(marker, 'const VERSION = "' + swVersion + '"');
+    text += "\n/* deployed " + swVersion + " */\n";
+    body = Buffer.from(text);
   }
   res.writeHead(200, headers);
   res.end(body);
@@ -105,7 +133,16 @@ const origin = "http://127.0.0.1:" + PORT;
 const home = origin + "/binderhunt/";
 
 let browser;
+function releaseHung() {
+  stallShell = false;
+  stallNav = false;
+  for (const res of hung) {
+    try { res.destroy(); } catch (e) {}
+  }
+  hung.clear();
+}
 function shutdown(code) {
+  releaseHung();
   return (browser ? browser.close().catch(() => {}) : Promise.resolve()).finally(() => {
     server.close();
     process.exit(code);
@@ -144,6 +181,13 @@ try {
   note(/const IMG_CAP = 300/.test(sw) && /keys\.length - cap/.test(sw), "image cache is capped at about 300");
   note(/type !== "opaque"/.test(sw) && /response\.ok/.test(sw), "error and opaque responses are not stored");
   note(/skipWaiting\(/.test(sw) && /New version, tap to refresh/.test(html), "skipWaiting plus the refresh toast");
+  const install = sw.slice(sw.indexOf('addEventListener("install"'), sw.indexOf('addEventListener("activate"'));
+  note(install.includes("self.skipWaiting()") && install.indexOf("self.skipWaiting()") < install.indexOf("event.waitUntil"), "skipWaiting runs at the start of install");
+  note(!sw.includes("addAll") && install.includes("precacheShell"), "one failed shell fetch cannot reject install");
+  note(/const NAV_TIMEOUT = 4000/.test(sw) && /withTimeout\(fetch\(request\), NAV_TIMEOUT\)/.test(sw), "navigations time out and fall back to the cached shell");
+  note(sw.includes("clients.claim()") && sw.includes("SKIP_WAITING"), "activate claims clients and a waiting worker can be skipped");
+  note(!/__BH_GEN|bh\.sw\.gen/.test(html + "\n" + sw), "update flow does not depend on a generation counter");
+  note(html.includes('postMessage("SKIP_WAITING")') && html.includes("controllerchange") && /setInterval\(look, 30 \* 60 \* 1000\)/.test(html), "toast follows a real controller change and open tabs check for deploys");
   note(sw.includes("async function staleWhileRevalidate") && sw.includes("isData(url)"), "data JSON uses stale-while-revalidate");
 
   const manifestRes = await fetch(home + "manifest.webmanifest");
@@ -375,8 +419,58 @@ try {
   note(!offlineErrors.length, "no console errors on offline reload", offlineErrors.slice(0, 6).join(" | "));
   await shot(page, "screenshot_pwa_offline_390");
 
-  // Standalone safe area at 390x844.
+  // install, reload, offline, reload, back online, then a new sw.js.
+  // One shell file never answers. A navigation is stalled for 20s. The next
+  // worker must not stay waiting, and a tap must finish the reload.
   await context.setOffline(false);
+  note(await page.locator("#updateToast").isHidden(), "toast stays hidden until a new service worker takes over");
+  stallShell = true;
+  swVersion = "bh-2";
+  await page.evaluate(async () => {
+    const reg = await navigator.serviceWorker.getRegistration();
+    await reg.update();
+  });
+  await page.waitForSelector("#updateToast:not([hidden])", { timeout: 20000 });
+  const workerState = await page.evaluate(async () => {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const version = await new Promise(resolve => {
+      const channel = new MessageChannel();
+      const timer = setTimeout(() => resolve(null), 4000);
+      channel.port1.onmessage = event => { clearTimeout(timer); resolve(event.data); };
+      const sw = navigator.serviceWorker.controller;
+      if (!sw) { clearTimeout(timer); resolve(null); return; }
+      sw.postMessage("bh-version", [channel.port2]);
+    });
+    return { waiting: !!(reg && reg.waiting), installing: !!(reg && reg.installing), version };
+  });
+  note(!workerState.waiting, "new service worker does not stay waiting", JSON.stringify(workerState));
+  note(workerState.version && workerState.version.version === "bh-2" && workerState.version.gen == null, "plain VERSION bump took over without a generation counter", JSON.stringify(workerState.version));
+  const toast = await page.locator("#updateToast").innerText();
+  note(/New version, tap to refresh/.test(toast), "update toast copy", toast);
+  await shot(page, "screenshot_pwa_update_toast_390");
+  stallNav = true;
+  await page.evaluate(() => { window.__bhReloadMark = 1; });
+  const started = Date.now();
+  const loaded = page.waitForFunction(() => !window.__bhReloadMark, null, { timeout: 12000 });
+  await page.click("#updateRefresh", { noWaitAfter: true });
+  await loaded;
+  const elapsed = Date.now() - started;
+  console.log("reload-after-offline", elapsed + "ms");
+  note(elapsed < 10000, "reload finishes after the offline visit", elapsed + "ms");
+  await page.locator("#updateToast").waitFor({ state: "attached", timeout: 10000 });
+  note(await page.locator("#updateToast").isHidden(), "toast clears after refresh");
+  const refreshed = await page.evaluate(() => new Promise(resolve => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => resolve(null), 4000);
+    channel.port1.onmessage = event => { clearTimeout(timer); resolve(event.data); };
+    const sw = navigator.serviceWorker.controller;
+    if (!sw) { clearTimeout(timer); resolve(null); return; }
+    sw.postMessage("bh-version", [channel.port2]);
+  }));
+  note(refreshed && refreshed.version === "bh-2", "tap loads the new build", JSON.stringify(refreshed));
+  releaseHung();
+
+  // Standalone safe area at 390x844.
   const client = await context.newCDPSession(page);
   await client.send("Emulation.setEmulatedMedia", { features: [{ name: "display-mode", value: "standalone" }] });
   let insetOk = false;
@@ -427,29 +521,7 @@ try {
     note(/safe-area-inset-top/.test(css) && /safe-area-inset-bottom/.test(css), "standalone CSS uses safe-area insets", insetDetail);
   }
 
-  // A new service worker reaches the open page as a toast, then a refresh.
   await client.send("Emulation.setEmulatedMedia", { features: [{ name: "display-mode", value: "" }] }).catch(() => {});
-  swGen = 2;
-  const updated = await page.evaluate(async () => {
-    const reg = await navigator.serviceWorker.getRegistration();
-    await reg.update();
-    return true;
-  });
-  note(updated, "registration.update() ran");
-  await page.waitForSelector("#updateToast:not([hidden])", { timeout: 15000 });
-  const toast = await page.locator("#updateToast").innerText();
-  note(/New version, tap to refresh/.test(toast), "update toast copy", toast);
-  await shot(page, "screenshot_pwa_update_toast_390");
-  await page.click("#updateRefresh");
-  await page.waitForLoadState("domcontentloaded");
-  await page.waitForFunction(() => navigator.serviceWorker.controller);
-  const gen = await page.evaluate(() => new Promise(resolve => {
-    const channel = new MessageChannel();
-    const timer = setTimeout(() => resolve(null), 4000);
-    channel.port1.onmessage = event => { clearTimeout(timer); resolve(event.data); };
-    navigator.serviceWorker.controller.postMessage("bh-version", [channel.port2]);
-  }));
-  note(gen && gen.gen === 2 && gen.version === "bh-1", "refreshed page is on the new service worker", JSON.stringify(gen));
   const scrydexHits = requests.filter(url => /scrydex\.com/i.test(url) && !url.includes("/binderhunt/data/scrydex.json"));
   note(!scrydexHits.length, "no Scrydex network calls", scrydexHits.slice(0, 3).join(" "));
 
