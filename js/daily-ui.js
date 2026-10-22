@@ -372,8 +372,12 @@
           if (at != null) input.setSelectionRange(Math.min(at, draft.text.length), Math.min(at, draft.text.length));
         }
         const parsed = D.parseGuess(input.value);
-        if (parsed.ok || !draft.message) clearGuessError();
-        else showGuessError(draft.message);
+        /* Clear only when this value parses, or the field was wiped mid-edit.
+           "0" and "0.00" are well-formed digits, so readGuess has no message,
+           but they are still "above zero" and must keep that error. */
+        const empty = String(input.value ?? "").trim() === "";
+        if (empty || parsed.ok) clearGuessError();
+        else showGuessError(parsed.message);
       });
       if (document.getElementById("viewDaily") && !document.getElementById("viewDaily").hidden) input.focus();
     }

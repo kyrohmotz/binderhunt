@@ -237,6 +237,12 @@ check("rejected guesses say what was wrong", () => {
   assert.equal(parseGuess(".").reason, "invalid");
   assert.equal(parseGuess("0").reason, "low");
   assert.match(parseGuess("0").message, /above zero/);
+  assert.equal(parseGuess("0.00").reason, "low");
+  assert.match(parseGuess("0.00").message, /above zero/);
+  assert.equal(readGuess("0").message, "");
+  assert.match(parseGuess(readGuess("0").text).message, /above zero/);
+  assert.equal(readGuess("0.00").message, "");
+  assert.match(parseGuess("-").message, /isn't a price/);
   assert.equal(parseGuess("").reason, "low");
   assert.equal(parseGuess("1000001").reason, "high");
   assert.match(parseGuess("1000001").message, /too high/);

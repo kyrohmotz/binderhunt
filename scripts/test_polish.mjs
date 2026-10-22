@@ -1,10 +1,12 @@
 // Regression checks for the daily and price polish:
-// 1. A "nope" guess error clears once the field becomes a valid price like .5,
-//    and .5 still parses as 0.50. Checked at 390x844 and 1440x900.
+// 1. Guess errors follow the current field. "0" and "0.00" keep
+//    "Enter a price above zero." "-" and "nope" keep "That isn't a price."
+//    ".5" parses as 0.50 and clears the error. An emptied field clears it.
+//    Checked at 390x844 and 1440x900.
 // 2. Morpeko V-UNION (and the other V-UNION names) resolve to the Pokémon,
 //    the same way BREAK and the other suffixes already do.
-// 3. On the desktop Daily panel, the streak stays put while the price line
-//    still says sealed, then updates after the reveal finishes.
+// 3. The Daily streak stays put while the price line still says sealed, then
+//    updates after the 720ms reveal. Same hold at 390x844 and 1440x900.
 // 4. Hisuian Zoroark shows its TCGplayer market. That price is on the printing,
 //    not the card record. A card with no market still shows the same em dash
 //    as any other unpriced card.
@@ -120,27 +122,55 @@ async function checkGuess(width) {
   const snap = await page.evaluate(() => {
     const input = document.getElementById("dailyGuess");
     const err = () => document.getElementById("dailyError");
-    input.value = "nope";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    const blocked = err();
-    const whileNope = { hidden: !blocked || blocked.hidden, text: blocked ? blocked.textContent : "" };
-    input.value = ".5";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    const after = err();
-    const parsed = BinderDaily.parseGuess(input.value);
-    return {
-      value: input.value,
-      whileNope,
-      hidden: !after || after.hidden,
-      text: after ? after.textContent : "",
-      parsed: parsed.value,
-      ok: parsed.ok
+    const read = () => {
+      const node = err();
+      const parsed = BinderDaily.parseGuess(input.value);
+      return {
+        value: input.value,
+        hidden: !node || node.hidden,
+        text: node ? node.textContent : "",
+        ok: parsed.ok,
+        parsed: parsed.value,
+        message: parsed.message
+      };
     };
+    const type = (value) => {
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      return read();
+    };
+    const zero = type("0");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    const zeroAgain = read();
+    const zeroCents = type("0.00");
+    document.getElementById("dailyForm").requestSubmit();
+    const submitted = read();
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    const submittedAgain = read();
+    const dash = type("-");
+    const nope = type("nope");
+    const half = type(".5");
+    const wiped = type("");
+    type("0");
+    const cleared = type("");
+    return { zero, zeroAgain, zeroCents, submitted, submittedAgain, dash, nope, half, wiped, cleared };
   });
   console.log(width, "guess", JSON.stringify(snap));
-  note(snap.whileNope.hidden === false && /isn't a price/.test(snap.whileNope.text), width + " nope shows the price error", JSON.stringify(snap.whileNope));
-  note(snap.value === ".5" && snap.ok && snap.parsed === 0.5, width + " .5 parses as 0.50", JSON.stringify(snap));
-  note(snap.hidden === true && snap.text === "", width + " editing to .5 clears the nope error", JSON.stringify(snap));
+  const above = (row, label) => {
+    note(row.hidden === false && /above zero/.test(row.text) && row.ok === false, width + " " + label + " keeps the above-zero error", JSON.stringify(row));
+    note(row.message === row.text, width + " " + label + " error matches what that value parses to", JSON.stringify(row));
+  };
+  above(snap.zero, "0");
+  above(snap.zeroAgain, "0 still");
+  above(snap.zeroCents, "0.00");
+  above(snap.submitted, "submitting 0.00");
+  above(snap.submittedAgain, "0.00 after submit");
+  note(snap.dash.value === "-" && snap.dash.hidden === false && /isn't a price/.test(snap.dash.text), width + " - stays an invalid price", JSON.stringify(snap.dash));
+  note(snap.nope.value === "nope" && snap.nope.hidden === false && /isn't a price/.test(snap.nope.text), width + " nope shows the price error", JSON.stringify(snap.nope));
+  note(snap.half.value === ".5" && snap.half.ok && snap.half.parsed === 0.5, width + " .5 parses as 0.50", JSON.stringify(snap.half));
+  note(snap.half.hidden === true && snap.half.text === "", width + " editing to .5 clears the error", JSON.stringify(snap.half));
+  note(snap.wiped.value === "" && snap.wiped.hidden === true && snap.wiped.text === "", width + " emptying the field clears the error", JSON.stringify(snap.wiped));
+  note(snap.cleared.hidden === true && snap.cleared.text === "", width + " wiping a zero clears the above-zero error", JSON.stringify(snap.cleared));
 }
 
 await checkGuess(1440);
@@ -162,68 +192,92 @@ species.forEach(row => {
   note(row.species !== "V-UNION" && row.species !== "UNION", row.name + " is not the suffix");
 });
 
-await page.setViewportSize({ width: 1440, height: 900 });
-await page.evaluate(() => showTab("daily"));
-await page.waitForSelector("#dailyGuess");
-const answer = await page.evaluate(async () => {
-  const data = await (await fetch("data/daily.json", { cache: "no-store" })).json();
-  const iso = BinderDaily.nyDateISO(new Date());
-  const quote = BinderDaily.quoteForPlay(data, iso, null);
-  const drop = BinderDaily.pickDrop(data, iso);
-  return { price: (quote && quote.price) || (drop && drop.card && drop.card.price), name: drop && drop.card && drop.card.name };
-});
-console.log("answer", JSON.stringify(answer));
-note(answer.price > 0, "today's drop has a price", JSON.stringify(answer));
-await page.evaluate(async (amount) => {
-  const before = dailySideModel().streak;
-  window.__streakBefore = before;
-  document.getElementById("dailyGuess").value = String(amount);
-  document.getElementById("dailyForm").requestSubmit();
-  const start = Date.now();
-  while (document.getElementById("dailyForm") && Date.now() - start < 8000) {
-    await new Promise(r => setTimeout(r, 20));
-  }
-}, answer.price);
-const mid = await page.evaluate(() => {
-  const model = dailySideModel();
-  const side = document.querySelector("[data-side='daily']");
-  const pageStreak = document.querySelector("#dailyScroll .daily-streak b");
-  const ticket = document.querySelector("#priceTicket .ticket-front");
-  return {
-    before: window.__streakBefore,
-    sideStreak: model.streak,
-    best: model.best,
-    done: model.done,
-    pageStreak: pageStreak ? pageStreak.textContent : "",
-    side: side ? side.innerText.replace(/\s+/g, " ") : "",
-    front: ticket ? ticket.textContent.replace(/\s+/g, " ") : ""
-  };
-});
-console.log("mid-reveal", JSON.stringify(mid));
-note(mid.before === 4, "streak started at 4", String(mid.before));
-note(mid.done === false, "desktop price stays sealed during the reveal", mid.side);
-note(/sealed/i.test(mid.side) || /sealed/i.test(mid.front), "price line still says sealed", mid.side + " | " + mid.front);
-note(mid.sideStreak === 4 && mid.pageStreak === "4", "streak waits for the reveal", JSON.stringify(mid));
-await sleep(900);
-const later = await page.evaluate(() => {
-  const model = dailySideModel();
-  const side = document.querySelector("[data-side='daily']");
-  const pageStreak = document.querySelector("#dailyScroll .daily-streak b");
-  const price = side ? side.querySelector(".market-price") : null;
-  return {
-    sideStreak: model.streak,
-    best: model.best,
-    done: model.done,
-    pageStreak: pageStreak ? pageStreak.textContent : "",
-    price: price ? price.textContent.trim() : "",
-    side: side ? side.innerText.replace(/\s+/g, " ") : ""
-  };
-});
-console.log("revealed", JSON.stringify(later));
-note(later.done === true && later.sideStreak === 5 && later.best === 5, "streak updates after the reveal", JSON.stringify(later));
-note(later.pageStreak === "5", "daily streak updates after the reveal", later.pageStreak);
-note(later.price && later.price !== "—", "revealed panel shows the price", later.price);
+async function resetDaily() {
+  await page.evaluate(() => {
+    const bag = {};
+    new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()).forEach(part => { bag[part.type] = part.value; });
+    const iso = bag.year + "-" + bag.month + "-" + bag.day;
+    const prev = new Date(Date.UTC(+bag.year, +bag.month - 1, +bag.day) - 86400000);
+    const y = prev.getUTCFullYear() + "-" + String(prev.getUTCMonth() + 1).padStart(2, "0") + "-" + String(prev.getUTCDate()).padStart(2, "0");
+    localStorage.setItem("bh.daily.v1", JSON.stringify({ v: 1, current: 4, best: 4, lastPlayed: y, prompted: iso, days: {} }));
+    renderDaily();
+  });
+  await page.waitForSelector("#dailyGuess");
+}
 
+async function checkStreak(width) {
+  const narrow = width === 390;
+  await page.setViewportSize({ width, height: narrow ? 844 : 900 });
+  await page.evaluate(() => showTab("daily"));
+  await resetDaily();
+  const answer = await page.evaluate(async () => {
+    const data = await (await fetch("data/daily.json", { cache: "no-store" })).json();
+    const iso = BinderDaily.nyDateISO(new Date());
+    const quote = BinderDaily.quoteForPlay(data, iso, null);
+    const drop = BinderDaily.pickDrop(data, iso);
+    return { price: (quote && quote.price) || (drop && drop.card && drop.card.price), name: drop && drop.card && drop.card.name };
+  });
+  console.log(width, "answer", JSON.stringify(answer));
+  note(answer.price > 0, width + " drop has a price", JSON.stringify(answer));
+  await page.evaluate(async (amount) => {
+    const before = dailySideModel().streak;
+    window.__streakBefore = before;
+    document.getElementById("dailyGuess").value = String(amount);
+    document.getElementById("dailyForm").requestSubmit();
+    const start = Date.now();
+    while (document.getElementById("dailyForm") && Date.now() - start < 8000) {
+      await new Promise(r => setTimeout(r, 20));
+    }
+  }, answer.price);
+  const mid = await page.evaluate(() => {
+    const model = dailySideModel();
+    const side = document.querySelector("[data-side='daily']");
+    const pageStreak = document.querySelector("#dailyScroll .daily-streak b");
+    const ticket = document.querySelector("#priceTicket .ticket-front");
+    const profile = document.getElementById("profile");
+    return {
+      before: window.__streakBefore,
+      sideStreak: model.streak,
+      best: model.best,
+      done: model.done,
+      pageStreak: pageStreak ? pageStreak.textContent : "",
+      side: side ? side.innerText.replace(/\s+/g, " ") : "",
+      front: ticket ? ticket.textContent.replace(/\s+/g, " ") : "",
+      profileHidden: !profile || profile.hidden
+    };
+  });
+  console.log(width, "mid-reveal", JSON.stringify(mid));
+  note(mid.before === 4, width + " streak started at 4", String(mid.before));
+  note(mid.done === false, width + " price stays sealed during the reveal", mid.front);
+  note(/sealed/i.test(mid.front), width + " ticket still says sealed", mid.front);
+  note(mid.sideStreak === 4 && mid.pageStreak === "4", width + " streak waits for the reveal", JSON.stringify(mid));
+  if (narrow) note(mid.profileHidden === true, width + " the on-screen streak is the daily counter", JSON.stringify(mid));
+  if (!narrow) note(/sealed/i.test(mid.side), width + " side price line still says sealed", mid.side);
+  await sleep(900);
+  const later = await page.evaluate(() => {
+    const model = dailySideModel();
+    const side = document.querySelector("[data-side='daily']");
+    const pageStreak = document.querySelector("#dailyScroll .daily-streak b");
+    const price = side ? side.querySelector(".market-price") : null;
+    return {
+      sideStreak: model.streak,
+      best: model.best,
+      done: model.done,
+      pageStreak: pageStreak ? pageStreak.textContent : "",
+      price: price ? price.textContent.trim() : "",
+      side: side ? side.innerText.replace(/\s+/g, " ") : ""
+    };
+  });
+  console.log(width, "revealed", JSON.stringify(later));
+  note(later.done === true && later.sideStreak === 5 && later.best === 5, width + " streak updates after the reveal", JSON.stringify(later));
+  note(later.pageStreak === "5", width + " daily streak updates after the reveal", later.pageStreak);
+  if (!narrow) note(later.price && later.price !== "—", width + " revealed panel shows the price", later.price);
+}
+
+await checkStreak(1440);
+await checkStreak(390);
+
+await page.setViewportSize({ width: 1440, height: 900 });
 const priced = await page.evaluate(async () => {
   generation++;
   if (typeof clearHuntWatch === "function") clearHuntWatch();
