@@ -11,6 +11,7 @@
   let shownISO = "";
   let revealTimer = 0;
   let holdAnswer = false;
+  let sealedStreak = null;
   const preview = new Map();
 
   function host() { return window.BHDailyHost || {}; }
@@ -279,11 +280,13 @@
     const day = packed.day;
     const card = cardFor(day, drop);
     const results = resultsFor(day);
-    const streak = D.visibleStreak(state, iso);
     const done = !!day.done;
     const animate = justFinished && done && typeof reduceMotion === "function" && !reduceMotion();
     justFinished = false;
     holdAnswer = !!animate;
+    if (!animate) sealedStreak = null;
+    const liveStreak = D.visibleStreak(state, iso);
+    const streak = animate && sealedStreak ? sealedStreak : liveStreak;
     clearTimeout(revealTimer);
     const guessesLeft = Math.max(0, D.MAX_GUESSES - (day.guesses || []).length);
     const onWish = (host().wish || []).some(item => item && item.id === card.id);
@@ -363,12 +366,18 @@
     if (input) {
       input.addEventListener("input", () => {
         const draft = D.readGuess(input.value);
-        if (draft.message) showGuessError(draft.message);
         if (draft.text !== input.value) {
           const at = input.selectionStart;
           input.value = draft.text;
           if (at != null) input.setSelectionRange(Math.min(at, draft.text.length), Math.min(at, draft.text.length));
         }
+        const parsed = D.parseGuess(input.value);
+        /* Clear only when this value parses, or the field was wiped mid-edit.
+           "0" and "0.00" are well-formed digits, so readGuess has no message,
+           but they are still "above zero" and must keep that error. */
+        const empty = String(input.value ?? "").trim() === "";
+        if (empty || parsed.ok) clearGuessError();
+        else showGuessError(parsed.message);
       });
       if (document.getElementById("viewDaily") && !document.getElementById("viewDaily").hidden) input.focus();
     }
@@ -394,6 +403,11 @@
         if (reveal && reveal.isConnected) reveal.hidden = false;
         showAnswer();
         holdAnswer = false;
+        sealedStreak = null;
+        const live = D.visibleStreak(loadState(), iso);
+        const nums = document.querySelectorAll("#dailyScroll .daily-streak b");
+        if (nums[0] && nums[0].isConnected) nums[0].textContent = String(live.current);
+        if (nums[1] && nums[1].isConnected) nums[1].textContent = String(live.best);
         if (typeof paintSide === "function" && typeof tab !== "undefined" && tab === "daily") paintSide();
       }, 720);
     } else if (done) {
@@ -406,9 +420,17 @@
   function showGuessError(message) {
     const node = document.getElementById("dailyError");
     if (!node) { announce(message); return; }
+    const same = !node.hidden && node.textContent === message;
     node.hidden = false;
     node.textContent = message;
-    announce(message);
+    if (!same) announce(message);
+  }
+
+  function clearGuessError() {
+    const node = document.getElementById("dailyError");
+    if (!node) return;
+    node.hidden = true;
+    node.textContent = "";
   }
 
   async function submitGuess(event, data, iso) {
@@ -446,6 +468,7 @@
       if (typeof countEvent === "function") countEvent("daily-play");
     }
     if (finished) {
+      sealedStreak = D.visibleStreak(state, iso);
       day.done = true;
       day.solved = result.band === "hit";
       const streak = D.applyStreak(state, iso);
@@ -610,7 +633,8 @@
   window.dailySideModel = function () {
     const iso = todayISO();
     const state = loadState();
-    const streak = D.visibleStreak(state, iso);
+    const liveStreak = D.visibleStreak(state, iso);
+    const streak = holdAnswer && sealedStreak ? sealedStreak : liveStreak;
     const countdown = D.formatRemain(D.msUntilNextNyDay(new Date()));
     const base = { ready: !!cache, empty: false, n: 0, streak: streak.current, best: streak.best, countdown, done: false, solved: false, guesses: 0, price: 0 };
     if (!cache) return base;

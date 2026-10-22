@@ -25,11 +25,16 @@
 //    inert while Today's Drop or the Daily view is open.
 // 7. A desktop deep link (?card=base1-4) keeps that profile pinned after the
 //    hunt deck loads. One Skip then replaces it with the new top card.
+//    #deck is not read until that element is in the document. Each run gets
+//    its own Chrome profile and debugging port, so another browser cannot
+//    answer the probe.
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import net from "node:net";
 
 if (typeof WebSocket !== "function") {
   throw new Error("test_owned_regressions.mjs requires Node.js 22+ (global WebSocket).");
@@ -37,17 +42,30 @@ if (typeof WebSocket !== "function") {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 8774;
-const CDP = 9227;
+function freePort() {
+  return new Promise((resolvePort, reject) => {
+    const srv = net.createServer();
+    srv.once("error", reject);
+    srv.listen(0, "127.0.0.1", () => {
+      const { port } = srv.address();
+      srv.close(() => resolvePort(port));
+    });
+  });
+}
+const CDP = await freePort();
+const profileDir = mkdtempSync(join(tmpdir(), "chrome-owned-"));
 const server = spawn("python3", ["-m", "http.server", String(PORT), "--bind", "127.0.0.1"], { cwd: root, stdio: "ignore" });
 const chrome = spawn("google-chrome", [
   "--headless=new", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage",
-  "--remote-debugging-port=" + CDP, "--user-data-dir=/tmp/chrome-owned-regress", "about:blank"
+  "--remote-debugging-port=" + CDP, "--user-data-dir=" + profileDir, "about:blank"
 ], { stdio: "ignore" });
 const errors = [];
-process.on("exit", () => {
+function cleanup() {
   try { chrome.kill(); } catch (e) {}
   try { server.kill(); } catch (e) {}
-});
+  try { rmSync(profileDir, { recursive: true, force: true }); } catch (e) {}
+}
+process.on("exit", cleanup);
 function sendFactory(socket) {
   let seq = 0;
   const pending = new Map();
@@ -80,8 +98,7 @@ async function waitPort() {
   throw new Error("Chrome did not open a debugging port");
 }
 function shutdown(code) {
-  try { chrome.kill(); } catch (e) {}
-  try { server.kill(); } catch (e) {}
+  cleanup();
   process.exit(code);
 }
 
@@ -117,15 +134,25 @@ localStorage.setItem("bh.owned.v1", JSON.stringify({v:1,ids:[],sets:{},celebrate
   localStorage.setItem("bh.daily.v1", JSON.stringify({ v:1, current:0, best:0, lastPlayed:"", prompted: bag.year + "-" + bag.month + "-" + bag.day, days:{} }));
 })();`;
 await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: boot });
-await cdp.send("Page.navigate", { url: "http://127.0.0.1:" + PORT + "/index.html" });
-await sleep(600);
-await ev(`new Promise((resolve, reject) => {
+async function waitForDeck() {
   const start = Date.now();
-  const t = setInterval(() => {
-    if (typeof meta !== "undefined" && meta.ready) { clearInterval(t); resolve(true); }
-    else if (Date.now() - start > 20000) { clearInterval(t); reject(new Error("catalog metadata did not load")); }
-  }, 50);
-})`);
+  let last = "deck was not ready";
+  while (Date.now() - start < 20000) {
+    try {
+      const ready = await ev(`(() => {
+        const deck = document.getElementById("deck");
+        return !!(deck && typeof renderDeck === "function" && typeof meta !== "undefined" && meta.ready);
+      })()`);
+      if (ready) return;
+    } catch (e) {
+      last = String(e && e.message || e);
+    }
+    await sleep(200);
+  }
+  throw new Error(last);
+}
+await cdp.send("Page.navigate", { url: "http://127.0.0.1:" + PORT + "/index.html" });
+await waitForDeck();
 
 const keyScript = `(async () => {
   const problems = [];
@@ -723,42 +750,47 @@ const report = await ev(`(async () => {
 
 await cdp.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 await cdp.send("Page.navigate", { url: "http://127.0.0.1:" + PORT + "/index.html?card=base1-4" });
+await waitForDeck();
 const deepLink = await ev(`(async () => {
   const fails = [];
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const profileState = () => {
+    const deckEl = document.getElementById("deck");
+    if (!deckEl) return null;
     const titleEl = document.getElementById("profileTitle");
     const title = titleEl ? titleEl.textContent : "";
     const eyebrowEl = document.querySelector("#profile .eyebrow");
     const eyebrow = eyebrowEl ? eyebrowEl.textContent : "";
     const pinned = !!document.getElementById("closeProfile") && !document.querySelector("#profile [data-summary='1']");
-    const top = [...document.querySelectorAll("#deck .card")].reverse().find(el => el.card && !el.classList.contains("leaving"));
+    const top = [...deckEl.querySelectorAll(".card")].reverse().find(el => el.card && !el.classList.contains("leaving"));
     const skip = document.getElementById("skip");
-    return { title, eyebrow, pinned, top: top && top.card ? top.card.name : "", topId: top && top.card ? top.card.id : "", deck: document.getElementById("deck").dataset.status || "", skipDisabled: !skip || skip.disabled };
+    return { title, eyebrow, pinned, top: top && top.card ? top.card.name : "", topId: top && top.card ? top.card.id : "", deck: deckEl.dataset.status || "", skipDisabled: !skip || skip.disabled };
   };
   const start = Date.now();
   let shownAt = 0;
   while (Date.now() - start < 20000) {
     const state = profileState();
-    if (state.pinned && state.title === "Charizard") { shownAt = Date.now(); break; }
+    if (state && state.pinned && state.title === "Charizard") { shownAt = Date.now(); break; }
     await sleep(100);
   }
   if (!shownAt) return ["deep link did not pin Charizard — " + JSON.stringify(profileState())];
   let deckReady = false;
   while (Date.now() - start < 25000) {
     const state = profileState();
-    if (state.top && !state.skipDisabled) { deckReady = true; break; }
+    if (state && state.top && !state.skipDisabled) { deckReady = true; break; }
     await sleep(100);
   }
   const waited = Date.now() - shownAt;
   if (waited < 8000) await sleep(8000 - waited);
   const held = profileState();
+  if (!held) return fails.concat("deck was not ready for the deep link");
   if (!deckReady) fails.push("deck did not finish loading — " + JSON.stringify(held));
   if (!(held.pinned && held.title === "Charizard" && held.eyebrow !== "On the table")) fails.push("Charizard unpinned after the deck loaded — " + JSON.stringify(held));
   const beforeTop = held.topId;
   document.getElementById("skip").click();
   await sleep(700);
   const after = profileState();
+  if (!after) return fails.concat("deck disappeared after Skip");
   if (after.pinned || after.eyebrow !== "On the table") fails.push("Skip did not return to the live summary — " + JSON.stringify(after));
   if (!after.title || after.title === "Charizard") fails.push("Skip left Charizard in the panel — " + JSON.stringify(after));
   if (after.top && after.title !== after.top) fails.push("summary is not the new top card — " + JSON.stringify(after));

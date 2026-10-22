@@ -1899,11 +1899,29 @@ function usdVariants(tp){
   }
   return out;
 }
+/* TCGdex sometimes leaves pricing.tcgplayer empty and stores the same table
+   on a printing. Hisuian Zoroark (swsh11-076) is that shape: the card record
+   has no top-level market, and the holofoil market lives under
+   variants_detailed. A card with no market on either level still has no USD price. */
+function dexUsdVariants(card){
+  const top = usdVariants(card && card.pricing && card.pricing.tcgplayer);
+  if (top.length) return top;
+  const out = [];
+  const seen = new Set();
+  const rows = card && Array.isArray(card.variants_detailed) ? card.variants_detailed : [];
+  rows.forEach(row => {
+    usdVariants(row && row.pricing && row.pricing.tcgplayer).forEach(variant => {
+      if (!variant || seen.has(variant.key)) return;
+      seen.add(variant.key);
+      out.push(variant);
+    });
+  });
+  return out;
+}
 function avgPoints(a, b, c){
   return [["30-day avg", pos(a)], ["7-day avg", pos(b)], ["1-day avg", pos(c)]].filter(([, v]) => v != null).map(([label, value]) => ({ label, value }));
 }
 function normalizeDex(c){
-  const tp = (c.pricing && c.pricing.tcgplayer) || {};
   const cm = (c.pricing && c.pricing.cardmarket) || {};
   const printings = [];
   const seenP = new Set();
@@ -1926,7 +1944,7 @@ function normalizeDex(c){
     set:(c.set && c.set.name) || "", setId:(c.set && c.set.id) || "", number:c.localId || "",
     rarity:c.rarity || "—", artist:c.illustrator || "", hp:pos(Number(c.hp)) || (Number(c.hp) > 0 ? Number(c.hp) : null),
     types:c.types || [], flavor:c.description || "", legal:c.legal || null,
-    variants:usdVariants(tp),
+    variants:dexUsdVariants(c),
     stampedFirst:(c.variants_detailed || []).some(v => Array.isArray(v.stamp) && v.stamp.some(s => String(s).toLowerCase().includes("1st"))),
     cm:{ avg:pos(cm.avg), low:pos(cm.low), trend:pos(cm.trend), idProduct:cm.idProduct || null, points:avgPoints(cm.avg30, cm.avg7, cm.avg1) },
     printings
