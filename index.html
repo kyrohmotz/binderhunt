@@ -319,7 +319,7 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 .booktools{flex:none;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:6px}
 .booktools .chip{max-width:none}
 .booktools::-webkit-scrollbar{display:none}
-.bookstage{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;min-width:0}
+.bookstage{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;min-width:0;perspective:1200px}
 .book{position:relative;flex:1;min-height:0;width:min(100%,440px);margin:0 auto;display:flex;flex-direction:column;min-width:0}
 .book-spread{flex:1;min-height:0;display:grid;grid-template-columns:14px minmax(0,1fr);grid-template-rows:minmax(0,1fr);perspective:1600px;position:relative}
 .spine,.rings{grid-column:1;grid-row:1;display:flex;flex-direction:column;justify-content:space-evenly;align-items:center;z-index:3}
@@ -457,6 +457,126 @@ html.reduce .sleeve.holo img{transform:none}
 .ownrow .fine{margin:0;min-width:0}
 .ownchip{flex:none}
 .ownchip[aria-pressed="true"]{background:var(--green);color:var(--ink)}
+/* Cloth-bound binder. Texture is a static image; motion is transform and opacity only. */
+:root{--cloth:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");--sage-thread:#ABB28D}
+.wish-row{position:relative;overflow:hidden;align-items:center;background:linear-gradient(180deg,rgba(255,255,255,.55),transparent 46%),linear-gradient(135deg,#f5fcff,#c9f0ff);border-radius:18px;padding:12px 12px 12px 22px}
+.wish-row::before{content:"";position:absolute;left:0;top:0;bottom:0;width:12px;background:linear-gradient(180deg,#b7e7fb,#5eb6d8);box-shadow:inset -1px 0 rgba(31,31,30,.15)}
+.wish-row > span:first-of-type{min-width:0;flex:1}
+.wish-row b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wish-row .fine{white-space:normal}
+#bindersScroll > .shelf-title{margin:14px 2px 8px;font-size:20px}
+.shelf-scene{margin-top:2px;padding:0 0 12px;border-radius:10px 10px 18px 18px;background:linear-gradient(180deg,#f3e6d6,#e4d0b8);box-shadow:0 8px 0 #d2bea8,0 14px 18px rgba(80,60,40,.1)}
+.shelf{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px;align-items:stretch;padding:14px 12px 16px;background:linear-gradient(180deg,rgba(255,255,255,.34),transparent 34%),linear-gradient(180deg,#fbf6ee,#f0e4d4);border-radius:10px 10px 6px 6px}
+.cover{position:relative;isolation:isolate;display:flex;min-height:0;aspect-ratio:3/3.25;padding:0;border:0;border-radius:4px 14px 14px 4px;background:transparent;box-shadow:none;color:var(--ink);overflow:hidden;transform-origin:center bottom;transition:transform .18s cubic-bezier(.2,.8,.2,1)}
+.cover:active{transform:translateY(3px) scale(.985)}
+.cover .binder-shell{position:absolute;inset:0;border-radius:inherit;background-image:linear-gradient(90deg,rgba(40,32,24,.16),transparent 15px),linear-gradient(165deg,color-mix(in srgb,var(--cover,#E9D5C0) 78%,white),var(--cover,#E9D5C0) 46%,color-mix(in srgb,var(--cover,#E9D5C0) 82%,#6d6458)),var(--cloth);background-size:auto,auto,140px 140px;background-blend-mode:multiply,normal,soft-light;box-shadow:inset 0 0 0 1px rgba(255,255,255,.38),0 10px 16px rgba(48,38,28,.14);pointer-events:none}
+.binder-stitch,.pad-stitch{position:absolute;inset:10px 9px 10px 16px;border:1.5px dashed rgba(31,31,30,.42);border-radius:3px 10px 10px 3px;pointer-events:none}
+.cover .cover-row{position:relative;z-index:1;height:100%;width:100%;min-width:0;display:flex;align-items:center;gap:8px;padding:12px 8px 12px 16px}
+.cover .cover-copy{min-width:0;gap:1px}
+.cover .cover-copy b,.cover .cover-copy .fine,.cover .togo{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
+.cover .cover-copy b{font-size:16px}
+.cover .ring{width:44px;height:44px}
+.cover .ring-val,.pad .ring-val{stroke:#737863}
+.cover .ring.done .ring-val,.pad .ring.done .ring-val{stroke:#3d4a30}
+.cover-meter{display:block;width:100%;height:5px;margin:3px 0 1px;border-radius:999px;background:rgba(31,31,30,.12);overflow:hidden}
+.cover-meter i{display:block;height:100%;width:0;border-radius:inherit;background:#737863}
+.cover.complete .cover-meter i,.pad.complete .cover-meter i{background:var(--sage-thread)}
+.cover.complete .binder-shell::after,.pad.complete::after{content:"";position:absolute;left:16px;right:12px;bottom:9px;height:4px;border-radius:999px;background:var(--sage-thread);box-shadow:0 0 0 1px rgba(31,31,30,.18);pointer-events:none}
+.cover-charm{position:absolute;z-index:2;top:8px;right:8px;width:26px;height:26px;display:grid;place-items:center;background:#fff;border:1.5px solid var(--ink);border-radius:50%}
+.cover-charm .toad{width:18px;height:12px}
+.cover-charm.star{border-radius:7px;transform:rotate(8deg);background:var(--butter);font-family:var(--display);font-size:14px}
+.cover.add{display:grid;place-items:center;background:transparent}
+.cover.add .binder-shell{background-image:repeating-linear-gradient(90deg,rgba(31,31,30,.05) 0 1px,transparent 1px 4px),linear-gradient(180deg,rgba(255,255,255,.45),rgba(255,255,255,.16));background-blend-mode:normal,normal;box-shadow:inset 0 0 0 1.5px rgba(31,31,30,.35)}
+.cover-add-label{position:relative;z-index:1;font-family:var(--display);font-weight:700;font-size:16px;text-align:center;padding:12px}
+.swatch{width:46px;height:62px;border-radius:3px 10px 10px 3px;border:1.5px solid rgba(31,31,30,.75);position:relative;box-shadow:inset 7px 0 0 rgba(0,0,0,.1),inset 0 0 0 5px rgba(255,255,255,.25),2px 2px 0 var(--ink)}
+.swatch::after{content:"";position:absolute;inset:7px 6px 7px 11px;border:1px dashed rgba(31,31,30,.45);border-radius:2px 6px 6px 2px;pointer-events:none}
+#bindersScroll.reading{background:radial-gradient(90% 42% at 50% 100%,rgba(210,190,168,.45),transparent 72%),var(--paper)}
+.book.leather,.book.folio{border-radius:7px 16px 16px 7px;padding:8px 30px 8px 22px;box-shadow:0 10px 22px rgba(48,38,28,.12)}
+.book.leather{background-image:linear-gradient(90deg,rgba(40,32,24,.2),transparent 16px),linear-gradient(180deg,color-mix(in srgb,var(--cover,#E9D5C0) 80%,white),var(--cover,#E9D5C0) 48%,color-mix(in srgb,var(--cover,#E9D5C0) 76%,#6a6156)),var(--cloth);background-size:auto,auto,140px 140px;background-blend-mode:multiply,normal,soft-light}
+.book.folio{--cover:#E4E7DA;background-image:linear-gradient(180deg,#f7f8f2,#d5dcc8),var(--cloth);background-size:auto,140px 140px;background-blend-mode:normal,soft-light}
+.book.opening{animation:binderOpen .52s cubic-bezier(.16,.84,.22,1) both;transform-origin:left center}
+@keyframes binderOpen{from{transform:rotateY(-18deg) translateY(10px);opacity:0}to{transform:none;opacity:1}}
+.spine{background:linear-gradient(90deg,color-mix(in srgb,var(--cover,#E9D5C0) 42%,#3c342c),color-mix(in srgb,var(--cover,#E9D5C0) 78%,white) 48%,color-mix(in srgb,var(--cover,#E9D5C0) 50%,#3c342c));border:0;border-radius:7px 0 0 7px;box-shadow:inset -4px 0 5px rgba(0,0,0,.12)}
+.rings i,.spine i{border:2px solid #8d8478;background:linear-gradient(180deg,#fff,#d5ccc0 48%,#b3a898);box-shadow:inset 0 1px 0 #fff,0 1px 1px rgba(40,32,24,.28)}
+.face{background-image:linear-gradient(90deg,rgba(70,52,36,.07),transparent 18px),repeating-linear-gradient(0deg,rgba(90,70,40,.03) 0 1px,transparent 1px 6px),linear-gradient(180deg,#fffdf8,#f3eadc);border:1px solid rgba(70,54,38,.28);border-radius:2px 14px 14px 2px;box-shadow:inset 0 1px 0 rgba(255,255,255,.7);padding:6px}
+.face h3{font-family:var(--label);font-style:italic;font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin:0 0 4px}
+.face:has(> .pad){background:transparent;border:0;box-shadow:none;padding:3px}
+.book.solo .face.page-right{box-shadow:inset 12px 0 14px rgba(40,32,24,.06)}
+.pad{margin:0;border:0;border-radius:4px 14px 14px 4px;overflow:hidden;background-image:linear-gradient(90deg,rgba(40,32,24,.14),transparent 16px),linear-gradient(165deg,color-mix(in srgb,var(--cover,#E9D5C0) 86%,white),var(--cover,#E9D5C0)),var(--cloth);background-size:auto,auto,140px 140px;background-blend-mode:multiply,normal,soft-light;box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)}
+.pad h2{font-size:clamp(20px,4.2vw,28px);max-width:100%;text-shadow:0 1px 0 rgba(255,255,255,.4)}
+.pad .cover-meter{width:min(168px,72%)}
+.pad-ring .ring{width:68px;height:68px}
+.sleeves{gap:5px}
+.slot{position:relative;min-height:0}
+.sleeve{min-width:0;min-height:0;border-radius:2px 2px 6px 6px;background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,.12) 34%,rgba(255,255,255,.28));box-shadow:inset 0 0 0 1px rgba(255,255,255,.72),inset 0 0 0 1px rgba(40,32,24,.1),inset 0 8px 12px rgba(40,32,24,.05);transition:transform .16s cubic-bezier(.2,.85,.2,1)}
+.sleeve.sunk{transform:scale(.975)}
+.sleeve .sleeve-weld{position:absolute;z-index:4;left:0;right:0;top:0;height:7%;min-height:5px;background:linear-gradient(180deg,rgba(255,255,255,.2),rgba(60,48,36,.16) 42%,rgba(255,255,255,.45));pointer-events:none}
+.sleeve::after{content:"";position:absolute;z-index:3;left:0;right:0;bottom:0;height:9%;background:linear-gradient(transparent,rgba(40,32,24,.12));pointer-events:none}
+.sleeve .cardhit{inset:11% 8% 8%;z-index:1;border-radius:2px;overflow:hidden}
+.sleeve .cardhit:active{transform:scale(.985)}
+.sleeve img{border-radius:2px;box-shadow:none}
+.sleeve .gloss,.sleeve .shine,.sleeve .glare{z-index:3}
+.sleeve .glare{position:absolute;inset:0;pointer-events:none;background:radial-gradient(85% 48% at var(--sx,26%) var(--sy,10%),rgba(255,255,255,.62),transparent 46%);mix-blend-mode:soft-light}
+.sleeve .gloss{background:linear-gradient(118deg,rgba(255,255,255,.7),rgba(255,255,255,0) 44%)}
+.sleeve.wanted{background:linear-gradient(180deg,rgba(255,255,255,.2),rgba(255,255,255,.05)),repeating-linear-gradient(135deg,rgba(31,31,30,.035) 0 7px,transparent 7px 14px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.4),inset 0 0 0 1px rgba(40,32,24,.08)}
+.sleeve.wanted .cardhit{box-shadow:inset 0 0 0 1.5px rgba(31,31,30,.16);background:repeating-linear-gradient(135deg,rgba(255,255,255,.15) 0 6px,transparent 6px 12px)}
+.sleeve.wanted img{opacity:.62;filter:none}
+.sleeve.owned{background:linear-gradient(180deg,rgba(255,255,255,.7),rgba(255,255,255,.28));box-shadow:inset 0 0 0 1px rgba(255,255,255,.85),inset 0 0 0 2px rgba(171,178,141,.95),inset 0 8px 10px rgba(40,32,24,.05)}
+.sleeve.owned .cardhit{box-shadow:0 2px 3px rgba(40,32,24,.28)}
+.sleeve.owned img{opacity:1}
+.sleeve.owned .gloss{opacity:.34}
+.sleeve.empty{background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,.04))}
+.sleeve.empty .ghost-card{inset:16% 13% 14%;border:1.5px dashed rgba(31,31,30,.22);border-radius:3px;background:rgba(255,255,255,.14)}
+.sleeve.holo .shine{opacity:.92;z-index:3;background:linear-gradient(115deg,transparent 16%,rgba(255,255,255,.82) 34%,rgba(134,222,255,.5) 46%,rgba(246,201,201,.4) 57%,rgba(243,237,200,.5) 68%,transparent 84%);background-size:240% 240%;background-position:var(--sx,30%) var(--sy,22%);mix-blend-mode:soft-light}
+.sleeve.holo img{transform:perspective(520px) rotateX(var(--ty,0deg)) rotateY(var(--tx,0deg))}
+.sleeve.wanted.holo .shine{opacity:.42}
+.sleeve .sleeve-tag{top:9%;left:6%;max-width:calc(100% - 40px);background:var(--paper)}
+.sleeve.owned .sleeve-tag{background:var(--sage-thread)}
+.sleeve.wanted .sleeve-tag{background:var(--rose)}
+.slot .iconish.more{position:absolute;z-index:5;top:2px;right:2px;width:28px;height:28px;min-height:28px;padding:0;border-radius:8px;border:1.5px solid var(--ink);background:rgba(248,247,239,.94);font-size:16px;line-height:1}
+.sleeve .gotbtn{width:32px;height:32px;min-width:32px;min-height:32px}
+.sleeve .gotbtn .mark{width:16px;height:16px}
+.sleeve .gotbtn:active .mark{transform:scale(.9)}
+.leaf.hot{transition:transform .58s cubic-bezier(.22,.61,.36,1);will-change:transform}
+.leaf.hot.live{transition:none}
+.leaf.hot .face.front::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:var(--turn,0);background:linear-gradient(90deg,rgba(40,32,24,.2),transparent 38%)}
+.leaf.hot.backward .face.front::after{background:linear-gradient(270deg,rgba(40,32,24,.2),transparent 38%)}
+.leaf.hot:not(.live) .face.front::after{transition:opacity .58s cubic-bezier(.22,.61,.36,1)}
+.dogear,.dogear.prev,.dogear.next{width:26px;height:72px;top:50%;bottom:auto;margin-top:-36px;background:linear-gradient(135deg,transparent 42%,rgba(60,48,36,.18) 42% 54%,#f7f1e6 54%)}
+.dogear.prev{left:0;transform:scaleX(-1)}
+.dogear.next{right:0;transform:none}
+.dogear.prev:active{transform:scaleX(-1) scale(.96)}
+.dogear.next:active{transform:scale(.96)}
+.booknav .iconish{transition:transform .16s cubic-bezier(.2,.8,.2,1)}
+.booknav .iconish:active{transform:scale(.92)}
+.cardzoom{position:fixed;z-index:72;pointer-events:none;border-radius:10px;overflow:hidden;background:#fff;box-shadow:0 18px 36px rgba(40,32,24,.28);transform:translateZ(0);transition:transform .3s cubic-bezier(.16,.84,.22,1)}
+.cardzoom img{width:100%;height:100%;object-fit:contain;display:block;background:#fff}
+.rail-binder::before{content:"";width:7px;align-self:stretch;border-radius:4px;background:linear-gradient(180deg,color-mix(in srgb,var(--cover,#E9D5C0) 80%,white),var(--cover,#E9D5C0));box-shadow:inset 0 0 0 1px rgba(31,31,30,.18);flex:none}
+html.reduce .sleeve.holo img{transform:none}
+html.reduce .book.opening{animation:none}
+@media (min-width:1024px){
+  .book.spread.leather,.book.spread.folio{padding-left:26px;padding-right:26px}
+  .book.spread .face.page-left{border-radius:14px 3px 3px 14px;box-shadow:inset -12px 0 14px rgba(40,32,24,.06)}
+  .book.spread .face.page-right{border-radius:3px 14px 14px 3px;box-shadow:inset 12px 0 14px rgba(40,32,24,.06)}
+  .dogear.prev{left:0}
+  .book.spread .rings i:nth-child(even){display:none}
+  .book.spread .rings i{width:26px;height:13px}
+  .shelf{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (min-width:1280px){
+  .shelf{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-height:800px){
+  .book.solo.leather,.book.solo.folio{padding:6px 28px 6px 18px}
+  .book.spread.leather,.book.spread.folio{padding:6px 22px}
+  .face{padding:4px}
+  .booktools .chip{min-height:36px}
+  .dogear{height:56px;margin-top:-28px}
+}
+@media (prefers-reduced-motion:reduce){
+  html:not(.motion-on) .sleeve.holo img{transform:none}
+  html:not(.motion-on) .book.opening{animation:none}
+}
 </style>
 <link rel="stylesheet" href="css/daily.css">
 </head>
@@ -772,6 +892,7 @@ let swipeBusy = false;
 let audioCtx = null;
 let setView = null;
 let binderView = null;
+let binderOpenAnim = false;
 let flipPage = 0;
 let pendingSparkle = -1;
 let binderToastTimer = 0;
@@ -2946,11 +3067,12 @@ function binderSideMeter(list){
   const money = val == null ? "" : priceText(val, "USD");
   return `<div class="side-progress">${ringMarkup(p.owned, p.total)}<div><p class="market-price">${esc(p.total ? p.owned + " / " + p.total : "0")}</p><p class="fine">${esc(p.label)}${money ? " · " + esc(money) : ""}</p></div></div>`;
 }
-function binderSideRow(name, list){
+function binderSideRow(name, list, color){
   const p = progressOf(list);
   const val = valueOf(list || []);
   const money = val == null ? "" : priceText(val, "USD");
-  return `<div class="rail-binder"><span class="rail-binder-copy"><b>${esc(name)}</b><span class="fine">${esc(p.label)}${money ? " · " + esc(money) : ""}</span></span>${ringMarkup(p.owned, p.total)}</div>`;
+  const tint = coverColor(color, true);
+  return `<div class="rail-binder"${tint ? ` style="--cover:${tint}"` : ""}><span class="rail-binder-copy"><b>${esc(name)}</b><span class="fine">${esc(p.label)}${money ? " · " + esc(money) : ""}</span></span>${ringMarkup(p.owned, p.total)}</div>`;
 }
 function renderBinderSide(){
   const key = binderSideKey();
@@ -2961,7 +3083,7 @@ function renderBinderSide(){
   shell.classList.remove("no-profile");
   profileEl.removeAttribute("aria-modal");
   if (!binderView) {
-    const rows = binderState.binders.slice(0, 5).map(b => binderSideRow(b.name, b.cards)).join("");
+    const rows = binderState.binders.slice(0, 5).map(b => binderSideRow(b.name, b.cards, b.color)).join("");
     profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Binders</p><h2 class="pname" id="profileTitle">Your shelf</h2>${binderSideRow("Wishlist", wish)}<div class="side-list">${rows || `<p class="fine">No binders yet. Create one and its progress lands here.</p>`}</div></div>`;
     return;
   }
@@ -3024,9 +3146,10 @@ function paintRail(){
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "rail-binder";
+    btn.style.setProperty("--cover", coverColor(b.color));
     btn.setAttribute("aria-label", b.name + ", " + p.label);
     btn.innerHTML = `<span class="rail-binder-copy"><b>${esc(b.name)}</b><span class="fine">${esc(p.label)}</span></span>${ringMarkup(p.owned, p.total)}`;
-    btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; showTab("binders"); };
+    btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); showTab("binders"); };
     host.append(btn);
   });
   if (binders.length > 5) {
@@ -3370,6 +3493,11 @@ function renderSetPage(root){
   paintContext();
 }
 
+function coverColor(value, optional){
+  const raw = String(value || "");
+  if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw;
+  return optional ? "" : "#E9D5C0";
+}
 function renderBinders(){
   const root = document.getElementById("bindersScroll");
   if (binderView) { renderCollection(root); return; }
@@ -3380,26 +3508,31 @@ function renderBinders(){
   const wishFine = wish.length ? wish.length + " cards · " + ownedN + " owned · " + wantedN + " wanted · not a binder" : "Nothing saved yet · not a binder";
   root.innerHTML = `<p class="fine">Wishlist is the master list. Mark a card Got it once it's in your hands. That owned mark is shared by every binder.</p>
     <button class="wish-row" id="openWish" type="button"><span><b>Wishlist</b><span class="fine">${esc(wishFine)}</span></span><span class="pill${total ? "" : " missing"}">${esc(total ? priceText(total, "USD") : "—")}</span></button>
-    <h2>Your binders</h2>
-    <div class="shelf" id="shelf"></div>`;
+    <h2 class="shelf-title">Your binders</h2>
+    <div class="shelf-scene"><div class="shelf" id="shelf"></div></div>`;
   const shelf = document.getElementById("shelf");
   binderState.binders.forEach(b => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "cover";
-    btn.style.background = b.color || COLORS[0];
+    const cloth = coverColor(b.color);
+    btn.style.setProperty("--cover", cloth);
     const val = valueOf(b.cards);
     const p = progressOf(b.cards);
     const price = val ? priceText(val, "USD") : "—";
+    const pct = p.total ? Math.max(0, Math.min(100, Math.round((p.owned / p.total) * 100))) : 0;
+    if (p.total && p.owned >= p.total) btn.classList.add("complete");
+    const charm = b.charm === "toad" ? `<span class="cover-charm">${toad()}</span>` : b.charm === "sticker" ? `<span class="cover-charm star" aria-hidden="true">★</span>` : "";
     btn.dataset.progress = p.owned + "/" + p.total;
-    btn.innerHTML = `<span class="cover-row"><span class="cover-copy"><b>${esc(b.name)}</b><span class="fine">${esc(themeLabel(themeOf(b)))}</span><span class="togo">${esc(p.label)}</span><span class="fine">${b.cards.length} ${b.cards.length === 1 ? "card" : "cards"} · ${esc(price)}</span><span class="sr-only">${esc(p.total ? p.owned + " of " + p.total + " owned" : "No cards yet")}</span></span>${ringMarkup(p.owned, p.total)}</span>`;
-    btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; renderBinders(); };
+    btn.innerHTML = `<span class="binder-shell" aria-hidden="true"><span class="binder-stitch"></span></span>${charm}<span class="cover-row"><span class="cover-copy"><b>${esc(b.name)}</b><span class="fine">${esc(themeLabel(themeOf(b)))}</span><span class="togo">${esc(p.label)}</span><span class="cover-meter" aria-hidden="true"><i style="width:${pct}%"></i></span><span class="fine">${b.cards.length} ${b.cards.length === 1 ? "card" : "cards"} · ${esc(price)}</span><span class="sr-only">${esc(p.total ? p.owned + " of " + p.total + " owned" : "No cards yet")}</span></span>${ringMarkup(p.owned, p.total)}</span>`;
+    btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); renderBinders(); };
     shelf.append(btn);
   });
   const add = document.createElement("button");
   add.type = "button";
   add.className = "cover add";
-  add.textContent = "+ New binder";
+  add.style.setProperty("--cover", "#F1F1E4");
+  add.innerHTML = `<span class="binder-shell" aria-hidden="true"><span class="binder-stitch"></span></span><span class="cover-add-label">+ New binder</span>`;
   add.onclick = openBinderForm;
   shelf.append(add);
   document.getElementById("openWish").onclick = () => { binderView = { kind:"wish" }; flipPage = 0; renderBinders(); };
@@ -3469,13 +3602,14 @@ function showConfetti(message){
 }
 function coverPad(binder, list){
   const pad = document.createElement("div");
-  pad.className = "pad";
-  pad.style.setProperty("--cover", binder.color || "#E9D5C0");
-  const val = valueOf(list);
   const p = progressOf(list);
+  pad.className = "pad" + (p.total && p.owned >= p.total ? " complete" : "");
+  pad.style.setProperty("--cover", coverColor(binder.color));
+  const val = valueOf(list);
   const price = val ? priceText(val, "USD") : "—";
+  const pct = p.total ? Math.max(0, Math.min(100, Math.round((p.owned / p.total) * 100))) : 0;
   const charm = binder.charm === "toad" ? `<div class="charm">${toad()}</div>` : binder.charm === "sticker" ? `<div class="charm sticker" aria-hidden="true">★</div>` : "";
-  pad.innerHTML = `<div class="pad-stitch"></div><div class="pad-ring">${ringMarkup(p.owned, p.total)}</div><h2>${esc(binder.name)}</h2><p class="count">${esc(p.label)}</p><p class="count">${list.length} ${list.length === 1 ? "card" : "cards"} · ${esc(price)}</p>${list.length ? `<p class="fine">${esc(themeLabel(themeOf(binder)))}</p>` : `<p class="fine">A fresh binder. These pockets are waiting.</p>${toad()}`}${charm}`;
+  pad.innerHTML = `<div class="pad-stitch" aria-hidden="true"></div><div class="pad-ring">${ringMarkup(p.owned, p.total)}</div><h2>${esc(binder.name)}</h2><p class="count">${esc(p.label)}</p><div class="cover-meter" aria-hidden="true"><i style="width:${pct}%"></i></div><p class="count">${list.length} ${list.length === 1 ? "card" : "cards"} · ${esc(price)}</p>${list.length ? `<p class="fine">${esc(themeLabel(themeOf(binder)))}</p>` : `<p class="fine">A fresh binder. These pockets are waiting.</p>${toad()}`}${charm}`;
   return pad;
 }
 function endPaper(text){
@@ -3501,9 +3635,11 @@ function sleeveSlot(card, index, ctx){
   const sleeve = document.createElement("div");
   sleeve.className = "sleeve " + (owned ? "owned" : "wanted") + (isHolo(card) ? " holo" : "");
   sleeve.dataset.index = String(index);
-  sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card) + (owned ? ", owned" : ", wanted"))}"></button><span class="sleeve-tag" aria-hidden="true">${owned ? "Owned" : "Wanted"}</span><span class="shine" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span>`;
+  sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card) + (owned ? ", owned" : ", wanted"))}"></button><span class="sleeve-weld" aria-hidden="true"></span><span class="sleeve-tag" aria-hidden="true">${owned ? "Owned" : "Wanted"}</span><span class="shine" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span><span class="glare" aria-hidden="true"></span>`;
   ensureLabelFont();
   paintArt(sleeve.querySelector(".cardhit"), card);
+  const art = sleeve.querySelector("img");
+  if (art) { art.loading = "lazy"; art.decoding = "async"; }
   const got = document.createElement("button");
   got.type = "button";
   got.className = "gotbtn";
@@ -3544,7 +3680,7 @@ function emptySlot(insertAt){
   const sleeve = document.createElement("div");
   sleeve.className = "sleeve empty";
   if (insertAt != null) sleeve.dataset.insert = String(insertAt);
-  sleeve.innerHTML = `<span class="ghost-card"></span><span class="gloss" aria-hidden="true"></span>`;
+  sleeve.innerHTML = `<span class="ghost-card"></span><span class="sleeve-weld" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span><span class="glare" aria-hidden="true"></span>`;
   slot.append(sleeve);
   return slot;
 }
@@ -3598,11 +3734,19 @@ function renderCollection(root){
   tools.className = "booktools";
   tools.innerHTML = `<button class="chip" id="backBinders" type="button">All binders</button>` +
     (wishMode ? `<button class="chip" id="copyList" type="button">Copy list</button>`
-      : `<button class="chip" id="fillFrom" type="button">Fill from wishlist</button><button class="chip" id="discover" type="button">Swipe to discover</button><button class="chip" id="renameBinder" type="button">Rename</button><button class="chip" id="copyList" type="button">Copy list</button>`);
+      : `<button class="chip" id="fillFrom" type="button">Fill from wishlist</button><button class="chip" id="discover" type="button">Swipe to discover</button><button class="chip" id="renameBinder" type="button">Rename</button><button class="chip" id="recolorBinder" type="button">Cover</button><button class="chip" id="copyList" type="button">Copy list</button>`);
   const stage = document.createElement("div");
   stage.className = "bookstage";
   const book = document.createElement("div");
-  book.className = "book" + (desktop ? " spread" : " solo");
+  book.className = "book " + (desktop ? "spread" : "solo") + (wishMode ? " folio" : " leather");
+  book.style.setProperty("--cover", wishMode ? "#E4E7DA" : coverColor(binder.color));
+  if (binderOpenAnim && !wishMode) {
+    binderOpenAnim = false;
+    if (!reduceMotion()) {
+      book.classList.add("opening");
+      book.addEventListener("animationend", e => { if (e.target === book) book.classList.remove("opening"); });
+    }
+  } else binderOpenAnim = false;
   book.setAttribute("aria-label", wishMode ? "Wishlist pages" : binder.name);
   const spread = document.createElement("div");
   spread.className = "book-spread";
@@ -3850,15 +3994,45 @@ function renderCollection(root){
         if (sleeve && !origin.closest(".iconish, .gotbtn")) liftCard(list[Number(sleeve.dataset.index)]);
       }
     }
+    book.querySelectorAll(".sleeve.sunk").forEach(s => s.classList.remove("sunk"));
     mode = ""; pid = null; leaf = null; pressBtn = null;
   };
+  let zoomToken = 0;
   function liftCard(card){
     if (!card) return;
-    const sleeve = book.querySelector('.sleeve[data-index="' + list.indexOf(card) + '"]');
     const open = () => openProfile(card);
+    const sleeve = book.querySelector('.sleeve[data-index="' + list.indexOf(card) + '"]');
     if (reduceMotion() || !sleeve) { open(); return; }
-    sleeve.classList.add("lifting");
-    setTimeout(open, 160);
+    const token = ++zoomToken;
+    document.querySelectorAll(".cardzoom").forEach(node => node.remove());
+    if (settings.haptics) haptic(8);
+    const rect = sleeve.getBoundingClientRect();
+    const fly = document.createElement("div");
+    fly.className = "cardzoom";
+    fly.setAttribute("aria-hidden", "true");
+    const img = sleeve.querySelector("img");
+    if (img) {
+      const clone = img.cloneNode(true);
+      clone.alt = "";
+      fly.append(clone);
+    }
+    fly.style.left = rect.left + "px";
+    fly.style.top = rect.top + "px";
+    fly.style.width = Math.max(1, rect.width) + "px";
+    fly.style.height = Math.max(1, rect.height) + "px";
+    document.body.append(fly);
+    const targetW = Math.min(260, window.innerWidth - 48);
+    const scale = targetW / Math.max(1, rect.width);
+    const dx = (window.innerWidth / 2) - (rect.left + rect.width / 2);
+    const dy = (window.innerHeight * 0.42) - (rect.top + rect.height / 2);
+    sleeve.style.opacity = ".4";
+    requestAnimationFrame(() => { fly.style.transform = "translate(" + dx.toFixed(1) + "px," + dy.toFixed(1) + "px) scale(" + scale.toFixed(3) + ")"; });
+    setTimeout(() => {
+      if (token !== zoomToken) return;
+      fly.remove();
+      sleeve.style.opacity = "";
+      open();
+    }, 300);
   }
   function commit(){ if (binder) saveBinders(); else saveWish(); }
   function removeAt(index){
@@ -3912,6 +4086,7 @@ function renderCollection(root){
     }
     const sleeve = e.target.closest(".sleeve[data-index]");
     if (sleeve) {
+      if (!onGot) sleeve.classList.add("sunk");
       dragIndex = Number(sleeve.dataset.index);
       timer = setTimeout(() => {
         mode = "card";
@@ -3936,15 +4111,16 @@ function renderCollection(root){
   nextEar.addEventListener("click", () => { if (fromPointer) { fromPointer = false; return; } finishFlip(1); });
   book.addEventListener("pointermove", e => {
     if (mode) return;
-    const sleeve = e.target.closest(".sleeve.holo");
+    const sleeve = e.target.closest(".sleeve");
     if (!sleeve || reduceMotion()) return;
     const r = sleeve.getBoundingClientRect();
     const px = (e.clientX - r.left) / Math.max(1, r.width);
     const py = (e.clientY - r.top) / Math.max(1, r.height);
-    sleeve.style.setProperty("--tx", ((px - 0.5) * 8).toFixed(2) + "deg");
-    sleeve.style.setProperty("--ty", ((0.5 - py) * 6).toFixed(2) + "deg");
     sleeve.style.setProperty("--sx", (px * 100).toFixed(0) + "%");
     sleeve.style.setProperty("--sy", (py * 100).toFixed(0) + "%");
+    if (!sleeve.classList.contains("holo")) return;
+    sleeve.style.setProperty("--tx", ((px - 0.5) * 8).toFixed(2) + "deg");
+    sleeve.style.setProperty("--ty", ((0.5 - py) * 6).toFixed(2) + "deg");
   });
   document.getElementById("backBinders").onclick = () => { binderView = null; renderBinders(); };
   document.getElementById("copyList").onclick = async () => {
@@ -3967,6 +4143,18 @@ function renderCollection(root){
         closeSheet("binderSheet");
         renderBinders();
       };
+    };
+    document.getElementById("recolorBinder").onclick = () => {
+      const current = coverColor(binder.color);
+      document.getElementById("binderSheetTitle").textContent = "Cover color";
+      document.getElementById("binderSheetBody").innerHTML = `<p class="fine">Pick a cloth. The cards in this binder stay where they are.</p><div class="swatches" id="swatches">${COLORS.map((c, i) => `<button type="button" class="swatch" data-color="${c}" style="background:${c}" aria-label="Cover ${i + 1}" aria-pressed="${current === c ? "true" : "false"}"></button>`).join("")}</div>`;
+      openSheet("binderSheet");
+      document.querySelectorAll("#binderSheet .swatch").forEach(btn => btn.onclick = () => {
+        binder.color = btn.dataset.color;
+        closeSheet("binderSheet");
+        saveBinders();
+        if (settings.haptics) haptic(8);
+      });
     };
   }
   paintContext();
@@ -4052,6 +4240,8 @@ async function openBinderForm(){
     closeSheet("binderSheet");
     binderView = { kind:"binder", id:binder.id };
     flipPage = 0;
+    binderOpenAnim = true;
+    if (settings.haptics) haptic(10);
     renderBinders();
     announce(name + " is ready.");
   };
@@ -4695,11 +4885,12 @@ window.addEventListener("deviceorientation", e => {
   if (gyroFrame) return;
   gyroFrame = requestAnimationFrame(() => {
     gyroFrame = 0;
-    document.querySelectorAll("#bindersScroll .sleeve.holo").forEach(el => {
-      el.style.setProperty("--tx", (gx * 6).toFixed(2) + "deg");
-      el.style.setProperty("--ty", (gy * -6).toFixed(2) + "deg");
+    document.querySelectorAll("#bindersScroll .sleeve").forEach(el => {
       el.style.setProperty("--sx", ((gx + 1) * 50).toFixed(0) + "%");
       el.style.setProperty("--sy", ((gy + 1) * 50).toFixed(0) + "%");
+      if (!el.classList.contains("holo")) return;
+      el.style.setProperty("--tx", (gx * 6).toFixed(2) + "deg");
+      el.style.setProperty("--ty", (gy * -6).toFixed(2) + "deg");
     });
   });
 }, { passive:true });
