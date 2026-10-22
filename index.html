@@ -177,6 +177,15 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 .market-price{font-family:Nunito,sans-serif;font-weight:800;font-size:32px;line-height:1.15;font-variant-numeric:tabular-nums;margin:0;overflow-wrap:anywhere}
 .delta{font-variant-numeric:tabular-nums;border:2px solid var(--ink);border-radius:999px;padding:3px 8px;background:var(--sage);font-size:13px}
 .delta.down{background:var(--rose)}
+.drop-badge{position:relative;display:inline-flex;align-items:center;flex:none;background:var(--rose);color:var(--ink);border:2px solid var(--ink);border-radius:999px;padding:2px 7px;font-family:var(--display);font-weight:700;font-size:12px;line-height:1.2;box-shadow:2px 2px 0 var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap;pointer-events:none;max-width:100%}
+.drop-badge[hidden]{display:none !important}
+.price-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0}
+.price-row .market-price{min-width:0}
+.market-copy{min-width:0;flex:1}
+.frame > .drop-badge{position:absolute;z-index:4;right:10px;bottom:10px;font-size:13px}
+.wish-row .drop-badge{align-self:center}
+.rail-wish > span:first-child{min-width:0}
+.rail-wish > .drop-badge{display:inline-flex;margin-left:auto;font-size:11px;padding:2px 6px}
 .grade-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
 .grade{text-align:left;background:#fff;border:2.5px solid var(--ink);border-radius:14px;padding:6px 8px;box-shadow:2px 2px 0 var(--ink)}
 .grade span,.grade b,.grade small{display:block}
@@ -616,6 +625,7 @@ html.reduce .book.opening{animation:none}
 .under{z-index:1}
 .sleeve .gotbtn{z-index:6;right:4px;bottom:2px;width:34px;height:34px;min-width:34px;min-height:34px;border-radius:9px 9px 5px 5px;background:rgba(248,247,239,.94);box-shadow:inset 0 0 0 1px rgba(40,32,24,.18);place-items:center}
 .sleeve .gotbtn .mark{margin:0}
+.sleeve > .drop-badge{position:absolute;z-index:6;left:4px;bottom:36px;right:auto;top:auto;font-size:10px;line-height:1.15;padding:1px 4px;border-width:1.5px;box-shadow:1px 1px 0 var(--ink);max-width:calc(100% - 42px);overflow:hidden;text-overflow:ellipsis}
 /* Page curl is a stack of projected strips. The leaf itself stays put. */
 .leaf.hot{perspective:none;will-change:auto;transition:none}
 .leaf.hot.forward,.leaf.hot.backward,.leaf.hot.forward.live,.leaf.hot.backward.live{transform:none}
@@ -1982,10 +1992,13 @@ function loadScrydex(){
   scrydexPromise = fetch("data/scrydex.json", { cache:"no-cache" }).then(r => r.ok ? r.json() : null).then(j => {
     scrydex = { ready:true, cards:(j && j.cards) || {} };
   }).catch(() => { scrydex = { ready:true, cards:{} }; }).then(() => {
+    paintDeckDrops();
     if (profilePinned && profileCard && !profileEl.hidden) {
       renderProfile(cardCache.get(profileCard.id) || profileCard);
       queuePrice(profileCard.id);
     } else { summaryId = ""; paintDeckSummary(currentTop()); }
+    if (tab === "binders") renderBinders();
+    else paintRail();
   });
   return scrydexPromise;
 }
@@ -2767,7 +2780,22 @@ function alignHuntColumn(){
   const w = box ? box.getBoundingClientRect().width : 0;
   if (w > 40) root.style.setProperty("--deck-w", Math.round(w) + "px");
 }
+function paintCardDrop(el){
+  const frame = el && el.querySelector(".frame");
+  if (!frame) return;
+  const drop = el.card ? priceDrop(el.card) : null;
+  const shown = drop && Number.isFinite(drop.shown) ? String(drop.shown) : "";
+  const cur = frame.querySelector(":scope > .drop-badge");
+  if (cur && cur.dataset.pct === shown) return;
+  if (!shown && !cur) return;
+  if (cur) cur.remove();
+  if (shown) frame.insertAdjacentHTML("beforeend", dropBadgeMarkup(drop));
+}
+function paintDeckDrops(){
+  deck.querySelectorAll(".card").forEach(paintCardDrop);
+}
 function paintCaption(){
+  paintDeckDrops();
   const row = document.getElementById("deckCaption");
   if (!row) return;
   const top = [...deck.querySelectorAll(".card")].reverse().find(el => el.card && !el.classList.contains("leaving"));
@@ -3139,8 +3167,9 @@ function binderSideRow(name, list, color){
   const p = progressOf(list);
   const val = valueOf(list || []);
   const money = val == null ? "" : priceText(val, "USD");
+  const dropped = name === "Wishlist" ? droppedCount(list) : 0;
   const tint = coverColor(color, true);
-  return `<div class="rail-binder"${tint ? ` style="--cover:${tint}"` : ""}><span class="rail-binder-copy"><b>${esc(name)}</b><span class="fine">${esc(p.label)}${money ? " · " + esc(money) : ""}</span></span>${ringMarkup(p.owned, p.total)}</div>`;
+  return `<div class="rail-binder"${tint ? ` style="--cover:${tint}"` : ""}><span class="rail-binder-copy"><b>${esc(name)}</b><span class="fine">${esc(p.label)}${money ? " · " + esc(money) : ""}${dropped ? " · " + dropped + " dropped" : ""}</span></span>${ringMarkup(p.owned, p.total)}</div>`;
 }
 function renderBinderSide(){
   const key = binderSideKey();
@@ -3156,7 +3185,8 @@ function renderBinderSide(){
     return;
   }
   if (binderView.kind === "wish") {
-    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Wishlist</p><h2 class="pname" id="profileTitle">Saved cards</h2>${binderSideMeter(wish)}<p class="fine">${wish.length === 1 ? "1 card saved." : wish.length + " cards saved."}</p></div>`;
+    const dropped = droppedCount(wish);
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Wishlist</p><h2 class="pname" id="profileTitle">Saved cards</h2>${binderSideMeter(wish)}<p class="fine">${wish.length === 1 ? "1 card saved." : wish.length + " cards saved."}${dropped ? " " + dropped + " dropped." : ""}</p></div>`;
     return;
   }
   const binder = binderState.binders.find(x => x.id === binderView.id);
@@ -3199,7 +3229,18 @@ function paintRail(){
   const wishBtn = document.getElementById("railWish");
   if (!count || !host || !wishBtn) return;
   count.textContent = String(wish.length);
-  wishBtn.setAttribute("aria-label", "Wishlist, " + wish.length + (wish.length === 1 ? " card" : " cards"));
+  const dropped = droppedCount(wish);
+  let mark = wishBtn.querySelector(".drop-badge");
+  if (dropped) {
+    if (!mark) {
+      mark = document.createElement("span");
+      mark.className = "drop-badge drop-count";
+      wishBtn.append(mark);
+    }
+    mark.textContent = "Dropped " + dropped;
+    mark.hidden = false;
+  } else if (mark) mark.remove();
+  wishBtn.setAttribute("aria-label", "Wishlist, " + wish.length + (wish.length === 1 ? " card" : " cards") + (dropped ? ", " + dropped + " dropped" : ""));
   host.replaceChildren();
   const binders = (binderState && binderState.binders) || [];
   if (!binders.length) {
@@ -3574,8 +3615,10 @@ function renderBinders(){
   const ownedN = wish.filter(c => ownedIds.has(c.id)).length;
   const wantedN = Math.max(0, wish.length - ownedN);
   const wishFine = wish.length ? wish.length + " cards · " + ownedN + " owned · " + wantedN + " wanted · not a binder" : "Nothing saved yet · not a binder";
+  const dropped = droppedCount(wish);
+  const wishLabel = "Wishlist" + (wish.length ? ", " + wish.length + (wish.length === 1 ? " card" : " cards") : ", nothing saved") + (dropped ? ", " + dropped + " dropped" : "");
   root.innerHTML = `<p class="fine">Wishlist is the master list. Mark a card Got it once it's in your hands. That owned mark is shared by every binder.</p>
-    <button class="wish-row" id="openWish" type="button"><span><b>Wishlist</b><span class="fine">${esc(wishFine)}</span></span><span class="pill${total ? "" : " missing"}">${esc(total ? priceText(total, "USD") : "—")}</span></button>
+    <button class="wish-row" id="openWish" type="button" aria-label="${esc(wishLabel)}"><span><b>Wishlist</b><span class="fine">${esc(wishFine)}</span></span>${droppedCountMarkup(dropped)}<span class="pill${total ? "" : " missing"}">${esc(total ? priceText(total, "USD") : "—")}</span></button>
     <h2 class="shelf-title">Your binders</h2>
     <div class="shelf-scene"><div class="shelf" id="shelf"></div></div>`;
   const shelf = document.getElementById("shelf");
@@ -3707,7 +3750,9 @@ function sleeveSlot(card, index, ctx){
   const sleeve = document.createElement("div");
   sleeve.className = "sleeve " + (owned ? "owned" : "wanted") + (isHolo(card) ? " holo" : "");
   sleeve.dataset.index = String(index);
-  sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card) + (owned ? ", owned" : ", wanted"))}"></button><span class="sleeve-weld" aria-hidden="true"></span><span class="sleeve-tag" aria-hidden="true">${owned ? "Owned" : "Wanted"}</span><span class="shine" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span><span class="glare" aria-hidden="true"></span>`;
+  const drop = priceDrop(card);
+  const dropNote = drop ? ", down " + drop.shown + " percent" : "";
+  sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card) + (owned ? ", owned" : ", wanted") + dropNote)}"></button><span class="sleeve-weld" aria-hidden="true"></span><span class="sleeve-tag" aria-hidden="true">${owned ? "Owned" : "Wanted"}</span>${dropBadgeMarkup(drop)}<span class="shine" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span><span class="glare" aria-hidden="true"></span>`;
   ensureLabelFont();
   paintArt(sleeve.querySelector(".cardhit"), card);
   const art = sleeve.querySelector("img");
@@ -4119,7 +4164,9 @@ function renderCollection(root){
   const shownLeft = withCover && flipPage === 0 ? "Cover" : "Page " + (withCover ? flipPage : flipPage + 1);
   const ownedHere = list.filter(c => ownedIds.has(c.id)).length;
   const ownBit = list.length ? " · " + ownedHere + " owned · " + (list.length - ownedHere) + " wanted" : "";
-  foot.textContent = (wishMode ? "Wishlist · " : "") + shownLeft + (twoPage && flipPage + 1 < total ? " – " + (withCover && flipPage + 1 === 0 ? "Cover" : "Page " + (withCover ? flipPage + 1 : flipPage + 2)) : "") + " · " + list.length + (list.length === 1 ? " card" : " cards") + ownBit + " · " + (val ? priceText(val, "USD") : "—");
+  const droppedN = wishMode ? droppedCount(list) : 0;
+  const dropBit = droppedN ? " · " + droppedN + " dropped" : "";
+  foot.textContent = (wishMode ? "Wishlist · " : "") + shownLeft + (twoPage && flipPage + 1 < total ? " – " + (withCover && flipPage + 1 === 0 ? "Cover" : "Page " + (withCover ? flipPage + 1 : flipPage + 2)) : "") + " · " + list.length + (list.length === 1 ? " card" : " cards") + ownBit + dropBit + " · " + (val ? priceText(val, "USD") : "—");
   stage.append(book, nav, foot);
   root.append(tools, stage);
 
@@ -4664,6 +4711,65 @@ function scryHistory(card){
   if (!name) return [];
   return (rec.history || []).filter(row => row && row.v === name && pos(row.m)).map(row => ({ t:parseDay(row.d), label:String(row.d).slice(0, 10), value:pos(row.m) })).filter(p => p.t && p.value).sort((a, b) => a.t - b.t);
 }
+// Price-drop badge. Uses only the cached Scrydex raw near-mint USD history
+// already stored for the card (data/scrydex.json keeps about 90 days). This
+// does not call Scrydex.
+// Window: newest cached day for the printing on screen, compared with the
+// newest point on or before 30 days earlier. That baseline has to fall
+// between 30 and 45 days before the newest day, so a short series, or a lone
+// older point, does not pretend to be a 30-day move. The window is measured
+// from the newest cached day, not from today's calendar date.
+// Threshold: the newest market is at least 10% below that baseline. Both
+// prices have to be finite and greater than zero. Missing history, no
+// matching printing, or a non-finite percent shows no badge.
+const DROP_MIN_PCT = 10;
+const DROP_WINDOW_DAYS = 30;
+const DROP_MAX_LAG_DAYS = 45;
+function priceDrop(card){
+  if (!card || !card.id) return null;
+  const points = scryHistory(card);
+  if (!points || points.length < 2) return null;
+  const last = points[points.length - 1];
+  if (!last || !(last.value > 0) || !(last.t > 0)) return null;
+  const target = last.t - DROP_WINDOW_DAYS * 86400000;
+  let prev = null;
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i];
+    if (point && point.t <= target && point.value > 0) prev = point;
+  }
+  if (!prev || !(prev.t > 0) || !(prev.value > 0)) return null;
+  const lag = (last.t - prev.t) / 86400000;
+  if (!(lag >= DROP_WINDOW_DAYS && lag <= DROP_MAX_LAG_DAYS)) return null;
+  const pct = (prev.value - last.value) / prev.value * 100;
+  if (!Number.isFinite(pct) || pct < DROP_MIN_PCT) return null;
+  const shown = Math.round(pct);
+  if (!Number.isFinite(shown) || shown < DROP_MIN_PCT) return null;
+  const days = Math.round(lag);
+  if (!Number.isFinite(days) || days < DROP_WINDOW_DAYS) return null;
+  return { pct, shown, days };
+}
+function dropBadgeMarkup(drop){
+  if (!drop || !Number.isFinite(drop.shown) || drop.shown < DROP_MIN_PCT) return "";
+  const quiet = "Down " + drop.shown + "% versus about " + drop.days + " days ago";
+  return `<span class="drop-badge" data-pct="${drop.shown}"><span aria-hidden="true">↓${drop.shown}%</span><span class="sr-only">${esc(quiet)}</span></span>`;
+}
+function droppedCount(list){
+  let n = 0;
+  (list || []).forEach(card => { if (priceDrop(card)) n++; });
+  return n;
+}
+function droppedCountMarkup(n){
+  if (!Number.isFinite(n) || n < 1) return "";
+  const label = n === 1 ? "1 wishlisted card dropped" : n + " wishlisted cards dropped";
+  return `<span class="drop-badge drop-count"><span aria-hidden="true">Dropped ${n}</span><span class="sr-only">${esc(label)}</span></span>`;
+}
+function marketBlock(card, variant, shown, delta){
+  const badge = dropBadgeMarkup(priceDrop(card));
+  const move = !badge && delta != null && Number.isFinite(delta) ? delta : null;
+  const deltaHtml = move == null ? "" : `<span class="delta ${move < 0 ? "down" : ""}">${move < 0 ? "▼" : "▲"} ${Math.abs(move).toFixed(1)}%</span>`;
+  const price = shown ? priceText(shown.amount, shown.currency) : "—";
+  return `<div class="market"><div class="market-copy"><p class="eyebrow">${esc(marketCaption(card, variant))}</p><div class="price-row"><p class="market-price">${esc(price)}</p>${badge}</div></div>${deltaHtml}</div>`;
+}
 function trendHistory(card){
   const variant = selectedVariant(card);
   const list = (card.printings || []).filter(p => p && ((p.points && p.points.length) || pos(p.avg)));
@@ -4854,9 +4960,7 @@ function renderSummary(card){
       <div class="thumb" id="summaryThumb"></div>
       <div style="min-width:0;flex:1"><h2 class="pname" id="profileTitle">${esc(card.name || "Card")}</h2><p class="fine">${esc([card.set, card.number ? "#" + card.number : "", card.rarity].filter(Boolean).join(" · "))}</p></div>
     </div>
-    <div class="market"><div><p class="eyebrow">${esc(marketCaption(card, variant))}</p><p class="market-price">${esc(shown ? priceText(shown.amount, shown.currency) : "—")}</p></div>
-      ${delta == null ? "" : `<span class="delta ${delta < 0 ? "down" : ""}">${delta < 0 ? "▼" : "▲"} ${Math.abs(delta).toFixed(1)}%</span>`}
-    </div>
+    ${marketBlock(card, variant, shown, delta)}
     ${variants.length > 1 ? `<div class="vtoggle" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${variants.map(v => `<button type="button" data-variant="${esc(v.key)}" aria-pressed="${variant && variant.key === v.key ? "true" : "false"}">${esc(v.label)}</button>`).join("")}</div>` : ""}
     ${!gradedReady ? `<p class="fine">Checking graded prices…</p>` : gradedKnown ? `<div class="grade-grid">${GRADES.map(([company, grade]) => gradeCell(facts, company, grade)).join("")}</div>` : `<p class="note">No graded sales yet</p>`}
     <div class="chart-wrap">
@@ -4979,9 +5083,7 @@ function renderProfile(card){
       <button class="iconbtn" id="closeProfile" type="button" aria-label="Close profile">✕</button>
     </div>
     ${banner ? `<p class="note">${esc(banner)}</p>` : ""}
-    <div class="market"><div><p class="eyebrow">${esc(marketCaption(card, variant))}</p><p class="market-price">${esc(shown ? priceText(shown.amount, shown.currency) : "—")}</p></div>
-      ${delta == null ? "" : `<span class="delta ${delta < 0 ? "down" : ""}">${delta < 0 ? "▼" : "▲"} ${Math.abs(delta).toFixed(1)}%</span>`}
-    </div>
+    ${marketBlock(card, variant, shown, delta)}
     ${variants.length > 1 ? `<div class="vtoggle" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${variants.map(v => `<button type="button" data-variant="${esc(v.key)}" aria-pressed="${variant && variant.key === v.key ? "true" : "false"}">${esc(v.label)}</button>`).join("")}</div>` : ""}
     ${!gradedReady ? `<p class="fine">Checking graded prices…</p>` : gradedKnown ? `<div class="grade-grid">${GRADES.map(([company, grade]) => gradeCell(facts, company, grade)).join("")}</div>` : `<p class="note">No graded sales yet</p>${priceQueued ? `<p class="fine">Queued for the next price batch.</p>` : ""}`}
     <div class="chart-wrap">

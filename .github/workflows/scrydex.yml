@@ -65,11 +65,43 @@ jobs:
           git add data/scrydex.json data/scrydex-usage.json data/fx.json
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            git commit -m "Update cached Scrydex prices"
-            git push origin HEAD:main
-            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          git commit -m "Update cached Scrydex prices"
+          # The Daily Drop quote also pushes main at 09:00 UTC, just after this
+          # 08:15 UTC sync. If that quote lands first, the push below is rejected
+          # as a non-fast-forward. Replay this commit onto the new main and
+          # retry. Any other push failure stops the job.
+          base=$(git rev-parse HEAD)
+          ok=0
+          for delay in 0 4 8 16 32; do
+            if [ "$delay" -ne 0 ]; then
+              echo "rebase and push retry in ${delay}s"
+              sleep "$delay"
+              git reset --hard "$base"
+            fi
+            git fetch --deepen=32 origin main || git fetch origin main
+            if ! git pull --rebase origin main; then
+              git rebase --abort || true
+              continue
+            fi
+            push_log=$(mktemp)
+            if git push origin HEAD:main >"$push_log" 2>&1; then
+              cat "$push_log"
+              ok=1
+              break
+            fi
+            cat "$push_log"
+            if ! grep -Eqi 'non-fast-forward|Updates were rejected' "$push_log"; then
+              echo "push failed for a reason other than a non-fast-forward rejection"
+              exit 1
+            fi
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "push failed after non-fast-forward retries"
+            exit 1
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Setup Pages
         if: github.ref == 'refs/heads/main' && steps.commit.outputs.changed == 'true'
