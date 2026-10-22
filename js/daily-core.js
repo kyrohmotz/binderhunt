@@ -177,7 +177,8 @@
     dark: 1, light: 1, shining: 1, shiny: 1, team: 1, rocket: 1, rockets: 1,
     radiant: 1, amazing: 1, galarian: 1, alolan: 1, hisuian: 1, paldean: 1,
     the: 1, an: 1, ex: 1, gx: 1, v: 1, vmax: 1, vstar: 1,
-    break: 1, legend: 1, star: 1, prism: 1, lv: 1, lvx: 1
+    break: 1, legend: 1, star: 1, prism: 1, lv: 1, lvx: 1,
+    union: 1, "v-union": 1, vunion: 1
   };
 
   function speciesName(name) {
@@ -186,8 +187,11 @@
     words.forEach(word => {
       let display = word.replace(/['’]s$/i, "");
       let token = display.toLowerCase();
-      const dash = token.lastIndexOf("-");
-      if (dash > 0 && SPECIES_SKIP[token.slice(dash + 1)]) {
+      if (SPECIES_SKIP[token]) return;
+      let guard = 0;
+      while (guard++ < 4) {
+        const dash = token.lastIndexOf("-");
+        if (dash <= 0 || !SPECIES_SKIP[token.slice(dash + 1)]) break;
         display = display.slice(0, display.lastIndexOf("-"));
         token = token.slice(0, dash);
       }

@@ -215,6 +215,7 @@ SPECIES_SKIP = {
     "radiant", "amazing", "galarian", "alolan", "hisuian", "paldean",
     "the", "an", "ex", "gx", "v", "vmax", "vstar",
     "break", "legend", "star", "prism", "lv", "lvx",
+    "union", "v-union", "vunion",
 }
 
 
@@ -224,8 +225,12 @@ def species_of(name: str) -> str:
     for word in words:
         display = re.sub(r"['’]s$", "", word, flags=re.IGNORECASE)
         token = display.lower()
-        dash = token.rfind("-")
-        if dash > 0 and token[dash + 1:] in SPECIES_SKIP:
+        if token in SPECIES_SKIP:
+            continue
+        for _ in range(4):
+            dash = token.rfind("-")
+            if dash <= 0 or token[dash + 1:] not in SPECIES_SKIP:
+                break
             display = display[:display.rfind("-")]
             token = token[:dash]
         if token in SPECIES_SKIP or len(token) <= 1:

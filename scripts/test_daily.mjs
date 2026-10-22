@@ -247,6 +247,7 @@ check("rejected guesses say what was wrong", () => {
   assert.match(parseGuess(letters.text).message, /isn't a price/);
   assert.doesNotMatch(parseGuess(letters.text).message, /above zero/);
   assert.equal(readGuess(".5").text, ".5");
+  assert.equal(readGuess(".5").message, "");
   assert.equal(parseGuess(readGuess(".5").text).value, 0.5);
   assert.equal(readGuess("abc$12.5.0x").text, "$12.50");
 });
@@ -290,6 +291,14 @@ check("a daily save keeps the fields a binder matches on", () => {
   assert.equal(speciesName("Staraptor"), "Staraptor");
   assert.equal(speciesName("Starmie GX"), "Starmie");
   assert.notEqual(speciesName("Pyroar BREAK"), "BREAK");
+  assert.equal(speciesName("Morpeko V-UNION"), "Morpeko");
+  assert.equal(speciesName("Zacian V-UNION"), "Zacian");
+  assert.equal(speciesName("Greninja V-UNION"), "Greninja");
+  assert.equal(speciesName("Mewtwo V-UNION"), "Mewtwo");
+  assert.equal(speciesName("Pikachu VUNION"), "Pikachu");
+  assert.equal(speciesName("Morpeko V UNION"), "Morpeko");
+  assert.notEqual(speciesName("Morpeko V-UNION"), "V-UNION");
+  assert.notEqual(speciesName("Morpeko V-UNION"), "UNION");
 });
 
 check("committed schedule is a priced, mixed year", () => {
