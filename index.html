@@ -585,7 +585,7 @@ html.reduce .book.opening{animation:none}
 .empty-note{flex:none;margin:0 4px 2px;font-size:12px;line-height:1.3}
 .slot{position:relative;min-width:0;min-height:0}
 .slot > .sleeve{position:absolute;inset:0;container-type:size}
-.sleeve .cardhit{inset:auto;left:50%;top:56%;right:auto;bottom:auto;width:min(84cqi,calc(74cqb * 63 / 88));height:auto;max-height:none;aspect-ratio:63/88;transform:translate(-50%,-50%);border-radius:2px}
+.sleeve .cardhit{inset:auto;left:50%;top:calc(50% - 18px);right:auto;bottom:auto;width:min(84cqi,calc((100cqb - 44px) * 63 / 88));height:auto;max-height:none;aspect-ratio:63/88;transform:translate(-50%,-50%);border-radius:2px}
 .sleeve .cardhit:active{transform:translate(-50%,-50%) scale(.985)}
 .sleeve.empty{background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.16) 38%,rgba(255,255,255,.34));box-shadow:inset 0 0 0 1px rgba(255,255,255,.82),inset 0 0 0 1px rgba(40,32,24,.12),inset 0 8px 12px rgba(40,32,24,.05)}
 .sleeve.empty .ghost-card{display:none}
@@ -613,25 +613,28 @@ html.reduce .book.opening{animation:none}
 .pad h2{margin:0 0 10px}
 .pad .fine{max-width:16em}
 .pad .cover-meter,.cover .cover-meter,.cover .togo{display:none}
-/* The turning page is three hinges, not one rotating plane. */
-.leaf.hot.forward,.leaf.hot.backward{transform:none}
-.leaf.hot:has(.peel) > .face{opacity:0}
-.peel{position:absolute;inset:0;z-index:5;pointer-events:none;transform-style:preserve-3d}
-.hinge{position:absolute;top:0;transform-style:preserve-3d;will-change:transform}
-.curl-clip{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;transform:translateZ(0.1px)}
-.curl-sheet{position:absolute;top:0;margin:0}
-.curl-backface{position:absolute;inset:0;transform:rotateY(180deg);backface-visibility:hidden;background:linear-gradient(180deg,#f6f0e4,#e6d9c6);box-shadow:inset 0 0 0 1px rgba(70,54,38,.18)}
-.curl-edge{position:absolute;top:1px;bottom:1px;width:8px;background:repeating-linear-gradient(180deg,#fbf7f0 0 1px,#e4d5c2 1px 2px,#cbbba6 2px 3px);box-shadow:0 0 0 1px rgba(40,32,24,.2)}
-.leaf.hot.forward .hinge{transform-origin:left center}
-.leaf.hot.backward .hinge{transform-origin:right center}
-.leaf.hot.forward .curl-edge{right:0;transform-origin:right center;transform:rotateY(90deg)}
-.leaf.hot.backward .curl-edge{left:0;transform-origin:left center;transform:rotateY(-90deg)}
-.leaf.hot:not(.live) .hinge{transition:transform .55s cubic-bezier(.22,.61,.36,1)}
-.leaf.hot.live .hinge,.leaf.hot.live .curl-shadow{transition:none}
-.curl-shadow{position:absolute;top:0;bottom:0;width:48%;z-index:2;pointer-events:none;opacity:calc(var(--turn,0) * .82)}
-.leaf.hot.forward .curl-shadow{left:0;background:linear-gradient(90deg,rgba(40,32,24,.5),rgba(40,32,24,.08) 62%,transparent);transform:translateX(calc(var(--turn,0) * 22%))}
-.leaf.hot.backward .curl-shadow{right:0;background:linear-gradient(270deg,rgba(40,32,24,.5),rgba(40,32,24,.08) 62%,transparent);transform:translateX(calc(var(--turn,0) * -22%))}
-.leaf.hot:not(.live) .curl-shadow{transition:transform .55s cubic-bezier(.22,.61,.36,1),opacity .55s linear}
+.under{z-index:1}
+.sleeve .gotbtn{z-index:6;right:4px;bottom:2px;width:34px;height:34px;min-width:34px;min-height:34px;border-radius:9px 9px 5px 5px;background:rgba(248,247,239,.94);box-shadow:inset 0 0 0 1px rgba(40,32,24,.18);place-items:center}
+.sleeve .gotbtn .mark{margin:0}
+/* Page curl is a stack of projected strips. The leaf itself stays put. */
+.leaf.hot{perspective:none;will-change:auto;transition:none}
+.leaf.hot.forward,.leaf.hot.backward,.leaf.hot.forward.live,.leaf.hot.backward.live{transform:none}
+.leaf.hot.armed > .face{opacity:0}
+.peel{position:absolute;inset:0;z-index:5;pointer-events:none;opacity:0}
+.leaf.hot .peel{opacity:1}
+.strip{position:absolute;top:0;left:0;height:100%;transform-origin:left center;overflow:hidden;background:#f4ecdf}
+.strip .strip-front,.strip .strip-back{position:absolute;top:0;overflow:hidden}
+.strip .strip-front{background:#f4ecdf;background-image:repeating-linear-gradient(0deg,rgba(90,70,40,.05) 0 1px,transparent 1px 6px)}
+.strip .strip-back{opacity:0;background:#c4b198;background-image:repeating-linear-gradient(0deg,rgba(90,70,50,.14) 0 1px,transparent 1px 4px)}
+.strip i{position:absolute;display:block;background:rgba(255,255,255,.82);border:1px solid rgba(40,32,24,.28)}
+.strip .strip-back i{background:rgba(70,52,36,.16);border-color:rgba(60,46,34,.4)}
+.strip i.pad{background:#e7d3b8}
+.strip img{position:absolute;object-fit:contain;display:block}
+.curl-edge{position:absolute;top:-1px;bottom:-1px;left:0;width:18px;z-index:40;opacity:0;border-radius:1px;background:repeating-linear-gradient(180deg,#fbf6ee 0 1px,#e7d8c4 1px 2px,#c9b59c 2px 3px,#8d7760 3px 4px);box-shadow:0 0 0 1px rgba(40,32,24,.5),2px 0 6px rgba(24,16,10,.28)}
+.curl-shadow,.curl-gloss{position:absolute;top:-4%;bottom:-4%;left:0;pointer-events:none}
+.curl-shadow{z-index:30;background:linear-gradient(90deg,rgba(24,16,10,.12),rgba(24,16,10,.62) 18%,rgba(24,16,10,.34) 46%,transparent 100%)}
+.leaf.hot.backward .curl-shadow{background:linear-gradient(270deg,rgba(24,16,10,.12),rgba(24,16,10,.62) 18%,rgba(24,16,10,.34) 46%,transparent 100%)}
+.curl-gloss{z-index:36;background:linear-gradient(90deg,transparent,rgba(255,252,245,.96) 48%,transparent)}
 .leaf.hot .face.front::after{content:none}
 html.reduce .leaf.hot > .face{opacity:1}
 html.reduce .peel{display:none}
@@ -1606,7 +1609,7 @@ function snapshot(card){
   return {
     id:card.id, name:card.name || "", set:card.set || "", setId:card.setId || "", number:card.number || "",
     rarity:card.rarity || "", img:card.img || "", thumb:card.thumb || "", types:card.types || [],
-    variants:card.variants || [], price:pos(card.price), source:card.source || "", stampedFirst:!!card.stampedFirst,
+    variants:card.variants || [], price:pos(card.price), source:card.source || "", stampedFirst:!!card.stampedFirst, holo:card.holo === true,
     artist:card.artist || "", hp:card.hp, flavor:card.flavor || "", legal:card.legal || null, cm:card.cm || null, printings:card.printings || []
   };
 }
@@ -1899,8 +1902,10 @@ function normalizeDex(c){
     if (!pts.length && pos(pcm.avg) == null && pos(pcm.trend) == null) continue;
     printings.push({ label, avg:pos(pcm.avg), low:pos(pcm.low), trend:pos(pcm.trend), points:pts, updated:pcm.updated || "" });
   }
+  const dexPrint = c.variants && typeof c.variants === "object" ? c.variants : {};
+  const holo = dexPrint.holo === true || (Array.isArray(c.variants_detailed) && c.variants_detailed.some(v => String(v && v.type || "").toLowerCase() === "holo"));
   return {
-    source:"tcgdex", id:c.id, name:c.name,
+    source:"tcgdex", id:c.id, name:c.name, holo,
     img:c.image ? safeImg(c.image + "/high.webp") : "", thumb:c.image ? safeImg(c.image + "/low.webp") : "",
     set:(c.set && c.set.name) || "", setId:(c.set && c.set.id) || "", number:c.localId || "",
     rarity:c.rarity || "—", artist:c.illustrator || "", hp:pos(Number(c.hp)) || (Number(c.hp) > 0 ? Number(c.hp) : null),
@@ -1921,8 +1926,9 @@ function normalizePtcg(c){
     if (market == null && mid == null && low == null && high == null) continue;
     variants.push({ key, label:variantLabel(key), low, mid, high, market, productId:null });
   }
+  const holo = /holo|illustration|hyper|secret|shiny|radiant|amazing/i.test(c.rarity || "") || Object.keys(prices).some(k => /holo/i.test(k) && !/reverse/i.test(k));
   return {
-    source:"pokemontcg.io", id:c.id, name:c.name,
+    source:"pokemontcg.io", id:c.id, name:c.name, holo,
     img:safeImg(c.images && c.images.large), thumb:safeImg(c.images && c.images.small),
     set:(c.set && c.set.name) || "", setId:(c.set && c.set.id) || "", number:c.number || "",
     rarity:c.rarity || "—", artist:c.artist || "", types:c.types || [],
@@ -3598,7 +3604,17 @@ function renderBinders(){
   paintContext();
 }
 function pagesOf(list){ return Math.max(1, Math.ceil(list.length / 9) || 1); }
-function isHolo(card){ return /holo|illustration|hyper|secret|shiny|radiant|amazing/i.test((card && card.rarity) || ""); }
+function isHolo(card){
+  if (!card) return false;
+  if (card.holo === true) return true;
+  if (/holo|illustration|hyper|secret|shiny|radiant|amazing/i.test(card.rarity || "")) return true;
+  const vars = card.variants;
+  if (vars && typeof vars === "object" && !Array.isArray(vars) && vars.holo === true) return true;
+  return Array.isArray(vars) && vars.some(v => {
+    const key = String(v && v.key || "");
+    return /holo/i.test(key) && !/reverse/i.test(key);
+  });
+}
 function playPaper(){
   if (!settings.sound || reduceMotion()) return;
   playTone(150);
@@ -3783,75 +3799,173 @@ function binderSpread(root){
   const byH = ((gridH - 8) / 3) * (63 / 88);
   return Math.min(byW, byH) >= 74;
 }
-function curlPose(t){
+const CURL_STRIPS = 12;
+function curlWorld(t){
   const turn = Math.max(0, Math.min(1, t));
+  const flat = Math.pow(turn, 2.6) * 176;
   const bend = Math.sin(Math.PI * turn);
-  const body = Math.pow(turn, 2.15) * 178;
-  const mid = Math.min(178, body + bend * 38);
-  const lead = Math.min(178, body + bend * 76);
-  return [body, mid - body, lead - mid];
+  const angles = [];
+  for (let i = 0; i < CURL_STRIPS; i++) {
+    const s = (i + 0.5) / CURL_STRIPS;
+    angles.push(Math.min(176, flat + bend * Math.pow(s, 1.8) * 150));
+  }
+  return angles;
 }
 function applyCurl(leaf, t){
   if (!leaf) return;
-  const sign = leaf.classList.contains("backward") ? 1 : -1;
-  const angles = curlPose(t);
-  leaf.querySelectorAll(".hinge").forEach(hinge => {
-    const index = hinge.classList.contains("h0") ? 0 : hinge.classList.contains("h1") ? 1 : 2;
-    hinge.style.transform = "rotateY(" + (sign * angles[index]).toFixed(2) + "deg)";
-  });
+  const backward = leaf.classList.contains("backward") || leaf.dataset.curlDir === "-1";
+  const width = leaf._curlW || leaf.clientWidth || 1;
+  const angles = curlWorld(t);
+  const strips = leaf._curlStrips || [];
+  let cursor = backward ? width : 0;
+  let apex = cursor;
+  let folded = false;
+  for (let i = 0; i < strips.length; i++) {
+    const strip = strips[i];
+    if (!strip) continue;
+    const angle = angles[i] || 0;
+    const rad = angle * Math.PI / 180;
+    const proj = strip._w * Math.cos(rad);
+    const end = cursor + (backward ? -proj : proj);
+    const left = Math.min(cursor, end);
+    const scale = Math.abs(Math.cos(rad));
+    strip.dataset.world = angle.toFixed(1);
+    strip.style.transform = "translate(" + left.toFixed(2) + "px,0) scaleX(" + Math.max(0.02, scale).toFixed(4) + ")";
+    const showBack = angle > 92;
+    if (strip._front) strip._front.style.opacity = showBack ? "0" : "1";
+    if (strip._back) strip._back.style.opacity = showBack ? "1" : "0";
+    if (angle > 80 && angle < 110) folded = true;
+    if (backward) apex = Math.min(apex, cursor, end);
+    else apex = Math.max(apex, cursor, end);
+    cursor = end;
+  }
+  const turn = Math.max(0, Math.min(1, t));
+  const lift = Math.sin(Math.PI * turn);
+  const shadeW = width * 0.62;
+  const glossW = width * 0.1;
+  const shadow = leaf.querySelector(".curl-shadow");
+  const gloss = leaf.querySelector(".curl-gloss");
+  const edge = leaf.querySelector(".curl-edge");
+  if (shadow) {
+    const sx = backward ? apex - shadeW * 0.82 : apex - shadeW * 0.18;
+    shadow.style.transform = "translate(" + sx.toFixed(1) + "px,0)";
+    shadow.style.opacity = (0.28 + lift * 0.72).toFixed(3);
+  }
+  if (gloss) {
+    const gx = backward ? apex - glossW * 0.7 : apex - glossW * 0.28;
+    gloss.style.transform = "translate(" + gx.toFixed(1) + "px,0)";
+    gloss.style.opacity = (0.2 + lift * 0.8).toFixed(3);
+  }
+  if (edge) {
+    edge.style.transform = "translate(" + (apex - 9).toFixed(1) + "px,0)";
+    edge.style.opacity = folded ? Math.min(1, 0.55 + lift * 0.45).toFixed(3) : "0";
+  }
+  leaf._curlApex = apex;
 }
-function mountPeel(leaf){
-  leaf.querySelectorAll(".peel").forEach(node => node.remove());
-  if (reduceMotion()) return;
+function mountPeel(leaf, dir){
+  if (reduceMotion() || !leaf) return;
   const front = leaf.querySelector(":scope > .face.front");
   if (!front) return;
-  const w = leaf.clientWidth;
-  const h = leaf.clientHeight;
+  const backward = dir < 0;
+  const imgs = front.querySelectorAll("img");
+  let painted = 0;
+  imgs.forEach(img => { if (img.complete && img.naturalWidth) painted++; });
+  const prefix = backward ? "b" : "f";
+  if (leaf.dataset.peel && leaf.dataset.peel.charAt(0) === prefix && leaf.dataset.peel.endsWith(":" + painted) && leaf._curlStrips && leaf.querySelector(".peel")) return;
+  const w = Math.round(leaf.clientWidth);
+  const h = Math.round(leaf.clientHeight);
   if (w < 40 || h < 40) return;
-  const backward = leaf.classList.contains("backward");
-  const w0 = Math.round(w * 0.34);
-  const w1 = Math.round(w * 0.33);
-  const w2 = w - w0 - w1;
-  const widths = [w0, w1, w2];
-  const offsets = backward ? [w1 + w2, w2, 0] : [0, w0, w0 + w1];
+  const key = prefix + w + "x" + h + ":" + painted;
+  const host = front.getBoundingClientRect();
+  const bits = [];
+  const pockets = [];
+  imgs.forEach(img => {
+    if (!img.complete || !img.naturalWidth) {
+      img.addEventListener("load", () => {
+        if (!leaf.isConnected || leaf.classList.contains("hot")) return;
+        mountPeel(leaf, Number(leaf.dataset.curlDir) || (backward ? -1 : 1));
+      }, { once:true });
+      return;
+    }
+    const rect = img.getBoundingClientRect();
+    if (rect.width < 2 || rect.height < 2) return;
+    bits.push({ img, x: rect.left - host.left, y: rect.top - host.top, w: rect.width, h: rect.height });
+  });
+  front.querySelectorAll(".sleeve, .pad").forEach(node => {
+    const rect = node.getBoundingClientRect();
+    if (rect.width < 2 || rect.height < 2) return;
+    pockets.push({ x: rect.left - host.left, y: rect.top - host.top, w: rect.width, h: rect.height, pad: node.classList.contains("pad") });
+  });
+  const base = Math.floor(w / CURL_STRIPS);
+  const widths = Array(CURL_STRIPS).fill(base);
+  widths[CURL_STRIPS - 1] = w - base * (CURL_STRIPS - 1);
+  const sheet = (sx, back) => {
+    const node = document.createElement("div");
+    node.className = back ? "strip-back" : "strip-front";
+    node.style.left = (-sx) + "px";
+    node.style.width = w + "px";
+    node.style.height = h + "px";
+    if (!back) pockets.forEach(pocket => {
+      const cell = document.createElement("i");
+      cell.style.left = pocket.x + "px";
+      cell.style.top = pocket.y + "px";
+      cell.style.width = pocket.w + "px";
+      cell.style.height = pocket.h + "px";
+      if (pocket.pad) cell.className = "pad";
+      node.append(cell);
+    });
+    if (!back) bits.forEach(bit => {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = bit.img.currentSrc || bit.img.src;
+      img.style.left = bit.x + "px";
+      img.style.top = bit.y + "px";
+      img.style.width = bit.w + "px";
+      img.style.height = bit.h + "px";
+      node.append(img);
+    });
+    return node;
+  };
   const peel = document.createElement("div");
   peel.className = "peel";
   peel.setAttribute("aria-hidden", "true");
   const shadow = document.createElement("div");
   shadow.className = "curl-shadow";
-  let node = null;
-  for (let i = 2; i >= 0; i--) {
-    const hinge = document.createElement("div");
-    hinge.className = "hinge h" + i;
-    hinge.style.width = widths[i] + "px";
-    hinge.style.height = h + "px";
-    hinge.style.left = "0px";
-    if (node) {
-      node.style.left = (backward ? -widths[i + 1] : widths[i]) + "px";
-      hinge.append(node);
-    }
-    const clip = document.createElement("div");
-    clip.className = "curl-clip";
-    const sheet = front.cloneNode(true);
-    sheet.className = "face curl-sheet";
-    sheet.querySelectorAll("button").forEach(btn => btn.remove());
-    sheet.style.width = w + "px";
-    sheet.style.height = h + "px";
-    sheet.style.left = (-offsets[i]) + "px";
-    clip.append(sheet);
-    const back = document.createElement("div");
-    back.className = "curl-backface";
-    hinge.append(clip, back);
-    if (i === 2) {
-      const edge = document.createElement("div");
-      edge.className = "curl-edge";
-      hinge.append(edge);
-    }
-    node = hinge;
+  shadow.style.width = Math.round(w * 0.62) + "px";
+  const gloss = document.createElement("div");
+  gloss.className = "curl-gloss";
+  gloss.style.width = Math.round(w * 0.1) + "px";
+  const edge = document.createElement("div");
+  edge.className = "curl-edge";
+  const made = [];
+  for (let i = 0; i < CURL_STRIPS; i++) {
+    let sx = 0;
+    for (let k = 0; k < i; k++) sx += widths[k];
+    if (backward) sx = w - sx - widths[i];
+    const faceSlice = sheet(sx, false);
+    const backSlice = sheet(sx, true);
+    const strip = document.createElement("div");
+    strip.className = "strip";
+    strip.dataset.i = String(i);
+    strip.style.width = widths[i] + "px";
+    strip.style.height = h + "px";
+    strip.style.zIndex = String(8 + i);
+    strip.append(faceSlice, backSlice);
+    strip._w = widths[i];
+    strip._front = faceSlice;
+    strip._back = backSlice;
+    made.push(strip);
   }
-  if (backward) node.style.left = (w1 + w2) + "px";
-  peel.append(shadow, node);
+  peel.append(shadow, gloss, edge, ...made);
+  leaf.querySelectorAll(".peel").forEach(old => old.remove());
   leaf.append(peel);
+  leaf._curlW = w;
+  leaf._curlH = h;
+  leaf._curlStrips = made;
+  leaf.classList.add("armed");
+  leaf.dataset.peel = key;
+  leaf.dataset.curlDir = backward ? "-1" : "1";
+  applyCurl(leaf, leaf.classList.contains("hot") ? (Number(leaf.style.getPropertyValue("--turn")) || 0) : 0);
 }
 function renderCollection(root){
   const wishMode = binderView.kind === "wish";
@@ -3923,7 +4037,7 @@ function renderCollection(root){
     back.className = "face back";
     leafR.append(face, back);
   }
-  spread.append(underL, underR, spine, rings, leafL, leafR);
+  spread.append(leafL, leafR, underL, underR, spine, rings);
   const prevEar = document.createElement("button");
   prevEar.type = "button";
   prevEar.className = "dogear prev";
@@ -3992,18 +4106,23 @@ function renderCollection(root){
     const dest = Math.max(0, Math.min(total - 1, flipPage + dir * step));
     return twoPage ? dest - (dest % 2) : dest;
   };
+  const revealedFor = dir => dir > 0 ? (twoPage ? flipPage + 3 : flipPage + 1) : (twoPage ? flipPage - 2 : flipPage - 1);
+  const fillUnder = dir => {
+    const revealed = revealedFor(dir);
+    const under = book.querySelector(dir > 0 || !twoPage ? ".under.right" : ".under.left");
+    if (!under || under.dataset.sheet === String(revealed)) return;
+    under.replaceChildren(buildFace(revealed, ctx, false));
+    under.dataset.sheet = String(revealed);
+  };
   const arm = dir => {
     const leaf = book.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right"));
     if (!leaf) return null;
-    const back = leaf.querySelector(".face.back");
-    const landing = dir > 0 ? (twoPage ? flipPage + 2 : flipPage + 1) : (twoPage ? flipPage - 1 : flipPage - 1);
-    const revealed = dir > 0 ? (twoPage ? flipPage + 3 : flipPage + 1) : (twoPage ? flipPage - 2 : flipPage - 1);
-    if (back) { back.replaceChildren(buildFace(landing, ctx, false)); back.classList.add("back"); }
-    const under = book.querySelector(dir > 0 || !twoPage ? ".under.right" : ".under.left");
-    if (under) under.replaceChildren(buildFace(revealed, ctx, false));
+    fillUnder(dir);
     leaf.classList.add("hot", dir > 0 ? "forward" : "backward");
+    if (dir < 0) leaf.classList.remove("forward");
+    else leaf.classList.remove("backward");
     leaf.style.setProperty("--turn", "0");
-    mountPeel(leaf);
+    mountPeel(leaf, dir);
     applyCurl(leaf, 0);
     return leaf;
   };
@@ -4034,12 +4153,21 @@ function renderCollection(root){
       renderBinders();
     };
     if (!leaf) { go(); return; }
-    leaf.addEventListener("transitionend", e => { if (e.propertyName === "transform") go(); });
-    requestAnimationFrame(() => {
-      leaf.style.setProperty("--turn", "1");
-      applyCurl(leaf, 1);
-    });
-    setTimeout(go, 640);
+    const from = Number(leaf.style.getPropertyValue("--turn")) || 0;
+    leaf.classList.add("live");
+    const started = performance.now();
+    const frame = now => {
+      if (went || token !== flipToken || !leaf.isConnected) return;
+      const p = Math.min(1, (now - started) / 560);
+      const eased = 1 - Math.pow(1 - p, 2.4);
+      const turn = from + (1 - from) * eased;
+      leaf.style.setProperty("--turn", turn.toFixed(4));
+      applyCurl(leaf, turn);
+      if (p < 1) requestAnimationFrame(frame);
+      else go();
+    };
+    requestAnimationFrame(frame);
+    setTimeout(go, 700);
   };
   prevBtn.onclick = () => finishFlip(-1);
   nextBtn.onclick = () => finishFlip(1);
@@ -4087,14 +4215,23 @@ function renderCollection(root){
   };
   const snapCurl = turning => {
     if (!turning) return;
-    turning.classList.remove("live");
-    turning.style.setProperty("--turn", "0");
-    applyCurl(turning, 0);
-    setTimeout(() => {
-      turning.querySelectorAll(".peel").forEach(node => node.remove());
-      turning.classList.remove("hot", "forward", "backward", "live");
-      turning.style.removeProperty("--turn");
-    }, 560);
+    const from = Number(turning.style.getPropertyValue("--turn")) || 0;
+    turning.classList.add("live");
+    const started = performance.now();
+    const frame = now => {
+      if (!turning.isConnected) return;
+      const p = Math.min(1, (now - started) / 420);
+      const turn = from * Math.pow(1 - p, 1.6);
+      turning.style.setProperty("--turn", turn.toFixed(4));
+      applyCurl(turning, turn);
+      if (p < 1) requestAnimationFrame(frame);
+      else {
+        turning.classList.remove("hot", "forward", "backward", "live");
+        turning.style.removeProperty("--turn");
+        applyCurl(turning, 0);
+      }
+    };
+    requestAnimationFrame(frame);
   };
   const onUp = e => {
     if (e.pointerId !== pid) return;
@@ -4319,6 +4456,19 @@ function renderCollection(root){
     };
   }
   paintContext();
+  const warmBook = book;
+  requestAnimationFrame(() => {
+    if (!warmBook.isConnected || reduceMotion()) return;
+    const warm = dir => {
+      const leaf = warmBook.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right"));
+      if (!leaf || leaf.classList.contains("hot")) return;
+      fillUnder(dir);
+      mountPeel(leaf, dir);
+      applyCurl(leaf, 0);
+    };
+    warm(1);
+    if (twoPage) warm(-1);
+  });
 }
 
 function openMenu(anchor, card, binder){
