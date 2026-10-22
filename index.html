@@ -577,6 +577,68 @@ html.reduce .book.opening{animation:none}
   html:not(.motion-on) .sleeve.holo img{transform:none}
   html:not(.motion-on) .book.opening{animation:none}
 }
+/* Pockets keep the card ratio. A spread is only used when three of them fit. */
+.face{container-type:size}
+.face:not(:has(> .pad)){align-items:center}
+.sleeves{flex:none;align-self:center;margin:auto;width:min(100cqi,calc((100cqb - 30px) * 63 / 88));height:min(calc(100cqb - 30px),calc(100cqi * 88 / 63));max-height:calc(100cqb - 24px);grid-template-rows:repeat(3,minmax(0,1fr));gap:4px}
+.face:has(.empty-note) .sleeves{width:min(100cqi,calc((100cqb - 68px) * 63 / 88));height:min(calc(100cqb - 68px),calc(100cqi * 88 / 63))}
+.empty-note{flex:none;margin:0 4px 2px;font-size:12px;line-height:1.3}
+.slot{position:relative;min-width:0;min-height:0}
+.slot > .sleeve{position:absolute;inset:0;container-type:size}
+.sleeve .cardhit{inset:auto;left:50%;top:56%;right:auto;bottom:auto;width:min(84cqi,calc(74cqb * 63 / 88));height:auto;max-height:none;aspect-ratio:63/88;transform:translate(-50%,-50%);border-radius:2px}
+.sleeve .cardhit:active{transform:translate(-50%,-50%) scale(.985)}
+.sleeve.empty{background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.16) 38%,rgba(255,255,255,.34));box-shadow:inset 0 0 0 1px rgba(255,255,255,.82),inset 0 0 0 1px rgba(40,32,24,.12),inset 0 8px 12px rgba(40,32,24,.05)}
+.sleeve.empty .ghost-card{display:none}
+.sleeve.wanted{background:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,.12) 40%,rgba(255,255,255,.28));box-shadow:inset 0 0 0 1px rgba(255,255,255,.7),inset 0 0 0 1px rgba(40,32,24,.1),inset 0 8px 12px rgba(40,32,24,.05)}
+.sleeve.wanted .cardhit{box-shadow:none;background:transparent}
+.sleeve .sleeve-tag{top:0;left:0;right:auto;z-index:6;max-width:62%;border-radius:1px 0 8px 0;border:1.5px solid var(--ink);border-top:0;border-left:0;padding:2px 6px 2px 4px;font-size:8px;line-height:1.25;letter-spacing:.04em;background:#F6C9C9}
+.sleeve.owned .sleeve-tag{background:#ABB28D}
+.sleeve.wanted .sleeve-tag{background:#F6C9C9}
+.binder-stitch,.pad-stitch{display:none}
+.shelf-scene{position:relative;margin-top:2px;padding:10px 8px 26px;border-radius:8px 8px 18px 18px;background:linear-gradient(180deg,#f3e6d4,#e7d3bc);box-shadow:none}
+.shelf-scene::after{content:"";position:absolute;left:12px;right:12px;bottom:9px;height:12px;border-radius:3px;background:linear-gradient(180deg,#e6d3c0,#c4a88e 46%,#a88870);box-shadow:0 3px 0 #8d7058,0 8px 12px rgba(60,40,20,.18),inset 0 1px 0 rgba(255,255,255,.45)}
+.shelf{position:relative;z-index:1;align-items:end;background:transparent;box-shadow:none;padding:6px 4px 8px}
+.cover{display:block;aspect-ratio:5/6.6;overflow:visible;background:transparent;border:0;box-shadow:none;padding:0}
+.binder-book{position:absolute;inset:0;display:grid;grid-template-columns:15px minmax(0,1fr) 8px;width:100%;height:100%}
+.binder-spine{border-radius:5px 1px 1px 4px;background:linear-gradient(90deg,rgba(0,0,0,.32),transparent 40%,rgba(255,255,255,.2) 52%,rgba(0,0,0,.28)),linear-gradient(180deg,color-mix(in srgb,var(--cover,#E9D5C0) 48%,#2a241e),color-mix(in srgb,var(--cover,#E9D5C0) 28%,#16130f));box-shadow:inset -3px 0 4px rgba(0,0,0,.28)}
+.binder-board{position:relative;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px 8px 14px;background-image:linear-gradient(180deg,rgba(255,255,255,.34),transparent 32%),linear-gradient(165deg,color-mix(in srgb,var(--cover,#E9D5C0) 76%,white),var(--cover,#E9D5C0) 52%,color-mix(in srgb,var(--cover,#E9D5C0) 82%,#5c5348)),var(--cloth);background-size:auto,auto,140px 140px;background-blend-mode:normal,multiply,soft-light;box-shadow:inset 0 0 0 1px rgba(255,255,255,.38),6px 12px 0 rgba(48,38,28,.06)}
+.binder-name{position:relative;z-index:1;max-width:100%;font-family:var(--display);font-size:16px;line-height:1.15;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cover .ring{position:relative;z-index:1;width:48px;height:48px}
+.binder-fore{border-radius:1px 5px 5px 1px;background:repeating-linear-gradient(180deg,rgba(255,255,255,.7) 0 1px,rgba(90,70,50,.2) 1px 3px),linear-gradient(90deg,color-mix(in srgb,var(--cover,#E9D5C0) 55%,#efe6d8),#f8f3ea);box-shadow:inset 2px 0 2px rgba(40,32,24,.16)}
+.cover .cover-charm{z-index:2;top:auto;right:16px;bottom:12px}
+.cover.add .binder-board{background-image:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,.2)),var(--cloth);background-blend-mode:normal,soft-light;box-shadow:inset 0 0 0 1px rgba(40,32,24,.18)}
+.cover.add .binder-spine{background:linear-gradient(90deg,#cfc8b8,#f7f3ea 50%,#b7b09f)}
+.cover.complete .binder-shell::after,.pad.complete::after{content:none}
+.pad{border-radius:4px 14px 14px 4px}
+.pad h2{margin:0 0 10px}
+.pad .fine{max-width:16em}
+.pad .cover-meter,.cover .cover-meter,.cover .togo{display:none}
+/* The turning page is three hinges, not one rotating plane. */
+.leaf.hot.forward,.leaf.hot.backward{transform:none}
+.leaf.hot:has(.peel) > .face{opacity:0}
+.peel{position:absolute;inset:0;z-index:5;pointer-events:none;transform-style:preserve-3d}
+.hinge{position:absolute;top:0;transform-style:preserve-3d;will-change:transform}
+.curl-clip{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;transform:translateZ(0.1px)}
+.curl-sheet{position:absolute;top:0;margin:0}
+.curl-backface{position:absolute;inset:0;transform:rotateY(180deg);backface-visibility:hidden;background:linear-gradient(180deg,#f6f0e4,#e6d9c6);box-shadow:inset 0 0 0 1px rgba(70,54,38,.18)}
+.curl-edge{position:absolute;top:1px;bottom:1px;width:8px;background:repeating-linear-gradient(180deg,#fbf7f0 0 1px,#e4d5c2 1px 2px,#cbbba6 2px 3px);box-shadow:0 0 0 1px rgba(40,32,24,.2)}
+.leaf.hot.forward .hinge{transform-origin:left center}
+.leaf.hot.backward .hinge{transform-origin:right center}
+.leaf.hot.forward .curl-edge{right:0;transform-origin:right center;transform:rotateY(90deg)}
+.leaf.hot.backward .curl-edge{left:0;transform-origin:left center;transform:rotateY(-90deg)}
+.leaf.hot:not(.live) .hinge{transition:transform .55s cubic-bezier(.22,.61,.36,1)}
+.leaf.hot.live .hinge,.leaf.hot.live .curl-shadow{transition:none}
+.curl-shadow{position:absolute;top:0;bottom:0;width:48%;z-index:2;pointer-events:none;opacity:calc(var(--turn,0) * .82)}
+.leaf.hot.forward .curl-shadow{left:0;background:linear-gradient(90deg,rgba(40,32,24,.5),rgba(40,32,24,.08) 62%,transparent);transform:translateX(calc(var(--turn,0) * 22%))}
+.leaf.hot.backward .curl-shadow{right:0;background:linear-gradient(270deg,rgba(40,32,24,.5),rgba(40,32,24,.08) 62%,transparent);transform:translateX(calc(var(--turn,0) * -22%))}
+.leaf.hot:not(.live) .curl-shadow{transition:transform .55s cubic-bezier(.22,.61,.36,1),opacity .55s linear}
+.leaf.hot .face.front::after{content:none}
+html.reduce .leaf.hot > .face{opacity:1}
+html.reduce .peel{display:none}
+@media (prefers-reduced-motion:reduce){
+  html:not(.motion-on) .leaf.hot > .face{opacity:1}
+  html:not(.motion-on) .peel{display:none}
+}
 </style>
 <link rel="stylesheet" href="css/daily.css">
 </head>
@@ -3517,14 +3579,11 @@ function renderBinders(){
     btn.className = "cover";
     const cloth = coverColor(b.color);
     btn.style.setProperty("--cover", cloth);
-    const val = valueOf(b.cards);
     const p = progressOf(b.cards);
-    const price = val ? priceText(val, "USD") : "—";
-    const pct = p.total ? Math.max(0, Math.min(100, Math.round((p.owned / p.total) * 100))) : 0;
     if (p.total && p.owned >= p.total) btn.classList.add("complete");
     const charm = b.charm === "toad" ? `<span class="cover-charm">${toad()}</span>` : b.charm === "sticker" ? `<span class="cover-charm star" aria-hidden="true">★</span>` : "";
     btn.dataset.progress = p.owned + "/" + p.total;
-    btn.innerHTML = `<span class="binder-shell" aria-hidden="true"><span class="binder-stitch"></span></span>${charm}<span class="cover-row"><span class="cover-copy"><b>${esc(b.name)}</b><span class="fine">${esc(themeLabel(themeOf(b)))}</span><span class="togo">${esc(p.label)}</span><span class="cover-meter" aria-hidden="true"><i style="width:${pct}%"></i></span><span class="fine">${b.cards.length} ${b.cards.length === 1 ? "card" : "cards"} · ${esc(price)}</span><span class="sr-only">${esc(p.total ? p.owned + " of " + p.total + " owned" : "No cards yet")}</span></span>${ringMarkup(p.owned, p.total)}</span>`;
+    btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board"><b class="binder-name">${esc(b.name)}</b>${ringMarkup(p.owned, p.total)}</span><span class="binder-fore"></span></span>${charm}<span class="sr-only">${esc(b.name + ". " + (p.total ? p.owned + " of " + p.total + " owned" : "No cards yet"))}</span>`;
     btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); renderBinders(); };
     shelf.append(btn);
   });
@@ -3532,7 +3591,7 @@ function renderBinders(){
   add.type = "button";
   add.className = "cover add";
   add.style.setProperty("--cover", "#F1F1E4");
-  add.innerHTML = `<span class="binder-shell" aria-hidden="true"><span class="binder-stitch"></span></span><span class="cover-add-label">+ New binder</span>`;
+  add.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board"><span class="cover-add-label">+ New binder</span></span><span class="binder-fore"></span></span>`;
   add.onclick = openBinderForm;
   shelf.append(add);
   document.getElementById("openWish").onclick = () => { binderView = { kind:"wish" }; flipPage = 0; renderBinders(); };
@@ -3605,18 +3664,15 @@ function coverPad(binder, list){
   const p = progressOf(list);
   pad.className = "pad" + (p.total && p.owned >= p.total ? " complete" : "");
   pad.style.setProperty("--cover", coverColor(binder.color));
-  const val = valueOf(list);
-  const price = val ? priceText(val, "USD") : "—";
-  const pct = p.total ? Math.max(0, Math.min(100, Math.round((p.owned / p.total) * 100))) : 0;
   const charm = binder.charm === "toad" ? `<div class="charm">${toad()}</div>` : binder.charm === "sticker" ? `<div class="charm sticker" aria-hidden="true">★</div>` : "";
-  pad.innerHTML = `<div class="pad-stitch" aria-hidden="true"></div><div class="pad-ring">${ringMarkup(p.owned, p.total)}</div><h2>${esc(binder.name)}</h2><p class="count">${esc(p.label)}</p><div class="cover-meter" aria-hidden="true"><i style="width:${pct}%"></i></div><p class="count">${list.length} ${list.length === 1 ? "card" : "cards"} · ${esc(price)}</p>${list.length ? `<p class="fine">${esc(themeLabel(themeOf(binder)))}</p>` : `<p class="fine">A fresh binder. These pockets are waiting.</p>${toad()}`}${charm}`;
+  pad.innerHTML = `<h2>${esc(binder.name)}</h2><div class="pad-ring">${ringMarkup(p.owned, p.total)}</div>${list.length ? "" : `<p class="fine">A fresh binder. These pockets are waiting.</p>`}${charm}`;
   return pad;
 }
 function endPaper(text){
   const wrap = document.createElement("div");
   wrap.className = "pad";
   wrap.style.setProperty("--cover", "#F3EDC8");
-  wrap.innerHTML = `<div class="pad-stitch"></div><p class="count">${esc(text)}</p>${toad()}`;
+  wrap.innerHTML = `<p class="count">${esc(text)}</p>${toad()}`;
   return wrap;
 }
 let suppressGotClickUntil = 0;
@@ -3680,7 +3736,7 @@ function emptySlot(insertAt){
   const sleeve = document.createElement("div");
   sleeve.className = "sleeve empty";
   if (insertAt != null) sleeve.dataset.insert = String(insertAt);
-  sleeve.innerHTML = `<span class="ghost-card"></span><span class="sleeve-weld" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span><span class="glare" aria-hidden="true"></span>`;
+  sleeve.innerHTML = `<span class="sleeve-weld" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span><span class="glare" aria-hidden="true"></span>`;
   slot.append(sleeve);
   return slot;
 }
@@ -3714,6 +3770,89 @@ function buildFace(sheet, ctx, spark){
   }
   return face;
 }
+function binderSpread(root){
+  if (!root) return false;
+  const innerW = root.clientWidth - 24;
+  const innerH = root.clientHeight - 24;
+  if (innerW < 280 || innerH < 300) return false;
+  const pageW = (innerW - 86) / 2;
+  const gridW = pageW - 12;
+  const gridH = innerH - 174;
+  if (gridW < 48 || gridH < 90) return false;
+  const byW = (gridW - 8) / 3;
+  const byH = ((gridH - 8) / 3) * (63 / 88);
+  return Math.min(byW, byH) >= 74;
+}
+function curlPose(t){
+  const turn = Math.max(0, Math.min(1, t));
+  const bend = Math.sin(Math.PI * turn);
+  const body = Math.pow(turn, 2.15) * 178;
+  const mid = Math.min(178, body + bend * 38);
+  const lead = Math.min(178, body + bend * 76);
+  return [body, mid - body, lead - mid];
+}
+function applyCurl(leaf, t){
+  if (!leaf) return;
+  const sign = leaf.classList.contains("backward") ? 1 : -1;
+  const angles = curlPose(t);
+  leaf.querySelectorAll(".hinge").forEach(hinge => {
+    const index = hinge.classList.contains("h0") ? 0 : hinge.classList.contains("h1") ? 1 : 2;
+    hinge.style.transform = "rotateY(" + (sign * angles[index]).toFixed(2) + "deg)";
+  });
+}
+function mountPeel(leaf){
+  leaf.querySelectorAll(".peel").forEach(node => node.remove());
+  if (reduceMotion()) return;
+  const front = leaf.querySelector(":scope > .face.front");
+  if (!front) return;
+  const w = leaf.clientWidth;
+  const h = leaf.clientHeight;
+  if (w < 40 || h < 40) return;
+  const backward = leaf.classList.contains("backward");
+  const w0 = Math.round(w * 0.34);
+  const w1 = Math.round(w * 0.33);
+  const w2 = w - w0 - w1;
+  const widths = [w0, w1, w2];
+  const offsets = backward ? [w1 + w2, w2, 0] : [0, w0, w0 + w1];
+  const peel = document.createElement("div");
+  peel.className = "peel";
+  peel.setAttribute("aria-hidden", "true");
+  const shadow = document.createElement("div");
+  shadow.className = "curl-shadow";
+  let node = null;
+  for (let i = 2; i >= 0; i--) {
+    const hinge = document.createElement("div");
+    hinge.className = "hinge h" + i;
+    hinge.style.width = widths[i] + "px";
+    hinge.style.height = h + "px";
+    hinge.style.left = "0px";
+    if (node) {
+      node.style.left = (backward ? -widths[i + 1] : widths[i]) + "px";
+      hinge.append(node);
+    }
+    const clip = document.createElement("div");
+    clip.className = "curl-clip";
+    const sheet = front.cloneNode(true);
+    sheet.className = "face curl-sheet";
+    sheet.querySelectorAll("button").forEach(btn => btn.remove());
+    sheet.style.width = w + "px";
+    sheet.style.height = h + "px";
+    sheet.style.left = (-offsets[i]) + "px";
+    clip.append(sheet);
+    const back = document.createElement("div");
+    back.className = "curl-backface";
+    hinge.append(clip, back);
+    if (i === 2) {
+      const edge = document.createElement("div");
+      edge.className = "curl-edge";
+      hinge.append(edge);
+    }
+    node = hinge;
+  }
+  if (backward) node.style.left = (w1 + w2) + "px";
+  peel.append(shadow, node);
+  leaf.append(peel);
+}
 function renderCollection(root){
   const wishMode = binderView.kind === "wish";
   const binder = wishMode ? null : binderState.binders.find(b => b.id === binderView.id);
@@ -3725,8 +3864,8 @@ function renderCollection(root){
   const total = withCover ? cardPages + 1 : cardPages;
   if (flipPage < 0) flipPage = 0;
   if (flipPage >= total) flipPage = total - 1;
-  if (wide() && flipPage % 2 === 1) flipPage -= 1;
-  const desktop = wide();
+  const twoPage = binderSpread(root);
+  if (twoPage && flipPage % 2 === 1) flipPage -= 1;
   const ctx = { list, binder, withCover, total };
   const val = valueOf(list);
   root.innerHTML = "";
@@ -3738,7 +3877,8 @@ function renderCollection(root){
   const stage = document.createElement("div");
   stage.className = "bookstage";
   const book = document.createElement("div");
-  book.className = "book " + (desktop ? "spread" : "solo") + (wishMode ? " folio" : " leather");
+  book.className = "book " + (twoPage ? "spread" : "solo") + (wishMode ? " folio" : " leather");
+  book.dataset.layout = twoPage ? "spread" : "solo";
   book.style.setProperty("--cover", wishMode ? "#E4E7DA" : coverColor(binder.color));
   if (binderOpenAnim && !wishMode) {
     binderOpenAnim = false;
@@ -3773,9 +3913,9 @@ function renderCollection(root){
     back.className = "face back";
     leaf.append(face, back);
   };
-  if (desktop) put(leafL, flipPage, "left", true);
-  put(leafR, desktop ? Math.min(total, flipPage + 1) : flipPage, "right", true);
-  if (desktop && flipPage + 1 >= total) {
+  if (twoPage) put(leafL, flipPage, "left", true);
+  put(leafR, twoPage ? Math.min(total, flipPage + 1) : flipPage, "right", true);
+  if (twoPage && flipPage + 1 >= total) {
     leafR.replaceChildren();
     const face = buildFace(total, ctx, false);
     face.classList.add("front", "page-right");
@@ -3820,7 +3960,7 @@ function renderCollection(root){
     dot.dataset.sheet = String(i);
     dot.title = label;
     dot.setAttribute("aria-label", label);
-    const here = i === flipPage || (desktop && i === flipPage + 1 && i < total);
+    const here = i === flipPage || (twoPage && i === flipPage + 1 && i < total);
     dot.setAttribute("aria-current", here ? "true" : "false");
     dots.append(dot);
     const opt = document.createElement("option");
@@ -3842,32 +3982,34 @@ function renderCollection(root){
   const shownLeft = withCover && flipPage === 0 ? "Cover" : "Page " + (withCover ? flipPage : flipPage + 1);
   const ownedHere = list.filter(c => ownedIds.has(c.id)).length;
   const ownBit = list.length ? " · " + ownedHere + " owned · " + (list.length - ownedHere) + " wanted" : "";
-  foot.textContent = (wishMode ? "Wishlist · " : "") + shownLeft + (desktop && flipPage + 1 < total ? " – " + (withCover && flipPage + 1 === 0 ? "Cover" : "Page " + (withCover ? flipPage + 1 : flipPage + 2)) : "") + " · " + list.length + (list.length === 1 ? " card" : " cards") + ownBit + " · " + (val ? priceText(val, "USD") : "—");
+  foot.textContent = (wishMode ? "Wishlist · " : "") + shownLeft + (twoPage && flipPage + 1 < total ? " – " + (withCover && flipPage + 1 === 0 ? "Cover" : "Page " + (withCover ? flipPage + 1 : flipPage + 2)) : "") + " · " + list.length + (list.length === 1 ? " card" : " cards") + ownBit + " · " + (val ? priceText(val, "USD") : "—");
   stage.append(book, nav, foot);
   root.append(tools, stage);
 
-  const step = desktop ? 2 : 1;
+  const step = twoPage ? 2 : 1;
   let flipToken = 0;
   const landed = dir => {
     const dest = Math.max(0, Math.min(total - 1, flipPage + dir * step));
-    return desktop ? dest - (dest % 2) : dest;
+    return twoPage ? dest - (dest % 2) : dest;
   };
   const arm = dir => {
-    const leaf = book.querySelector(dir > 0 ? ".leaf.right" : (desktop ? ".leaf.left" : ".leaf.right"));
+    const leaf = book.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right"));
     if (!leaf) return null;
     const back = leaf.querySelector(".face.back");
-    const landing = dir > 0 ? (desktop ? flipPage + 2 : flipPage + 1) : (desktop ? flipPage - 1 : flipPage - 1);
-    const revealed = dir > 0 ? (desktop ? flipPage + 3 : flipPage + 1) : (desktop ? flipPage - 2 : flipPage - 1);
+    const landing = dir > 0 ? (twoPage ? flipPage + 2 : flipPage + 1) : (twoPage ? flipPage - 1 : flipPage - 1);
+    const revealed = dir > 0 ? (twoPage ? flipPage + 3 : flipPage + 1) : (twoPage ? flipPage - 2 : flipPage - 1);
     if (back) { back.replaceChildren(buildFace(landing, ctx, false)); back.classList.add("back"); }
-    const under = book.querySelector(dir > 0 || !desktop ? ".under.right" : ".under.left");
+    const under = book.querySelector(dir > 0 || !twoPage ? ".under.right" : ".under.left");
     if (under) under.replaceChildren(buildFace(revealed, ctx, false));
     leaf.classList.add("hot", dir > 0 ? "forward" : "backward");
     leaf.style.setProperty("--turn", "0");
+    mountPeel(leaf);
+    applyCurl(leaf, 0);
     return leaf;
   };
   const noteFlip = () => { if (!wishMode) countEvent("page-flip"); };
   const goSheet = dest => {
-    const next = desktop ? Math.max(0, dest - (dest % 2)) : dest;
+    const next = twoPage ? Math.max(0, dest - (dest % 2)) : dest;
     if (next === flipPage || next < 0 || next >= total) return;
     noteFlip();
     flipPage = next;
@@ -3893,21 +4035,24 @@ function renderCollection(root){
     };
     if (!leaf) { go(); return; }
     leaf.addEventListener("transitionend", e => { if (e.propertyName === "transform") go(); });
-    requestAnimationFrame(() => leaf.style.setProperty("--turn", "1"));
+    requestAnimationFrame(() => {
+      leaf.style.setProperty("--turn", "1");
+      applyCurl(leaf, 1);
+    });
     setTimeout(go, 640);
   };
   prevBtn.onclick = () => finishFlip(-1);
   nextBtn.onclick = () => finishFlip(1);
   dots.querySelectorAll("button").forEach(btn => btn.onclick = () => {
     const n = Number(btn.dataset.sheet);
-    const dest = desktop ? n - (n % 2) : n;
+    const dest = twoPage ? n - (n % 2) : n;
     if (dest === flipPage) return;
     if (Math.abs(dest - flipPage) === step) finishFlip(dest > flipPage ? 1 : -1);
     else goSheet(dest);
   });
   select.onchange = () => {
     const n = Number(select.value);
-    const dest = desktop ? n - (n % 2) : n;
+    const dest = twoPage ? n - (n % 2) : n;
     if (Math.abs(dest - flipPage) === step) finishFlip(dest > flipPage ? 1 : -1);
     else goSheet(dest);
   };
@@ -3922,7 +4067,10 @@ function renderCollection(root){
       const width = Math.max(120, (leaf && leaf.clientWidth) || 200);
       const dir = leaf && leaf.classList.contains("backward") ? 1 : -1;
       const turned = dir === -1 ? Math.max(0, Math.min(1, -dx / width)) : Math.max(0, Math.min(1, dx / width));
-      if (leaf) leaf.style.setProperty("--turn", String(turned));
+      if (leaf) {
+        leaf.style.setProperty("--turn", String(turned));
+        applyCurl(leaf, turned);
+      }
       return;
     }
     if (mode === "card") {
@@ -3941,7 +4089,12 @@ function renderCollection(root){
     if (!turning) return;
     turning.classList.remove("live");
     turning.style.setProperty("--turn", "0");
-    setTimeout(() => { turning.classList.remove("hot", "forward", "backward", "live"); }, 460);
+    applyCurl(turning, 0);
+    setTimeout(() => {
+      turning.querySelectorAll(".peel").forEach(node => node.remove());
+      turning.classList.remove("hot", "forward", "backward", "live");
+      turning.style.removeProperty("--turn");
+    }, 560);
   };
   const onUp = e => {
     if (e.pointerId !== pid) return;
@@ -4006,11 +4159,19 @@ function renderCollection(root){
     const token = ++zoomToken;
     document.querySelectorAll(".cardzoom").forEach(node => node.remove());
     if (settings.haptics) haptic(8);
-    const rect = sleeve.getBoundingClientRect();
+    const art = sleeve.querySelector(".cardhit") || sleeve;
+    const rect = art.getBoundingClientRect();
+    const ratio = 63 / 88;
+    let w = rect.width;
+    let h = rect.height;
+    if (!(w > 8 && h > 8) || Math.abs(w / Math.max(h, 1) - ratio) > 0.08) {
+      w = Math.max(8, w || rect.width || 8);
+      h = w / ratio;
+    }
     const fly = document.createElement("div");
     fly.className = "cardzoom";
     fly.setAttribute("aria-hidden", "true");
-    const img = sleeve.querySelector("img");
+    const img = art.querySelector("img") || sleeve.querySelector("img");
     if (img) {
       const clone = img.cloneNode(true);
       clone.alt = "";
@@ -4018,13 +4179,13 @@ function renderCollection(root){
     }
     fly.style.left = rect.left + "px";
     fly.style.top = rect.top + "px";
-    fly.style.width = Math.max(1, rect.width) + "px";
-    fly.style.height = Math.max(1, rect.height) + "px";
+    fly.style.width = Math.max(1, w) + "px";
+    fly.style.height = Math.max(1, h) + "px";
     document.body.append(fly);
-    const targetW = Math.min(260, window.innerWidth - 48);
-    const scale = targetW / Math.max(1, rect.width);
-    const dx = (window.innerWidth / 2) - (rect.left + rect.width / 2);
-    const dy = (window.innerHeight * 0.42) - (rect.top + rect.height / 2);
+    const targetW = Math.min(280, window.innerWidth - 48);
+    const scale = targetW / Math.max(1, w);
+    const dx = (window.innerWidth / 2) - (rect.left + w / 2);
+    const dy = (window.innerHeight * 0.42) - (rect.top + h / 2);
     sleeve.style.opacity = ".4";
     requestAnimationFrame(() => { fly.style.transform = "translate(" + dx.toFixed(1) + "px," + dy.toFixed(1) + "px) scale(" + scale.toFixed(3) + ")"; });
     setTimeout(() => {
