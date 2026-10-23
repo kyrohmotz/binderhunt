@@ -13703,5 +13703,27 @@
         }
       ]
     }
-  ]
+  ],
+  "quotes": {
+    "2026-10-24": {
+      "id": "xy1-29",
+      "price": 11.65,
+      "variant": "holofoil",
+      "printing": "Holofoil",
+      "alts": 1,
+      "source": "tcgplayer",
+      "eur": 10.86,
+      "at": "2026-10-23T13:05:24Z"
+    },
+    "2026-10-25": {
+      "id": "cel25-5",
+      "price": 4.76,
+      "variant": "holofoil",
+      "printing": "Holofoil",
+      "alts": 1,
+      "source": "tcgplayer",
+      "eur": 4.23,
+      "at": "2026-10-23T13:05:24Z"
+    }
+  }
 }
