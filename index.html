@@ -670,6 +670,83 @@ html.reduce .peel{display:none}
   html:not(.motion-on) .leaf.hot > .face{opacity:1}
   html:not(.motion-on) .peel{display:none}
 }
+/* Showcase binder. Dark matte pages on the pastel desk, cards as the hero. */
+#bindersScroll.reading{background:radial-gradient(90% 55% at 50% 100%,rgba(171,178,141,.38),transparent 70%),var(--paper)}
+.book.leather,.book.folio{background:#14151b;background-image:none;border:0;border-radius:18px;padding:8px;box-shadow:0 0 0 1px rgba(255,255,255,.35),0 22px 40px rgba(48,40,28,.24)}
+.book.opening{transform-origin:center bottom}
+.book .book-spread{background:#0c0d11;border-radius:12px}
+.book.solo .book-spread{grid-template-columns:minmax(0,1fr)}
+.book.solo .spine,.book.solo .rings,.book.solo .leaf.left,.book.solo .under.left{display:none}
+.book.solo .leaf.right,.book.solo .under.right{grid-column:1}
+.book .face{background:#1b1c22;border:0;box-shadow:none;border-radius:10px;color:rgba(255,255,255,.78);padding:12px 12px 22px;overflow:visible;container-type:size}
+.book .face h3{display:none}
+.book .face.page-left{border-radius:10px 3px 3px 10px}
+.book .face.page-right{border-radius:3px 10px 10px 3px}
+.book .page-num{position:absolute;bottom:4px;z-index:2;font-family:Nunito,sans-serif;font-weight:700;font-size:11px;letter-spacing:.04em;color:rgba(255,255,255,.42);pointer-events:none;font-variant-numeric:tabular-nums}
+.book .face.page-left .page-num{left:10px;right:auto}
+.book .face.page-right .page-num,.book.solo .page-num{right:10px;left:auto}
+.book .sleeves{flex:none;align-self:center;width:min(100cqi,calc((100cqb - 6px) * 63 / 88));height:min(calc(100cqb - 6px),calc(100cqi * 88 / 63));max-height:none;margin:auto;gap:7px;grid-template-rows:repeat(3,minmax(0,1fr))}
+.book .slot{position:relative;min-width:0;min-height:0}
+.book .slot > .sleeve{position:absolute;inset:0;border-radius:8px;overflow:visible;background:transparent;box-shadow:none}
+.book .sleeve .cardhit{position:absolute;inset:0;left:0;top:0;right:0;bottom:0;width:auto;height:auto;aspect-ratio:auto;max-height:none;transform:perspective(720px) rotateX(var(--ty,0deg)) rotateY(var(--tx,0deg)) scale(var(--lift,1));transform-origin:center;border-radius:7px;overflow:hidden;transition:transform .16s cubic-bezier(.2,.8,.2,1),box-shadow .16s ease}
+.book .sleeve .cardhit:active{transform:perspective(720px) rotateX(var(--ty,0deg)) rotateY(var(--tx,0deg)) scale(var(--lift,.98))}
+.book .sleeve img{border-radius:7px;opacity:1;filter:none;box-shadow:none}
+.book .sleeve.wanted,.book .sleeve.owned,.book .sleeve.wanted .cardhit,.book .sleeve.owned .cardhit{background:transparent;box-shadow:none}
+.book .sleeve.wanted img,.book .sleeve.owned img{opacity:1;filter:none}
+.book .slot > .sleeve.empty{background:linear-gradient(180deg,#16181f,#0c0d12);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),inset 0 1px 0 rgba(255,255,255,.32),inset 0 12px 18px rgba(0,0,0,.62);border-radius:8px}
+.book .sleeve.empty .ghost-card,.book .sleeve .sleeve-weld,.book .sleeve .sleeve-tag,.book .sleeve::after{display:none}
+.book .sleeve .gloss,.book .sleeve .shine,.book .sleeve .glare{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0}
+.book .sleeve.tilting .glare,.book .sleeve.tilting .shine{opacity:.95;background:linear-gradient(115deg,transparent 16%,rgba(255,255,255,.72) 34%,rgba(134,222,255,.48) 46%,rgba(246,201,201,.42) 56%,rgba(243,237,200,.38) 66%,transparent 82%);background-size:230% 230%;background-position:var(--sx,30%) var(--sy,24%);mix-blend-mode:soft-light}
+.book .sleeve.holo.tilting .shine{opacity:1;mix-blend-mode:color-dodge}
+.book .sleeve.holo img{transform:none}
+.book .price-pill{position:absolute;z-index:4;left:4px;bottom:4px;padding:2px 6px;border-radius:999px;background:rgba(10,10,14,.58);color:#fff;font-family:Nunito,sans-serif;font-weight:800;font-size:10px;line-height:1.3;letter-spacing:.01em;pointer-events:none;font-variant-numeric:tabular-nums}
+.book .sleeve > .drop-badge{left:auto;right:4px;bottom:4px;top:auto;background:rgba(246,201,201,.94);color:#1f1f1e;border:0;box-shadow:0 1px 2px rgba(0,0,0,.35);font-size:10px;line-height:1.2;padding:2px 5px;max-width:none}
+.book .sleeve .gotbtn{z-index:6;top:0;right:0;bottom:auto;left:auto;width:34px;height:34px;min-width:34px;min-height:34px;border-radius:8px;background:transparent;box-shadow:none;place-items:center}
+.book .sleeve .gotbtn .mark{width:15px;height:15px;margin:0;background:rgba(248,247,239,.9);box-shadow:0 1px 2px rgba(0,0,0,.35)}
+.book .sleeve.owned .gotbtn .mark{background:#ABB28D}
+.book .slot .iconish.more,.book .sleeve .iconish.more{position:absolute;z-index:6;top:0;left:0;width:32px;height:32px;min-height:32px;padding:0;border-radius:8px;border:0;background:transparent;color:rgba(255,255,255,.82);font-size:18px;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+.book .pad{background:transparent;border:0;box-shadow:none;color:#f4f1ea}
+.book .pad h2{color:#f7f4ee;text-shadow:none}
+.book .pad .fine{color:rgba(255,255,255,.66)}
+.book .pad .ring-track{stroke:rgba(255,255,255,.2)}
+.book .pad .ring-val{stroke:#ABB28D}
+.book .pad .ring text{fill:#f7f4ee}
+@media (hover:hover) and (pointer:fine){
+  .book .sleeve.tilting{z-index:4}
+  .book .sleeve.tilting .cardhit{--lift:1.05;box-shadow:0 16px 26px rgba(0,0,0,.46)}
+}
+.book .dogear,.book .dogear.prev,.book .dogear.next{width:44px;height:auto;top:0;bottom:0;margin:0;background:transparent;border-radius:0}
+.book .dogear.prev{left:0;transform:none}
+.book .dogear.next{right:0;transform:none}
+.book .dogear.prev:active,.book .dogear.next:active{transform:none}
+.leaf.hot.curling,
+.leaf.hot.curling.forward,
+.leaf.hot.curling.backward{transform:none !important}
+.leaf.hot.fallback.forward{transform-origin:left center;transform:rotateY(calc(var(--turn,0) * -175deg))}
+.leaf.hot.fallback.backward{transform-origin:right center;transform:rotateY(calc(var(--turn,0) * 175deg))}
+.leaf.hot.curling > .face{visibility:hidden}
+.curl-view{position:absolute;inset:0;z-index:5;pointer-events:none}
+.curl-cast{position:absolute;top:6%;bottom:6%;width:34%;z-index:3;pointer-events:none;background:linear-gradient(90deg,transparent,rgba(0,0,0,.55) 55%,transparent);filter:blur(6px);opacity:0}
+.showcase{position:fixed;inset:0;z-index:74;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:18px 16px calc(18px + env(safe-area-inset-bottom));background:rgba(20,22,28,.72);touch-action:none}
+.showcase[hidden]{display:none !important}
+.showcase-stage{display:grid;place-items:center;width:min(100%,440px)}
+.showcase-card{width:min(78vw,380px);aspect-ratio:63/88;border-radius:14px;position:relative;overflow:hidden;background:#111;box-shadow:0 24px 48px rgba(0,0,0,.45);transform:perspective(900px) rotateX(var(--ty,0deg)) rotateY(var(--tx,0deg));transform-style:preserve-3d;touch-action:none}
+.showcase-card img{width:100%;height:100%;object-fit:contain;display:block;background:#111;pointer-events:none}
+.showcase-card .glare{position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 18%,rgba(255,255,255,.7) 38%,rgba(134,222,255,.45) 48%,rgba(246,201,201,.4) 58%,rgba(243,237,200,.35) 68%,transparent 82%);background-size:220% 220%;background-position:var(--sx,30%) var(--sy,20%);mix-blend-mode:soft-light}
+.showcase-actions{display:flex;gap:8px;align-items:center}
+.showcase-close{position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;min-height:44px;padding:0 14px;border-radius:999px;border:2px solid var(--ink);background:var(--paper);font-family:var(--display);font-weight:700}
+html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !important}
+@media (min-width:1024px){
+  .book.spread.leather,.book.spread.folio{padding:10px;width:min(100%,1080px)}
+  .book.spread .book-spread{grid-template-columns:minmax(0,1fr) 9px minmax(0,1fr)}
+  .book.spread .rings,.book.spread .spine{display:none}
+  .book.spread .face.page-left{border-radius:12px 2px 2px 12px;box-shadow:none}
+  .book.spread .face.page-right{border-radius:2px 12px 12px 2px;box-shadow:none}
+  .book .dogear.prev{left:0}
+}
+@media (prefers-reduced-motion:reduce){
+  html:not(.motion-on) .book .sleeve .cardhit,html:not(.motion-on) .showcase-card{transform:none !important}
+}
 </style>
 <link rel="stylesheet" href="css/daily.css">
 </head>
@@ -808,6 +885,15 @@ html.reduce .peel{display:none}
   </div>
 </div>
 <div id="menu" class="menu" hidden role="menu"></div>
+<div id="showcase" class="showcase" hidden>
+  <button type="button" class="showcase-close" id="showcaseClose">Close</button>
+  <div class="showcase-stage" id="showcaseStage">
+    <div class="showcase-card" id="showcaseCard" tabindex="0"></div>
+  </div>
+  <div class="showcase-actions">
+    <button type="button" class="chip" id="showcaseDetails">Details</button>
+  </div>
+</div>
 <div id="dropPrompt" class="drop-prompt" hidden>
   <div class="drop-card" role="dialog" aria-modal="true" aria-labelledby="dropPromptTitle">
     <div class="toad-row">
@@ -846,6 +932,7 @@ html.reduce .peel{display:none}
   <span>New version, tap to refresh</span>
   <button type="button" id="updateRefresh">Refresh</button>
 </div>
+<script src="js/binder-curl.js"></script>
 <script>
 try {
   if (navigator.serviceWorker && navigator.serviceWorker.controller && navigator.onLine === false) navigator.serviceWorker.controller.postMessage("bh-offline");
@@ -2814,7 +2901,7 @@ function placeholder(card){
   d.innerHTML = `<div class="cardback-inner">${toad()}<b>${esc((card && card.name) || "Card")}</b></div>`;
   return d;
 }
-function paintArt(host, card){
+function paintArt(host, card, opts){
   host.replaceChildren();
   const urls = knownArt(card);
   if (!urls.length) { host.append(placeholder(card)); return; }
@@ -2822,10 +2909,24 @@ function paintArt(host, card){
   img.alt = altText(card || {});
   img.draggable = false;
   img.decoding = "async";
+  if (opts && opts.lazy) img.loading = "lazy";
+  if (opts && opts.cors) img.crossOrigin = "anonymous";
   img.addEventListener("dragstart", e => e.preventDefault());
   img.onerror = () => { img.replaceWith(placeholder(card)); };
   img.src = urls[0];
   host.append(img);
+}
+function pocketPrice(card){
+  const shown = printingMoney(card);
+  if (!shown || !(shown.amount > 0)) return "";
+  const n = shown.amount;
+  const sym = shown.currency === "EUR" ? "€" : "$";
+  if (n >= 1000) {
+    const k = n / 1000;
+    const body = k >= 100 ? String(Math.round(k)) : (Math.round(k * 10) / 10).toFixed(1).replace(/\.0$/, "");
+    return sym + body + "K";
+  }
+  return sym + n.toFixed(2);
 }
 function topCard(){ const cards = deck.querySelectorAll(".card"); return cards[cards.length - 1] || null; }
 function layoutStack(){
@@ -3344,6 +3445,7 @@ function paintDiscovery(){
   syncActs();
 }
 function showTab(name){
+  closeShowcase();
   tab = name;
   document.getElementById("viewHunt").hidden = name !== "hunt";
   document.getElementById("viewSets").hidden = name !== "sets";
@@ -3820,11 +3922,23 @@ function sleeveSlot(card, index, ctx){
   sleeve.dataset.index = String(index);
   const drop = priceDrop(card);
   const dropNote = drop ? ", down " + drop.shown + " percent" : "";
-  sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card) + (owned ? ", owned" : ", wanted") + dropNote)}"></button><span class="sleeve-weld" aria-hidden="true"></span><span class="sleeve-tag" aria-hidden="true">${owned ? "Owned" : "Wanted"}</span>${dropBadgeMarkup(drop)}<span class="shine" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span><span class="glare" aria-hidden="true"></span>`;
-  ensureLabelFont();
-  paintArt(sleeve.querySelector(".cardhit"), card);
-  const art = sleeve.querySelector("img");
-  if (art) { art.loading = "lazy"; art.decoding = "async"; }
+  const price = pocketPrice(card);
+  sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card) + (owned ? ", owned" : ", wanted") + (price ? ", " + price : "") + dropNote)}"></button>${dropBadgeMarkup(drop)}`;
+  const hit = sleeve.querySelector(".cardhit");
+  paintArt(hit, card, { lazy:true, cors:true });
+  const glare = document.createElement("span");
+  glare.className = "glare";
+  glare.setAttribute("aria-hidden", "true");
+  const shine = document.createElement("span");
+  shine.className = "shine";
+  shine.setAttribute("aria-hidden", "true");
+  hit.append(glare, shine);
+  if (price) {
+    const pill = document.createElement("span");
+    pill.className = "price-pill";
+    pill.textContent = price;
+    hit.append(pill);
+  }
   const got = document.createElement("button");
   got.type = "button";
   got.className = "gotbtn";
@@ -3849,14 +3963,14 @@ function sleeveSlot(card, index, ctx){
     if (gotPressIgnored(press, Date.now(), e.clientX, e.clientY)) return;
     setOwned(card, !ownedIds.has(card.id), "pocket");
   };
-  sleeve.append(got);
   const more = document.createElement("button");
   more.type = "button";
   more.className = "iconish more";
   more.setAttribute("aria-label", "Card menu");
   more.textContent = "⋯";
   more.onclick = e => { e.stopPropagation(); openMenu(more, card, ctx.binder); };
-  slot.append(sleeve, more);
+  sleeve.append(got, more);
+  slot.append(sleeve);
   return slot;
 }
 function emptySlot(insertAt){
@@ -3872,236 +3986,43 @@ function emptySlot(insertAt){
 function buildFace(sheet, ctx, spark){
   const face = document.createElement("div");
   face.className = "face";
-  if (sheet < 0 || sheet >= ctx.total) { face.append(endPaper("That's the last page.")); return face; }
-  if (ctx.withCover && sheet === 0) { face.append(coverPad(ctx.binder, ctx.list)); return face; }
-  const page = ctx.withCover ? sheet - 1 : sheet;
-  if (page < 0) { face.append(endPaper("That's the last page.")); return face; }
-  const h = document.createElement("h3");
-  h.textContent = "Page " + (page + 1);
-  face.append(h);
-  if (!ctx.list.length && page === 0) {
+  const page = ctx.withCover && sheet > 0 ? sheet - 1 : sheet;
+  const past = sheet < 0 || (ctx.withCover ? sheet === 0 ? false : page < 0 : false) || sheet >= ctx.total;
+  if (ctx.withCover && sheet === 0) {
+    face.classList.add("cover-face");
+    face.append(coverPad(ctx.binder, ctx.list));
+    return face;
+  }
+  if (!past && !ctx.list.length && page === 0) {
     const note = document.createElement("p");
-    note.className = "fine empty-note";
+    note.className = "sr-only";
     note.textContent = ctx.withCover ? "Empty pockets. Swipe to discover, or fill from your wishlist." : "Nothing saved yet. Right-swipe a card and it lands here.";
     face.append(note);
   }
   const grid = document.createElement("div");
   grid.className = "sleeves";
-  const slice = ctx.list.slice(page * 9, page * 9 + 9);
+  const slice = past ? [] : ctx.list.slice(page * 9, page * 9 + 9);
   for (let i = 0; i < 9; i++) {
     const card = slice[i];
-    grid.append(card ? sleeveSlot(card, page * 9 + i, ctx) : emptySlot(Math.min(ctx.list.length, page * 9 + i)));
+    grid.append(card ? sleeveSlot(card, page * 9 + i, ctx) : emptySlot(past ? null : Math.min(ctx.list.length, page * 9 + i)));
   }
   face.append(grid);
-  if (spark && pendingSparkle === page) {
+  const num = document.createElement("span");
+  num.className = "page-num";
+  num.textContent = String((past ? sheet : page) + 1);
+  face.append(num);
+  if (spark && !past && pendingSparkle === page) {
     face.append(sparkBits());
     pendingSparkle = -1;
   }
   return face;
 }
 function binderSpread(root){
-  if (!root) return false;
-  const innerW = root.clientWidth - 24;
-  const innerH = root.clientHeight - 24;
-  if (innerW < 280 || innerH < 300) return false;
-  const pageW = (innerW - 86) / 2;
-  const gridW = pageW - 12;
-  const gridH = innerH - 174;
-  if (gridW < 48 || gridH < 90) return false;
-  const byW = (gridW - 8) / 3;
-  const byH = ((gridH - 8) / 3) * (63 / 88);
-  return Math.min(byW, byH) >= 74;
-}
-const CURL_STRIPS = 12;
-let peelWarmGen = 0;
-function scheduleIdle(fn){
-  if (typeof requestIdleCallback === "function") requestIdleCallback(() => fn(), { timeout: 280 });
-  else setTimeout(fn, 0);
-}
-function curlWorld(t){
-  const turn = Math.max(0, Math.min(1, t));
-  const flat = Math.pow(turn, 2.6) * 176;
-  const bend = Math.sin(Math.PI * turn);
-  const angles = [];
-  for (let i = 0; i < CURL_STRIPS; i++) {
-    const s = (i + 0.5) / CURL_STRIPS;
-    angles.push(Math.min(176, flat + bend * Math.pow(s, 1.8) * 150));
-  }
-  return angles;
-}
-function applyCurl(leaf, t){
-  if (!leaf) return;
-  const backward = leaf.classList.contains("backward") || leaf.dataset.curlDir === "-1";
-  const width = leaf._curlW || leaf.clientWidth || 1;
-  const angles = curlWorld(t);
-  const strips = leaf._curlStrips || [];
-  let cursor = backward ? width : 0;
-  let apex = cursor;
-  let folded = false;
-  for (let i = 0; i < strips.length; i++) {
-    const strip = strips[i];
-    if (!strip) continue;
-    const angle = angles[i] || 0;
-    const rad = angle * Math.PI / 180;
-    const proj = strip._w * Math.cos(rad);
-    const end = cursor + (backward ? -proj : proj);
-    const left = Math.min(cursor, end);
-    const scale = Math.abs(Math.cos(rad));
-    strip.dataset.world = angle.toFixed(1);
-    strip.style.transform = "translate(" + left.toFixed(2) + "px,0) scaleX(" + Math.max(0.02, scale).toFixed(4) + ")";
-    const showBack = angle > 92;
-    if (strip._front) strip._front.style.opacity = showBack ? "0" : "1";
-    if (strip._back) strip._back.style.opacity = showBack ? "1" : "0";
-    if (angle > 80 && angle < 110) folded = true;
-    if (backward) apex = Math.min(apex, cursor, end);
-    else apex = Math.max(apex, cursor, end);
-    cursor = end;
-  }
-  const turn = Math.max(0, Math.min(1, t));
-  const lift = Math.sin(Math.PI * turn);
-  const shadeW = width * 0.62;
-  const glossW = width * 0.1;
-  const shadow = leaf.querySelector(".curl-shadow");
-  const gloss = leaf.querySelector(".curl-gloss");
-  const edge = leaf.querySelector(".curl-edge");
-  if (shadow) {
-    const sx = backward ? apex - shadeW * 0.82 : apex - shadeW * 0.18;
-    shadow.style.transform = "translate(" + sx.toFixed(1) + "px,0)";
-    shadow.style.opacity = (0.28 + lift * 0.72).toFixed(3);
-  }
-  if (gloss) {
-    const gx = backward ? apex - glossW * 0.7 : apex - glossW * 0.28;
-    gloss.style.transform = "translate(" + gx.toFixed(1) + "px,0)";
-    gloss.style.opacity = (0.2 + lift * 0.8).toFixed(3);
-  }
-  if (edge) {
-    edge.style.transform = "translate(" + (apex - 9).toFixed(1) + "px,0)";
-    edge.style.opacity = folded ? Math.min(1, 0.55 + lift * 0.45).toFixed(3) : "0";
-  }
-  leaf._curlApex = apex;
-}
-function mountPeel(leaf, dir, done){
-  const idle = typeof done === "function";
-  if (reduceMotion() || !leaf) { if (idle) done(); return; }
-  const front = leaf.querySelector(":scope > .face.front");
-  if (!front) { if (idle) done(); return; }
-  const backward = dir < 0;
-  const imgs = front.querySelectorAll("img");
-  let painted = 0;
-  imgs.forEach(img => { if (img.complete && img.naturalWidth) painted++; });
-  const prefix = backward ? "b" : "f";
-  if (leaf.dataset.peel && leaf.dataset.peel.charAt(0) === prefix && leaf.dataset.peel.endsWith(":" + painted) && leaf._curlStrips && leaf.querySelector(".peel")) { if (idle) done(); return; }
-  const w = Math.round(leaf.clientWidth);
-  const h = Math.round(leaf.clientHeight);
-  if (w < 40 || h < 40) { if (idle) done(); return; }
-  const key = prefix + w + "x" + h + ":" + painted;
-  const host = front.getBoundingClientRect();
-  const bits = [];
-  const pockets = [];
-  imgs.forEach(img => {
-    if (!img.complete || !img.naturalWidth) {
-      img.addEventListener("load", () => {
-        if (!leaf.isConnected || leaf.classList.contains("hot")) return;
-        mountPeel(leaf, Number(leaf.dataset.curlDir) || (backward ? -1 : 1));
-      }, { once:true });
-      return;
-    }
-    const rect = img.getBoundingClientRect();
-    if (rect.width < 2 || rect.height < 2) return;
-    bits.push({ img, x: rect.left - host.left, y: rect.top - host.top, w: rect.width, h: rect.height });
-  });
-  front.querySelectorAll(".sleeve, .pad").forEach(node => {
-    const rect = node.getBoundingClientRect();
-    if (rect.width < 2 || rect.height < 2) return;
-    pockets.push({ x: rect.left - host.left, y: rect.top - host.top, w: rect.width, h: rect.height, pad: node.classList.contains("pad") });
-  });
-  const base = Math.floor(w / CURL_STRIPS);
-  const widths = Array(CURL_STRIPS).fill(base);
-  widths[CURL_STRIPS - 1] = w - base * (CURL_STRIPS - 1);
-  const sheet = (sx, back) => {
-    const node = document.createElement("div");
-    node.className = back ? "strip-back" : "strip-front";
-    node.style.left = (-sx) + "px";
-    node.style.width = w + "px";
-    node.style.height = h + "px";
-    if (!back) pockets.forEach(pocket => {
-      const cell = document.createElement("i");
-      cell.style.left = pocket.x + "px";
-      cell.style.top = pocket.y + "px";
-      cell.style.width = pocket.w + "px";
-      cell.style.height = pocket.h + "px";
-      if (pocket.pad) cell.className = "pad";
-      node.append(cell);
-    });
-    if (!back) bits.forEach(bit => {
-      const img = document.createElement("img");
-      img.alt = "";
-      img.src = bit.img.currentSrc || bit.img.src;
-      img.style.left = bit.x + "px";
-      img.style.top = bit.y + "px";
-      img.style.width = bit.w + "px";
-      img.style.height = bit.h + "px";
-      node.append(img);
-    });
-    return node;
-  };
-  const gen = (leaf._peelGen || 0) + 1;
-  leaf._peelGen = gen;
-  const peel = document.createElement("div");
-  peel.className = "peel";
-  peel.setAttribute("aria-hidden", "true");
-  const shadow = document.createElement("div");
-  shadow.className = "curl-shadow";
-  shadow.style.width = Math.round(w * 0.62) + "px";
-  const gloss = document.createElement("div");
-  gloss.className = "curl-gloss";
-  gloss.style.width = Math.round(w * 0.1) + "px";
-  const edge = document.createElement("div");
-  edge.className = "curl-edge";
-  peel.append(shadow, gloss, edge);
-  leaf.querySelectorAll(".peel").forEach(old => old.remove());
-  leaf.append(peel);
-  const made = [];
-  let built = 0;
-  const chunk = idle ? 3 : CURL_STRIPS;
-  const stop = () => {
-    if (idle && leaf.isConnected && !leaf.classList.contains("hot")) done();
-  };
-  const step = () => {
-    if (leaf._peelGen !== gen || !leaf.isConnected) { stop(); return; }
-    const end = Math.min(CURL_STRIPS, built + chunk);
-    for (; built < end; built++) {
-      let sx = 0;
-      for (let k = 0; k < built; k++) sx += widths[k];
-      if (backward) sx = w - sx - widths[built];
-      const faceSlice = sheet(sx, false);
-      const backSlice = sheet(sx, true);
-      const strip = document.createElement("div");
-      strip.className = "strip";
-      strip.dataset.i = String(built);
-      strip.style.width = widths[built] + "px";
-      strip.style.height = h + "px";
-      strip.style.zIndex = String(8 + built);
-      strip.append(faceSlice, backSlice);
-      strip._w = widths[built];
-      strip._front = faceSlice;
-      strip._back = backSlice;
-      made.push(strip);
-      peel.append(strip);
-    }
-    if (built < CURL_STRIPS) { scheduleIdle(step); return; }
-    if (leaf._peelGen !== gen || !leaf.isConnected) { stop(); return; }
-    leaf._curlW = w;
-    leaf._curlH = h;
-    leaf._curlStrips = made;
-    leaf.classList.add("armed");
-    leaf.dataset.peel = key;
-    leaf.dataset.curlDir = backward ? "-1" : "1";
-    applyCurl(leaf, leaf.classList.contains("hot") ? (Number(leaf.style.getPropertyValue("--turn")) || 0) : 0);
-    if (idle) done();
-  };
-  if (idle) scheduleIdle(step);
-  else step();
+  if (!matchMedia("(min-width: 1024px)").matches) return false;
+  if (!root) return true;
+  const w = root.clientWidth;
+  if (!w) return true;
+  return w >= 640;
 }
 function renderCollection(root){
   const wishMode = binderView.kind === "wish";
@@ -4109,7 +4030,7 @@ function renderCollection(root){
   if (!wishMode && !binder) { binderView = null; renderBinders(); return; }
   root.classList.add("reading");
   const list = wishMode ? wish : binder.cards;
-  const withCover = !wishMode;
+  const withCover = false;
   const cardPages = Math.max(1, Math.ceil(list.length / 9) || 1);
   const total = withCover ? cardPages + 1 : cardPages;
   if (flipPage < 0) flipPage = 0;
@@ -4129,6 +4050,7 @@ function renderCollection(root){
   const book = document.createElement("div");
   book.className = "book " + (twoPage ? "spread" : "solo") + (wishMode ? " folio" : " leather");
   book.dataset.layout = twoPage ? "spread" : "solo";
+  book.dataset.flip = String(flipPage);
   book.style.setProperty("--cover", wishMode ? "#E4E7DA" : coverColor(binder.color));
   if (binderOpenAnim && !wishMode) {
     binderOpenAnim = false;
@@ -4252,16 +4174,52 @@ function renderCollection(root){
     under.replaceChildren(buildFace(revealed, ctx, false));
     under.dataset.sheet = String(revealed);
   };
-  const arm = dir => {
+  const showTurn = (turning, turn) => {
+    if (!turning) return;
+    turning.style.setProperty("--turn", String(turn));
+    if (turning._curl) turning._curl.render(turn, turning._grab == null ? 0.5 : turning._grab);
+  };
+  const dropCurl = turning => {
+    if (turning && turning._curl) { turning._curl.destroy(); turning._curl = null; }
+    if (book.dataset.curling) delete book.dataset.curling;
+  };
+  let cancelSpring = null;
+  const springTurn = (turning, from, to, token, done) => {
+    if (cancelSpring) cancelSpring();
+    let x = from, v = 0, last = performance.now(), alive = true, raf = 0;
+    const stiff = to > from ? 150 : 210;
+    const damp = to > from ? 14 : 18;
+    const step = now => {
+      if (!alive || token !== flipToken || !turning.isConnected) return;
+      const dt = Math.min(0.034, (now - last) / 1000);
+      last = now;
+      v += (to - x) * stiff * dt;
+      v *= Math.exp(-damp * dt);
+      x += v * dt;
+      showTurn(turning, Math.max(-0.02, Math.min(1.06, x)));
+      if (Math.abs(to - x) < 0.01 && Math.abs(v) < 0.06) { showTurn(turning, to); done(); return; }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    cancelSpring = () => { alive = false; cancelAnimationFrame(raf); };
+  };
+  const arm = (dir, grab) => {
     const leaf = book.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right"));
     if (!leaf) return null;
     fillUnder(dir);
-    leaf.classList.add("hot", dir > 0 ? "forward" : "backward");
+    leaf.classList.add("hot", dir > 0 ? "forward" : "backward", "live");
     if (dir < 0) leaf.classList.remove("forward");
     else leaf.classList.remove("backward");
+    leaf._grab = grab == null ? 0.5 : Math.max(0, Math.min(1, grab));
     leaf.style.setProperty("--turn", "0");
-    mountPeel(leaf, dir);
-    applyCurl(leaf, 0);
+    book.dataset.curling = "1";
+    let curl = null;
+    if (!reduceMotion() && window.BinderCurl) {
+      try { curl = BinderCurl.start({ book: book, leaf: leaf, dir: dir, grab: leaf._grab }); }
+      catch (err) { curl = null; }
+    }
+    if (curl) { leaf._curl = curl; leaf.classList.add("curling"); curl.render(0, leaf._grab); }
+    else leaf.classList.add("fallback");
     return leaf;
   };
   const noteFlip = () => { if (!wishMode) countEvent("page-flip"); };
@@ -4272,40 +4230,34 @@ function renderCollection(root){
     flipPage = next;
     renderBinders();
   };
-  const finishFlip = dir => {
+  const finishFlip = (dir, grab) => {
     const dest = landed(dir);
     if (dest === flipPage) return;
     noteFlip();
     playPaper();
     if (settings.haptics) haptic(8);
-    if (reduceMotion()) { flipPage = dest; renderBinders(); return; }
+    if (reduceMotion()) {
+      dropCurl(book.querySelector(".leaf.hot"));
+      flipPage = dest;
+      renderBinders();
+      return;
+    }
     const token = ++flipToken;
-    let leaf = book.querySelector(".leaf.hot");
-    if (leaf) leaf.classList.remove("live");
-    else leaf = arm(dir);
+    let turning = book.querySelector(".leaf.hot");
+    if (!turning) turning = arm(dir, grab == null ? 0.5 : grab);
+    if (!turning) { flipPage = dest; renderBinders(); return; }
+    const from = Number(turning.style.getPropertyValue("--turn")) || 0;
     let went = false;
     const go = () => {
       if (went || token !== flipToken) return;
       went = true;
+      if (cancelSpring) cancelSpring();
+      dropCurl(turning);
       flipPage = dest;
       renderBinders();
     };
-    if (!leaf) { go(); return; }
-    const from = Number(leaf.style.getPropertyValue("--turn")) || 0;
-    leaf.classList.add("live");
-    const started = performance.now();
-    const frame = now => {
-      if (went || token !== flipToken || !leaf.isConnected) return;
-      const p = Math.min(1, (now - started) / 560);
-      const eased = 1 - Math.pow(1 - p, 2.4);
-      const turn = from + (1 - from) * eased;
-      leaf.style.setProperty("--turn", turn.toFixed(4));
-      applyCurl(leaf, turn);
-      if (p < 1) requestAnimationFrame(frame);
-      else requestAnimationFrame(go);
-    };
-    requestAnimationFrame(frame);
-    setTimeout(go, 700);
+    springTurn(turning, from, 1, token, go);
+    setTimeout(go, 980);
   };
   prevBtn.onclick = () => finishFlip(-1);
   nextBtn.onclick = () => finishFlip(1);
@@ -4333,10 +4285,7 @@ function renderCollection(root){
       const width = Math.max(120, (leaf && leaf.clientWidth) || 200);
       const dir = leaf && leaf.classList.contains("backward") ? 1 : -1;
       const turned = dir === -1 ? Math.max(0, Math.min(1, -dx / width)) : Math.max(0, Math.min(1, dx / width));
-      if (leaf) {
-        leaf.style.setProperty("--turn", String(turned));
-        applyCurl(leaf, turned);
-      }
+      showTurn(leaf, turned);
       return;
     }
     if (mode === "card") {
@@ -4347,29 +4296,35 @@ function renderCollection(root){
     }
     if (!mode && Math.hypot(dx, dy) > 10) {
       clearTimer();
+      if (Math.abs(dx) > Math.abs(dy) && !pressBtn) {
+        const dir = dx < 0 ? 1 : -1;
+        if (landed(dir) !== flipPage) {
+          const host = book.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right")) || book;
+          const rect = host.getBoundingClientRect();
+          leaf = arm(dir, (sy - rect.top) / Math.max(1, rect.height));
+          if (leaf) {
+            mode = "curl";
+            const width = Math.max(120, leaf.clientWidth || 200);
+            const turned = dir === 1 ? Math.max(0, Math.min(1, -dx / width)) : Math.max(0, Math.min(1, dx / width));
+            showTurn(leaf, turned);
+            return;
+          }
+        }
+      }
       if (Math.abs(dx) > Math.abs(dy)) mode = dx < 0 ? "swipe-next" : "swipe-prev";
       else mode = "scroll";
     }
   };
   const snapCurl = turning => {
     if (!turning) return;
+    const token = ++flipToken;
     const from = Number(turning.style.getPropertyValue("--turn")) || 0;
-    turning.classList.add("live");
-    const started = performance.now();
-    const frame = now => {
-      if (!turning.isConnected) return;
-      const p = Math.min(1, (now - started) / 420);
-      const turn = from * Math.pow(1 - p, 1.6);
-      turning.style.setProperty("--turn", turn.toFixed(4));
-      applyCurl(turning, turn);
-      if (p < 1) requestAnimationFrame(frame);
-      else {
-        turning.classList.remove("hot", "forward", "backward", "live");
-        turning.style.removeProperty("--turn");
-        applyCurl(turning, 0);
-      }
-    };
-    requestAnimationFrame(frame);
+    springTurn(turning, from, 0, token, () => {
+      if (token !== flipToken || !turning.isConnected) return;
+      dropCurl(turning);
+      turning.classList.remove("hot", "forward", "backward", "live", "curling", "fallback");
+      turning.style.removeProperty("--turn");
+    });
   };
   const onUp = e => {
     if (e.pointerId !== pid) return;
@@ -4387,7 +4342,7 @@ function renderCollection(root){
         const turn = Number(turning.style.getPropertyValue("--turn")) || 0;
         const dir = turning.classList.contains("backward") ? -1 : 1;
         turning.classList.remove("live");
-        if (turn > 0.33 || Math.hypot(dx, dy) < 8) finishFlip(dir);
+        if (turn > 0.5 || Math.hypot(dx, dy) < 8) finishFlip(dir);
         else snapCurl(turning);
       }
     } else if (mode === "card") {
@@ -4428,7 +4383,7 @@ function renderCollection(root){
   let zoomToken = 0;
   function liftCard(card){
     if (!card) return;
-    const open = () => openProfile(card);
+    const open = () => { if (wide()) openProfile(card); else openShowcase(card); };
     const sleeve = book.querySelector('.sleeve[data-index="' + list.indexOf(card) + '"]');
     if (reduceMotion() || !sleeve) { open(); return; }
     const token = ++zoomToken;
@@ -4513,8 +4468,10 @@ function renderCollection(root){
       const dir = dog.classList.contains("prev") ? -1 : 1;
       if (landed(dir) === flipPage) return;
       mode = "curl";
-      leaf = arm(dir);
-      if (leaf) leaf.classList.add("live");
+      const host = book.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right")) || book;
+      const rect = host.getBoundingClientRect();
+      const grab = (e.clientY - rect.top) / Math.max(1, rect.height);
+      leaf = arm(dir, grab);
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
       window.addEventListener("pointercancel", onUp);
@@ -4547,16 +4504,20 @@ function renderCollection(root){
   nextEar.addEventListener("click", () => { if (fromPointer) { fromPointer = false; return; } finishFlip(1); });
   book.addEventListener("pointermove", e => {
     if (mode) return;
-    const sleeve = e.target.closest(".sleeve");
-    if (!sleeve || reduceMotion()) return;
+    const sleeve = e.target.closest(".sleeve:not(.empty)");
+    book.querySelectorAll(".sleeve.tilting").forEach(node => { if (node !== sleeve) node.classList.remove("tilting"); });
+    if (!sleeve || reduceMotion() || e.pointerType === "touch") return;
     const r = sleeve.getBoundingClientRect();
     const px = (e.clientX - r.left) / Math.max(1, r.width);
     const py = (e.clientY - r.top) / Math.max(1, r.height);
+    sleeve.classList.add("tilting");
     sleeve.style.setProperty("--sx", (px * 100).toFixed(0) + "%");
     sleeve.style.setProperty("--sy", (py * 100).toFixed(0) + "%");
-    if (!sleeve.classList.contains("holo")) return;
-    sleeve.style.setProperty("--tx", ((px - 0.5) * 8).toFixed(2) + "deg");
-    sleeve.style.setProperty("--ty", ((0.5 - py) * 6).toFixed(2) + "deg");
+    sleeve.style.setProperty("--tx", ((px - 0.5) * 22).toFixed(2) + "deg");
+    sleeve.style.setProperty("--ty", ((0.5 - py) * 16).toFixed(2) + "deg");
+  });
+  book.addEventListener("pointerleave", () => {
+    book.querySelectorAll(".sleeve.tilting").forEach(node => node.classList.remove("tilting"));
   });
   document.getElementById("backBinders").onclick = () => { binderView = null; renderBinders(); };
   document.getElementById("copyList").onclick = async () => {
@@ -4594,26 +4555,78 @@ function renderCollection(root){
     };
   }
   paintContext();
-  const warmBook = book;
-  const warmGen = ++peelWarmGen;
-  const warmDirs = [1];
-  if (twoPage) warmDirs.push(-1);
-  const warmDir = () => {
-    if (warmGen !== peelWarmGen || !warmBook.isConnected || reduceMotion()) return;
-    const dir = warmDirs.shift();
-    if (dir == null) return;
-    const leaf = warmBook.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right"));
-    if (!leaf || leaf.classList.contains("hot")) { scheduleIdle(warmDir); return; }
-    fillUnder(dir);
-    scheduleIdle(() => {
-      if (warmGen !== peelWarmGen || !warmBook.isConnected || reduceMotion()) return;
-      if (!leaf.isConnected || leaf.classList.contains("hot")) { scheduleIdle(warmDir); return; }
-      mountPeel(leaf, dir, () => scheduleIdle(warmDir));
-    });
-  };
-  scheduleIdle(warmDir);
 }
 
+let showcaseCardRef = null;
+let showcaseDrag = false;
+function openShowcase(card){
+  if (!card) return;
+  showcaseCardRef = card;
+  const root = document.getElementById("showcase");
+  const frame = document.getElementById("showcaseCard");
+  if (!root || !frame) { openProfile(card); return; }
+  frame.replaceChildren();
+  frame.style.removeProperty("--tx");
+  frame.style.removeProperty("--ty");
+  frame.style.removeProperty("--sx");
+  frame.style.removeProperty("--sy");
+  paintArt(frame, card, { cors:true });
+  const glare = document.createElement("span");
+  glare.className = "glare";
+  glare.setAttribute("aria-hidden", "true");
+  frame.append(glare);
+  root.hidden = false;
+  if (settings.haptics) haptic(8);
+}
+function closeShowcase(){
+  const root = document.getElementById("showcase");
+  if (root) root.hidden = true;
+  showcaseDrag = false;
+  showcaseCardRef = null;
+}
+function bindShowcase(){
+  const root = document.getElementById("showcase");
+  const frame = document.getElementById("showcaseCard");
+  if (!root || !frame || root.dataset.bound) return;
+  root.dataset.bound = "1";
+  const tilt = e => {
+    const box = frame.getBoundingClientRect();
+    const px = (e.clientX - box.left) / Math.max(1, box.width);
+    const py = (e.clientY - box.top) / Math.max(1, box.height);
+    frame.style.setProperty("--tx", ((px - 0.5) * 32).toFixed(2) + "deg");
+    frame.style.setProperty("--ty", ((0.5 - py) * 22).toFixed(2) + "deg");
+    frame.style.setProperty("--sx", (px * 100).toFixed(0) + "%");
+    frame.style.setProperty("--sy", (py * 100).toFixed(0) + "%");
+  };
+  frame.addEventListener("pointerdown", e => {
+    if (e.button) return;
+    showcaseDrag = true;
+    try { frame.setPointerCapture(e.pointerId); } catch (err) {}
+    tilt(e);
+  });
+  frame.addEventListener("pointermove", e => { if (showcaseDrag) tilt(e); });
+  frame.addEventListener("pointerup", () => { showcaseDrag = false; });
+  frame.addEventListener("pointercancel", () => { showcaseDrag = false; });
+  root.addEventListener("pointerdown", e => {
+    if (e.target === root || e.target.id === "showcaseStage") closeShowcase();
+  });
+  document.getElementById("showcaseClose").onclick = () => closeShowcase();
+  document.getElementById("showcaseDetails").onclick = () => {
+    const card = showcaseCardRef;
+    closeShowcase();
+    if (card) openProfile(card);
+  };
+  window.addEventListener("deviceorientation", e => {
+    if (root.hidden || showcaseDrag) return;
+    if (typeof e.gamma !== "number" || typeof e.beta !== "number") return;
+    const tx = Math.max(-18, Math.min(18, e.gamma * 0.35));
+    const ty = Math.max(-14, Math.min(14, (e.beta - 40) * 0.22));
+    frame.style.setProperty("--tx", tx.toFixed(2) + "deg");
+    frame.style.setProperty("--ty", ty.toFixed(2) + "deg");
+    frame.style.setProperty("--sx", (50 + tx * 1.4).toFixed(0) + "%");
+    frame.style.setProperty("--sy", (42 + ty).toFixed(0) + "%");
+  });
+}
 function openMenu(anchor, card, binder){
   menuCard = { card, binder };
   const menu = document.getElementById("menu");
@@ -5334,6 +5347,8 @@ document.addEventListener("keydown", e => {
     }
   }
   if (e.key === "Escape") {
+    const showcase = document.getElementById("showcase");
+    if (showcase && !showcase.hidden) { closeShowcase(); return; }
     if (!document.getElementById("menu").hidden) { document.getElementById("menu").hidden = true; return; }
     ["fillSheet","binderSheet","settingsSheet","filterSheet"].forEach(id => { if (!document.getElementById(id).hidden) closeSheet(id); });
     const prompt = document.getElementById("dropPrompt");
@@ -5347,6 +5362,7 @@ document.addEventListener("keydown", e => {
     return;
   }
   if (typingTarget(e.target) || blocking()) return;
+  if (document.getElementById("showcase") && !document.getElementById("showcase").hidden) return;
   if ((e.key === "f" || e.key === "F") && tab === "hunt") { e.preventDefault(); openFilter("set", document.querySelector("[data-filter=set]")); return; }
   if (e.key === "z" || e.key === "Z") { if (tab === "hunt") undo(); return; }
   if (tab === "hunt" && !blocking()) {
@@ -5366,6 +5382,7 @@ document.addEventListener("pointerdown", e => {
 });
 
 applyMotion();
+bindShowcase();
 syncProfilePane();
 matchMedia("(min-width: 1024px)").addEventListener("change", syncProfilePane);
 document.getElementById("chips").addEventListener("scroll", syncChipFade);
