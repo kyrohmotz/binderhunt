@@ -715,10 +715,13 @@ html.reduce .peel{display:none}
   .book .sleeve.tilting{z-index:4}
   .book .sleeve.tilting .cardhit{--lift:1.05;box-shadow:0 16px 26px rgba(0,0,0,.46)}
 }
-.book .dogear,.book .dogear.prev,.book .dogear.next{width:44px;height:auto;top:0;bottom:0;margin:0;background:transparent;border-radius:0}
+.book .dogear,.book .dogear.prev,.book .dogear.next{width:14px;height:auto;top:0;bottom:0;margin:0;background:transparent;border-radius:0}
 .book .dogear.prev{left:0;transform:none}
 .book .dogear.next{right:0;transform:none}
 .book .dogear.prev:active,.book .dogear.next:active{transform:none}
+.book .cardhit:focus-visible,
+.book .gotbtn:focus-visible,
+.book .sleeve .iconish.more:focus-visible{outline:3px solid #F3EDC8;outline-offset:2px}
 .leaf.hot.curling,
 .leaf.hot.curling.forward,
 .leaf.hot.curling.backward{transform:none !important}
@@ -2928,6 +2931,32 @@ function pocketPrice(card){
   }
   return sym + n.toFixed(2);
 }
+function refreshPocketPrice(card){
+  if (!card || !card.id) return;
+  const price = pocketPrice(card);
+  const drop = priceDrop(card);
+  const owned = ownedIds.has(card.id);
+  const dropNote = drop ? ", down " + drop.shown + " percent" : "";
+  document.querySelectorAll("#bindersScroll .sleeve").forEach(sleeve => {
+    const got = sleeve.querySelector(":scope > .gotbtn");
+    if (!got || got.dataset.for !== card.id) return;
+    const hit = sleeve.querySelector(".cardhit");
+    if (!hit) return;
+    let pill = hit.querySelector(".price-pill");
+    if (price) {
+      if (!pill) {
+        pill = document.createElement("span");
+        pill.className = "price-pill";
+        hit.append(pill);
+      }
+      pill.textContent = price;
+    } else if (pill) pill.remove();
+    sleeve.querySelectorAll(":scope > .drop-badge").forEach(node => node.remove());
+    const markup = dropBadgeMarkup(drop);
+    if (markup) hit.insertAdjacentHTML("afterend", markup);
+    hit.setAttribute("aria-label", altText(card) + (owned ? ", owned" : ", wanted") + (price ? ", " + price : "") + dropNote);
+  });
+}
 function topCard(){ const cards = deck.querySelectorAll(".card"); return cards[cards.length - 1] || null; }
 function layoutStack(){
   const cards = [...deck.querySelectorAll(".card")];
@@ -4125,22 +4154,31 @@ function renderCollection(root){
   const select = document.createElement("select");
   select.id = "jumpPage";
   select.setAttribute("aria-label", "Jump to page");
-  for (let i = 0; i < total; i++) {
-    const label = withCover && i === 0 ? "Cover" : "Page " + (withCover ? i : i + 1);
+  const sheetLabel = (index, spread) => {
+    if (!spread) return withCover && index === 0 ? "Cover" : "Page " + (withCover ? index : index + 1);
+    const left = withCover ? index : index + 1;
+    const right = left + 1;
+    if (withCover && index === 0) return "Cover–Page " + right;
+    return "Page " + left + "–" + right;
+  };
+  const starts = [];
+  if (twoPage) { for (let i = 0; i < total; i += 2) starts.push(i); }
+  else { for (let i = 0; i < total; i++) starts.push(i); }
+  starts.forEach(i => {
+    const label = sheetLabel(i, twoPage);
     const dot = document.createElement("button");
     dot.type = "button";
     dot.dataset.sheet = String(i);
     dot.title = label;
     dot.setAttribute("aria-label", label);
-    const here = i === flipPage || (twoPage && i === flipPage + 1 && i < total);
-    dot.setAttribute("aria-current", here ? "true" : "false");
+    dot.setAttribute("aria-current", i === flipPage ? "true" : "false");
     dots.append(dot);
     const opt = document.createElement("option");
     opt.value = String(i);
     opt.textContent = label;
     if (i === flipPage) opt.selected = true;
     select.append(opt);
-  }
+  });
   const nextBtn = document.createElement("button");
   nextBtn.type = "button";
   nextBtn.className = "iconish";
@@ -4151,12 +4189,11 @@ function renderCollection(root){
   nav.append(prevBtn, dots, jump, nextBtn);
   const foot = document.createElement("p");
   foot.className = "pagefoot";
-  const shownLeft = withCover && flipPage === 0 ? "Cover" : "Page " + (withCover ? flipPage : flipPage + 1);
   const ownedHere = list.filter(c => ownedIds.has(c.id)).length;
   const ownBit = list.length ? " · " + ownedHere + " owned · " + (list.length - ownedHere) + " wanted" : "";
   const droppedN = wishMode ? droppedCount(list) : 0;
   const dropBit = droppedN ? " · " + droppedN + " dropped" : "";
-  foot.textContent = (wishMode ? "Wishlist · " : "") + shownLeft + (twoPage && flipPage + 1 < total ? " – " + (withCover && flipPage + 1 === 0 ? "Cover" : "Page " + (withCover ? flipPage + 1 : flipPage + 2)) : "") + " · " + list.length + (list.length === 1 ? " card" : " cards") + ownBit + dropBit + " · " + (val ? priceText(val, "USD") : "—");
+  foot.textContent = (wishMode ? "Wishlist · " : "") + sheetLabel(flipPage, twoPage) + " · " + list.length + (list.length === 1 ? " card" : " cards") + ownBit + dropBit + " · " + (val ? priceText(val, "USD") : "—");
   stage.append(book, nav, foot);
   root.append(tools, stage);
 
@@ -4179,8 +4216,11 @@ function renderCollection(root){
     turning.style.setProperty("--turn", String(turn));
     if (turning._curl) turning._curl.render(turn, turning._grab == null ? 0.5 : turning._grab);
   };
-  const dropCurl = turning => {
-    if (turning && turning._curl) { turning._curl.destroy(); turning._curl = null; }
+  const dropCurl = () => {
+    book.querySelectorAll(".leaf").forEach(node => {
+      if (node._curl) { node._curl.destroy(); node._curl = null; }
+    });
+    book.querySelectorAll(".curl-view, .curl-cast").forEach(node => node.remove());
     if (book.dataset.curling) delete book.dataset.curling;
   };
   let cancelSpring = null;
@@ -4203,14 +4243,27 @@ function renderCollection(root){
     raf = requestAnimationFrame(step);
     cancelSpring = () => { alive = false; cancelAnimationFrame(raf); };
   };
+  const releaseFlight = () => {
+    flipToken++;
+    if (cancelSpring) cancelSpring();
+  };
   const arm = (dir, grab) => {
     const leaf = book.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right"));
     if (!leaf) return null;
+    book.querySelectorAll(".leaf").forEach(node => {
+      if (node._curl) { node._curl.destroy(); node._curl = null; }
+      if (node !== leaf) {
+        node.classList.remove("hot", "forward", "backward", "live", "curling", "fallback");
+        node.style.removeProperty("--turn");
+        node._base = 0;
+      }
+    });
+    book.querySelectorAll(".curl-view, .curl-cast").forEach(node => node.remove());
     fillUnder(dir);
+    leaf.classList.remove("forward", "backward", "curling", "fallback");
     leaf.classList.add("hot", dir > 0 ? "forward" : "backward", "live");
-    if (dir < 0) leaf.classList.remove("forward");
-    else leaf.classList.remove("backward");
     leaf._grab = grab == null ? 0.5 : Math.max(0, Math.min(1, grab));
+    leaf._base = 0;
     leaf.style.setProperty("--turn", "0");
     book.dataset.curling = "1";
     let curl = null;
@@ -4220,6 +4273,35 @@ function renderCollection(root){
     }
     if (curl) { leaf._curl = curl; leaf.classList.add("curling"); curl.render(0, leaf._grab); }
     else leaf.classList.add("fallback");
+    return leaf;
+  };
+  const adoptCurl = (dir, grab) => {
+    releaseFlight();
+    const host = book.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right"));
+    const dirClass = dir > 0 ? "forward" : "backward";
+    const reusable = host && host.classList.contains("hot") && host.classList.contains(dirClass) && (host._curl || host.classList.contains("fallback"));
+    const extras = book.querySelectorAll(".curl-view").length > (host && host._curl ? 1 : 0);
+    if (reusable && !extras) {
+      book.querySelectorAll(".leaf").forEach(node => {
+        if (node === host) return;
+        if (node._curl) { node._curl.destroy(); node._curl = null; }
+        node.classList.remove("hot", "forward", "backward", "live", "curling", "fallback");
+        node.style.removeProperty("--turn");
+        node._base = 0;
+      });
+      host.classList.add("hot", dirClass, "live");
+      host._grab = grab == null ? 0.5 : Math.max(0, Math.min(1, grab));
+      host._base = Number(host.style.getPropertyValue("--turn")) || 0;
+      book.dataset.curling = "1";
+      if (host._curl) host._curl.render(host._base, host._grab);
+      return host;
+    }
+    const base = reusable ? (Number(host.style.getPropertyValue("--turn")) || 0) : 0;
+    const leaf = arm(dir, grab);
+    if (leaf && base) {
+      leaf._base = base;
+      showTurn(leaf, base);
+    }
     return leaf;
   };
   const noteFlip = () => { if (!wishMode) countEvent("page-flip"); };
@@ -4274,18 +4356,23 @@ function renderCollection(root){
     if (Math.abs(dest - flipPage) === step) finishFlip(dest > flipPage ? 1 : -1);
     else goSheet(dest);
   };
-  let mode = "", pid = null, sx = 0, sy = 0, timer = 0, ghost = null, dragIndex = -1, leaf = null, fromPointer = false, pressBtn = null;
+  let mode = "", pid = null, sx = 0, sy = 0, timer = 0, ghost = null, dragIndex = -1, leaf = null, fromPointer = false, pressBtn = null, peak = 0;
   const clearTimer = () => { if (timer) { clearTimeout(timer); timer = 0; } };
   const endGhost = () => { if (ghost) { ghost.remove(); ghost = null; } book.querySelectorAll(".sleeve").forEach(s => { s.style.opacity = ""; }); };
   const onMove = e => {
     if (e.pointerId !== pid) return;
     const dx = e.clientX - sx, dy = e.clientY - sy;
+    peak = Math.max(peak, Math.hypot(dx, dy));
     if (pressBtn && pressBtn._press) pressBtn._press.d = Math.max(pressBtn._press.d || 0, Math.hypot(dx, dy));
+    const turnedFrom = node => {
+      const width = Math.max(120, (node && node.clientWidth) || 200);
+      const backward = node && node.classList.contains("backward");
+      const delta = backward ? dx / width : -dx / width;
+      const base = (node && node._base) || 0;
+      return Math.max(0, Math.min(1, base + delta));
+    };
     if (mode === "curl") {
-      const width = Math.max(120, (leaf && leaf.clientWidth) || 200);
-      const dir = leaf && leaf.classList.contains("backward") ? 1 : -1;
-      const turned = dir === -1 ? Math.max(0, Math.min(1, -dx / width)) : Math.max(0, Math.min(1, dx / width));
-      showTurn(leaf, turned);
+      showTurn(leaf, turnedFrom(leaf));
       return;
     }
     if (mode === "card") {
@@ -4301,12 +4388,10 @@ function renderCollection(root){
         if (landed(dir) !== flipPage) {
           const host = book.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right")) || book;
           const rect = host.getBoundingClientRect();
-          leaf = arm(dir, (sy - rect.top) / Math.max(1, rect.height));
+          leaf = adoptCurl(dir, (sy - rect.top) / Math.max(1, rect.height));
           if (leaf) {
             mode = "curl";
-            const width = Math.max(120, leaf.clientWidth || 200);
-            const turned = dir === 1 ? Math.max(0, Math.min(1, -dx / width)) : Math.max(0, Math.min(1, dx / width));
-            showTurn(leaf, turned);
+            showTurn(leaf, turnedFrom(leaf));
             return;
           }
         }
@@ -4342,7 +4427,8 @@ function renderCollection(root){
         const turn = Number(turning.style.getPropertyValue("--turn")) || 0;
         const dir = turning.classList.contains("backward") ? -1 : 1;
         turning.classList.remove("live");
-        if (turn > 0.5 || Math.hypot(dx, dy) < 8) finishFlip(dir);
+        const tap = peak < 8;
+        if ((turn > 0.5 || tap) && landed(dir) !== flipPage) finishFlip(dir);
         else snapCurl(turning);
       }
     } else if (mode === "card") {
@@ -4460,7 +4546,7 @@ function renderCollection(root){
     if (e.target.closest(".iconish")) return;
     const onGot = e.target.closest(".gotbtn");
     pressBtn = onGot || null;
-    pid = e.pointerId; sx = e.clientX; sy = e.clientY; mode = "";
+    pid = e.pointerId; sx = e.clientX; sy = e.clientY; mode = ""; peak = 0;
     const dog = e.target.closest(".dogear");
     const sleeveHit = e.target.closest(".sleeve");
     if ((dog || sleeveHit) && !onGot && e.cancelable) e.preventDefault();
@@ -4471,7 +4557,7 @@ function renderCollection(root){
       const host = book.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right")) || book;
       const rect = host.getBoundingClientRect();
       const grab = (e.clientY - rect.top) / Math.max(1, rect.height);
-      leaf = arm(dir, grab);
+      leaf = adoptCurl(dir, grab);
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
       window.addEventListener("pointercancel", onUp);
@@ -5065,7 +5151,7 @@ function renderSummary(card){
   </div>`;
   const thumb = document.getElementById("summaryThumb");
   if (thumb) paintArt(thumb, card);
-  profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => { variantChoice.set(card.id, btn.dataset.variant); summaryId = ""; renderSummary(card); summaryId = card.id; paintCaption(); });
+  profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => { variantChoice.set(card.id, btn.dataset.variant); summaryId = ""; renderSummary(card); summaryId = card.id; paintCaption(); refreshPocketPrice(card); });
   profileEl.querySelectorAll("[data-range]").forEach(btn => btn.onclick = () => { chartRange = btn.dataset.range; summaryId = ""; renderSummary(card); });
   const full = document.getElementById("openFullProfile");
   if (full) full.onclick = () => openProfile(card);
@@ -5200,7 +5286,7 @@ function renderProfile(card){
   const thumb = document.getElementById("profileThumb");
   paintArt(thumb, card);
   document.getElementById("closeProfile").onclick = closeProfile;
-  profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => { variantChoice.set(card.id, btn.dataset.variant); renderProfile(card); paintCaption(); });
+  profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => { variantChoice.set(card.id, btn.dataset.variant); renderProfile(card); paintCaption(); refreshPocketPrice(card); });
   profileEl.querySelectorAll("[data-range]").forEach(btn => btn.onclick = () => { chartRange = btn.dataset.range; renderProfile(card); });
   profileEl.querySelectorAll("[data-compare]").forEach(btn => btn.onclick = () => { compareGrade = btn.dataset.compare; renderProfile(card); });
   if (series.pendingFx) ensureFx().then(rate => { if (rate && profileCard && profileCard.id === card.id) renderProfile(cardCache.get(card.id) || card); });
