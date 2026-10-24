@@ -1,0 +1,298 @@
+/* Premium binder.
+   A padded charcoal case with a stitched edge, a stitched gutter with real
+   depth, a visible stack of pages, dark matte pages and clear recessed
+   sleeves, so the cards are the only bright thing on the page. Everything
+   here is scoped to #bindersScroll (and the inspect overlay), so the pastel
+   Two Toads chrome around the binder is untouched. */
+
+/* ---------- desk and stage ---------- */
+
+#bindersScroll.reading{padding:8px 12px 6px;gap:6px;background:radial-gradient(120% 70% at 50% 108%,rgba(171,178,141,.34),transparent 64%),var(--paper)}
+#bindersScroll.reading .booktools{justify-content:center}
+#bindersScroll .bookstage{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;perspective:none;container-type:size}
+
+/* ---------- the case ---------- */
+
+#bindersScroll .book{
+  --case:#1a1b21;
+  --page:#1f2026;
+  --pocket:#16171c;
+  --gutter:30px;
+  --pad:12px;
+  --ratio:1.5;
+  --chrome:74px;
+  position:relative;flex:none;display:block;
+  width:min(100cqi,calc((100cqb - var(--chrome)) * var(--ratio)));
+  height:auto;aspect-ratio:var(--ratio);
+  margin:0;padding:var(--pad);
+  border:0;border-radius:22px;
+  background:
+    radial-gradient(120% 90% at 28% -6%,rgba(255,255,255,.085),transparent 56%),
+    linear-gradient(180deg,rgba(255,255,255,.035),rgba(0,0,0,.22)),
+    var(--case);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.16),
+    inset 0 0 0 1px rgba(255,255,255,.05),
+    inset 0 -4px 7px rgba(0,0,0,.5),
+    inset 0 0 22px rgba(0,0,0,.38),
+    0 2px 0 rgba(0,0,0,.28),
+    0 20px 34px -10px rgba(34,26,16,.5),
+    0 46px 80px -26px rgba(34,26,16,.42);
+  isolation:isolate;
+}
+#bindersScroll .book.leather{--case:color-mix(in srgb,var(--cover,#2a2b31) 24%,#17181d)}
+#bindersScroll .book.folio{--case:#1a1b21}
+#bindersScroll .book.solo{--gutter:12px;--pad:8px;--ratio:.755;--chrome:66px;border-radius:18px}
+/* Stitching around the padded edge. */
+#bindersScroll .book::before{content:"";position:absolute;inset:4px;border-radius:18px;border:1.5px dashed rgba(255,255,255,.13);pointer-events:none;z-index:0}
+#bindersScroll .book.solo::before{inset:3px;border-radius:15px}
+#bindersScroll .book::after{content:none}
+#bindersScroll .book.opening{animation:binderRise .5s cubic-bezier(.16,.84,.22,1) both;transform-origin:center 70%}
+@keyframes binderRise{from{opacity:0;transform:translateY(14px) scale(.975)}to{opacity:1;transform:none}}
+
+/* ---------- spread, gutter, page stack ---------- */
+
+#bindersScroll .book .book-spread{
+  position:relative;z-index:1;height:100%;min-height:0;
+  display:grid;grid-template-rows:minmax(0,1fr);
+  grid-template-columns:minmax(0,1fr) var(--gutter) minmax(0,1fr);
+  background:transparent;border-radius:10px;
+  perspective:4200px;perspective-origin:50% 50%;
+  /* Page edges peeking out past the top sheet: the thickness of the stack. */
+  box-shadow:
+    -2px 1px 0 0 #2a2b31,-3px 2px 0 0 #121317,
+    -4px 3px 0 0 #26272d,-5px 4px 0 0 #111216,
+    2px 1px 0 0 #2a2b31,3px 2px 0 0 #121317,
+    4px 3px 0 0 #26272d,5px 4px 0 0 #111216;
+}
+#bindersScroll .book.solo .book-spread{
+  grid-template-columns:var(--gutter) minmax(0,1fr);
+  perspective:2400px;perspective-origin:0% 50%;
+  overflow:hidden;border-radius:4px 10px 10px 4px;
+  box-shadow:2px 1px 0 0 #2a2b31,3px 2px 0 0 #121317,4px 3px 0 0 #26272d,5px 4px 0 0 #111216;
+}
+#bindersScroll .book .rings{display:none}
+#bindersScroll .book .spine{
+  display:block;grid-row:1;grid-column:2;position:relative;z-index:0;
+  border:0;border-radius:0;
+  background:
+    linear-gradient(90deg,rgba(0,0,0,.72),rgba(0,0,0,.2) 26%,rgba(255,255,255,.06) 50%,rgba(0,0,0,.2) 74%,rgba(0,0,0,.72)),
+    var(--case);
+  box-shadow:none;
+}
+#bindersScroll .book .spine i{display:none}
+#bindersScroll .book .spine::before{content:"";position:absolute;top:12px;bottom:12px;left:50%;margin-left:-.75px;border-left:1.5px dashed rgba(255,255,255,.17)}
+#bindersScroll .book.solo .spine{grid-column:1;border-radius:4px 0 0 4px;background:linear-gradient(90deg,rgba(0,0,0,.25),rgba(255,255,255,.05) 45%,rgba(0,0,0,.65)),var(--case)}
+#bindersScroll .book.solo .spine::before{left:42%}
+#bindersScroll .book .leaf,#bindersScroll .book .under{grid-row:1;position:relative;min-width:0;min-height:0;display:block}
+#bindersScroll .book.spread .leaf.left,#bindersScroll .book.spread .under.left{grid-column:1;display:block}
+#bindersScroll .book.spread .leaf.right,#bindersScroll .book.spread .under.right{grid-column:3;display:block}
+#bindersScroll .book.solo .leaf.left,#bindersScroll .book.solo .under.left{display:none}
+#bindersScroll .book.solo .leaf.right,#bindersScroll .book.solo .under.right{grid-column:2}
+#bindersScroll .book .under{z-index:1}
+#bindersScroll .book .leaf{z-index:2;transform-style:preserve-3d}
+#bindersScroll .book .leaf.hot{z-index:4}
+
+/* ---------- pages ---------- */
+
+#bindersScroll .book .face{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:0;padding:clamp(7px,2.2cqmin,14px) clamp(7px,2.2cqmin,14px) clamp(12px,3.4cqmin,20px);
+  overflow:hidden;container-type:size;
+  border:0;border-radius:4px 11px 11px 4px;
+  background:
+    radial-gradient(150% 110% at 18% -4%,rgba(255,255,255,.055),transparent 58%),
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .055 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--page);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.035),inset 0 1px 0 rgba(255,255,255,.05);
+  color:rgba(255,255,255,.78);
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;
+}
+#bindersScroll .book .face.back{transform:rotateY(180deg)}
+#bindersScroll .book .face.page-left{border-radius:11px 4px 4px 11px}
+#bindersScroll .book .face.page-right{border-radius:4px 11px 11px 4px}
+/* The page dips into the gutter. */
+#bindersScroll .book .face.page-left::after,#bindersScroll .book .face.page-right::after{content:"";position:absolute;top:0;bottom:0;width:16%;pointer-events:none;z-index:5}
+#bindersScroll .book .face.page-right::after{left:0;background:linear-gradient(90deg,rgba(0,0,0,.5),rgba(0,0,0,.16) 30%,transparent)}
+#bindersScroll .book .face.page-left::after{right:0;background:linear-gradient(270deg,rgba(0,0,0,.5),rgba(0,0,0,.16) 30%,transparent)}
+#bindersScroll .book .face.blank::after{width:22%}
+#bindersScroll .book .face h3{display:none}
+#bindersScroll .book .page-num{position:absolute;bottom:clamp(2px,.9cqmin,6px);z-index:6;font-family:Nunito,sans-serif;font-weight:700;font-size:clamp(9px,2.1cqmin,12px);letter-spacing:.06em;color:rgba(255,255,255,.34);pointer-events:none;font-variant-numeric:tabular-nums}
+#bindersScroll .book .face.page-left .page-num{left:14px;right:auto}
+#bindersScroll .book .face.page-right .page-num{right:14px;left:auto}
+
+/* ---------- pockets ---------- */
+
+#bindersScroll .book .sleeves{
+  --pa:.738;
+  flex:none;margin:auto;display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));
+  gap:clamp(4px,1.5cqmin,10px);
+  width:min(100cqi,calc(100cqb * var(--pa)));
+  height:min(100cqb,calc(100cqi / var(--pa)));
+  max-height:none;align-self:center;
+}
+#bindersScroll .book .slot{position:relative;min-width:0;min-height:0}
+#bindersScroll .book .slot > .sleeve{
+  position:absolute;inset:0;overflow:hidden;
+  border-radius:5px;
+  background:linear-gradient(180deg,rgba(0,0,0,.26),rgba(0,0,0,.08) 40%,rgba(255,255,255,.012)),var(--pocket);
+  box-shadow:
+    inset 0 2px 5px rgba(0,0,0,.6),
+    inset 0 0 0 1px rgba(255,255,255,.075),
+    inset 0 -1px 0 rgba(255,255,255,.07),
+    0 1px 0 rgba(255,255,255,.035);
+  transition:none;
+}
+/* The sleeve's welded seam and open lip, faint as clear plastic. */
+#bindersScroll .book .sleeve::before{content:"";position:absolute;left:3px;right:3px;top:6%;height:1px;z-index:5;background:linear-gradient(90deg,transparent,rgba(255,255,255,.13) 12%,rgba(255,255,255,.13) 88%,transparent);pointer-events:none}
+#bindersScroll .book .sleeve::after{content:"";display:block;position:absolute;inset:0;z-index:4;height:auto;pointer-events:none;border-radius:inherit;background:linear-gradient(122deg,rgba(255,255,255,.075),rgba(255,255,255,.01) 30%,transparent 62%,rgba(255,255,255,.035));box-shadow:inset 0 0 0 1px rgba(255,255,255,.03)}
+#bindersScroll .book .sleeve.empty .sleeve-weld,#bindersScroll .book .sleeve.empty .gloss,#bindersScroll .book .sleeve.empty .glare,#bindersScroll .book .sleeve .ghost-card,#bindersScroll .book .sleeve .sleeve-tag{display:none}
+#bindersScroll .book .sleeve.sunk .cardhit{transform:scale(.985)}
+
+/* The card sits snug in the sleeve. */
+#bindersScroll .book .sleeve .cardhit{
+  position:absolute;inset:0;margin:auto;
+  height:95%;width:auto;max-width:96%;aspect-ratio:63/88;
+  padding:0;border:0;display:block;z-index:1;
+  border-radius:4.6% / 3.3%;overflow:hidden;
+  background:transparent;box-shadow:0 1px 2px rgba(0,0,0,.45);
+  transform:perspective(720px) rotateX(var(--ty,0deg)) rotateY(var(--tx,0deg)) scale(var(--lift,1));
+  transform-origin:center;transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s ease;
+}
+#bindersScroll .book .sleeve .cardhit:active{transform:perspective(720px) rotateX(var(--ty,0deg)) rotateY(var(--tx,0deg)) scale(.985)}
+#bindersScroll .book .sleeve img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:0;background:transparent;opacity:1;filter:none;box-shadow:none;transform:none}
+#bindersScroll .book .sleeve.wanted img,#bindersScroll .book .sleeve.owned img{opacity:1;filter:none}
+#bindersScroll .book .sleeve.wanted,#bindersScroll .book .sleeve.owned{background:linear-gradient(180deg,rgba(0,0,0,.26),rgba(0,0,0,.08) 40%,rgba(255,255,255,.012)),var(--pocket)}
+#bindersScroll .book .sleeve.wanted .cardhit,#bindersScroll .book .sleeve.owned .cardhit{background:transparent}
+#bindersScroll .book .cardhit.inspect-source{visibility:hidden}
+/* No resting sheen: a light card read as washed out under it. The sheen only
+   shows while a pointer tilts the card. */
+#bindersScroll .book .sleeve .gloss,#bindersScroll .book .sleeve .shine,#bindersScroll .book .sleeve .glare{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0;background:none;mix-blend-mode:normal}
+#bindersScroll .book .sleeve.tilting .glare{opacity:.8;background:radial-gradient(70% 55% at var(--sx,30%) var(--sy,20%),rgba(255,255,255,.42),transparent 60%);mix-blend-mode:soft-light}
+#bindersScroll .book .sleeve.holo.tilting .shine{opacity:.55;background:linear-gradient(115deg,transparent 22%,rgba(255,255,255,.5) 36%,rgba(134,222,255,.4) 46%,rgba(246,201,201,.36) 56%,rgba(243,237,200,.32) 66%,transparent 80%);background-size:230% 230%;background-position:var(--sx,30%) var(--sy,24%);mix-blend-mode:color-dodge}
+@media (hover:hover) and (pointer:fine){
+  #bindersScroll .book .sleeve.tilting{overflow:visible;z-index:4}
+  #bindersScroll .book .sleeve.tilting .cardhit{--lift:1.045;box-shadow:0 14px 24px rgba(0,0,0,.55),0 2px 4px rgba(0,0,0,.4)}
+}
+
+/* A card whose art never loaded: a dark blank card with its name. */
+#bindersScroll .art-missing,.inspect .art-missing{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;padding:9% 8%;background:linear-gradient(160deg,#30323b,#1d1e24 62%,#25262d);color:rgba(255,255,255,.82);font-family:Nunito,sans-serif;text-align:left;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+#bindersScroll .art-missing b,.inspect .art-missing b{font-family:Nunito,sans-serif;font-weight:800;font-size:clamp(9px,1.4vmin,15px);line-height:1.15;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+#bindersScroll .art-missing span,.inspect .art-missing span{font-size:clamp(8px,1.1vmin,12px);color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#bindersScroll .book .cardback{display:none}
+
+/* Pocket labels sit on the card, small and quiet. */
+#bindersScroll .book .price-pill{position:absolute;z-index:4;left:5%;bottom:3.5%;padding:2px 6px;border-radius:999px;background:rgba(10,10,14,.66);color:#fff;font-family:Nunito,sans-serif;font-weight:800;font-size:clamp(9px,1.25vmin,12px);line-height:1.3;pointer-events:none;font-variant-numeric:tabular-nums;backdrop-filter:none}
+#bindersScroll .book .sleeve > .drop-badge{position:absolute;z-index:6;left:auto;right:6%;bottom:4.5%;top:auto;background:rgba(246,201,201,.95);color:#1f1f1e;border:0;box-shadow:0 1px 2px rgba(0,0,0,.4);font-size:clamp(9px,1.2vmin,11px);line-height:1.2;padding:2px 5px;max-width:none}
+#bindersScroll .book .sleeve .gotbtn{position:absolute;z-index:6;top:0;right:0;bottom:auto;left:auto;width:34px;height:34px;min-width:34px;min-height:34px;padding:0;border:0;border-radius:6px;background:transparent;box-shadow:none;display:grid;place-items:center}
+#bindersScroll .book .sleeve .gotbtn .mark{width:15px;height:15px;margin:0;border:1.5px solid #1f1f1e;background:rgba(248,247,239,.92);box-shadow:0 1px 2px rgba(0,0,0,.4)}
+#bindersScroll .book .sleeve.owned .gotbtn .mark{background:#ABB28D}
+#bindersScroll .book .sleeve .iconish.more{position:absolute;z-index:6;top:0;left:0;width:32px;height:32px;min-height:32px;padding:0;border:0;border-radius:6px;background:transparent;color:rgba(255,255,255,.86);font-size:18px;line-height:1;text-shadow:0 1px 3px rgba(0,0,0,.9);box-shadow:none}
+#bindersScroll .book .cardhit:focus-visible,#bindersScroll .book .gotbtn:focus-visible,#bindersScroll .book .sleeve .iconish.more:focus-visible{outline:3px solid #F3EDC8;outline-offset:2px}
+
+/* Thin page-turn strips on the outer edges. */
+#bindersScroll .book .dogear,#bindersScroll .book .dogear.prev,#bindersScroll .book .dogear.next{position:absolute;z-index:8;width:14px;height:auto;top:var(--pad);bottom:var(--pad);margin:0;padding:0;border:0;background:transparent;border-radius:0;box-shadow:none;transform:none;cursor:grab}
+#bindersScroll .book .dogear.prev{left:0;right:auto}
+#bindersScroll .book .dogear.next{right:0;left:auto}
+#bindersScroll .book .dogear:active{transform:none;cursor:grabbing}
+
+/* ---------- the turning sheet ---------- */
+
+#bindersScroll .book .leaf.turning{will-change:transform;transform-style:preserve-3d}
+#bindersScroll .book .leaf.turn-forward,#bindersScroll .book .leaf.turn-solo-forward,#bindersScroll .book .leaf.turn-solo-backward{transform-origin:calc(var(--gutter) / -2) 50%}
+#bindersScroll .book .leaf.turn-backward{transform-origin:calc(100% + var(--gutter) / 2) 50%}
+#bindersScroll .book .leaf.turning .sleeve.tilting .cardhit{--lift:1;box-shadow:0 1px 2px rgba(0,0,0,.45)}
+#bindersScroll .turn-shade{position:absolute;inset:0;z-index:20;pointer-events:none;opacity:0;background:#050507;border-radius:inherit;will-change:opacity}
+#bindersScroll .turn-glint{position:absolute;inset:0;z-index:21;pointer-events:none;opacity:0;border-radius:inherit;background:linear-gradient(100deg,transparent 18%,rgba(255,255,255,.55) 46%,transparent 74%);mix-blend-mode:soft-light;will-change:opacity}
+#bindersScroll .turn-cast{position:relative;grid-row:1;z-index:3;pointer-events:none;opacity:0;will-change:opacity,transform}
+#bindersScroll .turn-cast.on-right{grid-column:3;transform-origin:0 50%;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.4) 38%,rgba(0,0,0,.12) 76%,transparent)}
+#bindersScroll .turn-cast.on-left{grid-column:1;transform-origin:100% 50%;background:linear-gradient(270deg,rgba(0,0,0,.78),rgba(0,0,0,.4) 38%,rgba(0,0,0,.12) 76%,transparent)}
+#bindersScroll .book.solo .turn-cast.on-right{grid-column:2}
+#bindersScroll .book .curl-view,#bindersScroll .book .curl-cast,#bindersScroll .book .peel{display:none}
+
+/* ---------- controls under the binder (pastel, outside the binder) ---------- */
+
+/* Phone: the bar dissolves so the tools sit above the binder and the page
+   controls below it. */
+#bindersScroll .bookbar{display:contents}
+#bindersScroll .bookstage .booktools{order:-1;flex:none;width:100%;justify-content:center;padding-bottom:0}
+#bindersScroll .bookstage .book{order:0}
+#bindersScroll .bookstage .booknav{order:1;flex:none;width:100%;justify-content:center}
+#bindersScroll .bookstage .pagefoot{order:2;flex:none;margin:0;text-align:center;font-size:12px}
+#bindersScroll .book.solo{--chrome:116px}
+
+/* ---------- desktop: the binder takes the room ---------- */
+
+@media (min-width:1024px){
+  .shell.reading-wide{grid-template-columns:248px minmax(0,1fr)}
+  .shell.reading-wide #profile{display:none}
+  #bindersScroll.reading{padding:4px 20px 10px}
+  #bindersScroll .book.spread{--gutter:34px;--pad:15px;--ratio:1.49;--chrome:58px;border-radius:26px}
+  /* Desktop: tools, the page count and the page controls share one bar. */
+  #bindersScroll .bookbar{display:flex;align-items:center;gap:12px;flex:none;width:min(100%,calc((100cqb - 58px) * 1.49));min-width:0}
+  #bindersScroll .bookbar .booktools{order:0;width:auto;flex:none;padding:0;overflow:visible}
+  #bindersScroll .bookbar .pagefoot{order:0;flex:1 1 auto;min-width:0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #bindersScroll .bookbar .booknav{order:0;width:auto;flex:none}
+  #bindersScroll .bookbar .dots{flex:none;max-width:180px}
+  #bindersScroll .book.spread::before{inset:5px;border-radius:21px}
+}
+@media (min-width:1024px) and (max-height:820px){
+  #bindersScroll .book.spread{--pad:11px;--gutter:28px}
+}
+
+/* ---------- motion preferences ---------- */
+
+html.reduce #bindersScroll .book .sleeve .cardhit{transform:none !important;transition:none}
+html.reduce #bindersScroll .book.opening{animation:none}
+@media (prefers-reduced-motion:reduce){
+  html:not(.motion-on) #bindersScroll .book .sleeve .cardhit{transform:none !important;transition:none}
+  html:not(.motion-on) #bindersScroll .book.opening{animation:none}
+}
+
+/* ================= card inspect ================= */
+
+.inspect{position:fixed;inset:0;z-index:74;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:calc(14px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));background:radial-gradient(90% 70% at 50% 42%,rgba(28,30,38,.86),rgba(10,11,15,.94));touch-action:none;overscroll-behavior:contain;-webkit-user-select:none;user-select:none}
+.inspect[hidden]{display:none !important}
+.inspect-stage{position:relative;flex:1 1 auto;min-height:0;width:100%;display:grid;place-items:center}
+.inspect-lift{--w:min(84vw,calc((100dvh - 150px) * 63 / 88),470px);position:relative;width:var(--w);aspect-ratio:63/88;will-change:transform}
+.inspect-zoom{position:absolute;inset:0;perspective:1500px;will-change:transform;transform-origin:center}
+.inspect-card{position:absolute;inset:0;transform-style:preserve-3d;will-change:transform;outline:none;cursor:grab;border-radius:4.6% / 3.3%}
+.inspect-card:active{cursor:grabbing}
+.inspect-card:focus-visible{box-shadow:0 0 0 3px #F3EDC8}
+.inspect-face{position:absolute;inset:0;border-radius:4.6% / 3.3%;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;background:#15161b;box-shadow:0 0 0 1px rgba(255,255,255,.06)}
+.inspect-front img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.inspect-back{transform:rotateY(180deg)}
+/* Sheen layers are three times the card and slide under the card's clip. */
+.inspect-sheen-clip{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none}
+.inspect-sheen,.inspect-glare{position:absolute;left:0;top:0;width:300%;height:300%;will-change:transform,opacity;transform:translate3d(-33.3%,-33.3%,0);opacity:0}
+.inspect-sheen{background:linear-gradient(118deg,transparent 30%,rgba(255,255,255,.28) 40%,rgba(255,255,255,.5) 45%,rgba(255,255,255,.28) 50%,transparent 60%);mix-blend-mode:soft-light}
+.inspect-sheen.holo{background:
+  repeating-linear-gradient(118deg,rgba(255,92,138,.0) 0%,rgba(255,92,138,.55) 3%,rgba(255,214,102,.55) 6%,rgba(120,255,170,.55) 9%,rgba(92,198,255,.55) 12%,rgba(186,120,255,.55) 15%,rgba(255,92,138,.0) 18%),
+  linear-gradient(118deg,transparent 28%,rgba(255,255,255,.35) 46%,transparent 64%);
+  mix-blend-mode:color-dodge}
+.inspect-glare{background:radial-gradient(18% 14% at 50% 50%,rgba(255,255,255,.7),rgba(255,255,255,.18) 45%,transparent 75%);mix-blend-mode:overlay}
+.inspect-shadow{position:absolute;left:50%;top:50%;width:min(84vw,calc((100dvh - 150px) * 63 / 88),470px);aspect-ratio:63/88;translate:-50% -50%;border-radius:8%;background:radial-gradient(closest-side,rgba(0,0,0,.6),rgba(0,0,0,.25) 60%,transparent);filter:blur(18px);opacity:.6;pointer-events:none;will-change:transform,opacity}
+.inspect.is-closing .inspect-shadow{opacity:0 !important;transition:opacity .2s ease}
+
+/* The back: the facts, set like a slab label. */
+.iback{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;padding:11% 9%;color:#f4f1ea;font-family:Nunito,sans-serif;background:
+  radial-gradient(120% 80% at 20% 0%,rgba(171,178,141,.22),transparent 55%),
+  repeating-linear-gradient(135deg,rgba(255,255,255,.025) 0 2px,transparent 2px 9px),
+  linear-gradient(160deg,#25262d,#16171c)}
+.iback::before{content:"";position:absolute;inset:4.5%;border:1.5px solid rgba(255,255,255,.14);border-radius:4.5% / 3.2%;pointer-events:none}
+.iback-kicker{margin:0;font-family:Sniglet,var(--display),sans-serif;font-size:clamp(11px,2.4vmin,14px);letter-spacing:.08em;text-transform:uppercase;color:#ABB28D}
+.iback-name{margin:0;font-family:Sniglet,var(--display),sans-serif;font-weight:800;font-size:clamp(20px,4.6vmin,32px);line-height:1.08;color:#fff;overflow-wrap:anywhere}
+.iback-rows{margin:4px 0 0;display:flex;flex-direction:column;gap:0;border-top:1px solid rgba(255,255,255,.12)}
+.iback-rows div{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.1);font-size:clamp(12px,2.3vmin,15px)}
+.iback-rows dt{color:rgba(255,255,255,.55);font-weight:700}
+.iback-rows dd{margin:0;text-align:right;font-weight:800;color:#fff;overflow-wrap:anywhere}
+.iback-foot{margin:auto 0 0;font-size:clamp(11px,2vmin,13px);color:rgba(255,255,255,.5)}
+
+.inspect-bar{position:relative;z-index:2;flex:none;display:flex;gap:8px;align-items:center;justify-content:center}
+.inspect-btn{min-height:44px;padding:0 18px;border-radius:999px;border:2px solid #1F1F1E;background:#F8F7EF;color:#1F1F1E;font-family:Sniglet,var(--display),sans-serif;font-weight:800;font-size:15px;box-shadow:2px 2px 0 #1F1F1E;cursor:pointer;touch-action:manipulation}
+.inspect-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 #1F1F1E}
+.inspect-btn[aria-pressed="true"]{background:#ABB28D}
+.inspect-btn:focus-visible{outline:3px solid #F3EDC8;outline-offset:2px}
+.inspect-hint{flex:none;margin:0;font-family:Nunito,sans-serif;font-size:12px;color:rgba(255,255,255,.5)}
+@media (hover:none){.inspect-hint{display:none}}
