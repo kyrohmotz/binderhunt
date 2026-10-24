@@ -22,6 +22,7 @@ const SHELL_FILES = [
   "js/binder-turn.js",
   "js/card-inspect.js",
   "css/binder.css",
+  "css/polish.css",
   "manifest.webmanifest",
   "favicon-32.png",
   "apple-touch-icon.png",

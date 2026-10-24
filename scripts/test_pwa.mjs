@@ -406,7 +406,7 @@ try {
   await page.waitForSelector("#shelf");
   const bindersText = await page.locator("#bindersScroll").innerText();
   note(bindersText.includes("Jungle"), "binder still opens from localStorage", bindersText.slice(0, 180));
-  note(/1 cards/.test(bindersText), "wishlist still opens from localStorage", bindersText.slice(0, 180));
+  note(/1 card\b/.test(bindersText), "wishlist still opens from localStorage", bindersText.slice(0, 180));
   const keys = await page.evaluate(() => ({
     wish: localStorage.getItem("binderhuntWish"),
     binders: localStorage.getItem("bh.binders.v1"),

@@ -753,6 +753,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 </style>
 <link rel="stylesheet" href="css/daily.css">
 <link rel="stylesheet" href="css/binder.css">
+<link rel="stylesheet" href="css/polish.css">
 </head>
 <body>
 <div id="live" class="sr-only" aria-live="polite"></div>
@@ -834,6 +835,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
         <button class="act undo" id="undo" type="button" aria-label="Undo last swipe" disabled>↺</button>
         <button class="act add" id="save" type="button" aria-label="Add to wishlist" disabled>♥</button>
       </div>
+      <p class="keyhint" aria-hidden="true"><kbd>←</kbd> pass <kbd>→</kbd> save <kbd>Z</kbd> undo <kbd>↑</kbd> details</p>
       </div>
       </div>
     </div>
@@ -2704,7 +2706,7 @@ function showSkeleton(){
 function paintCount(){
   const el = document.getElementById("matchCount");
   if (!el) return;
-  el.textContent = streamDone ? (matched + (matched === 1 ? " card" : " cards")) : (matched ? matched + " so far" : "Looking…");
+  el.textContent = streamDone ? (matched + (matched === 1 ? " card" : " cards")) : (matched ? matched + (matched === 1 ? " card" : " cards") + " found so far" : "Looking…");
   const liveCount = document.getElementById("filterLive");
   if (liveCount && !document.getElementById("filterSheet").hidden) liveCount.textContent = el.textContent;
 }
@@ -3470,7 +3472,32 @@ function renderDailySide(){
   else if (model && model.ready) result = `<p class="fine">${guesses ? guesses + " of 3 guesses in. " : ""}The price stays sealed until the round ends.</p>`;
   profileEl.innerHTML = `<div class="profile-scroll" data-side="daily"><p class="eyebrow">Daily</p><h2 class="pname" id="profileTitle">${n ? "Drop #" + esc(String(n)) : "Today's drop"}</h2><div class="daily-side"><div class="stat"><span>Streak</span><b>${esc(String(streak))}</b></div><div class="stat"><span>Best</span><b>${esc(String(best))}</b></div></div><p class="fine" id="dailySideCount">${esc(countdown)}</p>${result}</div>`;
 }
+/* The Binders tab carries the wishlist count, so a right swipe visibly lands
+   somewhere. The count bumps when it grows. */
+let tabWishShown = -1;
+function paintTabCount(){
+  const n = wish.length;
+  const grew = tabWishShown >= 0 && n > tabWishShown;
+  tabWishShown = n;
+  document.querySelectorAll('.tabbtn[data-tab="binders"]').forEach(btn => {
+    let badge = btn.querySelector(".tabcount");
+    if (!badge) {
+      badge = document.createElement("span");
+      badge.className = "tabcount";
+      badge.setAttribute("aria-hidden", "true");
+      btn.append(badge);
+    }
+    badge.textContent = n > 99 ? "99+" : String(n);
+    badge.hidden = !n;
+    if (grew && !reduceMotion()) {
+      badge.classList.remove("bump");
+      void badge.offsetWidth;
+      badge.classList.add("bump");
+    }
+  });
+}
 function paintRail(){
+  paintTabCount();
   const count = document.getElementById("railWishCount");
   const host = document.getElementById("railBinders");
   const wishBtn = document.getElementById("railWish");
@@ -3717,7 +3744,7 @@ function renderSets(){
       const pctLabel = comp.pct == null ? "—" : comp.pct + "%";
       const pctAria = comp.total ? comp.owned + " of " + comp.total + " owned, " + pctLabel : "Set size unknown";
       const aria = [s.name, era, count ? count + " cards" : "", pctAria].filter(Boolean).join(", ");
-      html.push(`<button class="set-tile" type="button" data-set="${esc(s.id)}" aria-label="${esc(aria)}">${s.logo ? `<img alt="" src="${esc(s.logo + ".webp")}">` : ""}<b>${esc(s.name)}</b><span class="fine">${esc(era)}${count ? " · " + count + " cards" : ""}${s.year ? " · " + esc(s.year) : ""}</span><span class="setpct"><span class="bar" aria-hidden="true"><span style="width:${comp.pct == null ? 0 : comp.pct}%"></span></span><span class="pct">${esc(pctLabel)}</span></span></button>`);
+      html.push(`<button class="set-tile" type="button" data-set="${esc(s.id)}" aria-label="${esc(aria)}">${s.logo ? `<img alt="" src="${esc(s.logo + ".webp")}">` : ""}<b>${esc(s.name)}</b><span class="fine">${count ? count + " cards" : esc(era)}${s.year ? " · " + esc(s.year) : ""}</span><span class="setpct${comp.pct ? "" : " zero"}"><span class="bar" aria-hidden="true"><span style="width:${comp.pct == null ? 0 : comp.pct}%"></span></span><span class="pct">${esc(comp.pct ? pctLabel : comp.pct === 0 ? "Not started" : pctLabel)}</span></span></button>`);
     });
     html.push(`</div>`);
   });
@@ -3855,6 +3882,12 @@ function coverColor(value, optional){
   if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw;
   return optional ? "" : "#E9D5C0";
 }
+/* Up to three cards fanned out, so a binder shows what is inside it. */
+function peekMarkup(list, cls){
+  const art = (list || []).map(c => artUrls(c, false)[0]).filter(Boolean).slice(0, 3);
+  if (!art.length) return `<span class="${cls} empty" aria-hidden="true"><i></i><i></i><i></i></span>`;
+  return `<span class="${cls}" aria-hidden="true">${art.map(u => `<img alt="" src="${esc(u)}" loading="lazy" decoding="async" onerror="this.remove()">`).join("")}</span>`;
+}
 function renderBinders(){
   const root = document.getElementById("bindersScroll");
   if (binderView) { renderCollection(root); return; }
@@ -3862,12 +3895,13 @@ function renderBinders(){
   const total = valueOf(wish);
   const ownedN = wish.filter(c => ownedIds.has(c.id)).length;
   const wantedN = Math.max(0, wish.length - ownedN);
-  const wishFine = wish.length ? wish.length + " cards · " + ownedN + " owned · " + wantedN + " wanted · not a binder" : "Nothing saved yet · not a binder";
   const dropped = droppedCount(wish);
-  const wishLabel = "Wishlist" + (wish.length ? ", " + wish.length + (wish.length === 1 ? " card" : " cards") : ", nothing saved") + (dropped ? ", " + dropped + " dropped" : "");
-  root.innerHTML = `<p class="fine">Wishlist is the master list. Mark a card Got it once it's in your hands. That owned mark is shared by every binder.</p>
-    <button class="wish-row" id="openWish" type="button" aria-label="${esc(wishLabel)}"><span><b>Wishlist</b><span class="fine">${esc(wishFine)}</span></span>${droppedCountMarkup(dropped)}<span class="pill${total ? "" : " missing"}">${esc(total ? priceText(total, "USD") : "—")}</span></button>
-    <h2 class="shelf-title">Your binders</h2>
+  const cardsWord = n => n + (n === 1 ? " card" : " cards");
+  const wishLabel = "Wishlist" + (wish.length ? ", " + cardsWord(wish.length) : ", nothing saved") + (dropped ? ", " + dropped + " dropped" : "");
+  const wishMeta = wish.length ? cardsWord(wish.length) + (total ? " · " + priceText(total, "USD") : "") : "Nothing saved yet";
+  const wishSub = wish.length ? (wantedN ? wantedN + " still to find" : "You have every card") + (ownedN ? " · " + ownedN + " got" : "") : "Swipe right on a card and it lands here.";
+  root.innerHTML = `<button class="wish-row" id="openWish" type="button" aria-label="${esc(wishLabel)}">${peekMarkup(wish, "wish-peek")}<span class="wish-copy"><span class="eyebrow">Every card you saved</span><b>Wishlist</b><span class="wish-meta">${esc(wishMeta)}</span><span class="fine">${esc(wishSub)}</span></span>${droppedCountMarkup(dropped)}<span class="wish-go" aria-hidden="true">Open →</span></button>
+    <div class="shelf-head"><h2 class="shelf-title">Your binders</h2><p class="fine">Sort cards by theme. A card can sit in more than one binder and still stays on your wishlist.</p></div>
     <div class="shelf-scene"><div class="shelf" id="shelf"></div></div>`;
   const shelf = document.getElementById("shelf");
   binderState.binders.forEach(b => {
@@ -3880,7 +3914,7 @@ function renderBinders(){
     if (p.total && p.owned >= p.total) btn.classList.add("complete");
     const charm = b.charm === "toad" ? `<span class="cover-charm">${toad()}</span>` : b.charm === "sticker" ? `<span class="cover-charm star" aria-hidden="true">★</span>` : "";
     btn.dataset.progress = p.owned + "/" + p.total;
-    btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board"><b class="binder-name">${esc(b.name)}</b>${ringMarkup(p.owned, p.total)}</span><span class="binder-fore"></span></span>${charm}<span class="sr-only">${esc(b.name + ". " + (p.total ? p.owned + " of " + p.total + " owned" : "No cards yet"))}</span>`;
+    btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board">${peekMarkup(b.cards, "cover-peek")}<b class="binder-name">${esc(b.name)}</b>${ringMarkup(p.owned, p.total)}<span class="binder-count">${esc(b.cards.length ? cardsWord(b.cards.length) : "Empty")}</span></span><span class="binder-fore"></span></span>${charm}<span class="sr-only">${esc(b.name + ". " + (p.total ? p.owned + " of " + p.total + " owned" : "No cards yet"))}</span>`;
     btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); renderBinders(); };
     shelf.append(btn);
   });
