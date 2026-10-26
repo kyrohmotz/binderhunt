@@ -111,7 +111,9 @@ const binder = await ev(`(async () => {
   return [0, 1, 2].map(i => { const sl = pick(i); const img = sl.querySelector("img"); return { src: img ? img.currentSrc.split("/sv04.5/")[1] : "", size: img ? img.naturalWidth + "x" + img.naturalHeight : "", cors: img ? img.getAttribute("crossorigin") : null, missing: !!sl.querySelector(".art-missing"), toad: !!sl.querySelector(".cardback, .toad") }; });
 })()`);
 note(binder.every(c => c.size === "63x88" && !c.toad && !c.missing && c.cors === null), "every saved card shows its real art in the binder", JSON.stringify(binder));
-note(binder[2].src === "003-nocors/low.webp", "when the sharp file is gone the pocket falls back to the next URL", JSON.stringify(binder[2]));
+note(binder[2].src === "003-nocors/low.webp", "when the sharp file is gone the pocket keeps the preview", JSON.stringify(binder[2]));
+const sharp = await ev(`(async () => { await new Promise(r => setTimeout(r, 1200)); return [0, 1].map(i => (document.querySelector("#bindersScroll .leaf > .face.front .sleeve[data-index='" + i + "'] img") || {}).currentSrc || ""); })()`);
+note(sharp[0].endsWith("001/high.webp") && sharp[1].endsWith("002-nocors/high.webp"), "pockets swap the preview for the full-size file", JSON.stringify(sharp));
 note(!errors.length, "no page errors", errors.slice(0, 4).join(" | "));
 
 ws.close();

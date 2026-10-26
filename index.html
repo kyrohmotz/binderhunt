@@ -2936,11 +2936,19 @@ function artUrls(card, large){
 }
 /* Card art never asks for CORS: neither CDN promises the headers, and an
    <img> does not need them. If one URL fails, try the next before giving up
-   on the placeholder. */
+   on the placeholder.
+   With large set, the small preview shows at once (swiping stays instant)
+   and the full-size file replaces it as soon as it has loaded and decoded. */
+const sharpLoaded = new Set();
 function paintArt(host, card, opts){
   host.replaceChildren();
-  const urls = artUrls(card, opts && opts.large);
+  const large = !!(opts && opts.large);
+  const quick = knownArt(card);
+  const sharp = large ? artUrls(card, true).filter(u => !/\/low\.webp$/.test(u) && !/images\.pokemontcg\.io\/[^/]+\/[^/_]+\.png$/.test(u)) : [];
   const missing = () => (opts && opts.missing ? opts.missing(card) : placeholder(card));
+  /* Already sharp in this session: skip the preview step. */
+  const ready = sharp.find(u => sharpLoaded.has(u));
+  const urls = ready ? [ready].concat(quick.filter(u => u !== ready)) : quick.length ? quick : sharp;
   if (!urls.length) { host.append(missing()); return; }
   const img = document.createElement("img");
   img.alt = altText(card || {});
@@ -2956,6 +2964,75 @@ function paintArt(host, card, opts){
   };
   img.src = urls[0];
   host.append(img);
+  if (!large || ready) return;
+  let i = 0;
+  const next = () => {
+    const url = sharp[i++];
+    if (!url || !img.isConnected && i > 1) return;
+    const hi = new Image();
+    hi.decoding = "async";
+    hi.onload = () => {
+      sharpLoaded.add(url);
+      if (sharpLoaded.size > 2000) sharpLoaded.clear();
+      const swap = () => { if (img.isConnected || img.parentNode) { img.onerror = null; img.src = url; } };
+      /* decode() can stall in a background tab; never wait on it long. */
+      let swapped = false;
+      const once = () => { if (!swapped) { swapped = true; swap(); } };
+      if (hi.decode) hi.decode().then(once, once);
+      setTimeout(once, 250);
+    };
+    hi.onerror = next;
+    hi.src = url;
+  };
+  next();
+}
+/* The sharpest scan we can find for one card, for the zoomable 3D view.
+   pokemontcg.io keeps lossless 733x1024 scans; TCGdex tops out at 600x825.
+   The two catalogs name sets differently, so the guessed pokemontcg.io card
+   only counts when its name matches ours. Otherwise the TCGdex PNG. */
+const hdCache = new Map();
+function ptcgIdFor(card){
+  if (!card || !card.id) return "";
+  if (card.source === "pokemontcg.io") return card.id;
+  const m = /^([a-z]+)0*(\d+)(\.5)?$/i.exec(card.setId || String(card.id).replace(/-[^-]+$/, ""));
+  const num = String(card.number || String(card.id).split("-").pop() || "").replace(/^0+(?=\d)/, "");
+  if (!m || !num) return "";
+  return m[1].toLowerCase() + Number(m[2]) + (m[3] ? "pt5" : "") + "-" + num;
+}
+function sameCardName(a, b){
+  const norm = x => String(x || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "");
+  return !!a && norm(a) === norm(b);
+}
+function hdArt(card){
+  if (!card || !card.id) return Promise.resolve("");
+  if (hdCache.has(card.id)) return hdCache.get(card.id);
+  const fallback = () => {
+    const base = safeImg(card.image) || (safeImg(card.img) || "").replace(/\/(high|low)\.(webp|png|jpg)$/, "");
+    return base && base.startsWith("https://assets.tcgdex.net/") ? base + "/high.png" : "";
+  };
+  let busy = false;
+  const job = (async () => {
+    if (/_hires\.png$/.test(card.img || "")) return safeImg(card.img);
+    const id = ptcgIdFor(card);
+    if (id) {
+      busy = true;
+      try {
+        const res = await fetch("https://api.pokemontcg.io/v2/cards/" + encodeURIComponent(id) + "?select=name,images", { signal: AbortSignal.timeout(4000) });
+        if (res.ok) {
+          const data = (await res.json()).data || {};
+          const url = safeImg(data.images && data.images.large);
+          busy = false;
+          if (url && sameCardName(data.name, card.name)) return url;
+        } else if (res.status === 404) busy = false;
+      } catch (e) {}
+    }
+    return fallback();
+  })();
+  /* pokemontcg.io turns busy clients away; ask again next time. */
+  job.then(() => { if (busy) hdCache.delete(card.id); });
+  hdCache.set(card.id, job);
+  if (hdCache.size > 400) hdCache.delete(hdCache.keys().next().value);
+  return job;
 }
 /* Inside the binder a missing image is a dark blank card, not the toad. */
 function binderMissingArt(card){
@@ -3085,7 +3162,7 @@ function renderDeck(){
     const tag = card.spice ? `<span class="surprise">surprise pick</span>` : "";
     if (card.spice) ensureLabelFont();
     el.innerHTML = `<div class="frame"><div class="art"></div><span class="stamp like">${discoveryBinder() ? "BINDER!" : "WISH!"}</span><span class="stamp nope">PASS</span>${tag}</div>`;
-    paintArt(el.querySelector(".art"), card);
+    paintArt(el.querySelector(".art"), card, { large:true });
     deck.prepend(el);
     bindDrag(el);
   });
@@ -4826,6 +4903,7 @@ function openShowcase(card, from, opts){
   const ok = CardInspect.open({
     from: from || null,
     urls: artUrls(card, true),
+    upgrade: sealed ? null : hdArt(card),
     quick,
     alt: altText(card),
     title: card.name || "Card",

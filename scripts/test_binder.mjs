@@ -486,7 +486,7 @@ const art = await ev(`(async () => {
   renderBinders();
   return out;
 })()`);
-note(art.first.endsWith("none_hires.png"), "the binder asks for the sharp image first", JSON.stringify(art));
+note(art.first.endsWith("none.png"), "the binder shows the quick preview first, then the sharp file", JSON.stringify(art));
 note(art.cors === null && !art.anyCors, "binder images never request CORS", JSON.stringify(art));
 note(art.missing && art.toad === 0, "a card with no reachable art shows a dark blank, not the toad", JSON.stringify(art));
 

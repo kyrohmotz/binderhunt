@@ -192,6 +192,26 @@
       pointers: new Map(), pinch: null, source: opts.from || null
     };
     buildFront({ urls: opts.urls, quick: opts.quick, alt: opts.alt, holo: opts.holo, missing: opts.missing, token });
+    /* A sharper scan may arrive later; swap it in once it has decoded. */
+    if (opts.upgrade && typeof opts.upgrade.then === "function") {
+      opts.upgrade.then(url => {
+        if (!url || !state || state.token !== token) return;
+        const hi = new Image();
+        hi.decoding = "async";
+        hi.onload = () => {
+          const done = () => {
+            if (!state || state.token !== token) return;
+            const img = frontEl.querySelector("img");
+            if (img) { img.onerror = null; img.src = url; }
+          };
+          let ran = false;
+          const once = () => { if (!ran) { ran = true; done(); } };
+          if (hi.decode) hi.decode().then(once, once);
+          setTimeout(once, 250);
+        };
+        hi.src = url;
+      }).catch(() => {});
+    }
     backEl.innerHTML = opts.backHtml || "";
     frontEl.setAttribute("aria-hidden", "false");
     backEl.setAttribute("aria-hidden", "true");
