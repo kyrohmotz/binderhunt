@@ -3941,7 +3941,7 @@ function renderBinders(){
     if (p.total && p.owned >= p.total) btn.classList.add("complete");
     const charm = b.charm === "toad" ? `<span class="cover-charm">${toad()}</span>` : b.charm === "sticker" ? `<span class="cover-charm star" aria-hidden="true">★</span>` : "";
     btn.dataset.progress = p.owned + "/" + p.total;
-    btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board">${peekMarkup(b.cards, "cover-peek")}<b class="binder-name">${esc(b.name)}</b>${ringMarkup(p.owned, p.total)}<span class="binder-count">${esc(b.cards.length ? cardsWord(b.cards.length) : "Empty")}</span></span><span class="binder-fore"></span></span>${charm}<span class="sr-only">${esc(b.name + ". " + (p.total ? p.owned + " of " + p.total + " owned" : "No cards yet"))}</span>`;
+    btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board">${peekMarkup(b.cards, "cover-peek")}<b class="binder-name">${esc(b.name)}</b>${b.cards.length ? ringMarkup(p.owned, p.total) : ""}<span class="binder-count">${esc(b.cards.length ? cardsWord(b.cards.length) : "Empty")}</span></span><span class="binder-fore"></span></span>${charm}<span class="sr-only">${esc(b.name + ". " + (p.total ? p.owned + " of " + p.total + " owned" : "No cards yet"))}</span>`;
     btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); renderBinders(); };
     shelf.append(btn);
   });
