@@ -196,6 +196,8 @@
     frontEl.setAttribute("aria-hidden", "false");
     backEl.setAttribute("aria-hidden", "true");
     if (titleEl) titleEl.textContent = opts.title || "Card";
+    const detailsBtn = q("showcaseDetails");
+    if (detailsBtn) detailsBtn.hidden = !opts.onDetails;
     const flip = q("showcaseFlip");
     if (flip) flip.setAttribute("aria-pressed", "false");
     root.classList.toggle("is-holo", !!opts.holo);

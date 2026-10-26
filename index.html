@@ -4788,7 +4788,7 @@ function warmPages(list, at, step, total){
 
 let showcaseCardRef = null;
 /* The back of an inspected card: the facts a collector checks, in plain words. */
-function inspectBack(card){
+function inspectBack(card, sealed){
   const price = pocketPrice(card);
   const owned = ownedIds.has(card.id);
   const rows = [
@@ -4796,13 +4796,14 @@ function inspectBack(card){
     ["Number", card.number ? "#" + card.number : ""],
     ["Rarity", card.rarity && card.rarity !== "—" ? card.rarity : ""],
     ["Artist", card.artist],
-    ["Market", price],
-    ["Status", owned ? "Got it" : "Still hunting"]
+    ["Market", sealed ? "" : price],
+    ["Status", sealed ? "" : owned ? "Got it" : "Still hunting"]
   ].filter(row => row[1]);
-  return `<div class="iback"><p class="iback-kicker">BinderHunt</p><h3 class="iback-name">${esc(card.name || "Card")}</h3><dl class="iback-rows">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl><p class="iback-foot">Details has the price history.</p></div>`;
+  return `<div class="iback"><p class="iback-kicker">BinderHunt</p><h3 class="iback-name">${esc(card.name || "Card")}</h3><dl class="iback-rows">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>${sealed ? `<p class="iback-foot">The price stays sealed until you guess.</p>` : `<p class="iback-foot">Details has the price history.</p>`}</div>`;
 }
 /* Lift a card out of its pocket into the 3D inspect view. */
-function openShowcase(card, from){
+function openShowcase(card, from, opts){
+  const sealed = !!(opts && opts.sealed);
   if (!card) return;
   if (!window.CardInspect) { openProfile(card); return; }
   const shown = from && from.querySelector("img");
@@ -4816,8 +4817,8 @@ function openShowcase(card, from){
     holo: isHolo(card),
     reduce: reduceMotion(),
     missing: () => binderMissingArt(card),
-    backHtml: inspectBack(card),
-    onDetails: () => openProfile(card),
+    backHtml: inspectBack(card, sealed),
+    onDetails: sealed ? null : () => openProfile(card),
     onClose: () => { if (showcaseCardRef === card) showcaseCardRef = null; }
   });
   if (!ok) { openProfile(card); return; }

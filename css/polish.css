@@ -171,3 +171,14 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 @media (max-width:420px){
   #setsScroll .setstats .go{font-size:14px;padding:0 12px}
 }
+
+/* ---------- daily drop ---------- */
+
+/* Sniglet's zero reads as a dot; numbers use Nunito. */
+.daily-streak b{font-family:Nunito,sans-serif;font-weight:900}
+.daily-frame[role="button"]{cursor:zoom-in}
+.daily-frame[role="button"]:focus-visible{outline:3px solid var(--sky,#86DEFF);outline-offset:3px}
+.daily-frame img{object-fit:cover}
+.money-in{position:relative;display:block}
+.money-in > span{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-family:Nunito,sans-serif;font-weight:900;font-size:18px;color:var(--ink);pointer-events:none}
+.daily-form .money-in input{padding-left:28px;font-family:Nunito,sans-serif;font-weight:800;font-size:18px;font-variant-numeric:tabular-nums}
