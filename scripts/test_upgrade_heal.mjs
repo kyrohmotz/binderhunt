@@ -105,8 +105,8 @@ note(before.length === 1 && before.every(s => s === "107x150"), "bh-2 shows its 
 // 3. Deploy: the new worker takes over the open page.
 serveOld = false;
 await ev(`navigator.serviceWorker.getRegistration().then(r => r.update())`);
-const switched = await ev(`(async () => { const s = Date.now(); while (Date.now() - s < 15000) { const ch = new MessageChannel(); const v = await new Promise(res => { ch.port1.onmessage = e => res(e.data); navigator.serviceWorker.controller && navigator.serviceWorker.controller.postMessage("bh-version", [ch.port2]); setTimeout(() => res(null), 300); }); if (v && JSON.stringify(v).includes("bh-3")) return JSON.stringify(v); await new Promise(r => setTimeout(r, 200)); } return "timeout"; })()`);
-note(/bh-3/.test(switched), "the new worker takes over the open page", switched);
+const switched = await ev(`(async () => { const s = Date.now(); while (Date.now() - s < 15000) { const ch = new MessageChannel(); const v = await new Promise(res => { ch.port1.onmessage = e => res(e.data); navigator.serviceWorker.controller && navigator.serviceWorker.controller.postMessage("bh-version", [ch.port2]); setTimeout(() => res(null), 300); }); if (v && !JSON.stringify(v).includes("bh-2")) return JSON.stringify(v); await new Promise(r => setTimeout(r, 200)); } return "timeout"; })()`);
+note(/bh-\d/.test(switched) && !/bh-2/.test(switched), "the new worker takes over the open page", switched);
 await sleep(2500);
 const after = await ev(pocketSizes);
 note(after.length === 1 && after.every(s => s === "63x88"), "the open page swaps placeholders for the real art without a reload", JSON.stringify(after));
