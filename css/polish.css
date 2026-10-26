@@ -182,3 +182,15 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 .money-in{position:relative;display:block}
 .money-in > span{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-family:Nunito,sans-serif;font-weight:900;font-size:18px;color:var(--ink);pointer-events:none}
 .daily-form .money-in input{padding-left:28px;font-family:Nunito,sans-serif;font-weight:800;font-size:18px;font-variant-numeric:tabular-nums}
+
+/* ---------- desktop side panel on the binder shelf ---------- */
+
+#profile .side-h{margin:18px 0 8px;font-family:var(--display);font-size:16px}
+#profile .side-cards{display:flex;flex-direction:column;gap:6px}
+#profile .side-card{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;text-align:left;padding:6px 10px 6px 6px;min-height:64px;background:#fff;border:2px solid var(--ink);border-radius:12px;box-shadow:2px 2px 0 var(--ink);cursor:pointer}
+#profile .side-card:hover{background:var(--paper-2)}
+#profile .side-card img,#profile .side-card .side-art{width:40px;aspect-ratio:63/88;object-fit:cover;border-radius:3px;background:#e9e6da;box-shadow:0 0 0 1px rgba(31,31,30,.4)}
+#profile .side-card .side-copy{min-width:0;display:flex;flex-direction:column}
+#profile .side-card b{font-family:var(--display);font-size:13px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#profile .side-card .fine{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#profile .side-card .side-val{font-family:Nunito,sans-serif;font-weight:900;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}

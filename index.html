@@ -3429,8 +3429,23 @@ function renderBinderSide(){
   shell.classList.remove("no-profile");
   profileEl.removeAttribute("aria-modal");
   if (!binderView) {
-    const rows = binderState.binders.slice(0, 5).map(b => binderSideRow(b.name, b.cards, b.color)).join("");
-    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Binders</p><h2 class="pname" id="profileTitle">Your shelf</h2>${binderSideRow("Wishlist", wish)}<div class="side-list">${rows || `<p class="fine">No binders yet. Create one and its progress lands here.</p>`}</div></div>`;
+    /* The shelf already lists the binders, so the side panel answers what
+       a collector checks next: what got cheaper and what is worth most. */
+    const mini = (card, extra) => {
+      const art = artUrls(card, false)[0];
+      return `<button type="button" class="side-card" data-side-card="${esc(card.id)}">${art ? `<img alt="" src="${esc(art)}" loading="lazy" onerror="this.remove()">` : `<span class="side-art"></span>`}<span class="side-copy"><b>${esc(card.name || "Card")}</b><span class="fine">${esc([card.set, card.number ? "#" + card.number : ""].filter(Boolean).join(" · "))}</span></span><span class="side-val">${extra}</span></button>`;
+    };
+    const drops = wish.map(c => ({ c, d: priceDrop(c) })).filter(x => x.d).sort((x, y) => y.d.pct - x.d.pct).slice(0, 4);
+    const top = wish.map(c => ({ c, v: usdOf(c) })).filter(x => x.v > 0).sort((x, y) => y.v - x.v).slice(0, 3);
+    const val = valueOf(wish);
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Your hunt</p><h2 class="pname" id="profileTitle">${wish.length ? wish.length === 1 ? "1 card saved" : wish.length + " cards saved" : "Nothing saved yet"}</h2>${val ? `<p class="market-price">${esc(priceText(val, "USD"))}</p><p class="fine">What your wishlist costs at today's raw prices.</p>` : `<p class="fine">Swipe right on a card in Hunt and it lands on your wishlist.</p>`}
+      ${drops.length ? `<h3 class="side-h">Cheaper than ${DROP_WINDOW_DAYS} days ago</h3><div class="side-cards">${drops.map(x => mini(x.c, `<span class="drop-badge">↓${esc(String(x.d.shown))}%</span>`)).join("")}</div>` : ""}
+      ${top.length ? `<h3 class="side-h">Biggest hunts</h3><div class="side-cards">${top.map(x => mini(x.c, esc(priceText(x.v, "USD")))).join("")}</div>` : ""}
+    </div>`;
+    profileEl.querySelectorAll("[data-side-card]").forEach(btn => btn.onclick = () => {
+      const card = wish.find(c => c.id === btn.dataset.sideCard);
+      if (card) openProfile(card);
+    });
     return;
   }
   if (binderView.kind === "wish") {
