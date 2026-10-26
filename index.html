@@ -5910,6 +5910,17 @@ function noteBinderEngagement(){
   savePwa(data);
   maybeInstallHint();
 }
+/* The bh-2 worker answered some card images with a 107x150 placeholder.
+   When the new worker takes over, ask for those images again so an open
+   page heals without a reload. */
+function healArt(){
+  document.querySelectorAll("img").forEach(img => {
+    const src = img.currentSrc || img.src || "";
+    if (!/^https:\/\/(assets\.tcgdex\.net|images\.pokemontcg\.io)\//.test(src)) return;
+    if (!(img.complete && img.naturalWidth === 107 && img.naturalHeight === 150)) return;
+    img.src = src + (src.includes("?") ? "&" : "?") + "v=3";
+  });
+}
 function showUpdateToast(){
   const toast = document.getElementById("updateToast");
   if (!toast || !toast.hidden) return;
@@ -5965,6 +5976,8 @@ function bootPwa(){
   };
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     tell();
+    healArt();
+    setTimeout(healArt, 1500);
     if (hadController) showUpdateToast();
     hadController = true;
   });
