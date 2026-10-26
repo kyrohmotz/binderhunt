@@ -13744,6 +13744,16 @@
       "source": "tcgplayer",
       "eur": 3.04,
       "at": "2026-10-25T12:58:04Z"
+    },
+    "2026-10-28": {
+      "id": "ex1-11",
+      "price": 44.13,
+      "variant": "reverse-holofoil",
+      "printing": "Reverse Holofoil",
+      "alts": 2,
+      "source": "tcgplayer",
+      "eur": 34.41,
+      "at": "2026-10-26T14:51:54Z"
     }
   }
 }
