@@ -3010,21 +3010,26 @@ function hdArt(card){
     const base = safeImg(card.image) || (safeImg(card.img) || "").replace(/\/(high|low)\.(webp|png|jpg)$/, "");
     return base && base.startsWith("https://assets.tcgdex.net/") ? base + "/high.png" : "";
   };
+  let busy = false;
   const job = (async () => {
     if (/_hires\.png$/.test(card.img || "")) return safeImg(card.img);
     const id = ptcgIdFor(card);
     if (id) {
+      busy = true;
       try {
         const res = await fetch("https://api.pokemontcg.io/v2/cards/" + encodeURIComponent(id) + "?select=name,images", { signal: AbortSignal.timeout(4000) });
         if (res.ok) {
           const data = (await res.json()).data || {};
           const url = safeImg(data.images && data.images.large);
+          busy = false;
           if (url && sameCardName(data.name, card.name)) return url;
-        }
+        } else if (res.status === 404) busy = false;
       } catch (e) {}
     }
     return fallback();
   })();
+  /* pokemontcg.io turns busy clients away; ask again next time. */
+  job.then(() => { if (busy) hdCache.delete(card.id); });
   hdCache.set(card.id, job);
   if (hdCache.size > 400) hdCache.delete(hdCache.keys().next().value);
   return job;
