@@ -3795,15 +3795,13 @@ function renderSetPage(root){
   const pct = total ? Math.max(0, Math.min(100, Math.round(owned / total * 100))) : 0;
   const progressLine = total ? pct + "% · " + owned + " / " + total + " owned" + (owned > 0 ? " · " + progressLabel(owned, total) : "") : "Owned progress shows once this set has a card count.";
   if (s.mode !== "flip" && s.mode !== "about") s.mode = "flip";
-  root.innerHTML = `<div class="setpage"><div class="sethead"><button class="chip" id="backSets" type="button">All sets</button>
-    <h2>${esc(s.name)}</h2></div>
-    <p class="fine">${esc([s.release, eraOf(s.id), total ? total + " cards" : ""].filter(Boolean).join(" · "))}</p>
-    <div class="modes">
-      <button class="chip" id="swipeSet" type="button">Swipe this set</button>
-      <button class="chip on" id="flipSet" type="button" aria-pressed="true">Flip through</button>
+  const logo = knownSet && knownSet.logo ? `<img class="setlogo" alt="" src="${esc(knownSet.logo + ".webp")}" onerror="this.remove()">` : "";
+  root.innerHTML = `<div class="setpage"><div class="sethead"><button class="chip" id="backSets" type="button" aria-label="All sets">←</button>
+    ${logo}<div class="setname"><h2>${esc(s.name)}</h2><p class="fine">${esc([s.release, eraOf(s.id), total ? total + " cards" : ""].filter(Boolean).join(" · "))}</p></div></div>
+    <div class="setstats">
+      <div class="setmeter"><p class="fine" id="setProgress">${esc(progressLine)}</p><div class="bar" aria-hidden="true"><span style="width:${total ? pct : 0}%"></span></div></div>
+      <button class="chip go" id="swipeSet" type="button">Swipe this set</button>
     </div>
-    <p class="fine" id="setProgress">${esc(progressLine)}</p>
-    <div class="bar" aria-hidden="true"><span style="width:${total ? pct : 0}%"></span></div>
     <div class="setflip" id="setBody"></div></div>`;
   document.getElementById("backSets").onclick = () => { setView = null; renderSets(); paintContext(); };
   document.getElementById("swipeSet").onclick = () => {
@@ -3835,16 +3833,17 @@ function renderSetPage(root){
     const ownedCard = ownedIds.has(c.id);
     pocket.className = "pocket" + (ownedCard ? " owned" : "");
     const on = wish.some(w => w.id === c.id);
-    pocket.innerHTML = `<button type="button" class="open" aria-label="${esc(c.name)} – ${esc(s.name)} #${esc(c.localId || "")}${ownedCard ? ", owned" : ", wanted"}"><img alt="" draggable="false" decoding="async" loading="lazy"></button><b>${esc(c.name)}</b><button class="iconish heart" type="button" aria-label="${on ? "On wishlist" : "Add to wishlist"}">${on ? "♥" : "♡"}</button>`;
+    pocket.innerHTML = `<button type="button" class="open" aria-label="${esc(c.name)} – ${esc(s.name)} #${esc(c.localId || "")}${ownedCard ? ", owned" : ", wanted"}"><img alt="" draggable="false" decoding="async" loading="lazy"></button><b class="sr-only">${esc(c.name)}</b><button class="iconish heart${on ? " on" : ""}" type="button" aria-pressed="${on ? "true" : "false"}" aria-label="${on ? esc(c.name) + " is on your wishlist" : "Add " + esc(c.name) + " to wishlist"}">${on ? "♥" : "♡"}</button>${ownedCard ? `<span class="owned-mark" aria-hidden="true"></span>` : ""}`;
     const img = pocket.querySelector("img");
     img.alt = c.name + " – " + s.name + " #" + (c.localId || "");
     img.draggable = false;
     img.addEventListener("dragstart", e => e.preventDefault());
     const base = safeImg(c.image);
-    if (!base) img.replaceWith(placeholder(c));
+    if (!base) img.replaceWith(binderMissingArt({ name:c.name, set:s.name, number:c.localId }));
     else {
-      img.onerror = () => img.replaceWith(placeholder(c));
-      img.src = base + "/low.webp";
+      let tried = false;
+      img.onerror = () => { if (!tried) { tried = true; img.src = base + "/low.webp"; return; } img.replaceWith(binderMissingArt({ name:c.name, set:s.name, number:c.localId })); };
+      img.src = base + "/high.webp";
     }
     pocket.querySelector(".open").onclick = () => openProfile({ id:c.id, name:c.name, image:c.image, localId:c.localId });
     pocket.querySelector(".heart").onclick = async () => {
@@ -3861,7 +3860,7 @@ function renderSetPage(root){
   while (host.children.length < 9) {
     const empty = document.createElement("div");
     empty.className = "pocket empty";
-    empty.innerHTML = toad();
+    empty.setAttribute("aria-hidden", "true");
     host.append(empty);
   }
   const turn = (delta) => {
@@ -3872,6 +3871,19 @@ function renderSetPage(root){
     if (reduceMotion() || !paper) go();
     else { paper.classList.add("turning"); setTimeout(go, 450); if (settings.sound) playTone(180); }
   };
+  /* Swipe the page sideways to turn it, like the binder. */
+  const paperEl = document.getElementById("setPaper");
+  if (paperEl) {
+    let sx = 0, sy = 0, pid = null;
+    paperEl.addEventListener("pointerdown", e => { if (e.button) return; pid = e.pointerId; sx = e.clientX; sy = e.clientY; });
+    paperEl.addEventListener("pointerup", e => {
+      if (e.pointerId !== pid) return;
+      pid = null;
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.4) turn(dx < 0 ? 1 : -1);
+    });
+    paperEl.addEventListener("pointercancel", () => { pid = null; });
+  }
   document.getElementById("setPrev").onclick = () => turn(-1);
   document.getElementById("setNext").onclick = () => turn(1);
   paintContext();

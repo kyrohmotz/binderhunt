@@ -140,3 +140,34 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 #profile .shoplinks .buy-btn:hover{background:var(--paper-2)}
 #profile .ownrow.mine .chip{max-width:none;white-space:nowrap}
 #profile .ownrow.mine{margin:12px 0}
+
+/* ---------- set view: the same dark binder page as your binders ---------- */
+
+#setsScroll .setpage{gap:8px}
+#setsScroll .sethead{display:flex;align-items:center;gap:10px;min-width:0}
+#setsScroll .sethead #backSets{flex:none;width:44px;min-width:44px;padding:0;justify-content:center;font-size:18px}
+#setsScroll .sethead .setlogo{flex:none;height:40px;width:auto;max-width:96px;object-fit:contain}
+#setsScroll .setname{min-width:0;flex:1}
+#setsScroll .setname h2{margin:0;font-size:22px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#setsScroll .setstats{display:flex;align-items:center;gap:10px}
+#setsScroll .setmeter{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+#setsScroll .setmeter .bar{margin:0}
+#setsScroll .setstats .go{flex:none;background:var(--green,#ABB28D);white-space:nowrap}
+#setsScroll .setflip .paper{background:#1f2026;border:0;border-radius:16px;box-shadow:0 0 0 1px rgba(255,255,255,.04) inset,0 14px 28px -10px rgba(34,26,16,.5);padding:10px}
+#setsScroll .setflip .paper h3{display:none}
+#setsScroll .setflip .pockets{width:min(100cqw,calc(100cqh * 63 / 88 * .985));height:min(100cqh,calc(100cqw * 88 / 63 / .985));gap:6px}
+#setsScroll .setflip .pocket{background:linear-gradient(180deg,rgba(0,0,0,.26),rgba(0,0,0,.08) 40%),#16171c;border:0;border-radius:5px;padding:0;box-shadow:inset 0 2px 5px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.075)}
+#setsScroll .setflip .pocket.empty{border:0}
+#setsScroll .setflip .pocket .open{inset:2.5% 3%;border-radius:4.6% / 3.3%;overflow:hidden;background:transparent}
+#setsScroll .setflip .pocket img{object-fit:cover;background:transparent;border-radius:0}
+#setsScroll .setflip .pocket .art-missing{border-radius:4.6% / 3.3%}
+#setsScroll .setflip .pocket .iconish.heart{left:auto;right:4px;bottom:4px;top:auto;transform:none;width:30px;height:30px;min-height:30px;border-radius:999px;border:1.5px solid var(--ink);background:rgba(248,247,239,.94);font-size:15px;box-shadow:0 1px 3px rgba(0,0,0,.45)}
+#setsScroll .setflip .pocket .iconish.heart.on{background:#F6C9C9}
+#setsScroll .setflip .pocket.owned{box-shadow:inset 0 0 0 2px #ABB28D,inset 0 2px 5px rgba(0,0,0,.6)}
+#setsScroll .setflip .owned-mark{position:absolute;left:5px;top:5px;width:18px;height:18px;border-radius:999px;border:1.5px solid var(--ink);background:#ABB28D;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+#setsScroll .setflip .owned-mark::after{content:"";position:absolute;left:4px;top:3px;width:7px;height:4px;border-left:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:rotate(-45deg)}
+#setsScroll .setflip .pager{margin-top:6px}
+#setsScroll .setstats .go{max-width:none;overflow:visible;padding:0 14px;color:var(--ink)}
+@media (max-width:420px){
+  #setsScroll .setstats .go{font-size:14px;padding:0 12px}
+}
