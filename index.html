@@ -3900,7 +3900,7 @@ function renderBinders(){
   const wishLabel = "Wishlist" + (wish.length ? ", " + cardsWord(wish.length) : ", nothing saved") + (dropped ? ", " + dropped + " dropped" : "");
   const wishMeta = wish.length ? cardsWord(wish.length) + (total ? " · " + priceText(total, "USD") : "") : "Nothing saved yet";
   const wishSub = wish.length ? (wantedN ? wantedN + " still to find" : "You have every card") + (ownedN ? " · " + ownedN + " got" : "") : "Swipe right on a card and it lands here.";
-  root.innerHTML = `<button class="wish-row" id="openWish" type="button" aria-label="${esc(wishLabel)}">${peekMarkup(wish, "wish-peek")}<span class="wish-copy"><span class="eyebrow">Every card you saved</span><b>Wishlist</b><span class="wish-meta">${esc(wishMeta)}</span><span class="fine">${esc(wishSub)}</span></span>${droppedCountMarkup(dropped)}<span class="wish-go" aria-hidden="true">Open →</span></button>
+  root.innerHTML = `<button class="wish-row" id="openWish" type="button" aria-label="${esc(wishLabel)}">${peekMarkup(wish, "wish-peek")}<span class="wish-copy"><span class="eyebrow">All saved cards</span><b>Wishlist</b><span class="wish-meta">${esc(wishMeta)}</span><span class="fine">${esc(wishSub)}</span></span>${droppedCountMarkup(dropped)}<span class="wish-go" aria-hidden="true">Open →</span></button>
     <div class="shelf-head"><h2 class="shelf-title">Your binders</h2><p class="fine">Sort cards by theme. A card can sit in more than one binder and still stays on your wishlist.</p></div>
     <div class="shelf-scene"><div class="shelf" id="shelf"></div></div>`;
   const shelf = document.getElementById("shelf");
@@ -3922,7 +3922,7 @@ function renderBinders(){
   add.type = "button";
   add.className = "cover add";
   add.style.setProperty("--cover", "#F1F1E4");
-  add.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board"><span class="cover-add-label">+ New binder</span></span><span class="binder-fore"></span></span>`;
+  add.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board"><span class="cover-add-label">+ New binder<small>${binderState.binders.length ? "Another set, Pokémon or theme" : "One for a set, a Pokémon, or anything you collect"}</small></span></span><span class="binder-fore"></span></span>`;
   add.onclick = openBinderForm;
   shelf.append(add);
   document.getElementById("openWish").onclick = () => { binderView = { kind:"wish" }; flipPage = 0; renderBinders(); };
@@ -5352,7 +5352,7 @@ function renderProfile(card){
   const inBinder = binder && binder.cards.some(c => c.id === card.id);
   profileEl.innerHTML = `<div class="profile-scroll">
     <div class="phead">
-      <div class="thumb" id="profileThumb"></div>
+      <button class="thumb" id="profileThumb" type="button" aria-label="Look at ${esc(card.name || "this card")} up close"></button>
       <div style="min-width:0;flex:1"><h2 class="pname" id="profileTitle">${esc(card.name || "Card")}</h2><p class="fine">${esc([card.set, card.number ? "#" + card.number : ""].filter(Boolean).join(" · "))}</p></div>
       <button class="iconbtn" id="closeProfile" type="button" aria-label="Close profile">✕</button>
     </div>
@@ -5367,14 +5367,13 @@ function renderProfile(card){
       ${svg || `<p class="empty-state">${series.pendingFx ? "Checking the dollar rate…" : "Not enough price history"}</p>`}
       <p class="scrub" id="scrub">${guide ? esc(guide.label) + " latest cached " + esc(priceText(guide.value, "USD")) + ". The dashed line is that price, not a daily history." : esc(series.note || "")}</p>
     </div>
-    <div class="ownrow">
+    <div class="ownrow mine">
       <button class="chip ownchip" id="profileOwn" type="button" aria-pressed="${owned ? "true" : "false"}" aria-label="${esc(ownAria)}">${esc(ownLabel)}</button>
-      <p class="fine">${owned ? "Owned. The same mark shows in every binder." : "Wanted. Got it fills this card in every binder."}</p>
-    </div>
-    <div class="links">${buyLinks(card).map(l => `<a class="buy-btn" href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join("")}
-      <button class="chip" id="profileWish" type="button">${onWish ? "On wishlist" : "★ Add to wishlist"}</button>
+      <button class="chip wishchip" id="profileWish" type="button" aria-pressed="${onWish ? "true" : "false"}">${onWish ? "♥ On wishlist" : "♡ Add to wishlist"}</button>
       ${binder ? `<button class="chip" id="profileBinder" type="button">${inBinder ? "In " + esc(binder.name) : "Add to " + esc(binder.name)}</button>` : ""}
+      <p class="fine">${owned ? "You have it. Every binder shows it as owned." : "Tap Got it! once it's in your hands. Every binder updates."}</p>
     </div>
+    <div class="shoplinks"><p class="eyebrow">Check prices on</p><div class="links">${buyLinks(card).map(l => `<a class="buy-btn" href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label.replace(/^View on /, ""))} ↗</a>`).join("")}</div></div>
     <h2>Details</h2>
     <div class="facts">
       ${fact("Artist", card.artist)}
@@ -5389,7 +5388,8 @@ function renderProfile(card){
     <button class="chip" id="copyLink" type="button">Copy link</button>
   </div>`;
   const thumb = document.getElementById("profileThumb");
-  paintArt(thumb, card);
+  paintArt(thumb, card, { large:true });
+  thumb.onclick = () => openShowcase(card, thumb);
   document.getElementById("closeProfile").onclick = closeProfile;
   profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => { variantChoice.set(card.id, btn.dataset.variant); renderProfile(card); paintCaption(); refreshPocketPrice(card); });
   profileEl.querySelectorAll("[data-range]").forEach(btn => btn.onclick = () => { chartRange = btn.dataset.range; renderProfile(card); });
