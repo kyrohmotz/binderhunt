@@ -138,3 +138,5 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 #profile .shoplinks .links{margin-top:0}
 #profile .shoplinks .buy-btn{min-height:40px;background:transparent;color:var(--ink);border:2px solid var(--ink);font-size:14px}
 #profile .shoplinks .buy-btn:hover{background:var(--paper-2)}
+#profile .ownrow.mine .chip{max-width:none;white-space:nowrap}
+#profile .ownrow.mine{margin:12px 0}

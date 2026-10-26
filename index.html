@@ -5235,6 +5235,12 @@ function renderSummary(card){
     </div>
     ${marketBlock(card, variant, shown, delta)}
     ${variants.length > 1 ? `<div class="vtoggle" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${variants.map(v => `<button type="button" data-variant="${esc(v.key)}" aria-pressed="${variant && variant.key === v.key ? "true" : "false"}">${esc(v.label)}</button>`).join("")}</div>` : ""}
+    <div class="ownrow mine">
+      <button class="chip ownchip" id="profileOwn" type="button" aria-pressed="${owned ? "true" : "false"}" aria-label="${esc(ownAria)}">${esc(ownLabel)}</button>
+      <button class="chip wishchip" id="profileWish" type="button" aria-pressed="${onWish ? "true" : "false"}">${onWish ? "♥ On wishlist" : "♡ Add to wishlist"}</button>
+      ${binder ? `<button class="chip" id="profileBinder" type="button">${inBinder ? "In " + esc(binder.name) : "Add to " + esc(binder.name)}</button>` : ""}
+      <p class="fine">${owned ? "You have it. Every binder shows it as owned." : "Tap Got it! once it's in your hands. Every binder updates."}</p>
+    </div>
     ${!gradedReady ? `<p class="fine">Checking graded prices…</p>` : gradedKnown ? `<div class="grade-grid">${GRADES.map(([company, grade]) => gradeCell(facts, company, grade)).join("")}</div>` : `<p class="note">No graded sales yet</p>`}
     <div class="chart-wrap">
       <div class="rangebar"><div class="ranges">${["1M","3M","1Y","All"].map(r => `<button type="button" data-range="${r}" aria-pressed="${chartRange === r ? "true" : "false"}">${r}</button>`).join("")}</div></div>
@@ -5366,12 +5372,6 @@ function renderProfile(card){
       </div>
       ${svg || `<p class="empty-state">${series.pendingFx ? "Checking the dollar rate…" : "Not enough price history"}</p>`}
       <p class="scrub" id="scrub">${guide ? esc(guide.label) + " latest cached " + esc(priceText(guide.value, "USD")) + ". The dashed line is that price, not a daily history." : esc(series.note || "")}</p>
-    </div>
-    <div class="ownrow mine">
-      <button class="chip ownchip" id="profileOwn" type="button" aria-pressed="${owned ? "true" : "false"}" aria-label="${esc(ownAria)}">${esc(ownLabel)}</button>
-      <button class="chip wishchip" id="profileWish" type="button" aria-pressed="${onWish ? "true" : "false"}">${onWish ? "♥ On wishlist" : "♡ Add to wishlist"}</button>
-      ${binder ? `<button class="chip" id="profileBinder" type="button">${inBinder ? "In " + esc(binder.name) : "Add to " + esc(binder.name)}</button>` : ""}
-      <p class="fine">${owned ? "You have it. Every binder shows it as owned." : "Tap Got it! once it's in your hands. Every binder updates."}</p>
     </div>
     <div class="shoplinks"><p class="eyebrow">Check prices on</p><div class="links">${buyLinks(card).map(l => `<a class="buy-btn" href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label.replace(/^View on /, ""))} ↗</a>`).join("")}</div></div>
     <h2>Details</h2>
