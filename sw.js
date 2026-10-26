@@ -6,7 +6,7 @@
    index.html, js, or css. Any change to this file is a new worker: it
    calls skipWaiting immediately and takes over, and the page asks before
    it reloads. */
-const VERSION = "bh-2";
+const VERSION = "bh-3";
 const SHELL = "bh-shell-" + VERSION;
 const DATA = "bh-data-" + VERSION;
 const IMG = "bh-img-" + VERSION;
@@ -19,7 +19,10 @@ const SHELL_FILES = [
   "css/daily.css",
   "js/daily-core.js",
   "js/daily-ui.js",
-  "js/binder-curl.js",
+  "js/binder-turn.js",
+  "js/card-inspect.js",
+  "css/binder.css",
+  "css/polish.css",
   "manifest.webmanifest",
   "favicon-32.png",
   "apple-touch-icon.png",
@@ -190,12 +193,15 @@ function offlineNow() {
   return forceOffline || !!(self.navigator && self.navigator.onLine === false);
 }
 
-function cardFallback() {
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 63 88"><rect width="63" height="88" rx="8" fill="#F8F7EF" stroke="#1F1F1E" stroke-width="2.5"/><rect x="7" y="8" width="49" height="72" rx="5" fill="#E4E7DA" stroke="#1F1F1E" stroke-width="1.5"/><circle cx="24" cy="34" r="7" fill="#ABB28D" stroke="#1F1F1E" stroke-width="1.5"/><circle cx="40" cy="34" r="7" fill="#F6C9C9" stroke="#1F1F1E" stroke-width="1.5"/><circle cx="24" cy="34" r="1.4" fill="#1F1F1E"/><circle cx="40" cy="34" r="1.4" fill="#1F1F1E"/></svg>';
-  return new Response(svg, {
-    status: 200,
-    headers: { "Content-Type": "image/svg+xml", "Cache-Control": "no-store" }
-  });
+/* Card art comes from two CDNs, and TCGdex serves some files without CORS
+   headers. Fetching those in cors mode fails, which used to swap real cards
+   for a placeholder. Try cors first so the file can be cached; when the CDN
+   refuses, remember the URL and let the browser load it the way the page
+   asked (a plain <img> is no-cors and renders fine). */
+const corsRefused = new Set();
+function noteCorsRefused(url) {
+  if (corsRefused.size > 4000) corsRefused.clear();
+  corsRefused.add(url);
 }
 
 async function cached(cacheName, request) {
@@ -303,16 +309,26 @@ async function imageCache(request) {
     } catch (e) {}
     return hit;
   }
-  if (offlineNow()) return cardFallback();
-  try {
-    const response = await fetch(request.url, { mode: "cors", credentials: "omit", redirect: "follow" });
-    if (good(response)) {
-      await putLimited(IMG, request, response.clone(), IMG_CAP);
+  /* A network error makes the page fall back to its own placeholder, which
+     fits wherever the image sits (the binder has a dark one). */
+  if (offlineNow()) return Response.error();
+  if (!corsRefused.has(request.url)) {
+    try {
+      const response = await fetch(request.url, { mode: "cors", credentials: "omit", redirect: "follow" });
+      if (good(response)) {
+        await putLimited(IMG, request, response.clone(), IMG_CAP);
+        return response;
+      }
       return response;
+    } catch (e) {
+      noteCorsRefused(request.url);
     }
-    return response;
+  }
+  if (request.mode === "cors") return Response.error();
+  try {
+    return await fetch(request);
   } catch (e) {
-    return cardFallback();
+    return Response.error();
   }
 }
 

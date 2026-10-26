@@ -1,0 +1,196 @@
+/* UI polish across the app: more room for cards on a phone, visible feedback
+   when a card is saved, binders that show what is inside them, and quieter
+   set tiles. Loaded after the main styles; Two Toads tokens throughout. */
+
+/* ---------- phone: give the screen to the cards ---------- */
+
+/* The credits line sat under every screen and cost about 80px of card. It
+   lives in Settings, under About. */
+@media (max-width:1023px){
+  .foot{display:none}
+}
+
+/* ---------- Binders tab: the wishlist count ---------- */
+
+.tabbtn[data-tab="binders"]{position:relative}
+.tabcount{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:6px;padding:0 6px;border-radius:999px;border:2px solid var(--ink);background:var(--green,#ABB28D);color:var(--ink);font-family:Nunito,sans-serif;font-weight:900;font-size:11px;line-height:1;vertical-align:2px;font-variant-numeric:tabular-nums;box-shadow:1px 1px 0 var(--ink)}
+.tabcount[hidden]{display:none}
+.tabs .tabbtn[data-tab="binders"]{overflow:visible}
+.tabs .tabcount{position:absolute;top:-9px;right:0;margin:0;min-width:18px;height:17px;padding:0 4px;font-size:10px;border-width:1.5px}
+.tabcount.bump{animation:tabBump .5s cubic-bezier(.2,1.6,.4,1)}
+@keyframes tabBump{0%{transform:scale(1)}30%{transform:scale(1.45) rotate(-6deg);background:#F6C9C9}100%{transform:scale(1)}}
+html.reduce .tabcount.bump{animation:none}
+
+/* ---------- binder shelf ---------- */
+
+#bindersScroll .wish-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"peek copy go" "peek copy badge";align-items:center;column-gap:14px;row-gap:4px;margin:12px 0 4px;padding:14px 14px 14px 26px;min-height:116px}
+#bindersScroll .wish-row > .wish-peek{grid-area:peek}
+#bindersScroll .wish-row > .wish-copy{grid-area:copy;min-width:0;display:flex;flex-direction:column;gap:1px}
+#bindersScroll .wish-row > .drop-badge{grid-area:badge;justify-self:end;align-self:start}
+#bindersScroll .wish-row > .wish-go{grid-area:go;justify-self:end;align-self:end;font-family:var(--display);font-weight:700;font-size:14px;white-space:nowrap}
+#bindersScroll .wish-row .eyebrow{font-size:11px}
+#bindersScroll .wish-row b{font-size:22px;line-height:1.1}
+#bindersScroll .wish-row .wish-meta{font-family:Nunito,sans-serif;font-weight:800;font-size:15px;font-variant-numeric:tabular-nums}
+#bindersScroll .wish-row .fine{white-space:normal}
+
+/* Three cards fanned like they were just pulled from the pile. */
+.wish-peek,.cover-peek{position:relative;display:block;flex:none;pointer-events:none}
+.wish-peek{width:100px;height:88px}
+.wish-peek img,.wish-peek i,.cover-peek img,.cover-peek i{position:absolute;bottom:0;left:50%;width:auto;aspect-ratio:63/88;border-radius:4px;object-fit:cover;background:#e9e6da;box-shadow:0 2px 4px rgba(31,31,30,.28),0 0 0 1.5px rgba(31,31,30,.55);transform-origin:50% 100%}
+.wish-peek img,.wish-peek i{height:78px}
+.wish-peek > :nth-child(1){transform:translateX(-50%) rotate(-10deg) translateX(-20px)}
+.wish-peek > :nth-child(2){transform:translateX(-50%) rotate(0deg);z-index:1}
+.wish-peek > :nth-child(3){transform:translateX(-50%) rotate(10deg) translateX(20px);z-index:2}
+.wish-peek.empty i,.cover-peek.empty i{background:repeating-linear-gradient(135deg,rgba(31,31,30,.06) 0 6px,transparent 6px 12px),#f8f7ef;box-shadow:0 0 0 1.5px rgba(31,31,30,.3)}
+#bindersScroll .shelf-head{display:flex;flex-direction:column;gap:2px;margin:16px 2px 8px}
+#bindersScroll .shelf-head .shelf-title{margin:0;font-size:20px}
+#bindersScroll .shelf-head .fine{margin:0;max-width:52ch}
+
+/* On a cover: the cards peek out above the name. */
+.cover-peek{width:72%;height:38%;margin-bottom:2px}
+.cover-peek img,.cover-peek i{height:100%}
+.cover-peek > :nth-child(1){transform:translateX(-50%) rotate(-9deg) translateX(-26%)}
+.cover-peek > :nth-child(2){transform:translateX(-50%);z-index:1}
+.cover-peek > :nth-child(3){transform:translateX(-50%) rotate(9deg) translateX(26%);z-index:2}
+.cover-peek.empty{opacity:.55}
+.cover .binder-name{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:15px;line-height:1.12;padding:0 4px}
+.binder-board .binder-count{position:relative;z-index:1;font-family:Nunito,sans-serif;font-weight:800;font-size:12px;color:var(--ink-2)}
+.cover .binder-board{justify-content:flex-end;gap:6px;padding-bottom:16px}
+.cover .cover-charm{z-index:3}
+@media (hover:hover) and (pointer:fine){
+  .cover:not(.add):hover .cover-peek > :nth-child(1){transform:translateX(-50%) rotate(-14deg) translateX(-34%) translateY(-6px)}
+  .cover:not(.add):hover .cover-peek > :nth-child(2){transform:translateX(-50%) translateY(-10px)}
+  .cover:not(.add):hover .cover-peek > :nth-child(3){transform:translateX(-50%) rotate(14deg) translateX(34%) translateY(-6px)}
+  .cover-peek img,.cover-peek i{transition:transform .22s cubic-bezier(.2,.8,.2,1)}
+}
+html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
+
+/* ---------- set tiles ---------- */
+
+.set-tile{gap:3px}
+.set-tile img{height:42px;max-width:100%}
+.setpct.zero .bar{opacity:.35}
+.setpct.zero .pct{font-weight:600;color:var(--ink-2)}
+
+/* ---------- daily drop: a card you can actually see ---------- */
+
+.daily-frame{width:min(220px,54vw)}
+@media (min-width:1024px){
+  .daily-frame{width:min(260px,22vw)}
+}
+
+/* ---------- hunt: keyboard shortcuts on a desktop ---------- */
+
+.keyhint{display:none}
+@media (min-width:1024px) and (hover:hover) and (pointer:fine){
+  .hunt-align{--card-h:min(76vh,760px,calc(100cqh - 274px))}
+  .keyhint{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px 6px;margin:6px 0 0;font-size:12px;color:var(--ink-2);font-weight:600}
+  .keyhint kbd{display:inline-grid;place-items:center;min-width:22px;height:20px;padding:0 5px;border:1.5px solid var(--ink-2);border-bottom-width:3px;border-radius:6px;background:#fff;font-family:Nunito,sans-serif;font-size:11px;font-weight:800;color:var(--ink)}
+  .keyhint kbd + kbd,.keyhint kbd:not(:first-child){margin-left:6px}
+}
+@media (min-width:1024px) and (max-height:820px){
+  .keyhint{display:none}
+  .hunt-align{--card-h:min(76vh,760px,calc(100cqh - 248px))}
+}
+
+/* ---------- sets: the search stays in reach while scrolling ---------- */
+
+#setsScroll > #setFind{position:sticky;top:0;z-index:3;box-shadow:0 -16px 0 var(--paper),0 8px 0 var(--paper),0 14px 12px -8px rgba(31,31,30,.22)}
+#setsScroll{scroll-padding-top:60px}
+
+/* ---------- filters: show that the chip row scrolls ---------- */
+
+.chips{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);padding-right:28px}
+
+/* Phone: the whole row is the button, so the arrow goes and the copy gets
+   the room. */
+@media (max-width:560px){
+  #bindersScroll .wish-row{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"peek copy" "peek badge";column-gap:12px;padding-left:24px}
+  #bindersScroll .wish-row > .wish-go{display:none}
+  #bindersScroll .wish-row > .drop-badge{justify-self:start}
+  #bindersScroll .wish-row b{font-size:20px}
+  #bindersScroll .wish-row .wish-meta{font-size:14px}
+}
+.cover-add-label{display:flex;flex-direction:column;align-items:center;gap:6px}
+.cover-add-label small{font-family:Nunito,sans-serif;font-weight:700;font-size:12px;line-height:1.3;color:var(--ink-2);max-width:13em}
+
+/* ---------- card details ---------- */
+
+/* The card is the point of the page: show it big, and tapping it lifts it
+   into the 3D view. */
+#profile .phead{align-items:flex-start}
+#profile .phead .thumb{padding:0;cursor:zoom-in;width:72px;height:auto;aspect-ratio:63/88;border-radius:8px;transition:transform .16s cubic-bezier(.2,.8,.2,1)}
+#profile .phead .thumb:active{transform:scale(.97)}
+#profile .phead .thumb img{object-fit:cover}
+#profile .phead .thumb:focus-visible{outline:3px solid var(--sky,#86DEFF);outline-offset:2px}
+@media (max-width:1023px){
+  #profile .phead{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"art close" "name name";gap:12px 10px;align-items:start}
+  #profile .phead .thumb{grid-area:art;justify-self:center;width:min(52vw,220px);margin-left:44px;border-radius:12px;box-shadow:4px 4px 0 var(--ink)}
+  #profile .phead > div{grid-area:name;text-align:center}
+  #profile .phead #closeProfile{grid-area:close}
+}
+/* Your actions first, shopping links second and quieter. */
+#profile .ownrow.mine{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+#profile .ownrow.mine .fine{flex-basis:100%;margin:0}
+#profile .wishchip[aria-pressed="true"]{background:var(--rose,#F6C9C9)}
+#profile .shoplinks{margin-top:14px}
+#profile .shoplinks .eyebrow{margin:0 0 4px}
+#profile .shoplinks .links{margin-top:0}
+#profile .shoplinks .buy-btn{min-height:40px;background:transparent;color:var(--ink);border:2px solid var(--ink);font-size:14px}
+#profile .shoplinks .buy-btn:hover{background:var(--paper-2)}
+#profile .ownrow.mine .chip{max-width:none;white-space:nowrap}
+#profile .ownrow.mine{margin:12px 0}
+
+/* ---------- set view: the same dark binder page as your binders ---------- */
+
+#setsScroll .setpage{gap:8px}
+#setsScroll .sethead{display:flex;align-items:center;gap:10px;min-width:0}
+#setsScroll .sethead #backSets{flex:none;width:44px;min-width:44px;padding:0;justify-content:center;font-size:18px}
+#setsScroll .sethead .setlogo{flex:none;height:40px;width:auto;max-width:96px;object-fit:contain}
+#setsScroll .setname{min-width:0;flex:1}
+#setsScroll .setname h2{margin:0;font-size:22px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#setsScroll .setstats{display:flex;align-items:center;gap:10px}
+#setsScroll .setmeter{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+#setsScroll .setmeter .bar{margin:0}
+#setsScroll .setstats .go{flex:none;background:var(--green,#ABB28D);white-space:nowrap}
+#setsScroll .setflip .paper{background:#1f2026;border:0;border-radius:16px;box-shadow:0 0 0 1px rgba(255,255,255,.04) inset,0 14px 28px -10px rgba(34,26,16,.5);padding:10px}
+#setsScroll .setflip .paper h3{display:none}
+#setsScroll .setflip .pockets{width:min(100cqw,calc(100cqh * 63 / 88 * .985));height:min(100cqh,calc(100cqw * 88 / 63 / .985));gap:6px}
+#setsScroll .setflip .pocket{background:linear-gradient(180deg,rgba(0,0,0,.26),rgba(0,0,0,.08) 40%),#16171c;border:0;border-radius:5px;padding:0;box-shadow:inset 0 2px 5px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.075)}
+#setsScroll .setflip .pocket.empty{border:0}
+#setsScroll .setflip .pocket .open{inset:2.5% 3%;border-radius:4.6% / 3.3%;overflow:hidden;background:transparent}
+#setsScroll .setflip .pocket img{object-fit:cover;background:transparent;border-radius:0}
+#setsScroll .setflip .pocket .art-missing{border-radius:4.6% / 3.3%}
+#setsScroll .setflip .pocket .iconish.heart{left:auto;right:4px;bottom:4px;top:auto;transform:none;width:30px;height:30px;min-height:30px;border-radius:999px;border:1.5px solid var(--ink);background:rgba(248,247,239,.94);font-size:15px;box-shadow:0 1px 3px rgba(0,0,0,.45)}
+#setsScroll .setflip .pocket .iconish.heart.on{background:#F6C9C9}
+#setsScroll .setflip .pocket.owned{box-shadow:inset 0 0 0 2px #ABB28D,inset 0 2px 5px rgba(0,0,0,.6)}
+#setsScroll .setflip .owned-mark{position:absolute;left:5px;top:5px;width:18px;height:18px;border-radius:999px;border:1.5px solid var(--ink);background:#ABB28D;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+#setsScroll .setflip .owned-mark::after{content:"";position:absolute;left:4px;top:3px;width:7px;height:4px;border-left:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:rotate(-45deg)}
+#setsScroll .setflip .pager{margin-top:6px}
+#setsScroll .setstats .go{max-width:none;overflow:visible;padding:0 14px;color:var(--ink)}
+@media (max-width:420px){
+  #setsScroll .setstats .go{font-size:14px;padding:0 12px}
+}
+
+/* ---------- daily drop ---------- */
+
+/* Sniglet's zero reads as a dot; numbers use Nunito. */
+.daily-streak b{font-family:Nunito,sans-serif;font-weight:900}
+.daily-frame[role="button"]{cursor:zoom-in}
+.daily-frame[role="button"]:focus-visible{outline:3px solid var(--sky,#86DEFF);outline-offset:3px}
+.daily-frame img{object-fit:cover}
+.money-in{position:relative;display:block}
+.money-in > span{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-family:Nunito,sans-serif;font-weight:900;font-size:18px;color:var(--ink);pointer-events:none}
+.daily-form .money-in input{padding-left:28px;font-family:Nunito,sans-serif;font-weight:800;font-size:18px;font-variant-numeric:tabular-nums}
+
+/* ---------- desktop side panel on the binder shelf ---------- */
+
+#profile .side-h{margin:18px 0 8px;font-family:var(--display);font-size:16px}
+#profile .side-cards{display:flex;flex-direction:column;gap:6px}
+#profile .side-card{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;text-align:left;padding:6px 10px 6px 6px;min-height:64px;background:#fff;border:2px solid var(--ink);border-radius:12px;box-shadow:2px 2px 0 var(--ink);cursor:pointer}
+#profile .side-card:hover{background:var(--paper-2)}
+#profile .side-card img,#profile .side-card .side-art{width:40px;aspect-ratio:63/88;object-fit:cover;border-radius:3px;background:#e9e6da;box-shadow:0 0 0 1px rgba(31,31,30,.4)}
+#profile .side-card .side-copy{min-width:0;display:flex;flex-direction:column}
+#profile .side-card b{font-family:var(--display);font-size:13px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#profile .side-card .fine{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#profile .side-card .side-val{font-family:Nunito,sans-serif;font-weight:900;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}

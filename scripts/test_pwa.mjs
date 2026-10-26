@@ -87,7 +87,7 @@ const server = http.createServer((req, res) => {
   };
   if (rel === "sw.js" && swVersion) {
     let text = body.toString("utf8");
-    const marker = 'const VERSION = "bh-2"';
+    const marker = 'const VERSION = "bh-3"';
     if (!text.includes(marker)) {
       res.writeHead(500, { "Content-Type": "text/plain" });
       res.end("sw.js VERSION marker missing");
@@ -406,7 +406,7 @@ try {
   await page.waitForSelector("#shelf");
   const bindersText = await page.locator("#bindersScroll").innerText();
   note(bindersText.includes("Jungle"), "binder still opens from localStorage", bindersText.slice(0, 180));
-  note(/1 cards/.test(bindersText), "wishlist still opens from localStorage", bindersText.slice(0, 180));
+  note(/1 card\b/.test(bindersText), "wishlist still opens from localStorage", bindersText.slice(0, 180));
   const keys = await page.evaluate(() => ({
     wish: localStorage.getItem("binderhuntWish"),
     binders: localStorage.getItem("bh.binders.v1"),
@@ -425,7 +425,7 @@ try {
   await context.setOffline(false);
   note(await page.locator("#updateToast").isHidden(), "toast stays hidden until a new service worker takes over");
   stallShell = true;
-  swVersion = "bh-3";
+  swVersion = "bh-4";
   await page.evaluate(async () => {
     const reg = await navigator.serviceWorker.getRegistration();
     await reg.update();
@@ -444,7 +444,7 @@ try {
     return { waiting: !!(reg && reg.waiting), installing: !!(reg && reg.installing), version };
   });
   note(!workerState.waiting, "new service worker does not stay waiting", JSON.stringify(workerState));
-  note(workerState.version && workerState.version.version === "bh-3" && workerState.version.gen == null, "plain VERSION bump took over without a generation counter", JSON.stringify(workerState.version));
+  note(workerState.version && workerState.version.version === "bh-4" && workerState.version.gen == null, "plain VERSION bump took over without a generation counter", JSON.stringify(workerState.version));
   const toast = await page.locator("#updateToast").innerText();
   note(/New version, tap to refresh/.test(toast), "update toast copy", toast);
   await shot(page, "screenshot_pwa_update_toast_390");
@@ -467,7 +467,7 @@ try {
     if (!sw) { clearTimeout(timer); resolve(null); return; }
     sw.postMessage("bh-version", [channel.port2]);
   }));
-  note(refreshed && refreshed.version === "bh-3", "tap loads the new build", JSON.stringify(refreshed));
+  note(refreshed && refreshed.version === "bh-4", "tap loads the new build", JSON.stringify(refreshed));
   releaseHung();
 
   // Standalone safe area at 390x844.

@@ -330,7 +330,7 @@
         </div>
       </div>
       ${guessRows ? `<ol class="guesses">${guessRows}</ol>` : ""}
-      ${done ? "" : `<p class="daily-left" id="dailyLeft">${esc(guessesLeft === 1 ? "1 guess left" : guessesLeft + " guesses left")}</p><p class="daily-error" id="dailyError" role="alert" hidden></p><form class="daily-form" id="dailyForm"><label>Raw price in USD<input id="dailyGuess" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0.00"></label><button class="go" type="submit">Guess</button></form>`}
+      ${done ? "" : `<p class="daily-left" id="dailyLeft">${esc(guessesLeft === 1 ? "1 guess left" : guessesLeft + " guesses left")}</p><p class="daily-error" id="dailyError" role="alert" hidden></p><form class="daily-form" id="dailyForm"><label>Raw price in USD<span class="money-in"><span aria-hidden="true">$</span><input id="dailyGuess" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0.00"></span></label><button class="go" type="submit">Guess</button></form>`}
       <section class="daily-reveal" id="dailyReveal"${done && !animate ? "" : " hidden"}>
         ${cardmarketLine(day, known)}
         <p class="fine">${day.solved ? "You landed it." : "That's the raw price."} Same number for everyone.</p>
@@ -348,7 +348,18 @@
         <textarea class="daily-sharebox" id="dailyShareText" hidden readonly></textarea>
       </section>
     </div>`;
-    paintArt(document.getElementById("dailyArt"), card);
+    const art = document.getElementById("dailyArt");
+    paintArt(art, card);
+    /* Tap the card to look at it up close. */
+    if (art && typeof openShowcase === "function") {
+      art.tabIndex = 0;
+      art.setAttribute("role", "button");
+      art.setAttribute("aria-label", "Look at " + (card.name || "this card") + " up close");
+      /* No prices on the back: the answer stays sealed. */
+      const look = () => openShowcase({ id: "daily-" + (card.id || ""), name: card.name, set: card.set, number: card.num || card.number || "", rarity: card.rarity, image: card.image, img: card.img, thumb: card.thumb }, art, { sealed: true });
+      art.onclick = look;
+      art.onkeydown = event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); look(); } };
+    }
     const form = document.getElementById("dailyForm");
     if (form) form.onsubmit = event => submitGuess(event, data, iso);
     const wish = document.getElementById("dailyWish");

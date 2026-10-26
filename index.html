@@ -752,6 +752,8 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 }
 </style>
 <link rel="stylesheet" href="css/daily.css">
+<link rel="stylesheet" href="css/binder.css">
+<link rel="stylesheet" href="css/polish.css">
 </head>
 <body>
 <div id="live" class="sr-only" aria-live="polite"></div>
@@ -833,6 +835,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
         <button class="act undo" id="undo" type="button" aria-label="Undo last swipe" disabled>↺</button>
         <button class="act add" id="save" type="button" aria-label="Add to wishlist" disabled>♥</button>
       </div>
+      <p class="keyhint" aria-hidden="true"><kbd>←</kbd> pass <kbd>→</kbd> save <kbd>Z</kbd> undo <kbd>↑</kbd> details</p>
       </div>
       </div>
     </div>
@@ -888,14 +891,25 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
   </div>
 </div>
 <div id="menu" class="menu" hidden role="menu"></div>
-<div id="showcase" class="showcase" hidden>
-  <button type="button" class="showcase-close" id="showcaseClose">Close</button>
-  <div class="showcase-stage" id="showcaseStage">
-    <div class="showcase-card" id="showcaseCard" tabindex="0"></div>
+<div id="showcase" class="inspect" hidden role="dialog" aria-modal="true" aria-labelledby="inspectTitle">
+  <h2 class="sr-only" id="inspectTitle">Card</h2>
+  <div class="inspect-stage" id="showcaseStage">
+    <div class="inspect-shadow" id="inspectShadow" aria-hidden="true"></div>
+    <div class="inspect-lift" id="inspectLift">
+      <div class="inspect-zoom" id="inspectZoom">
+        <div class="inspect-card" id="showcaseCard" tabindex="0" aria-roledescription="card you can turn" aria-describedby="inspectHint">
+          <div class="inspect-face inspect-front" id="inspectFront"></div>
+          <div class="inspect-face inspect-back" id="inspectBack" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
   </div>
-  <div class="showcase-actions">
-    <button type="button" class="chip" id="showcaseDetails">Details</button>
+  <div class="inspect-bar">
+    <button type="button" class="inspect-btn" id="showcaseFlip" aria-pressed="false">Flip</button>
+    <button type="button" class="inspect-btn" id="showcaseDetails">Details</button>
+    <button type="button" class="inspect-btn" id="showcaseClose">Close</button>
   </div>
+  <p class="inspect-hint" id="inspectHint">Drag to turn it. Scroll or pinch to zoom.</p>
 </div>
 <div id="dropPrompt" class="drop-prompt" hidden>
   <div class="drop-card" role="dialog" aria-modal="true" aria-labelledby="dropPromptTitle">
@@ -935,7 +949,8 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
   <span>New version, tap to refresh</span>
   <button type="button" id="updateRefresh">Refresh</button>
 </div>
-<script src="js/binder-curl.js"></script>
+<script src="js/binder-turn.js"></script>
+<script src="js/card-inspect.js"></script>
 <script>
 try {
   if (navigator.serviceWorker && navigator.serviceWorker.controller && navigator.onLine === false) navigator.serviceWorker.controller.postMessage("bh-offline");
@@ -2691,7 +2706,7 @@ function showSkeleton(){
 function paintCount(){
   const el = document.getElementById("matchCount");
   if (!el) return;
-  el.textContent = streamDone ? (matched + (matched === 1 ? " card" : " cards")) : (matched ? matched + " so far" : "Looking…");
+  el.textContent = streamDone ? (matched + (matched === 1 ? " card" : " cards")) : (matched ? matched + (matched === 1 ? " card" : " cards") + " found so far" : "Looking…");
   const liveCount = document.getElementById("filterLive");
   if (liveCount && !document.getElementById("filterSheet").hidden) liveCount.textContent = el.textContent;
 }
@@ -2904,20 +2919,50 @@ function placeholder(card){
   d.innerHTML = `<div class="cardback-inner">${toad()}<b>${esc((card && card.name) || "Card")}</b></div>`;
   return d;
 }
+/* Every art URL we know for a card, sharpest first when large is set. */
+function artUrls(card, large){
+  const urls = knownArt(card);
+  if (!large || !card) return urls;
+  const out = [];
+  const push = value => {
+    const url = safeImg(value);
+    if (url && !out.includes(url)) out.push(url);
+  };
+  push(card.img);
+  const base = safeImg(card.image);
+  if (base) push(base + "/high.webp");
+  urls.forEach(push);
+  return out;
+}
+/* Card art never asks for CORS: neither CDN promises the headers, and an
+   <img> does not need them. If one URL fails, try the next before giving up
+   on the placeholder. */
 function paintArt(host, card, opts){
   host.replaceChildren();
-  const urls = knownArt(card);
-  if (!urls.length) { host.append(placeholder(card)); return; }
+  const urls = artUrls(card, opts && opts.large);
+  const missing = () => (opts && opts.missing ? opts.missing(card) : placeholder(card));
+  if (!urls.length) { host.append(missing()); return; }
   const img = document.createElement("img");
   img.alt = altText(card || {});
   img.draggable = false;
   img.decoding = "async";
   if (opts && opts.lazy) img.loading = "lazy";
-  if (opts && opts.cors) img.crossOrigin = "anonymous";
   img.addEventListener("dragstart", e => e.preventDefault());
-  img.onerror = () => { img.replaceWith(placeholder(card)); };
+  let at = 0;
+  img.onerror = () => {
+    at++;
+    if (at < urls.length) { img.src = urls[at]; return; }
+    img.replaceWith(missing());
+  };
   img.src = urls[0];
   host.append(img);
+}
+/* Inside the binder a missing image is a dark blank card, not the toad. */
+function binderMissingArt(card){
+  const d = document.createElement("div");
+  d.className = "art-missing";
+  d.innerHTML = `<b>${esc((card && card.name) || "Card")}</b><span>${esc([card && card.set, card && card.number ? "#" + card.number : ""].filter(Boolean).join(" · "))}</span>`;
+  return d;
 }
 function pocketPrice(card){
   const shown = printingMoney(card);
@@ -3314,7 +3359,13 @@ function paintContext(){
   paintRail();
   paintSide();
 }
+/* On a desktop, an open binder takes the side panel's room too. The panel
+   comes back as soon as a card's details are opened. */
+function syncReadingWide(){
+  shell.classList.toggle("reading-wide", wide() && tab === "binders" && !!binderView && !profilePinned);
+}
 function paintSide(){
+  syncReadingWide();
   if (!wide() || profilePinned) return;
   if (tab === "sets") renderSetSide();
   else if (tab === "binders") renderBinderSide();
@@ -3378,8 +3429,23 @@ function renderBinderSide(){
   shell.classList.remove("no-profile");
   profileEl.removeAttribute("aria-modal");
   if (!binderView) {
-    const rows = binderState.binders.slice(0, 5).map(b => binderSideRow(b.name, b.cards, b.color)).join("");
-    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Binders</p><h2 class="pname" id="profileTitle">Your shelf</h2>${binderSideRow("Wishlist", wish)}<div class="side-list">${rows || `<p class="fine">No binders yet. Create one and its progress lands here.</p>`}</div></div>`;
+    /* The shelf already lists the binders, so the side panel answers what
+       a collector checks next: what got cheaper and what is worth most. */
+    const mini = (card, extra) => {
+      const art = artUrls(card, false)[0];
+      return `<button type="button" class="side-card" data-side-card="${esc(card.id)}">${art ? `<img alt="" src="${esc(art)}" loading="lazy" onerror="this.remove()">` : `<span class="side-art"></span>`}<span class="side-copy"><b>${esc(card.name || "Card")}</b><span class="fine">${esc([card.set, card.number ? "#" + card.number : ""].filter(Boolean).join(" · "))}</span></span><span class="side-val">${extra}</span></button>`;
+    };
+    const drops = wish.map(c => ({ c, d: priceDrop(c) })).filter(x => x.d).sort((x, y) => y.d.pct - x.d.pct).slice(0, 4);
+    const top = wish.map(c => ({ c, v: usdOf(c) })).filter(x => x.v > 0).sort((x, y) => y.v - x.v).slice(0, 3);
+    const val = valueOf(wish);
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Your hunt</p><h2 class="pname" id="profileTitle">${wish.length ? wish.length === 1 ? "1 card saved" : wish.length + " cards saved" : "Nothing saved yet"}</h2>${val ? `<p class="market-price">${esc(priceText(val, "USD"))}</p><p class="fine">What your wishlist costs at today's raw prices.</p>` : `<p class="fine">Swipe right on a card in Hunt and it lands on your wishlist.</p>`}
+      ${drops.length ? `<h3 class="side-h">Cheaper than ${DROP_WINDOW_DAYS} days ago</h3><div class="side-cards">${drops.map(x => mini(x.c, `<span class="drop-badge">↓${esc(String(x.d.shown))}%</span>`)).join("")}</div>` : ""}
+      ${top.length ? `<h3 class="side-h">Biggest hunts</h3><div class="side-cards">${top.map(x => mini(x.c, esc(priceText(x.v, "USD")))).join("")}</div>` : ""}
+    </div>`;
+    profileEl.querySelectorAll("[data-side-card]").forEach(btn => btn.onclick = () => {
+      const card = wish.find(c => c.id === btn.dataset.sideCard);
+      if (card) openProfile(card);
+    });
     return;
   }
   if (binderView.kind === "wish") {
@@ -3421,7 +3487,32 @@ function renderDailySide(){
   else if (model && model.ready) result = `<p class="fine">${guesses ? guesses + " of 3 guesses in. " : ""}The price stays sealed until the round ends.</p>`;
   profileEl.innerHTML = `<div class="profile-scroll" data-side="daily"><p class="eyebrow">Daily</p><h2 class="pname" id="profileTitle">${n ? "Drop #" + esc(String(n)) : "Today's drop"}</h2><div class="daily-side"><div class="stat"><span>Streak</span><b>${esc(String(streak))}</b></div><div class="stat"><span>Best</span><b>${esc(String(best))}</b></div></div><p class="fine" id="dailySideCount">${esc(countdown)}</p>${result}</div>`;
 }
+/* The Binders tab carries the wishlist count, so a right swipe visibly lands
+   somewhere. The count bumps when it grows. */
+let tabWishShown = -1;
+function paintTabCount(){
+  const n = wish.length;
+  const grew = tabWishShown >= 0 && n > tabWishShown;
+  tabWishShown = n;
+  document.querySelectorAll('.tabbtn[data-tab="binders"]').forEach(btn => {
+    let badge = btn.querySelector(".tabcount");
+    if (!badge) {
+      badge = document.createElement("span");
+      badge.className = "tabcount";
+      badge.setAttribute("aria-hidden", "true");
+      btn.append(badge);
+    }
+    badge.textContent = n > 99 ? "99+" : String(n);
+    badge.hidden = !n;
+    if (grew && !reduceMotion()) {
+      badge.classList.remove("bump");
+      void badge.offsetWidth;
+      badge.classList.add("bump");
+    }
+  });
+}
 function paintRail(){
+  paintTabCount();
   const count = document.getElementById("railWishCount");
   const host = document.getElementById("railBinders");
   const wishBtn = document.getElementById("railWish");
@@ -3668,7 +3759,7 @@ function renderSets(){
       const pctLabel = comp.pct == null ? "—" : comp.pct + "%";
       const pctAria = comp.total ? comp.owned + " of " + comp.total + " owned, " + pctLabel : "Set size unknown";
       const aria = [s.name, era, count ? count + " cards" : "", pctAria].filter(Boolean).join(", ");
-      html.push(`<button class="set-tile" type="button" data-set="${esc(s.id)}" aria-label="${esc(aria)}">${s.logo ? `<img alt="" src="${esc(s.logo + ".webp")}">` : ""}<b>${esc(s.name)}</b><span class="fine">${esc(era)}${count ? " · " + count + " cards" : ""}${s.year ? " · " + esc(s.year) : ""}</span><span class="setpct"><span class="bar" aria-hidden="true"><span style="width:${comp.pct == null ? 0 : comp.pct}%"></span></span><span class="pct">${esc(pctLabel)}</span></span></button>`);
+      html.push(`<button class="set-tile" type="button" data-set="${esc(s.id)}" aria-label="${esc(aria)}">${s.logo ? `<img alt="" src="${esc(s.logo + ".webp")}">` : ""}<b>${esc(s.name)}</b><span class="fine">${count ? count + " cards" : esc(era)}${s.year ? " · " + esc(s.year) : ""}</span><span class="setpct${comp.pct ? "" : " zero"}"><span class="bar" aria-hidden="true"><span style="width:${comp.pct == null ? 0 : comp.pct}%"></span></span><span class="pct">${esc(comp.pct ? pctLabel : comp.pct === 0 ? "Not started" : pctLabel)}</span></span></button>`);
     });
     html.push(`</div>`);
   });
@@ -3719,15 +3810,13 @@ function renderSetPage(root){
   const pct = total ? Math.max(0, Math.min(100, Math.round(owned / total * 100))) : 0;
   const progressLine = total ? pct + "% · " + owned + " / " + total + " owned" + (owned > 0 ? " · " + progressLabel(owned, total) : "") : "Owned progress shows once this set has a card count.";
   if (s.mode !== "flip" && s.mode !== "about") s.mode = "flip";
-  root.innerHTML = `<div class="setpage"><div class="sethead"><button class="chip" id="backSets" type="button">All sets</button>
-    <h2>${esc(s.name)}</h2></div>
-    <p class="fine">${esc([s.release, eraOf(s.id), total ? total + " cards" : ""].filter(Boolean).join(" · "))}</p>
-    <div class="modes">
-      <button class="chip" id="swipeSet" type="button">Swipe this set</button>
-      <button class="chip on" id="flipSet" type="button" aria-pressed="true">Flip through</button>
+  const logo = knownSet && knownSet.logo ? `<img class="setlogo" alt="" src="${esc(knownSet.logo + ".webp")}" onerror="this.remove()">` : "";
+  root.innerHTML = `<div class="setpage"><div class="sethead"><button class="chip" id="backSets" type="button" aria-label="All sets">←</button>
+    ${logo}<div class="setname"><h2>${esc(s.name)}</h2><p class="fine">${esc([s.release, eraOf(s.id), total ? total + " cards" : ""].filter(Boolean).join(" · "))}</p></div></div>
+    <div class="setstats">
+      <div class="setmeter"><p class="fine" id="setProgress">${esc(progressLine)}</p><div class="bar" aria-hidden="true"><span style="width:${total ? pct : 0}%"></span></div></div>
+      <button class="chip go" id="swipeSet" type="button">Swipe this set</button>
     </div>
-    <p class="fine" id="setProgress">${esc(progressLine)}</p>
-    <div class="bar" aria-hidden="true"><span style="width:${total ? pct : 0}%"></span></div>
     <div class="setflip" id="setBody"></div></div>`;
   document.getElementById("backSets").onclick = () => { setView = null; renderSets(); paintContext(); };
   document.getElementById("swipeSet").onclick = () => {
@@ -3759,16 +3848,17 @@ function renderSetPage(root){
     const ownedCard = ownedIds.has(c.id);
     pocket.className = "pocket" + (ownedCard ? " owned" : "");
     const on = wish.some(w => w.id === c.id);
-    pocket.innerHTML = `<button type="button" class="open" aria-label="${esc(c.name)} – ${esc(s.name)} #${esc(c.localId || "")}${ownedCard ? ", owned" : ", wanted"}"><img alt="" draggable="false" decoding="async" loading="lazy"></button><b>${esc(c.name)}</b><button class="iconish heart" type="button" aria-label="${on ? "On wishlist" : "Add to wishlist"}">${on ? "♥" : "♡"}</button>`;
+    pocket.innerHTML = `<button type="button" class="open" aria-label="${esc(c.name)} – ${esc(s.name)} #${esc(c.localId || "")}${ownedCard ? ", owned" : ", wanted"}"><img alt="" draggable="false" decoding="async" loading="lazy"></button><b class="sr-only">${esc(c.name)}</b><button class="iconish heart${on ? " on" : ""}" type="button" aria-pressed="${on ? "true" : "false"}" aria-label="${on ? esc(c.name) + " is on your wishlist" : "Add " + esc(c.name) + " to wishlist"}">${on ? "♥" : "♡"}</button>${ownedCard ? `<span class="owned-mark" aria-hidden="true"></span>` : ""}`;
     const img = pocket.querySelector("img");
     img.alt = c.name + " – " + s.name + " #" + (c.localId || "");
     img.draggable = false;
     img.addEventListener("dragstart", e => e.preventDefault());
     const base = safeImg(c.image);
-    if (!base) img.replaceWith(placeholder(c));
+    if (!base) img.replaceWith(binderMissingArt({ name:c.name, set:s.name, number:c.localId }));
     else {
-      img.onerror = () => img.replaceWith(placeholder(c));
-      img.src = base + "/low.webp";
+      let tried = false;
+      img.onerror = () => { if (!tried) { tried = true; img.src = base + "/low.webp"; return; } img.replaceWith(binderMissingArt({ name:c.name, set:s.name, number:c.localId })); };
+      img.src = base + "/high.webp";
     }
     pocket.querySelector(".open").onclick = () => openProfile({ id:c.id, name:c.name, image:c.image, localId:c.localId });
     pocket.querySelector(".heart").onclick = async () => {
@@ -3785,7 +3875,7 @@ function renderSetPage(root){
   while (host.children.length < 9) {
     const empty = document.createElement("div");
     empty.className = "pocket empty";
-    empty.innerHTML = toad();
+    empty.setAttribute("aria-hidden", "true");
     host.append(empty);
   }
   const turn = (delta) => {
@@ -3796,6 +3886,19 @@ function renderSetPage(root){
     if (reduceMotion() || !paper) go();
     else { paper.classList.add("turning"); setTimeout(go, 450); if (settings.sound) playTone(180); }
   };
+  /* Swipe the page sideways to turn it, like the binder. */
+  const paperEl = document.getElementById("setPaper");
+  if (paperEl) {
+    let sx = 0, sy = 0, pid = null;
+    paperEl.addEventListener("pointerdown", e => { if (e.button) return; pid = e.pointerId; sx = e.clientX; sy = e.clientY; });
+    paperEl.addEventListener("pointerup", e => {
+      if (e.pointerId !== pid) return;
+      pid = null;
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.4) turn(dx < 0 ? 1 : -1);
+    });
+    paperEl.addEventListener("pointercancel", () => { pid = null; });
+  }
   document.getElementById("setPrev").onclick = () => turn(-1);
   document.getElementById("setNext").onclick = () => turn(1);
   paintContext();
@@ -3806,6 +3909,12 @@ function coverColor(value, optional){
   if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw;
   return optional ? "" : "#E9D5C0";
 }
+/* Up to three cards fanned out, so a binder shows what is inside it. */
+function peekMarkup(list, cls){
+  const art = (list || []).map(c => artUrls(c, false)[0]).filter(Boolean).slice(0, 3);
+  if (!art.length) return `<span class="${cls} empty" aria-hidden="true"><i></i><i></i><i></i></span>`;
+  return `<span class="${cls}" aria-hidden="true">${art.map(u => `<img alt="" src="${esc(u)}" loading="lazy" decoding="async" onerror="this.remove()">`).join("")}</span>`;
+}
 function renderBinders(){
   const root = document.getElementById("bindersScroll");
   if (binderView) { renderCollection(root); return; }
@@ -3813,12 +3922,13 @@ function renderBinders(){
   const total = valueOf(wish);
   const ownedN = wish.filter(c => ownedIds.has(c.id)).length;
   const wantedN = Math.max(0, wish.length - ownedN);
-  const wishFine = wish.length ? wish.length + " cards · " + ownedN + " owned · " + wantedN + " wanted · not a binder" : "Nothing saved yet · not a binder";
   const dropped = droppedCount(wish);
-  const wishLabel = "Wishlist" + (wish.length ? ", " + wish.length + (wish.length === 1 ? " card" : " cards") : ", nothing saved") + (dropped ? ", " + dropped + " dropped" : "");
-  root.innerHTML = `<p class="fine">Wishlist is the master list. Mark a card Got it once it's in your hands. That owned mark is shared by every binder.</p>
-    <button class="wish-row" id="openWish" type="button" aria-label="${esc(wishLabel)}"><span><b>Wishlist</b><span class="fine">${esc(wishFine)}</span></span>${droppedCountMarkup(dropped)}<span class="pill${total ? "" : " missing"}">${esc(total ? priceText(total, "USD") : "—")}</span></button>
-    <h2 class="shelf-title">Your binders</h2>
+  const cardsWord = n => n + (n === 1 ? " card" : " cards");
+  const wishLabel = "Wishlist" + (wish.length ? ", " + cardsWord(wish.length) : ", nothing saved") + (dropped ? ", " + dropped + " dropped" : "");
+  const wishMeta = wish.length ? cardsWord(wish.length) + (total ? " · " + priceText(total, "USD") : "") : "Nothing saved yet";
+  const wishSub = wish.length ? (wantedN ? wantedN + " still to find" : "You have every card") + (ownedN ? " · " + ownedN + " got" : "") : "Swipe right on a card and it lands here.";
+  root.innerHTML = `<button class="wish-row" id="openWish" type="button" aria-label="${esc(wishLabel)}">${peekMarkup(wish, "wish-peek")}<span class="wish-copy"><span class="eyebrow">All saved cards</span><b>Wishlist</b><span class="wish-meta">${esc(wishMeta)}</span><span class="fine">${esc(wishSub)}</span></span>${droppedCountMarkup(dropped)}<span class="wish-go" aria-hidden="true">Open →</span></button>
+    <div class="shelf-head"><h2 class="shelf-title">Your binders</h2><p class="fine">Sort cards by theme. A card can sit in more than one binder and still stays on your wishlist.</p></div>
     <div class="shelf-scene"><div class="shelf" id="shelf"></div></div>`;
   const shelf = document.getElementById("shelf");
   binderState.binders.forEach(b => {
@@ -3831,7 +3941,7 @@ function renderBinders(){
     if (p.total && p.owned >= p.total) btn.classList.add("complete");
     const charm = b.charm === "toad" ? `<span class="cover-charm">${toad()}</span>` : b.charm === "sticker" ? `<span class="cover-charm star" aria-hidden="true">★</span>` : "";
     btn.dataset.progress = p.owned + "/" + p.total;
-    btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board"><b class="binder-name">${esc(b.name)}</b>${ringMarkup(p.owned, p.total)}</span><span class="binder-fore"></span></span>${charm}<span class="sr-only">${esc(b.name + ". " + (p.total ? p.owned + " of " + p.total + " owned" : "No cards yet"))}</span>`;
+    btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board">${peekMarkup(b.cards, "cover-peek")}<b class="binder-name">${esc(b.name)}</b>${b.cards.length ? ringMarkup(p.owned, p.total) : ""}<span class="binder-count">${esc(b.cards.length ? cardsWord(b.cards.length) : "Empty")}</span></span><span class="binder-fore"></span></span>${charm}<span class="sr-only">${esc(b.name + ". " + (p.total ? p.owned + " of " + p.total + " owned" : "No cards yet"))}</span>`;
     btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); renderBinders(); };
     shelf.append(btn);
   });
@@ -3839,7 +3949,7 @@ function renderBinders(){
   add.type = "button";
   add.className = "cover add";
   add.style.setProperty("--cover", "#F1F1E4");
-  add.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board"><span class="cover-add-label">+ New binder</span></span><span class="binder-fore"></span></span>`;
+  add.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board"><span class="cover-add-label">+ New binder<small>${binderState.binders.length ? "Another set, Pokémon or theme" : "One for a set, a Pokémon, or anything you collect"}</small></span></span><span class="binder-fore"></span></span>`;
   add.onclick = openBinderForm;
   shelf.append(add);
   document.getElementById("openWish").onclick = () => { binderView = { kind:"wish" }; flipPage = 0; renderBinders(); };
@@ -3954,7 +4064,7 @@ function sleeveSlot(card, index, ctx){
   const price = pocketPrice(card);
   sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card) + (owned ? ", owned" : ", wanted") + (price ? ", " + price : "") + dropNote)}"></button>${dropBadgeMarkup(drop)}`;
   const hit = sleeve.querySelector(".cardhit");
-  paintArt(hit, card, { lazy:true, cors:true });
+  paintArt(hit, card, { large:true, missing:binderMissingArt });
   const glare = document.createElement("span");
   glare.className = "glare";
   glare.setAttribute("aria-hidden", "true");
@@ -4107,8 +4217,23 @@ function renderCollection(root){
   leafL.className = "leaf left turn-prev";
   const leafR = document.createElement("section");
   leafR.className = "leaf right turn-next";
+  /* After a turn lands, the pages it uncovered are already built and their
+     images decoded, so the new spread takes them over instead of rebuilding. */
+  const faceKey = (wishMode ? "wish" : binder.id) + ":" + list.length + ":" + total + ":" + (twoPage ? 2 : 1);
+  const handed = reuseFaces && reuseFaces.key === faceKey ? reuseFaces.faces : null;
+  reuseFaces = null;
+  const adoptFace = sheet => {
+    const face = handed && handed[sheet];
+    if (!face) return null;
+    delete handed[sheet];
+    face.classList.remove("back", "front", "page-left", "page-right", "blank");
+    face.style.removeProperty("transform");
+    face.inert = false;
+    face.removeAttribute("aria-hidden");
+    return face;
+  };
   const put = (leaf, sheet, side, spark) => {
-    const face = buildFace(sheet, ctx, spark);
+    const face = adoptFace(sheet) || buildFace(sheet, ctx, spark);
     face.classList.add("front", "page-" + side);
     const back = document.createElement("div");
     back.className = "face back";
@@ -4194,152 +4319,234 @@ function renderCollection(root){
   const droppedN = wishMode ? droppedCount(list) : 0;
   const dropBit = droppedN ? " · " + droppedN + " dropped" : "";
   foot.textContent = (wishMode ? "Wishlist · " : "") + sheetLabel(flipPage, twoPage) + " · " + list.length + (list.length === 1 ? " card" : " cards") + ownBit + dropBit + " · " + (val ? priceText(val, "USD") : "—");
-  stage.append(book, nav, foot);
-  root.append(tools, stage);
+  /* One control bar under the binder on a desktop; on a phone the bar
+     dissolves and the tools sit above the binder (see css/binder.css). */
+  const bar = document.createElement("div");
+  bar.className = "bookbar";
+  bar.append(tools, foot, nav);
+  stage.append(book, bar);
+  root.append(stage);
 
   const step = twoPage ? 2 : 1;
-  let flipToken = 0;
   const landed = dir => {
     const dest = Math.max(0, Math.min(total - 1, flipPage + dir * step));
     return twoPage ? dest - (dest % 2) : dest;
   };
-  const revealedFor = dir => dir > 0 ? (twoPage ? flipPage + 3 : flipPage + 1) : (twoPage ? flipPage - 2 : flipPage - 1);
-  const fillUnder = dir => {
-    const revealed = revealedFor(dir);
-    const under = book.querySelector(dir > 0 || !twoPage ? ".under.right" : ".under.left");
-    if (!under || under.dataset.sheet === String(revealed)) return;
-    under.replaceChildren(buildFace(revealed, ctx, false));
-    under.dataset.sheet = String(revealed);
+  const canTurn = dir => landed(dir) !== flipPage;
+  const kindFor = dir => twoPage ? (dir > 0 ? "forward" : "backward") : (dir > 0 ? "solo-forward" : "solo-backward");
+  const leafFor = dir => book.querySelector(twoPage ? (dir > 0 ? ".leaf.right" : ".leaf.left") : ".leaf.right");
+  /* Pages built ahead of a turn sit hidden under or behind the visible ones;
+     they stay out of the tab order and away from screen readers. */
+  const sideFace = (sheet, side, extra) => {
+    const face = buildFace(sheet, ctx, false);
+    face.classList.add("page-" + side);
+    if (extra) face.classList.add(extra);
+    face.inert = true;
+    face.setAttribute("aria-hidden", "true");
+    return face;
   };
-  const showTurn = (turning, turn) => {
-    if (!turning) return;
-    turning.style.setProperty("--turn", String(turn));
-    if (turning._curl) turning._curl.render(turn, turning._grab == null ? 0.5 : turning._grab);
+  const blankBack = side => {
+    const face = document.createElement("div");
+    face.className = "face back blank page-" + side;
+    face.setAttribute("aria-hidden", "true");
+    return face;
   };
-  const dropCurl = () => {
-    book.querySelectorAll(".leaf").forEach(node => {
-      if (node._curl) { node._curl.destroy(); node._curl = null; }
-    });
-    book.querySelectorAll(".curl-view, .curl-cast").forEach(node => node.remove());
-    if (book.dataset.curling) delete book.dataset.curling;
+  const setUnder = (side, face, sheet) => {
+    const under = book.querySelector(".under." + side);
+    if (!under) return;
+    under.replaceChildren(face);
+    under.dataset.sheet = String(sheet);
   };
-  let cancelSpring = null;
-  const springTurn = (turning, from, to, token, done) => {
-    if (cancelSpring) cancelSpring();
-    let x = from, v = 0, last = performance.now(), alive = true, raf = 0;
-    const stiff = to > from ? 150 : 210;
-    const damp = to > from ? 14 : 18;
-    const step = now => {
-      if (!alive || token !== flipToken || !turning.isConnected) return;
-      const dt = Math.min(0.034, (now - last) / 1000);
-      last = now;
-      v += (to - x) * stiff * dt;
-      v *= Math.exp(-damp * dt);
-      x += v * dt;
-      showTurn(turning, Math.max(-0.02, Math.min(1.06, x)));
-      if (Math.abs(to - x) < 0.01 && Math.abs(v) < 0.06) { showTurn(turning, to); done(); return; }
-      raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    cancelSpring = () => { alive = false; cancelAnimationFrame(raf); };
-  };
-  const releaseFlight = () => {
-    flipToken++;
-    if (cancelSpring) cancelSpring();
-  };
-  const arm = (dir, grab) => {
-    const leaf = book.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right"));
-    if (!leaf) return null;
-    book.querySelectorAll(".leaf").forEach(node => {
-      if (node._curl) { node._curl.destroy(); node._curl = null; }
-      if (node !== leaf) {
-        node.classList.remove("hot", "forward", "backward", "live", "curling", "fallback");
-        node.style.removeProperty("--turn");
-        node._base = 0;
-      }
-    });
-    book.querySelectorAll(".curl-view, .curl-cast").forEach(node => node.remove());
-    fillUnder(dir);
-    leaf.classList.remove("forward", "backward", "curling", "fallback");
-    leaf.classList.add("hot", dir > 0 ? "forward" : "backward", "live");
-    leaf._grab = grab == null ? 0.5 : Math.max(0, Math.min(1, grab));
-    leaf._base = 0;
-    leaf.style.setProperty("--turn", "0");
-    book.dataset.curling = "1";
-    let curl = null;
-    if (!reduceMotion() && window.BinderCurl) {
-      try { curl = BinderCurl.start({ book: book, leaf: leaf, dir: dir, grab: leaf._grab }); }
-      catch (err) { curl = null; }
+  /* Lay out what the turning sheet carries on its back and what it uncovers,
+     the way a real binder sheet holds a page on each side. */
+  const prepareTurn = (kind, leaf) => {
+    const saved = {};
+    const back = leaf.querySelector(":scope > .face.back");
+    if (kind === "forward") {
+      if (back) back.replaceWith(sideFace(flipPage + 2, "left", "back"));
+      setUnder("right", sideFace(flipPage + 3, "right"), flipPage + 3);
+    } else if (kind === "backward") {
+      if (back) back.replaceWith(sideFace(flipPage - 1, "right", "back"));
+      setUnder("left", sideFace(flipPage - 2, "left"), flipPage - 2);
+    } else if (kind === "solo-forward") {
+      if (back) back.replaceWith(blankBack("left"));
+      setUnder("right", sideFace(flipPage + 1, "right"), flipPage + 1);
+    } else {
+      /* One page on screen: the previous page swings in from the spine and
+         lands on top of the current one. */
+      const front = leaf.querySelector(":scope > .face.front");
+      saved.front = front;
+      setUnder("right", sideFace(flipPage, "right"), flipPage);
+      const incoming = sideFace(flipPage - 1, "right", "front");
+      if (front) front.replaceWith(incoming);
+      else leaf.prepend(incoming);
+      if (back) back.replaceWith(blankBack("left"));
     }
-    if (curl) { leaf._curl = curl; leaf.classList.add("curling"); curl.render(0, leaf._grab); }
-    else leaf.classList.add("fallback");
-    return leaf;
+    return saved;
   };
-  const adoptCurl = (dir, grab) => {
-    releaseFlight();
-    const host = book.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right"));
-    const dirClass = dir > 0 ? "forward" : "backward";
-    const reusable = host && host.classList.contains("hot") && host.classList.contains(dirClass) && (host._curl || host.classList.contains("fallback"));
-    const extras = book.querySelectorAll(".curl-view").length > (host && host._curl ? 1 : 0);
-    if (reusable && !extras) {
-      book.querySelectorAll(".leaf").forEach(node => {
-        if (node === host) return;
-        if (node._curl) { node._curl.destroy(); node._curl = null; }
-        node.classList.remove("hot", "forward", "backward", "live", "curling", "fallback");
-        node.style.removeProperty("--turn");
-        node._base = 0;
+  let turn = null;
+  let prepared = {};
+  const endTurn = (t, restore) => {
+    if (!t) return;
+    t.ctl.destroy();
+    t.leaf.classList.remove("hot");
+    if (restore && t.saved.front) {
+      const shown = t.leaf.querySelector(":scope > .face.front");
+      if (shown) shown.replaceWith(t.saved.front);
+    }
+    if (t.timer) clearTimeout(t.timer);
+    if (turn === t) {
+      turn = null;
+      delete book.dataset.curling;
+    }
+    if (restore) {
+      prepared = {};
+      prebuild();
+    }
+  };
+  /* Build the hidden pages a turn will need while the binder sits idle, so
+     grabbing a sheet costs nothing. */
+  const prebuild = () => {
+    const run = () => {
+      if (turn || !book.isConnected) return;
+      const kinds = twoPage ? [1, -1] : [1];
+      kinds.forEach(dir => {
+        const kind = kindFor(dir);
+        if (prepared[kind] || !canTurn(dir)) return;
+        const leaf = leafFor(dir);
+        if (leaf) prepared[kind] = prepareTurn(kind, leaf);
       });
-      host.classList.add("hot", dirClass, "live");
-      host._grab = grab == null ? 0.5 : Math.max(0, Math.min(1, grab));
-      host._base = Number(host.style.getPropertyValue("--turn")) || 0;
-      book.dataset.curling = "1";
-      if (host._curl) host._curl.render(host._base, host._grab);
-      return host;
+    };
+    if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 900 });
+    else setTimeout(run, 200);
+  };
+  const startTurn = dir => {
+    if (!canTurn(dir) || !window.BinderTurn) return null;
+    if (turn) {
+      if (turn.dir === dir) return turn;
+      return null;
     }
-    const base = reusable ? (Number(host.style.getPropertyValue("--turn")) || 0) : 0;
-    const leaf = arm(dir, grab);
-    if (leaf && base) {
-      leaf._base = base;
-      showTurn(leaf, base);
-    }
-    return leaf;
+    const leaf = leafFor(dir);
+    if (!leaf) return null;
+    const kind = kindFor(dir);
+    const saved = prepared[kind] || prepareTurn(kind, leaf);
+    prepared = {};
+    leaf.classList.add("hot");
+    book.dataset.curling = "1";
+    book.querySelectorAll(".sleeve.tilting").forEach(node => node.classList.remove("tilting"));
+    const ctl = BinderTurn.arm({ spread, leaf, kind, reduce: reduceMotion() });
+    turn = { ctl, dir, leaf, saved, kind, timer: 0 };
+    return turn;
   };
   const noteFlip = () => { if (!wishMode) countEvent("page-flip"); };
+  const commitTurn = t => {
+    const dest = landed(t.dir);
+    const faces = {};
+    const take = (node, sheet) => { if (node && node.classList.contains("face")) faces[sheet] = node; };
+    const back = t.leaf.querySelector(":scope > .face.back");
+    const underFace = side => { const u = book.querySelector(".under." + side); return u ? u.querySelector(":scope > .face") : null; };
+    if (t.kind === "forward") { take(back, flipPage + 2); take(underFace("right"), flipPage + 3); }
+    else if (t.kind === "backward") { take(back, flipPage - 1); take(underFace("left"), flipPage - 2); }
+    else if (t.kind === "solo-forward") take(underFace("right"), flipPage + 1);
+    else take(t.leaf.querySelector(":scope > .face.front"), flipPage - 1);
+    endTurn(t, false);
+    Object.values(faces).forEach(face => face.remove());
+    reuseFaces = { key: faceKey, faces };
+    flipPage = dest;
+    renderBinders();
+  };
+  const settleTurn = (t, to, speed) => {
+    if (t.timer) clearTimeout(t.timer);
+    const going = to >= 90;
+    if (going) {
+      noteFlip();
+      playPaper();
+      if (settings.haptics) haptic(8);
+    }
+    /* A hidden tab pauses animation frames; never leave a sheet mid-air. */
+    t.timer = setTimeout(() => {
+      if (turn !== t) return;
+      if (going) commitTurn(t);
+      else endTurn(t, true);
+    }, 2400);
+    t.ctl.settle(going ? 180 : 0, speed).then(done => {
+      if (done === null || turn !== t) return;
+      if (done) commitTurn(t);
+      else endTurn(t, true);
+    });
+  };
   const goSheet = dest => {
     const next = twoPage ? Math.max(0, dest - (dest % 2)) : dest;
     if (next === flipPage || next < 0 || next >= total) return;
+    if (turn) endTurn(turn, true);
     noteFlip();
     flipPage = next;
     renderBinders();
   };
-  const finishFlip = (dir, grab) => {
+  const finishFlip = dir => {
     const dest = landed(dir);
     if (dest === flipPage) return;
-    noteFlip();
-    playPaper();
-    if (settings.haptics) haptic(8);
     if (reduceMotion()) {
-      dropCurl(book.querySelector(".leaf.hot"));
+      if (turn) endTurn(turn, true);
+      noteFlip();
+      playPaper();
       flipPage = dest;
       renderBinders();
       return;
     }
-    const token = ++flipToken;
-    let turning = book.querySelector(".leaf.hot");
-    if (!turning) turning = arm(dir, grab == null ? 0.5 : grab);
-    if (!turning) { flipPage = dest; renderBinders(); return; }
-    const from = Number(turning.style.getPropertyValue("--turn")) || 0;
-    let went = false;
-    const go = () => {
-      if (went || token !== flipToken) return;
-      went = true;
-      if (cancelSpring) cancelSpring();
-      dropCurl(turning);
+    const t = startTurn(dir);
+    if (!t) {
+      if (turn) return;
+      noteFlip();
       flipPage = dest;
       renderBinders();
-    };
-    springTurn(turning, from, 1, token, go);
-    setTimeout(go, 980);
+      return;
+    }
+    settleTurn(t, 180, 520);
+  };
+  /* Dragging a sheet: the grabbed point of the page stays under the finger,
+     and the sheet's weight shows as a little lag behind it. */
+  let drag = null;
+  const beginDrag = (dir, x) => {
+    const t = startTurn(dir);
+    if (!t) return false;
+    const r = t.leaf.getBoundingClientRect();
+    let reach;
+    if (!twoPage) reach = r.width * 0.95;
+    else {
+      const hinge = dir > 0 ? r.left : r.right;
+      reach = 2 * Math.max(r.width * 0.35, Math.min(r.width, Math.abs(x - hinge)));
+    }
+    drag = { t, reach, base: BinderTurn.travelFor(t.ctl.theta, reach), sx: x, samples: [] };
+    return true;
+  };
+  const dragTo = x => {
+    if (!drag) return;
+    const raw = x - drag.sx;
+    const travel = drag.base + (drag.t.dir > 0 ? -raw : raw);
+    const th = BinderTurn.dragAngle(travel, drag.reach);
+    drag.t.ctl.follow(th);
+    const now = performance.now();
+    drag.samples.push({ at: now, th });
+    while (drag.samples.length > 2 && now - drag.samples[0].at > 110) drag.samples.shift();
+  };
+  const releaseDrag = (cancelled, tap) => {
+    const d = drag;
+    drag = null;
+    if (!d || turn !== d.t) return;
+    /* Speed comes from the last ~100ms of real movement; a lone jump of the
+       pointer is not a flick. */
+    let speed = 0;
+    const s = d.samples;
+    const now = performance.now();
+    if (s.length > 2) {
+      const a = s[0], b = s[s.length - 1];
+      if (now - b.at < 90 && b.at - a.at >= 24) speed = (b.th - a.th) / (b.at - a.at) * 1000;
+    }
+    /* A flick carries the sheet: judge where it would coast to. */
+    const coast = d.t.ctl.target + speed * 0.16;
+    const go = !cancelled && canTurn(d.t.dir) && (tap || coast > 90);
+    settleTurn(d.t, go ? 180 : 0, speed);
   };
   prevBtn.onclick = () => finishFlip(-1);
   nextBtn.onclick = () => finishFlip(1);
@@ -4356,7 +4563,7 @@ function renderCollection(root){
     if (Math.abs(dest - flipPage) === step) finishFlip(dest > flipPage ? 1 : -1);
     else goSheet(dest);
   };
-  let mode = "", pid = null, sx = 0, sy = 0, timer = 0, ghost = null, dragIndex = -1, leaf = null, fromPointer = false, pressBtn = null, peak = 0;
+  let mode = "", pid = null, sx = 0, sy = 0, timer = 0, ghost = null, dragIndex = -1, fromPointer = false, pressBtn = null, peak = 0;
   const clearTimer = () => { if (timer) { clearTimeout(timer); timer = 0; } };
   const endGhost = () => { if (ghost) { ghost.remove(); ghost = null; } book.querySelectorAll(".sleeve").forEach(s => { s.style.opacity = ""; }); };
   const onMove = e => {
@@ -4364,15 +4571,8 @@ function renderCollection(root){
     const dx = e.clientX - sx, dy = e.clientY - sy;
     peak = Math.max(peak, Math.hypot(dx, dy));
     if (pressBtn && pressBtn._press) pressBtn._press.d = Math.max(pressBtn._press.d || 0, Math.hypot(dx, dy));
-    const turnedFrom = node => {
-      const width = Math.max(120, (node && node.clientWidth) || 200);
-      const backward = node && node.classList.contains("backward");
-      const delta = backward ? dx / width : -dx / width;
-      const base = (node && node._base) || 0;
-      return Math.max(0, Math.min(1, base + delta));
-    };
     if (mode === "curl") {
-      showTurn(leaf, turnedFrom(leaf));
+      dragTo(e.clientX);
       return;
     }
     if (mode === "card") {
@@ -4383,33 +4583,18 @@ function renderCollection(root){
     }
     if (!mode && Math.hypot(dx, dy) > 10) {
       clearTimer();
+      book.querySelectorAll(".sleeve.sunk").forEach(s => s.classList.remove("sunk"));
       if (Math.abs(dx) > Math.abs(dy) && !pressBtn) {
         const dir = dx < 0 ? 1 : -1;
-        if (landed(dir) !== flipPage) {
-          const host = book.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right")) || book;
-          const rect = host.getBoundingClientRect();
-          leaf = adoptCurl(dir, (sy - rect.top) / Math.max(1, rect.height));
-          if (leaf) {
-            mode = "curl";
-            showTurn(leaf, turnedFrom(leaf));
-            return;
-          }
+        if (canTurn(dir) && beginDrag(dir, sx)) {
+          mode = "curl";
+          dragTo(e.clientX);
+          return;
         }
       }
       if (Math.abs(dx) > Math.abs(dy)) mode = dx < 0 ? "swipe-next" : "swipe-prev";
       else mode = "scroll";
     }
-  };
-  const snapCurl = turning => {
-    if (!turning) return;
-    const token = ++flipToken;
-    const from = Number(turning.style.getPropertyValue("--turn")) || 0;
-    springTurn(turning, from, 0, token, () => {
-      if (token !== flipToken || !turning.isConnected) return;
-      dropCurl(turning);
-      turning.classList.remove("hot", "forward", "backward", "live", "curling", "fallback");
-      turning.style.removeProperty("--turn");
-    });
   };
   const onUp = e => {
     if (e.pointerId !== pid) return;
@@ -4419,18 +4604,9 @@ function renderCollection(root){
     window.removeEventListener("pointercancel", onUp);
     clearTimer();
     const dx = cancelled ? 0 : e.clientX - sx, dy = cancelled ? 0 : e.clientY - sy;
-    if (mode === "curl" && leaf) {
-      const turning = leaf;
-      if (cancelled) snapCurl(turning);
-      else {
-        fromPointer = true;
-        const turn = Number(turning.style.getPropertyValue("--turn")) || 0;
-        const dir = turning.classList.contains("backward") ? -1 : 1;
-        turning.classList.remove("live");
-        const tap = peak < 8;
-        if ((turn > 0.5 || tap) && landed(dir) !== flipPage) finishFlip(dir);
-        else snapCurl(turning);
-      }
+    if (mode === "curl") {
+      fromPointer = true;
+      releaseDrag(cancelled, peak < 8);
     } else if (mode === "card") {
       if (pressBtn) suppressGotClickUntil = Date.now() + 500;
       endGhost();
@@ -4455,7 +4631,7 @@ function renderCollection(root){
       }
     } else if (!cancelled && mode === "swipe-next" && dx < -48) finishFlip(1);
     else if (!cancelled && mode === "swipe-prev" && dx > 48) finishFlip(-1);
-    else if (!cancelled && !mode && Math.hypot(dx, dy) < 8) {
+    else if (!cancelled && !mode && Math.hypot(dx, dy) < 8 && !turn) {
       const origin = e.target instanceof Element ? e.target : document.elementFromPoint(e.clientX, e.clientY);
       if (origin) {
         const hit = origin.closest(".sleeve[data-index] .cardhit, .sleeve[data-index]");
@@ -4464,52 +4640,12 @@ function renderCollection(root){
       }
     }
     book.querySelectorAll(".sleeve.sunk").forEach(s => s.classList.remove("sunk"));
-    mode = ""; pid = null; leaf = null; pressBtn = null;
+    mode = ""; pid = null; pressBtn = null;
   };
-  let zoomToken = 0;
   function liftCard(card){
     if (!card) return;
-    const open = () => { if (wide()) openProfile(card); else openShowcase(card); };
     const sleeve = book.querySelector('.sleeve[data-index="' + list.indexOf(card) + '"]');
-    if (reduceMotion() || !sleeve) { open(); return; }
-    const token = ++zoomToken;
-    document.querySelectorAll(".cardzoom").forEach(node => node.remove());
-    if (settings.haptics) haptic(8);
-    const art = sleeve.querySelector(".cardhit") || sleeve;
-    const rect = art.getBoundingClientRect();
-    const ratio = 63 / 88;
-    let w = rect.width;
-    let h = rect.height;
-    if (!(w > 8 && h > 8) || Math.abs(w / Math.max(h, 1) - ratio) > 0.08) {
-      w = Math.max(8, w || rect.width || 8);
-      h = w / ratio;
-    }
-    const fly = document.createElement("div");
-    fly.className = "cardzoom";
-    fly.setAttribute("aria-hidden", "true");
-    const img = art.querySelector("img") || sleeve.querySelector("img");
-    if (img) {
-      const clone = img.cloneNode(true);
-      clone.alt = "";
-      fly.append(clone);
-    }
-    fly.style.left = rect.left + "px";
-    fly.style.top = rect.top + "px";
-    fly.style.width = Math.max(1, w) + "px";
-    fly.style.height = Math.max(1, h) + "px";
-    document.body.append(fly);
-    const targetW = Math.min(280, window.innerWidth - 48);
-    const scale = targetW / Math.max(1, w);
-    const dx = (window.innerWidth / 2) - (rect.left + w / 2);
-    const dy = (window.innerHeight * 0.42) - (rect.top + h / 2);
-    sleeve.style.opacity = ".4";
-    requestAnimationFrame(() => { fly.style.transform = "translate(" + dx.toFixed(1) + "px," + dy.toFixed(1) + "px) scale(" + scale.toFixed(3) + ")"; });
-    setTimeout(() => {
-      if (token !== zoomToken) return;
-      fly.remove();
-      sleeve.style.opacity = "";
-      open();
-    }, 300);
+    openShowcase(card, sleeve ? sleeve.querySelector(".cardhit") : null);
   }
   function commit(){ if (binder) saveBinders(); else saveWish(); }
   function removeAt(index){
@@ -4552,12 +4688,9 @@ function renderCollection(root){
     if ((dog || sleeveHit) && !onGot && e.cancelable) e.preventDefault();
     if (dog) {
       const dir = dog.classList.contains("prev") ? -1 : 1;
-      if (landed(dir) === flipPage) return;
+      if (!canTurn(dir)) return;
+      if (!beginDrag(dir, e.clientX)) return;
       mode = "curl";
-      const host = book.querySelector(dir > 0 ? ".leaf.right" : (twoPage ? ".leaf.left" : ".leaf.right")) || book;
-      const rect = host.getBoundingClientRect();
-      const grab = (e.clientY - rect.top) / Math.max(1, rect.height);
-      leaf = adoptCurl(dir, grab);
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
       window.addEventListener("pointercancel", onUp);
@@ -4589,7 +4722,7 @@ function renderCollection(root){
   prevEar.addEventListener("click", () => { if (fromPointer) { fromPointer = false; return; } finishFlip(-1); });
   nextEar.addEventListener("click", () => { if (fromPointer) { fromPointer = false; return; } finishFlip(1); });
   book.addEventListener("pointermove", e => {
-    if (mode) return;
+    if (mode || turn) return;
     const sleeve = e.target.closest(".sleeve:not(.empty)");
     book.querySelectorAll(".sleeve.tilting").forEach(node => { if (node !== sleeve) node.classList.remove("tilting"); });
     if (!sleeve || reduceMotion() || e.pointerType === "touch") return;
@@ -4640,79 +4773,78 @@ function renderCollection(root){
       });
     };
   }
+  warmPages(list, flipPage, step, total);
+  prebuild();
   paintContext();
+}
+let reuseFaces = null;
+/* Fetch the art for the pages on either side, so a turn uncovers cards that
+   are already loaded. */
+const warmedArt = new Set();
+function warmPages(list, at, step, total){
+  const run = () => {
+    const sheets = [at + step, at + step + 1, at - 1, at - 2, at + step * 2, at + step * 2 + 1];
+    sheets.forEach(sheet => {
+      if (sheet < 0 || sheet >= total) return;
+      list.slice(sheet * 9, sheet * 9 + 9).forEach(card => {
+        const url = artUrls(card, true)[0];
+        if (!url || warmedArt.has(url)) return;
+        if (warmedArt.size > 600) warmedArt.clear();
+        warmedArt.add(url);
+        const img = new Image();
+        img.decoding = "async";
+        img.src = url;
+      });
+    });
+  };
+  if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 1200 });
+  else setTimeout(run, 250);
 }
 
 let showcaseCardRef = null;
-let showcaseDrag = false;
-function openShowcase(card){
+/* The back of an inspected card: the facts a collector checks, in plain words. */
+function inspectBack(card, sealed){
+  const price = pocketPrice(card);
+  const owned = ownedIds.has(card.id);
+  const rows = [
+    ["Set", card.set],
+    ["Number", card.number ? "#" + card.number : ""],
+    ["Rarity", card.rarity && card.rarity !== "—" ? card.rarity : ""],
+    ["Artist", card.artist],
+    ["Market", sealed ? "" : price],
+    ["Status", sealed ? "" : owned ? "Got it" : "Still hunting"]
+  ].filter(row => row[1]);
+  return `<div class="iback"><p class="iback-kicker">BinderHunt</p><h3 class="iback-name">${esc(card.name || "Card")}</h3><dl class="iback-rows">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>${sealed ? `<p class="iback-foot">The price stays sealed until you guess.</p>` : `<p class="iback-foot">Details has the price history.</p>`}</div>`;
+}
+/* Lift a card out of its pocket into the 3D inspect view. */
+function openShowcase(card, from, opts){
+  const sealed = !!(opts && opts.sealed);
   if (!card) return;
+  if (!window.CardInspect) { openProfile(card); return; }
+  const shown = from && from.querySelector("img");
+  const quick = shown && shown.complete && shown.naturalWidth ? (shown.currentSrc || shown.src) : "";
+  const ok = CardInspect.open({
+    from: from || null,
+    urls: artUrls(card, true),
+    quick,
+    alt: altText(card),
+    title: card.name || "Card",
+    holo: isHolo(card),
+    reduce: reduceMotion(),
+    missing: () => binderMissingArt(card),
+    backHtml: inspectBack(card, sealed),
+    onDetails: sealed ? null : () => openProfile(card),
+    onClose: () => { if (showcaseCardRef === card) showcaseCardRef = null; }
+  });
+  if (!ok) { openProfile(card); return; }
   showcaseCardRef = card;
-  const root = document.getElementById("showcase");
-  const frame = document.getElementById("showcaseCard");
-  if (!root || !frame) { openProfile(card); return; }
-  frame.replaceChildren();
-  frame.style.removeProperty("--tx");
-  frame.style.removeProperty("--ty");
-  frame.style.removeProperty("--sx");
-  frame.style.removeProperty("--sy");
-  paintArt(frame, card, { cors:true });
-  const glare = document.createElement("span");
-  glare.className = "glare";
-  glare.setAttribute("aria-hidden", "true");
-  frame.append(glare);
-  root.hidden = false;
   if (settings.haptics) haptic(8);
 }
 function closeShowcase(){
-  const root = document.getElementById("showcase");
-  if (root) root.hidden = true;
-  showcaseDrag = false;
-  showcaseCardRef = null;
+  if (window.CardInspect && CardInspect.isOpen()) CardInspect.close("return");
 }
-function bindShowcase(){
-  const root = document.getElementById("showcase");
-  const frame = document.getElementById("showcaseCard");
-  if (!root || !frame || root.dataset.bound) return;
-  root.dataset.bound = "1";
-  const tilt = e => {
-    const box = frame.getBoundingClientRect();
-    const px = (e.clientX - box.left) / Math.max(1, box.width);
-    const py = (e.clientY - box.top) / Math.max(1, box.height);
-    frame.style.setProperty("--tx", ((px - 0.5) * 32).toFixed(2) + "deg");
-    frame.style.setProperty("--ty", ((0.5 - py) * 22).toFixed(2) + "deg");
-    frame.style.setProperty("--sx", (px * 100).toFixed(0) + "%");
-    frame.style.setProperty("--sy", (py * 100).toFixed(0) + "%");
-  };
-  frame.addEventListener("pointerdown", e => {
-    if (e.button) return;
-    showcaseDrag = true;
-    try { frame.setPointerCapture(e.pointerId); } catch (err) {}
-    tilt(e);
-  });
-  frame.addEventListener("pointermove", e => { if (showcaseDrag) tilt(e); });
-  frame.addEventListener("pointerup", () => { showcaseDrag = false; });
-  frame.addEventListener("pointercancel", () => { showcaseDrag = false; });
-  root.addEventListener("pointerdown", e => {
-    if (e.target === root || e.target.id === "showcaseStage") closeShowcase();
-  });
-  document.getElementById("showcaseClose").onclick = () => closeShowcase();
-  document.getElementById("showcaseDetails").onclick = () => {
-    const card = showcaseCardRef;
-    closeShowcase();
-    if (card) openProfile(card);
-  };
-  window.addEventListener("deviceorientation", e => {
-    if (root.hidden || showcaseDrag) return;
-    if (typeof e.gamma !== "number" || typeof e.beta !== "number") return;
-    const tx = Math.max(-18, Math.min(18, e.gamma * 0.35));
-    const ty = Math.max(-14, Math.min(14, (e.beta - 40) * 0.22));
-    frame.style.setProperty("--tx", tx.toFixed(2) + "deg");
-    frame.style.setProperty("--ty", ty.toFixed(2) + "deg");
-    frame.style.setProperty("--sx", (50 + tx * 1.4).toFixed(0) + "%");
-    frame.style.setProperty("--sy", (42 + ty).toFixed(0) + "%");
-  });
-}
+/* Inspect input lives in js/card-inspect.js. */
+function bindShowcase(){}
 function openMenu(anchor, card, binder){
   menuCard = { card, binder };
   const menu = document.getElementById("menu");
@@ -5171,6 +5303,7 @@ function openProfile(card){
     hydrate(card).then(full => { if (profilePinned && profileCard && profileCard.id === card.id) renderProfile(full); }).catch(() => { if (profilePinned && profileCard && profileCard.id === card.id) renderProfile(card); });
   }
   profilePinned = true;
+  syncReadingWide();
   pinnedTopId = (currentTop() && currentTop().id) || "";
   summaryId = "";
   profileCard = card;
@@ -5247,13 +5380,19 @@ function renderProfile(card){
   const inBinder = binder && binder.cards.some(c => c.id === card.id);
   profileEl.innerHTML = `<div class="profile-scroll">
     <div class="phead">
-      <div class="thumb" id="profileThumb"></div>
+      <button class="thumb" id="profileThumb" type="button" aria-label="Look at ${esc(card.name || "this card")} up close"></button>
       <div style="min-width:0;flex:1"><h2 class="pname" id="profileTitle">${esc(card.name || "Card")}</h2><p class="fine">${esc([card.set, card.number ? "#" + card.number : ""].filter(Boolean).join(" · "))}</p></div>
       <button class="iconbtn" id="closeProfile" type="button" aria-label="Close profile">✕</button>
     </div>
     ${banner ? `<p class="note">${esc(banner)}</p>` : ""}
     ${marketBlock(card, variant, shown, delta)}
     ${variants.length > 1 ? `<div class="vtoggle" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${variants.map(v => `<button type="button" data-variant="${esc(v.key)}" aria-pressed="${variant && variant.key === v.key ? "true" : "false"}">${esc(v.label)}</button>`).join("")}</div>` : ""}
+    <div class="ownrow mine">
+      <button class="chip ownchip" id="profileOwn" type="button" aria-pressed="${owned ? "true" : "false"}" aria-label="${esc(ownAria)}">${esc(ownLabel)}</button>
+      <button class="chip wishchip" id="profileWish" type="button" aria-pressed="${onWish ? "true" : "false"}">${onWish ? "♥ On wishlist" : "♡ Add to wishlist"}</button>
+      ${binder ? `<button class="chip" id="profileBinder" type="button">${inBinder ? "In " + esc(binder.name) : "Add to " + esc(binder.name)}</button>` : ""}
+      <p class="fine">${owned ? "You have it. Every binder shows it as owned." : "Tap Got it! once it's in your hands. Every binder updates."}</p>
+    </div>
     ${!gradedReady ? `<p class="fine">Checking graded prices…</p>` : gradedKnown ? `<div class="grade-grid">${GRADES.map(([company, grade]) => gradeCell(facts, company, grade)).join("")}</div>` : `<p class="note">No graded sales yet</p>${priceQueued ? `<p class="fine">Queued for the next price batch.</p>` : ""}`}
     <div class="chart-wrap">
       <div class="rangebar"><div class="ranges">${["1M","3M","1Y","All"].map(r => `<button type="button" data-range="${r}" aria-pressed="${chartRange === r ? "true" : "false"}">${r}</button>`).join("")}</div>
@@ -5262,14 +5401,7 @@ function renderProfile(card){
       ${svg || `<p class="empty-state">${series.pendingFx ? "Checking the dollar rate…" : "Not enough price history"}</p>`}
       <p class="scrub" id="scrub">${guide ? esc(guide.label) + " latest cached " + esc(priceText(guide.value, "USD")) + ". The dashed line is that price, not a daily history." : esc(series.note || "")}</p>
     </div>
-    <div class="ownrow">
-      <button class="chip ownchip" id="profileOwn" type="button" aria-pressed="${owned ? "true" : "false"}" aria-label="${esc(ownAria)}">${esc(ownLabel)}</button>
-      <p class="fine">${owned ? "Owned. The same mark shows in every binder." : "Wanted. Got it fills this card in every binder."}</p>
-    </div>
-    <div class="links">${buyLinks(card).map(l => `<a class="buy-btn" href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join("")}
-      <button class="chip" id="profileWish" type="button">${onWish ? "On wishlist" : "★ Add to wishlist"}</button>
-      ${binder ? `<button class="chip" id="profileBinder" type="button">${inBinder ? "In " + esc(binder.name) : "Add to " + esc(binder.name)}</button>` : ""}
-    </div>
+    <div class="shoplinks"><p class="eyebrow">Check prices on</p><div class="links">${buyLinks(card).map(l => `<a class="buy-btn" href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label.replace(/^View on /, ""))} ↗</a>`).join("")}</div></div>
     <h2>Details</h2>
     <div class="facts">
       ${fact("Artist", card.artist)}
@@ -5284,7 +5416,8 @@ function renderProfile(card){
     <button class="chip" id="copyLink" type="button">Copy link</button>
   </div>`;
   const thumb = document.getElementById("profileThumb");
-  paintArt(thumb, card);
+  paintArt(thumb, card, { large:true });
+  thumb.onclick = () => openShowcase(card, thumb);
   document.getElementById("closeProfile").onclick = closeProfile;
   profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => { variantChoice.set(card.id, btn.dataset.variant); renderProfile(card); paintCaption(); refreshPocketPrice(card); });
   profileEl.querySelectorAll("[data-range]").forEach(btn => btn.onclick = () => { chartRange = btn.dataset.range; renderProfile(card); });

@@ -1,6 +1,8 @@
-// Showcase binder: drag past halfway turns the page, an early release snaps
-// back, arrow keys turn pages, empty pockets stay in the grid, and a card
-// can live in more than one binder without leaving the wishlist.
+// Binder: a dragged sheet turns once its edge crosses the spine, an early
+// release settles back, arrow keys turn pages, empty pockets stay in the
+// grid, cards inspect in 3D, card art never asks for CORS and falls back
+// through every URL, and a card can live in more than one binder without
+// leaving the wishlist.
 // Run: npx -y node@22 scripts/test_binder.mjs
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -161,7 +163,7 @@ await sleep(80);
 
 const opened = await ev(`(() => {
   const book = document.querySelector(".book");
-  const sleeves = [...document.querySelectorAll("#bindersScroll .sleeve")];
+  const sleeves = [...document.querySelectorAll("#bindersScroll .leaf > .face.front .sleeve")];
   const filled = sleeves.filter(el => !el.classList.contains("empty"));
   const empty = sleeves.filter(el => el.classList.contains("empty"));
   const pill = document.querySelector(".price-pill");
@@ -172,7 +174,7 @@ const opened = await ev(`(() => {
     empty: empty.length,
     holo: !!(filled[0] && filled[0].classList.contains("wanted") && filled[0].classList.contains("holo")),
     pill: pill ? pill.textContent : "",
-    pages: document.querySelectorAll(".page-num").length
+    pages: document.querySelectorAll(".leaf > .face.front .page-num").length
   };
 })()`);
 note(opened.layout === "solo" && opened.flip === "0", "phone shows one page", JSON.stringify(opened));
@@ -185,7 +187,7 @@ await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Tab", code: "T
 await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
 const controls = await ev(`(() => {
   const ears = [...document.querySelectorAll("#pagePrev, #pageCorner")];
-  const buttons = [...document.querySelectorAll("#bindersScroll .gotbtn, #bindersScroll .iconish.more")];
+  const buttons = [...document.querySelectorAll("#bindersScroll .leaf > .face.front .gotbtn, #bindersScroll .leaf > .face.front .iconish.more")];
   const overlap = (a, b) => a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
   let hits = 0;
   buttons.forEach(btn => {
@@ -262,64 +264,231 @@ const printing = await ev(`(() => {
 note(printing.clicked && printing.before.pill === "$420.50" && /↓/.test(printing.before.badge), "the pocket starts on the cheapest printing", JSON.stringify(printing.before));
 note(printing.after.profile === "$4,400.00" && printing.after.pill === "$4.4K" && !printing.after.badge, "switching printings updates the pill and the drop badge", JSON.stringify(printing.after));
 
-async function drag(fraction) {
+const turnLeaf = `(document.querySelector(".leaf.hot") || document.querySelector(".leaf.right"))`;
+async function waitIdle(ms = 2600) {
   return ev(`(async () => {
-    const ear = document.querySelector("#pageCorner");
-    const leaf = document.querySelector(".leaf.right") || document.querySelector(".leaf");
-    if (!ear || !leaf) return { error: "missing edge" };
+    const start = Date.now();
+    while (Date.now() - start < ${ms}) {
+      const book = document.querySelector(".book");
+      if (book && !book.dataset.curling && !document.querySelector(".leaf.hot")) return true;
+      await new Promise(r => setTimeout(r, 40));
+    }
+    return false;
+  })()`);
+}
+// Grab the page edge strip, pull it across by a share of the page width and
+// let go. Returns the turn seen mid-drag and the page that ends up open.
+async function drag(fraction, opts = {}) {
+  const out = await ev(`(async () => {
+    const ear = document.querySelector(${opts.back ? '"#pagePrev"' : '"#pageCorner"'});
+    const page = document.querySelector(".leaf.right") || document.querySelector(".leaf");
+    if (!ear || !page) return { error: "missing edge" };
     const edge = ear.getBoundingClientRect();
-    const box = leaf.getBoundingClientRect();
+    const width = page.getBoundingClientRect().width;
     const x = edge.left + edge.width / 2;
-    const y = edge.top + Math.min(edge.height - 4, Math.max(4, edge.height * 0.5));
-    const pid = 11;
-    const opts = (type, cx, buttons) => ({ bubbles: true, cancelable: true, pointerId: pid, pointerType: "touch", clientX: cx, clientY: y, button: 0, buttons, isPrimary: true });
-    ear.dispatchEvent(new PointerEvent("pointerdown", opts("pointerdown", x, 1)));
-    const dest = x - box.width * ${fraction};
-    window.dispatchEvent(new PointerEvent("pointermove", opts("pointermove", dest, 1)));
+    const y = edge.top + edge.height * 0.5;
+    const pid = ${opts.pid || 11};
+    const opts = (cx, buttons) => ({ bubbles: true, cancelable: true, pointerId: pid, pointerType: "touch", clientX: cx, clientY: y, button: 0, buttons, isPrimary: true });
+    ear.dispatchEvent(new PointerEvent("pointerdown", opts(x, 1)));
+    const dest = x ${opts.back ? "+" : "-"} width * ${fraction};
+    window.dispatchEvent(new PointerEvent("pointermove", opts(dest, 1)));
+    const leaf = document.querySelector(".leaf.hot");
     const mid = {
-      hot: !!document.querySelector(".leaf.hot"),
-      curl: !!document.querySelector(".curl-view, .leaf.hot.fallback"),
-      turn: leaf.style.getPropertyValue("--turn"),
+      hot: document.querySelectorAll(".leaf.hot").length,
+      turning: !!(leaf && leaf.classList.contains("turning")),
+      turn: leaf ? Number(leaf.dataset.turn) : 0,
+      casts: document.querySelectorAll(".turn-cast").length,
       flip: document.querySelector(".book").dataset.flip
     };
-    window.dispatchEvent(new PointerEvent("pointerup", opts("pointerup", dest, 0)));
-    const start = Date.now();
-    let flip = document.querySelector(".book").dataset.flip;
-    while (Date.now() - start < 1600) {
-      await new Promise(r => setTimeout(r, 40));
-      const book = document.querySelector(".book");
-      if (!book) break;
-      flip = book.dataset.flip;
-      if (!book.dataset.curling && !document.querySelector(".leaf.hot")) break;
-    }
-    const book = document.querySelector(".book");
-    return { mid, flip: book ? book.dataset.flip : flip, curling: book ? book.dataset.curling || "" : "gone" };
+    ${opts.hold ? `await new Promise(r => setTimeout(r, ${opts.hold}));` : ""}
+    window.dispatchEvent(new PointerEvent("pointerup", opts(dest, 0)));
+    return { mid };
   })()`);
+  await waitIdle();
+  out.flip = await ev(`document.querySelector(".book").dataset.flip`);
+  out.left = await ev(`({ hot: document.querySelectorAll(".leaf.hot").length, casts: document.querySelectorAll(".turn-cast").length, shades: document.querySelectorAll(".turn-shade").length, curling: document.querySelector(".book").dataset.curling || "" })`);
+  return out;
 }
 
 const snapped = await drag(0.22);
-note(snapped.mid && snapped.mid.hot && Number(snapped.mid.turn) > 0.15 && Number(snapped.mid.turn) < 0.5, "early drag curls without committing", JSON.stringify(snapped));
-note(snapped.flip === "0" && !snapped.curling, "releasing before halfway snaps back", JSON.stringify(snapped));
+note(snapped.mid && snapped.mid.hot === 1 && snapped.mid.turning && snapped.mid.turn > 0.15 && snapped.mid.turn < 0.5, "an early drag lifts the sheet without committing", JSON.stringify(snapped));
+note(snapped.flip === "0" && !snapped.left.hot && !snapped.left.casts && !snapped.left.shades && !snapped.left.curling, "releasing before the spine settles back and cleans up", JSON.stringify(snapped));
 
 const turned = await drag(0.72);
-note(turned.mid && Number(turned.mid.turn) > 0.5, "a long drag passes halfway", JSON.stringify(turned));
-note(turned.flip === "1" && !turned.curling, "releasing past halfway completes the turn", JSON.stringify(turned));
+note(turned.mid && turned.mid.turn > 0.5, "a long drag carries the sheet past upright", JSON.stringify(turned));
+note(turned.flip === "1" && !turned.left.hot && !turned.left.casts, "releasing past upright completes the turn", JSON.stringify(turned));
+
+const back = await drag(0.72, { back: true, pid: 12 });
+note(back.flip === "0", "dragging from the left edge turns back a page on a phone", JSON.stringify(back));
+await ev(`flipPage = 1; renderBinders()`);
 
 await ev(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }))`);
-await ev(`(async () => { const start = Date.now(); while (Date.now() - start < 1600) { const book = document.querySelector(".book"); if (book && book.dataset.flip === "2" && !book.dataset.curling) return; await new Promise(r => setTimeout(r, 40)); } })()`);
+await waitIdle();
 const afterRight = await ev(`(() => {
   const book = document.querySelector(".book");
-  const empty = document.querySelectorAll("#bindersScroll .sleeve.empty").length;
-  const filled = [...document.querySelectorAll("#bindersScroll .sleeve")].filter(el => !el.classList.contains("empty")).length;
-  return { flip: book && book.dataset.flip, empty, filled };
+  const sleeves = [...document.querySelectorAll("#bindersScroll .leaf > .face.front .sleeve")];
+  const empty = sleeves.filter(el => el.classList.contains("empty"));
+  return {
+    flip: book && book.dataset.flip,
+    empty: empty.length,
+    filled: sleeves.length - empty.length,
+    emptyArt: empty.filter(el => el.querySelector("img, .cardback, .toad, .art-missing")).length,
+    emptyBg: empty.length ? getComputedStyle(empty[0]).backgroundColor : ""
+  };
 })()`);
 note(afterRight.flip === "2", "ArrowRight turns to the next page", JSON.stringify(afterRight));
 note(afterRight.empty === 8 && afterRight.filled === 1, "the last page keeps empty pockets", JSON.stringify(afterRight));
+note(afterRight.emptyArt === 0, "empty pockets are bare sleeves: no card face, no toad", JSON.stringify(afterRight));
 
 await ev(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }))`);
-await ev(`(async () => { const start = Date.now(); while (Date.now() - start < 1600) { const book = document.querySelector(".book"); if (book && book.dataset.flip === "1" && !book.dataset.curling) return; await new Promise(r => setTimeout(r, 40)); } })()`);
+await waitIdle();
 const afterLeft = await ev(`document.querySelector(".book").dataset.flip`);
 note(afterLeft === "1", "ArrowLeft turns back", afterLeft);
+
+// A quick flick turns the page even though the sheet never got upright.
+await ev(`flipPage = 0; renderBinders()`);
+const flick = await ev(`(async () => {
+  const ear = document.querySelector("#pageCorner");
+  const width = document.querySelector(".leaf.right").getBoundingClientRect().width;
+  const edge = ear.getBoundingClientRect();
+  const x = edge.left + edge.width / 2, y = edge.top + edge.height / 2, pid = 15;
+  const o = (cx, b) => ({ bubbles: true, cancelable: true, pointerId: pid, pointerType: "touch", clientX: cx, clientY: y, button: 0, buttons: b, isPrimary: true });
+  ear.dispatchEvent(new PointerEvent("pointerdown", o(x, 1)));
+  let cx = x;
+  for (let i = 0; i < 5; i++) { await new Promise(r => setTimeout(r, 16)); cx -= width * 0.045; window.dispatchEvent(new PointerEvent("pointermove", o(cx, 1))); }
+  const at = Number(document.querySelector(".leaf.hot").dataset.turn);
+  window.dispatchEvent(new PointerEvent("pointerup", o(cx, 0)));
+  return { at };
+})()`);
+await waitIdle();
+flick.flip = await ev(`document.querySelector(".book").dataset.flip`);
+note(flick.at < 0.5 && flick.flip === "1", "a quick flick turns the page", JSON.stringify(flick));
+
+// Grab the sheet while a button turn is still in the air, pull it home.
+await ev(`flipPage = 0; renderBinders()`);
+await ev(`document.querySelector("#pageNext").click()`);
+await sleep(60);
+const stolen = await ev(`(async () => {
+  const ear = document.querySelector("#pageCorner");
+  const leaf = document.querySelector(".leaf.hot");
+  const width = document.querySelector(".leaf.right").getBoundingClientRect().width;
+  const edge = ear.getBoundingClientRect();
+  const x = edge.left + edge.width / 2, y = edge.top + 8, pid = 22;
+  const opts = (cx, buttons) => ({ bubbles: true, cancelable: true, pointerId: pid, pointerType: "touch", clientX: cx, clientY: y, button: 0, buttons, isPrimary: true });
+  const flying = leaf ? Number(leaf.dataset.shown) : -1;
+  ear.dispatchEvent(new PointerEvent("pointerdown", opts(x, 1)));
+  window.dispatchEvent(new PointerEvent("pointermove", opts(x - width * 0.1, 1)));
+  const during = { flying, hot: document.querySelectorAll(".leaf.hot").length, casts: document.querySelectorAll(".turn-cast").length, same: document.querySelector(".leaf.hot") === leaf, flip: document.querySelector(".book").dataset.flip };
+  window.dispatchEvent(new PointerEvent("pointermove", opts(x + width * 1.5, 1)));
+  const released = Number((document.querySelector(".leaf.hot") || {}).dataset.turn);
+  window.dispatchEvent(new PointerEvent("pointerup", opts(x + width * 1.5, 0)));
+  return { during, released };
+})()`);
+await waitIdle();
+stolen.flip = await ev(`document.querySelector(".book").dataset.flip`);
+note(stolen.during.hot === 1 && stolen.during.same && stolen.during.casts === 1 && stolen.during.flip === "0", "grabbing a sheet mid-turn keeps one sheet in hand", JSON.stringify(stolen));
+note(stolen.released < 0.1 && stolen.flip === "0", "pulling it back before the spine cancels the turn", JSON.stringify(stolen));
+
+// Tap a card: it lifts into the 3D inspect view.
+await ev(`flipPage = 0; renderBinders()`);
+const inspect = await ev(`(async () => {
+  const hit = document.querySelector("#bindersScroll .sleeve[data-index='1'] .cardhit");
+  const r = hit.getBoundingClientRect();
+  const o = (t, b) => ({ bubbles: true, cancelable: true, pointerId: 31, pointerType: "touch", clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0, buttons: b, isPrimary: true });
+  hit.dispatchEvent(new PointerEvent("pointerdown", o("down", 1)));
+  window.dispatchEvent(new PointerEvent("pointerup", o("up", 0)));
+  await new Promise(r => setTimeout(r, 650));
+  const root = document.getElementById("showcase");
+  const card = document.getElementById("showcaseCard");
+  const open = { shown: !root.hidden, isOpen: CardInspect.isOpen(), title: document.getElementById("inspectTitle").textContent, sourceHidden: getComputedStyle(hit).visibility, width: Math.round(card.getBoundingClientRect().width) };
+  // Spin it with a flick.
+  const c = card.getBoundingClientRect();
+  const p = (x, b) => ({ bubbles: true, cancelable: true, pointerId: 32, pointerType: "touch", clientX: x, clientY: c.top + c.height / 2, button: 0, buttons: b, isPrimary: true });
+  card.dispatchEvent(new PointerEvent("pointerdown", p(c.left + 40, 1)));
+  for (let i = 1; i <= 6; i++) { await new Promise(r => setTimeout(r, 16)); root.dispatchEvent(new PointerEvent("pointermove", p(c.left + 40 + i * 30, 1))); }
+  const spun = CardInspect.peek().ry;
+  root.dispatchEvent(new PointerEvent("pointerup", p(c.left + 220, 0)));
+  await new Promise(r => setTimeout(r, 60));
+  const coasting = CardInspect.peek();
+  await new Promise(r => setTimeout(r, 2600));
+  const rest = CardInspect.peek();
+  // Flip, zoom, then close with Escape.
+  CardInspect.flip();
+  await new Promise(r => setTimeout(r, 1600));
+  const flipped = CardInspect.peek();
+  const backText = document.getElementById("inspectBack").textContent;
+  root.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -400, clientX: 200, clientY: 300 }));
+  await new Promise(r => setTimeout(r, 500));
+  const zoomed = CardInspect.peek().scale;
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await new Promise(r => setTimeout(r, 900));
+  return { open, spun, coasting, rest, flipped, backText, zoomed, closed: root.hidden, sourceBack: getComputedStyle(document.querySelector("#bindersScroll .sleeve[data-index='1'] .cardhit")).visibility };
+})()`);
+note(inspect.open.shown && inspect.open.isOpen && inspect.open.title === "Card 2" && inspect.open.sourceHidden === "hidden" && inspect.open.width > 250, "tapping a card lifts it into the inspect view", JSON.stringify(inspect.open));
+note(inspect.spun > 30 && inspect.coasting.mode === "spin", "a flick keeps the card spinning", JSON.stringify({ spun: inspect.spun, coasting: inspect.coasting }));
+note(inspect.rest.mode === "rest" && Math.abs(inspect.rest.rx) < 0.1 && Math.abs(inspect.rest.ry % 180) < 0.1, "the spin settles flat on a face", JSON.stringify(inspect.rest));
+note(inspect.flipped.back !== inspect.rest.back && /Base/.test(inspect.backText) && /Market/.test(inspect.backText), "Flip shows the back with the card's facts", JSON.stringify({ flipped: inspect.flipped, back: inspect.backText.slice(0, 80) }));
+note(inspect.zoomed > 1.2, "scrolling zooms in", String(inspect.zoomed));
+note(inspect.closed && inspect.sourceBack === "visible", "Escape puts the card back in its pocket", JSON.stringify(inspect));
+
+// A tap outside the card closes it too.
+const outside = await ev(`(async () => {
+  const card = binderState.binders.find(b => b.id === "jungle").cards[2];
+  openShowcase(card, document.querySelector("#bindersScroll .sleeve[data-index='2'] .cardhit"));
+  await new Promise(r => setTimeout(r, 600));
+  const root = document.getElementById("showcase");
+  const o = (b) => ({ bubbles: true, cancelable: true, pointerId: 41, pointerType: "touch", clientX: 6, clientY: 6, button: 0, buttons: b, isPrimary: true });
+  const stage = document.getElementById("showcaseStage");
+  stage.dispatchEvent(new PointerEvent("pointerdown", o(1)));
+  root.dispatchEvent(new PointerEvent("pointerup", o(0)));
+  await new Promise(r => setTimeout(r, 900));
+  return root.hidden;
+})()`);
+note(outside, "tapping outside the card closes the inspect view", String(outside));
+
+// Swipe down to dismiss.
+const swiped = await ev(`(async () => {
+  const card = binderState.binders.find(b => b.id === "jungle").cards[3];
+  openShowcase(card, document.querySelector("#bindersScroll .sleeve[data-index='3'] .cardhit"));
+  await new Promise(r => setTimeout(r, 600));
+  const root = document.getElementById("showcase");
+  const c = document.getElementById("showcaseCard").getBoundingClientRect();
+  const p = (y, b) => ({ bubbles: true, cancelable: true, pointerId: 42, pointerType: "touch", clientX: c.left + c.width / 2, clientY: y, button: 0, buttons: b, isPrimary: true });
+  document.getElementById("showcaseCard").dispatchEvent(new PointerEvent("pointerdown", p(c.top + 60, 1)));
+  for (let i = 1; i <= 8; i++) { await new Promise(r => setTimeout(r, 16)); root.dispatchEvent(new PointerEvent("pointermove", p(c.top + 60 + i * 24, 1))); }
+  root.dispatchEvent(new PointerEvent("pointerup", p(c.top + 60 + 8 * 24, 0)));
+  await new Promise(r => setTimeout(r, 900));
+  return root.hidden;
+})()`);
+note(swiped, "swiping the card down dismisses it", String(swiped));
+
+// Card art: no CORS request, every URL is tried, and a dead card gets the
+// dark binder blank, never the toad.
+const art = await ev(`(async () => {
+  const dead = { id: "art-dead", name: "Ghost Card", set: "Nowhere", setId: "x", number: "1", rarity: "Common", price: 2,
+    img: "https://images.pokemontcg.io/zz-missing/none_hires.png", thumb: "https://images.pokemontcg.io/zz-missing/none.png" };
+  const jungle = binderState.binders.find(b => b.id === "jungle");
+  jungle.cards.unshift(dead);
+  flipPage = 0;
+  renderBinders();
+  const img = document.querySelector("#bindersScroll .sleeve[data-index='0'] img");
+  const first = img ? img.getAttribute("src") : "";
+  const cors = img ? img.getAttribute("crossorigin") : "none";
+  const start = Date.now();
+  while (Date.now() - start < 8000 && !document.querySelector("#bindersScroll .sleeve[data-index='0'] .art-missing")) await new Promise(r => setTimeout(r, 50));
+  const out = {
+    first, cors,
+    missing: !!document.querySelector("#bindersScroll .sleeve[data-index='0'] .art-missing"),
+    toad: document.querySelectorAll("#bindersScroll .cardback, #bindersScroll .toad").length,
+    anyCors: [...document.querySelectorAll("#bindersScroll img")].some(i => i.hasAttribute("crossorigin"))
+  };
+  jungle.cards.shift();
+  renderBinders();
+  return out;
+})()`);
+note(art.first.endsWith("none_hires.png"), "the binder asks for the sharp image first", JSON.stringify(art));
+note(art.cors === null && !art.anyCors, "binder images never request CORS", JSON.stringify(art));
+note(art.missing && art.toad === 0, "a card with no reachable art shows a dark blank, not the toad", JSON.stringify(art));
 
 await cdp.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 await sleep(400);
@@ -327,15 +496,18 @@ await ev(`flipPage = 0; renderBinders(); new Promise(r => requestAnimationFrame(
 await sleep(80);
 const spread = await ev(`(() => {
   const book = document.querySelector(".book");
-  const faces = document.querySelectorAll(".book .face").length;
-  const filled = [...document.querySelectorAll("#bindersScroll .sleeve")].filter(el => !el.classList.contains("empty")).length;
-  return { layout: book && book.dataset.layout, flip: book && book.dataset.flip, faces, filled };
+  const box = book.getBoundingClientRect();
+  const card = document.querySelector("#bindersScroll .sleeve .cardhit").getBoundingClientRect();
+  const faces = document.querySelectorAll(".book .leaf > .face.front").length;
+  const filled = [...document.querySelectorAll("#bindersScroll .leaf > .face.front .sleeve")].filter(el => !el.classList.contains("empty")).length;
+  return { layout: book && book.dataset.layout, flip: book && book.dataset.flip, faces, filled, w: Math.round(box.width), h: Math.round(box.height), cardH: Math.round(card.height), wide: document.getElementById("shell").classList.contains("reading-wide"), side: getComputedStyle(document.getElementById("profile")).display };
 })()`);
 note(spread.layout === "spread" && spread.faces >= 2 && spread.filled === 18, "desktop shows a two-page spread", JSON.stringify(spread));
+note(spread.wide && spread.side === "none" && spread.w >= 1000 && spread.h >= 680 && spread.cardH >= 190, "the open binder fills a 1440x900 screen", JSON.stringify(spread));
 
 const deskControls = await ev(`(() => {
   const ears = [...document.querySelectorAll("#pagePrev, #pageCorner")];
-  const buttons = [...document.querySelectorAll("#bindersScroll .gotbtn, #bindersScroll .iconish.more")];
+  const buttons = [...document.querySelectorAll("#bindersScroll .leaf > .face.front .gotbtn, #bindersScroll .leaf > .face.front .iconish.more")];
   const overlap = (a, b) => a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
   let hits = 0;
   let aimed = 0;
@@ -355,8 +527,22 @@ const deskControls = await ev(`(() => {
 })()`);
 note(deskControls.hits === 0 && deskControls.blocked === 0 && deskControls.aimed > 0 && deskControls.widths.every(w => w > 0 && w <= 20), "desktop card controls stay clear of the page edges", JSON.stringify(deskControls));
 
-const desk = await drag(0.7);
-note(desk.flip === "2", "desktop drag past halfway turns the spread", JSON.stringify(desk));
+const desk = await drag(1.2);
+note(desk.mid.casts === 2 && desk.flip === "2", "desktop: pulling the sheet over the spine turns the spread", JSON.stringify(desk));
+const deskBack = await drag(1.2, { back: true, pid: 13 });
+note(deskBack.flip === "0", "desktop: pulling the left sheet over turns back", JSON.stringify(deskBack));
+const deskSnap = await drag(0.5);
+note(deskSnap.flip === "0" && !deskSnap.left.hot, "desktop: letting go before the spine settles back", JSON.stringify(deskSnap));
+
+const sidePanel = await ev(`(() => {
+  const card = binderState.binders.find(b => b.id === "jungle").cards[1];
+  openProfile(card);
+  const open = { wide: document.getElementById("shell").classList.contains("reading-wide"), side: getComputedStyle(document.getElementById("profile")).display };
+  closeProfile();
+  const closed = { wide: document.getElementById("shell").classList.contains("reading-wide") };
+  return { open, closed };
+})()`);
+note(!sidePanel.open.wide && sidePanel.open.side !== "none" && sidePanel.closed.wide, "Details brings the side panel back, closing it gives the binder the room again", JSON.stringify(sidePanel));
 
 const membership = await ev(`(() => {
   const shared = "bh-0";
@@ -376,224 +562,70 @@ const membership = await ev(`(() => {
 note(membership.before, "one card starts in the wishlist and two binders", JSON.stringify(membership));
 note(membership.after.wish && membership.after.water && !membership.after.jungle && membership.after.storedWish && membership.after.storedWater, "removing from one binder keeps the wishlist and the other binder", JSON.stringify(membership.after));
 
-try { ws.close(); } catch (e) {}
-try { chrome.kill(); } catch (e) {}
-await sleep(300);
-
-const CDP2 = await freePort();
-const profile2 = mkdtempSync(join(tmpdir(), "chrome-binder-gl-"));
-extraProfiles.push(profile2);
-const chrome2 = spawn("google-chrome", [
-  "--headless=new", "--no-sandbox", "--disable-dev-shm-usage",
-  "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
-  "--ignore-gpu-blocklist", "--enable-webgl",
-  "--remote-debugging-port=" + CDP2, "--user-data-dir=" + profile2, "about:blank"
-], { stdio: "ignore" });
-extraProcs.push(chrome2);
-await waitPort(CDP2);
-const pages2 = await (await fetch("http://127.0.0.1:" + CDP2 + "/json/list")).json();
-const page2 = pages2.find(p => p.type === "page");
-const ws2 = new WebSocket(page2.webSocketDebuggerUrl);
-await new Promise((resolve, reject) => { ws2.addEventListener("open", resolve); ws2.addEventListener("error", reject); });
-const cdp2 = sendFactory(ws2);
-cdp2.on(msg => {
-  if (msg.method === "Runtime.exceptionThrown") {
-    const d = msg.params.exceptionDetails;
-    errors.push((d.exception && d.exception.description || d.text || "exception").split("\n")[0]);
-  }
-  if (msg.method === "Runtime.consoleAPICalled" && msg.params.type === "error") {
-    const text = (msg.params.args || []).map(a => a.value || a.description || "").join(" ");
-    if (text) errors.push(text.split("\n")[0]);
-  }
-});
-async function ev2(expression) {
-  const result = await cdp2.send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
-  if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails).slice(0, 1600));
-  return result.result.value;
-}
-await cdp2.send("Page.enable");
-await cdp2.send("Runtime.enable");
-await cdp2.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-await cdp2.send("Page.addScriptToEvaluateOnNewDocument", { source: boot });
-await cdp2.send("Page.navigate", { url: "http://127.0.0.1:" + PORT + "/index.html" });
-const ready2 = await ev2(`(async () => {
-  const start = Date.now();
-  while (Date.now() - start < 20000) {
-    if (typeof meta !== "undefined" && meta.ready && document.getElementById("deck") && typeof renderBinders === "function") return "";
-    await new Promise(r => setTimeout(r, 100));
-  }
-  return "app was not ready";
+await ev(`(() => {
+  const jungle = binderState.binders.find(b => b.id === "jungle");
+  jungle.cards = ${JSON.stringify(cards)};
+  flipPage = 2; renderBinders();
 })()`);
-if (ready2) { console.log(ready2); shutdown(1); }
-await ev2(`showTab("binders"); binderView = { kind: "binder", id: "jungle" }; flipPage = 0; renderBinders(); new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`);
-await sleep(80);
-
-const gl = await ev2(`(() => {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-  return !!(ctx && ctx.getParameter(ctx.VERSION));
-})()`);
-note(gl, "SwiftShader exposes WebGL");
-
-const returned = await ev2(`(async () => {
-  const ear = document.querySelector("#pageCorner");
-  const leaf = document.querySelector(".leaf.right");
-  const edge = ear.getBoundingClientRect();
-  const box = leaf.getBoundingClientRect();
-  const x = edge.left + edge.width / 2;
-  const y = edge.top + edge.height * 0.5;
-  const pid = 21;
-  const opts = (cx, buttons) => ({ bubbles: true, cancelable: true, pointerId: pid, pointerType: "touch", clientX: cx, clientY: y, button: 0, buttons, isPrimary: true });
-  ear.dispatchEvent(new PointerEvent("pointerdown", opts(x, 1)));
-  window.dispatchEvent(new PointerEvent("pointermove", opts(x - box.width * 0.42, 1)));
-  const mid = {
-    turn: Number(leaf.style.getPropertyValue("--turn")),
-    curls: document.querySelectorAll(".curl-view").length,
-    casts: document.querySelectorAll(".curl-cast").length,
-    curling: leaf.classList.contains("curling"),
-    fallback: leaf.classList.contains("fallback"),
-    hot: document.querySelectorAll(".leaf.hot").length
-  };
-  const back = x - 1;
-  window.dispatchEvent(new PointerEvent("pointermove", opts(back, 1)));
-  const near = Number(leaf.style.getPropertyValue("--turn"));
-  window.dispatchEvent(new PointerEvent("pointerup", opts(back, 0)));
-  const start = Date.now();
-  while (Date.now() - start < 1600) {
-    await new Promise(r => setTimeout(r, 40));
-    const book = document.querySelector(".book");
-    if (book && !book.dataset.curling && !document.querySelector(".leaf.hot")) break;
-  }
-  const book = document.querySelector(".book");
-  return {
-    mid, near,
-    flip: book && book.dataset.flip,
-    curls: document.querySelectorAll(".curl-view").length,
-    casts: document.querySelectorAll(".curl-cast").length
-  };
-})()`);
-note(returned.mid && returned.mid.curls === 1 && returned.mid.casts === 1 && returned.mid.curling && !returned.mid.fallback && returned.mid.hot === 1 && returned.mid.turn > 0.35 && returned.mid.turn < 0.5, "a WebGL drag uses one curl", JSON.stringify(returned.mid));
-note(returned.near < 0.05 && returned.flip === "0" && returned.curls === 0 && returned.casts === 0, "dragging back to the grab snaps instead of turning", JSON.stringify(returned));
-
-await ev2(`document.querySelector("#pageNext").click()`);
 await sleep(40);
-const stolen = await ev2(`(async () => {
-  const ear = document.querySelector("#pageCorner");
-  const leaf = document.querySelector(".leaf.right");
-  const edge = ear.getBoundingClientRect();
-  const box = leaf.getBoundingClientRect();
-  const x = edge.left + edge.width / 2;
-  const y = edge.top + 6;
-  const pid = 22;
-  const opts = (cx, buttons) => ({ bubbles: true, cancelable: true, pointerId: pid, pointerType: "touch", clientX: cx, clientY: y, button: 0, buttons, isPrimary: true });
-  ear.dispatchEvent(new PointerEvent("pointerdown", opts(x, 1)));
-  window.dispatchEvent(new PointerEvent("pointermove", opts(x - box.width * 0.35, 1)));
-  const during = {
-    curls: document.querySelectorAll(".curl-view").length,
-    casts: document.querySelectorAll(".curl-cast").length,
-    hot: document.querySelectorAll(".leaf.hot").length,
-    curling: leaf.classList.contains("curling"),
-    fallback: leaf.classList.contains("fallback"),
-    turn: Number(leaf.style.getPropertyValue("--turn")),
-    flip: document.querySelector(".book").dataset.flip
-  };
-  window.dispatchEvent(new PointerEvent("pointermove", opts(x + box.width * 1.5, 1)));
-  const released = Number(leaf.style.getPropertyValue("--turn"));
-  window.dispatchEvent(new PointerEvent("pointerup", opts(x + box.width * 1.5, 0)));
-  const start = Date.now();
-  while (Date.now() - start < 1800) {
-    await new Promise(r => setTimeout(r, 40));
-    const book = document.querySelector(".book");
-    if (book && !book.dataset.curling && !document.querySelector(".leaf.hot")) break;
-  }
-  const book = document.querySelector(".book");
-  return {
-    during,
-    released,
-    flip: book && book.dataset.flip,
-    curls: document.querySelectorAll(".curl-view").length,
-    casts: document.querySelectorAll(".curl-cast").length,
-    hot: document.querySelectorAll(".leaf.hot").length
-  };
-})()`);
-note(stolen.during && stolen.during.curls === 1 && stolen.during.casts === 1 && stolen.during.hot === 1 && stolen.during.curling && !stolen.during.fallback && stolen.during.flip === "0", "grabbing during a turn keeps a single curl", JSON.stringify(stolen.during));
-note(stolen.released < 0.5 && stolen.flip === "0" && stolen.curls === 0 && stolen.casts === 0 && stolen.hot === 0, "letting go before halfway cancels the in-flight turn", JSON.stringify(stolen));
-
-await cdp2.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
-await sleep(400);
-await ev2(`flipPage = 2; renderBinders(); new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`);
-await sleep(80);
-const lastSpread = await ev2(`(() => {
+const lastSpread = await ev(`(() => {
   const book = document.querySelector(".book");
   return {
     layout: book && book.dataset.layout,
     flip: book && book.dataset.flip,
-    nums: [...document.querySelectorAll(".page-num")].map(n => n.textContent),
+    nums: [...document.querySelectorAll(".leaf > .face.front .page-num")].map(n => n.textContent),
     foot: document.querySelector(".pagefoot").textContent,
     options: [...document.querySelectorAll("#jumpPage option")].map(o => o.textContent),
     sheets: [...document.querySelectorAll(".dots button")].map(b => b.dataset.sheet),
-    emptyRight: document.querySelectorAll(".leaf.right .sleeve.empty").length
+    emptyRight: document.querySelectorAll(".leaf.right > .face.front .sleeve.empty").length
   };
 })()`);
 note(lastSpread.layout === "spread" && lastSpread.flip === "2" && lastSpread.nums.join(",") === "3,4" && lastSpread.emptyRight === 9, "the last spread keeps a numbered blank facing page", JSON.stringify(lastSpread));
 note(lastSpread.foot.includes("Page 3–4") && lastSpread.options.join("|") === "Page 1–2|Page 3–4" && lastSpread.sheets.join(",") === "0,2", "the footer and picker name the whole spread", JSON.stringify(lastSpread));
 
-const stuck = await ev2(`(async () => {
-  const ear = document.querySelector("#pageCorner");
-  const leaf = document.querySelector(".leaf.right");
-  const edge = ear.getBoundingClientRect();
-  const box = leaf.getBoundingClientRect();
-  const x = edge.left + edge.width / 2;
-  const y = edge.top + edge.height * 0.5;
-  const pid = 23;
-  const opts = (cx, buttons) => ({ bubbles: true, cancelable: true, pointerId: pid, pointerType: "touch", clientX: cx, clientY: y, button: 0, buttons, isPrimary: true });
-  ear.dispatchEvent(new PointerEvent("pointerdown", opts(x, 1)));
-  window.dispatchEvent(new PointerEvent("pointermove", opts(x - box.width * 0.8, 1)));
-  const mid = { hot: !!document.querySelector(".leaf.hot"), curls: document.querySelectorAll(".curl-view").length };
-  window.dispatchEvent(new PointerEvent("pointerup", opts(x - box.width * 0.8, 0)));
-  await new Promise(r => setTimeout(r, 200));
-  const book = document.querySelector(".book");
-  return { mid, flip: book && book.dataset.flip, curls: document.querySelectorAll(".curl-view").length };
-})()`);
-note(stuck.flip === "2" && stuck.mid && !stuck.mid.hot && stuck.mid.curls === 0 && stuck.curls === 0, "the blank facing page cannot turn past the end", JSON.stringify(stuck));
+const stuck = await drag(1.2, { pid: 23 });
+note(stuck.flip === "2" && !stuck.mid.hot, "the blank facing page cannot turn past the end", JSON.stringify(stuck));
 
-await ev2(`(() => {
+await ev(`(() => {
   const jungle = binderState.binders.find(b => b.id === "jungle");
   jungle.cards = jungle.cards.slice(0, 5);
   flipPage = 0;
   renderBinders();
 })()`);
 await sleep(40);
-const shortSpread = await ev2(`(() => {
-  const book = document.querySelector(".book");
+const shortSpread = await ev(`(() => {
   const left = document.querySelector(".leaf.left");
   return {
-    flip: book && book.dataset.flip,
-    nums: [...document.querySelectorAll(".page-num")].map(n => n.textContent),
+    nums: [...document.querySelectorAll(".leaf > .face.front .page-num")].map(n => n.textContent),
     foot: document.querySelector(".pagefoot").textContent,
     options: [...document.querySelectorAll("#jumpPage option")].map(o => o.textContent),
-    filled: left ? [...left.querySelectorAll(".sleeve")].filter(el => !el.classList.contains("empty")).length : -1,
-    emptyRight: document.querySelectorAll(".leaf.right .sleeve.empty").length
+    filled: left ? [...left.querySelectorAll(":scope > .face.front .sleeve")].filter(el => !el.classList.contains("empty")).length : -1,
+    emptyRight: document.querySelectorAll(".leaf.right > .face.front .sleeve.empty").length
   };
 })()`);
 note(shortSpread.nums.join(",") === "1,2" && shortSpread.foot.includes("Page 1–2") && shortSpread.options.join("|") === "Page 1–2" && shortSpread.filled === 5 && shortSpread.emptyRight === 9, "a short binder still shows the facing empty page as page 2", JSON.stringify(shortSpread));
-const shortDrag = await ev2(`(async () => {
-  const ear = document.querySelector("#pageCorner");
-  const leaf = document.querySelector(".leaf.right");
-  const edge = ear.getBoundingClientRect();
-  const box = leaf.getBoundingClientRect();
-  const x = edge.left + edge.width / 2;
-  const y = edge.top + edge.height * 0.5;
-  const pid = 24;
-  const opts = (cx, buttons) => ({ bubbles: true, cancelable: true, pointerId: pid, pointerType: "touch", clientX: cx, clientY: y, button: 0, buttons, isPrimary: true });
-  ear.dispatchEvent(new PointerEvent("pointerdown", opts(x, 1)));
-  window.dispatchEvent(new PointerEvent("pointermove", opts(x - box.width * 0.8, 1)));
-  window.dispatchEvent(new PointerEvent("pointerup", opts(x - box.width * 0.8, 0)));
-  await new Promise(r => setTimeout(r, 200));
-  const book = document.querySelector(".book");
-  return { flip: book && book.dataset.flip, curls: document.querySelectorAll(".curl-view").length };
+const shortDrag = await drag(1.2, { pid: 24 });
+note(shortDrag.flip === "0" && !shortDrag.mid.hot, "a one-page spread cannot turn onto the blank page", JSON.stringify(shortDrag));
+
+// Reduced motion: turns and the inspect view jump instead of animating.
+const calm = await ev(`(async () => {
+  settings.reduce = "on"; applyMotion();
+  const jungle = binderState.binders.find(b => b.id === "jungle");
+  jungle.cards = ${JSON.stringify(cards)};
+  flipPage = 0; renderBinders();
+  document.querySelector("#pageNext").click();
+  const flip = document.querySelector(".book").dataset.flip;
+  const hit = document.querySelector("#bindersScroll .sleeve[data-index='18'] .cardhit") || document.querySelector("#bindersScroll .sleeve .cardhit");
+  openShowcase(jungle.cards[18], hit);
+  const anims = document.getAnimations().filter(a => a.playState === "running").length;
+  CardInspect.flip();
+  const back = CardInspect.peek().back;
+  closeShowcase();
+  const closed = document.getElementById("showcase").hidden;
+  settings.reduce = "off"; applyMotion();
+  return { flip, anims, back, closed };
 })()`);
-note(shortDrag.flip === "0" && shortDrag.curls === 0, "a one-page spread cannot turn onto the blank page", JSON.stringify(shortDrag));
+note(calm.flip === "2" && calm.anims === 0 && calm.back && calm.closed, "reduced motion turns pages and flips cards without animation", JSON.stringify(calm));
 
 const noise = errors.filter(line => !/ERR_|Failed to load resource|net::|favicon/i.test(line));
 note(!noise.length, "no console errors", noise.slice(0, 6).join(" | "));
