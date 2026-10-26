@@ -204,7 +204,10 @@
             const img = frontEl.querySelector("img");
             if (img) { img.onerror = null; img.src = url; }
           };
-          if (hi.decode) hi.decode().then(done, done); else done();
+          let ran = false;
+          const once = () => { if (!ran) { ran = true; done(); } };
+          if (hi.decode) hi.decode().then(once, once);
+          setTimeout(once, 250);
         };
         hi.src = url;
       }).catch(() => {});

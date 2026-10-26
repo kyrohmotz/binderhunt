@@ -2975,7 +2975,11 @@ function paintArt(host, card, opts){
       sharpLoaded.add(url);
       if (sharpLoaded.size > 2000) sharpLoaded.clear();
       const swap = () => { if (img.isConnected || img.parentNode) { img.onerror = null; img.src = url; } };
-      if (hi.decode) hi.decode().then(swap, swap); else swap();
+      /* decode() can stall in a background tab; never wait on it long. */
+      let swapped = false;
+      const once = () => { if (!swapped) { swapped = true; swap(); } };
+      if (hi.decode) hi.decode().then(once, once);
+      setTimeout(once, 250);
     };
     hi.onerror = next;
     hi.src = url;
