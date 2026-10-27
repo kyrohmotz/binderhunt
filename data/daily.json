@@ -13754,6 +13754,16 @@
       "source": "tcgplayer",
       "eur": 34.41,
       "at": "2026-10-26T14:51:54Z"
+    },
+    "2026-10-29": {
+      "id": "sv02-204",
+      "price": 48.67,
+      "variant": "holofoil",
+      "printing": "Holofoil",
+      "alts": 1,
+      "source": "tcgplayer",
+      "eur": 28.7,
+      "at": "2026-10-27T14:02:41Z"
     }
   }
 }
