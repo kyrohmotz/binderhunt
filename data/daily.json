@@ -13764,6 +13764,16 @@
       "source": "tcgplayer",
       "eur": 28.7,
       "at": "2026-10-27T14:02:41Z"
+    },
+    "2026-10-30": {
+      "id": "dp1-14",
+      "price": 5.59,
+      "variant": "reverse-holofoil",
+      "printing": "Reverse Holofoil",
+      "alts": 2,
+      "source": "tcgplayer",
+      "eur": 3.35,
+      "at": "2026-10-28T14:51:56Z"
     }
   }
 }
