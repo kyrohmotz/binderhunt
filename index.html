@@ -991,6 +991,7 @@ const MUST_SETS = [
   { id:"me02", name:"Phantasmal Flames", cardCount:{ official:94, total:130 }, logo:"https://assets.tcgdex.net/en/me/me02/logo" },
   { id:"base4", name:"Base Set 2", cardCount:{ official:130, total:130 }, logo:"https://assets.tcgdex.net/en/base/base4/logo" }
 ];
+const CARD_TYPES = ["Colorless","Darkness","Dragon","Fairy","Fighting","Fire","Grass","Lightning","Metal","Psychic","Water"];
 const ERA_ORDER = ["Mega Evolution","Scarlet & Violet","Sword & Shield","Sun & Moon","XY","Black & White","HeartGold & SoulSilver","Diamond & Pearl","EX","WOTC","Other"];
 const ERA_GROUPS = [
   { id:"vintage", label:"WotC / Vintage", eras:["WOTC"] },
@@ -1023,6 +1024,10 @@ const live = document.getElementById("live");
 const profileEl = document.getElementById("profile");
 const shell = document.getElementById("shell");
 let tab = "hunt";
+/* A set or type string the catalog has not confirmed yet. It is kept in
+   storage but not applied, so a bad value cannot empty the hunt. */
+let rememberedSet = "";
+let rememberedType = "";
 let filters = loadFilters();
 let wish = loadWish();
 let binderState = loadBinders();
@@ -1266,15 +1271,104 @@ function loadBinders(){
 function blankFilters(){
   return { set:"", rarities:[], era:"", type:"", names:[], min:null, max:null, pricePreset:"", graded:false };
 }
+function knownEra(value){
+  if (typeof value !== "string") return "";
+  const era = value.trim();
+  if (!era) return "";
+  if (ERA_GROUPS.some(g => g.id === era)) return era;
+  if (ERA_ORDER.includes(era)) return era;
+  return "";
+}
+function knownType(value){
+  if (typeof value !== "string") return "";
+  const type = value.trim();
+  if (!type) return "";
+  if (CARD_TYPES.includes(type)) return type;
+  if (meta.types && meta.types.includes(type)) return type;
+  return "";
+}
+function storedNames(value){
+  if (!Array.isArray(value)) return [];
+  const names = [];
+  value.forEach(item => {
+    if (typeof item !== "string" || names.length >= 24) return;
+    const name = item.trim().slice(0, 24);
+    if (name) names.push(name);
+  });
+  return names;
+}
+function storedRarities(value){
+  if (!Array.isArray(value)) return [];
+  const rarities = [];
+  value.forEach(item => {
+    if (typeof item !== "string") return;
+    const rarity = item.trim();
+    if (!rarity || rarity.length > 60 || rarity === "[object Object]" || rarities.includes(rarity)) return;
+    rarities.push(rarity);
+  });
+  return rarities;
+}
+function catalogHasSet(id){
+  if (!id) return false;
+  if (MUST_SETS.some(s => s.id === id)) return true;
+  return !!(meta.sets && meta.sets.some(s => s && s.id === id));
+}
 function loadFilters(){
   const blank = blankFilters();
+  rememberedSet = "";
+  rememberedType = "";
   try {
     const raw = JSON.parse(localStorage.getItem("bh.filters.v3") || "null");
-    if (!raw || typeof raw !== "object") return blank;
-    const preset = raw.pricePreset === "under10" || raw.pricePreset === "mid" || raw.pricePreset === "high" ? raw.pricePreset : "";
-    const names = Array.isArray(raw.names) ? raw.names.map(s => String(s).trim()).filter(Boolean).slice(0, 24) : [];
-    return { set:String(raw.set || ""), rarities:Array.isArray(raw.rarities) ? raw.rarities.map(String) : [], era:String(raw.era || ""), type:String(raw.type || ""), names, min:pos(raw.min), max:pos(raw.max), pricePreset:preset, graded:!!raw.graded };
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return blank;
+    const next = blank;
+    if (typeof raw.set === "string") {
+      const id = raw.set.trim();
+      if (id && id.length <= 40) {
+        if (MUST_SETS.some(s => s.id === id)) next.set = id;
+        else rememberedSet = id;
+      }
+    }
+    if (typeof raw.type === "string") {
+      const type = raw.type.trim();
+      if (CARD_TYPES.includes(type)) next.type = type;
+      else if (type && type.length <= 32) rememberedType = type;
+    }
+    next.names = storedNames(raw.names);
+    next.rarities = storedRarities(raw.rarities);
+    next.era = knownEra(raw.era);
+    next.min = pos(raw.min);
+    next.max = pos(raw.max);
+    next.pricePreset = raw.pricePreset === "under10" || raw.pricePreset === "mid" || raw.pricePreset === "high" ? raw.pricePreset : "";
+    next.graded = raw.graded === true;
+    return next;
   } catch (e) { return blank; }
+}
+function dropHeldFilters(){
+  rememberedSet = "";
+  rememberedType = "";
+}
+/* Once the catalog is in, keep a held set or type only if it is real.
+   Anything else is dropped. The hunt never searched with it. */
+function settleStoredFilters(){
+  if (!meta.complete) return;
+  const before = JSON.stringify(filters);
+  if (rememberedSet) {
+    const id = rememberedSet;
+    rememberedSet = "";
+    if (!filters.set && catalogHasSet(id)) filters.set = id;
+  }
+  if (filters.set && !catalogHasSet(filters.set)) filters.set = "";
+  if (rememberedType) {
+    const type = rememberedType;
+    rememberedType = "";
+    const known = knownType(type);
+    if (!filters.type && known) filters.type = known;
+  }
+  if (filters.type && !knownType(filters.type)) filters.type = "";
+  const changed = JSON.stringify(filters) !== before;
+  saveFilters();
+  if (changed && tab === "hunt") restart();
+  else paintChips();
 }
 function loadSettings(){
   const blank = { sound:false, haptics:true, reduce:"auto", currency:"USD" };
@@ -1289,7 +1383,23 @@ function loadSettings(){
 }
 function saveWish(){ try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {} paintContext(); paintCount(); if (tab === "binders") renderBinders(); if (tab === "sets") renderSets(); }
 function saveBinders(){ try { localStorage.setItem("bh.binders.v1", JSON.stringify(binderState)); } catch (e) {} if (tab === "binders") renderBinders(); paintDiscovery(); paintRail(); }
-function saveFilters(){ try { localStorage.setItem("bh.filters.v3", JSON.stringify(filters)); } catch (e) {} paintChips(); }
+function saveFilters(){
+  if (filters.set) rememberedSet = "";
+  if (filters.type) rememberedType = "";
+  const payload = {
+    set: filters.set || rememberedSet || "",
+    rarities: filters.rarities || [],
+    era: filters.era || "",
+    type: filters.type || rememberedType || "",
+    names: filters.names || [],
+    min: filters.min,
+    max: filters.max,
+    pricePreset: filters.pricePreset || "",
+    graded: filters.graded === true
+  };
+  try { localStorage.setItem("bh.filters.v3", JSON.stringify(payload)); } catch (e) {}
+  paintChips();
+}
 function saveSettings(){ try { localStorage.setItem("bh.settings.v1", JSON.stringify(settings)); } catch (e) {} applyMotion(); }
 
 const OWNED_KEY = "bh.owned.v1";
@@ -2169,6 +2279,7 @@ function loadMeta(){
     meta.sets = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
     meta.types = (types || []).filter(t => typeof t === "string");
     meta.rarities = (rarities || []).filter(r => !POCKET_RARITIES.has(r)).sort((a, b) => a.localeCompare(b));
+    meta.complete = true;
     meta.ready = true;
   })().catch(() => { meta.sets = MUST_SETS.slice(); meta.ready = true; });
   return metaPromise;
@@ -2722,6 +2833,7 @@ function showSkeleton(){
   if (deck.querySelector(".card")) return;
   if (busyHold && !pile.length) return;
   deck.dataset.status = "loading";
+  delete deck.dataset.huntEnd;
   deck.setAttribute("aria-busy", "true");
   deck.innerHTML = `<div class="skel"></div>`;
   const row = document.getElementById("deckCaption");
@@ -2927,6 +3039,7 @@ function restart(opts){
   setListHoldUntil = 0;
   huntBatch = [];
   deck.innerHTML = "";
+  delete deck.dataset.huntEnd;
   showSkeleton();
   paintChips(); paintContext(); paintDiscovery(); paintCount();
   abortStaleHuntFetches();
@@ -3164,6 +3277,7 @@ function syncActs(){
   document.getElementById("save").setAttribute("aria-label", b ? "Add to wishlist and " + b.name : "Add to wishlist");
 }
 function renderDeck(){
+  delete deck.dataset.huntEnd;
   if (pile.length) busyHold = false;
   if (!pile.length && !pumpError && !streamDone && (busyHold || catalogBusy)) {
     busyHold = true;
@@ -3202,6 +3316,8 @@ function renderDeck(){
     if (noMatch) {
       const facts = filterFacts();
       const drop = widenTarget();
+      const huntEnd = matched > 0 ? "seen" : "none";
+      deck.dataset.huntEnd = huntEnd;
       const headline = matched > 0 ? "You've seen every card that fits." : "Nothing fits these filters.";
       const named = facts.map(f => f.label).join(", ");
       const detail = matched > 0
@@ -3211,7 +3327,7 @@ function renderDeck(){
       if (drop) actions.push(`<button class="chip" id="widenDeck" type="button">Drop ${esc(drop.label)}</button>`);
       if (facts.some(f => !f.locked) && (!drop || facts.filter(f => !f.locked).length > 1)) actions.push(`<button class="chip" id="clearDeck" type="button">Clear filters</button>`);
       if (!actions.length) actions.push(`<button class="chip" id="editDeck" type="button">Edit filters</button>`);
-      deck.innerHTML = `<div class="empty-state" role="status"><p><b>${headline}</b></p><p class="fine">${esc(detail)} Nothing stays hidden once the filters are clear.</p>${toad()}<div class="huntpicks">${actions.join("")}</div></div>`;
+      deck.innerHTML = `<div class="empty-state" role="status" data-hunt-end="${huntEnd}"><p><b>${headline}</b></p><p class="fine">${esc(detail)} Nothing stays hidden once the filters are clear.</p>${toad()}<div class="huntpicks">${actions.join("")}</div></div>`;
       const widen = document.getElementById("widenDeck");
       const clear = document.getElementById("clearDeck");
       const edit = document.getElementById("editDeck");
@@ -3454,13 +3570,14 @@ function clearFilterKey(key){
   if (key === "graded") filters.graded = false;
   else if (key === "rarities") filters.rarities = [];
   else if (key === "price") { filters.pricePreset = ""; filters.min = null; filters.max = null; }
-  else if (key === "type" && !lock.type) filters.type = "";
+  else if (key === "type" && !lock.type) { filters.type = ""; rememberedType = ""; }
   else if (key === "names" && !lock.names) filters.names = [];
-  else if (key === "set" && !lock.set) filters.set = "";
+  else if (key === "set" && !lock.set) { filters.set = ""; rememberedSet = ""; }
   else if (key === "era") filters.era = "";
 }
 function clearAllFilters(){
   const b = discoveryBinder();
+  dropHeldFilters();
   filters = blankFilters();
   if (b) {
     const t = themeOf(b);
@@ -4244,6 +4361,7 @@ function renderSetPage(root){
   document.getElementById("swipeSet").onclick = () => {
     binderState.discoveryId = "";
     saveBinders();
+    dropHeldFilters();
     filters = blankFilters();
     filters.set = s.id;
     saveFilters();
@@ -5409,6 +5527,7 @@ function startDiscovery(id){
   binderState.discoveryId = id;
   saveBinders();
   const theme = themeOf(binder);
+  dropHeldFilters();
   filters = blankFilters();
   if (theme.kind === "set") filters.set = theme.setId;
   if (theme.kind === "type") filters.type = theme.type;
@@ -6421,6 +6540,7 @@ function skipOnboard(){
 function finishOnboard(){
   if (onboardStep === 1) { onboardStep = 2; renderOnboard(); return; }
   const names = namesFromOnboard();
+  dropHeldFilters();
   filters = blankFilters();
   filters.names = names;
   filters.era = onboardEra || "";
@@ -6449,6 +6569,7 @@ paintContext();
 paintDiscovery();
 loadScrydex();
 loadMeta().then(() => {
+  settleStoredFilters();
   backfillOwnedSets();
   quietSeedSets();
   if (tab === "sets") renderSets();

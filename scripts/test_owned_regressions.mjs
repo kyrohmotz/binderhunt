@@ -393,7 +393,17 @@ const report = await ev(`(async () => {
   tab = "sets";
   renderSets();
   const line = (document.getElementById("setProgress") || {}).textContent || "";
-  check("set page never shows owned above the total", line.indexOf("4 / 3") < 0 && line.indexOf("3 / 3") >= 0, line);
+  const wishMark = " on your wishlist";
+  const at = line.indexOf(wishMark);
+  const head = at >= 0 ? line.slice(0, at) : "";
+  const tail = at >= 0 ? line.slice(at + wishMark.length).trim() : "";
+  const ofAt = head.indexOf(" of ");
+  const savedN = ofAt >= 0 ? Number(head.slice(0, ofAt)) : NaN;
+  const totalN = ofAt >= 0 ? Number(head.slice(ofAt + 4)) : NaN;
+  const ownedDigits = tail.split("").filter(ch => ch >= "0" && ch <= "9").join("");
+  const ownedN = tail.indexOf("owned") >= 0 && ownedDigits ? Number(ownedDigits) : 0;
+  check("set page uses wishlist and owned wording", at >= 0 && savedN === 0 && totalN === 3 && tail.indexOf("owned") >= 0 && ownedN === 3, line);
+  check("set page never shows owned above the total", at >= 0 && ownedN <= totalN && line.indexOf("4 / 3") < 0 && line.indexOf("4 owned") < 0, line);
 
   setLists.delete("base4");
   if (setView && setView.id === "base4") setView = null;

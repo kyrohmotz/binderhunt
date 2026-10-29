@@ -108,20 +108,24 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 
 /* ---------- filters: what is on, and one tap to clear it ---------- */
 
-.chipbar{display:flex;align-items:center;gap:6px;padding:8px 12px 0;min-width:0}
+/* Filters and Clear stay in their own columns. The chips live in the middle
+   track, which clips and scrolls. A chip's × never sits under either button. */
+.chipbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:6px;padding:8px 12px 0;min-width:0;max-width:100%;width:100%}
 .chipbar::before,.chipbar::after{display:none}
 .context{min-height:44px}
-#openFilters,#resetFilters{flex:none;display:inline-flex;align-items:center;justify-content:center}
+#openFilters,#resetFilters{display:inline-flex;align-items:center;justify-content:center}
 #resetFilters[hidden],.filter-count[hidden]{display:none !important}
 #openFilters{gap:0}
 #resetFilters{background:var(--rose)}
 .filter-count{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:6px;padding:0 5px;border-radius:999px;border:2px solid var(--ink);background:var(--butter);font-family:Nunito,sans-serif;font-weight:900;font-size:12px;line-height:1}
 .filter-count[hidden]{display:none}
-.active-scroll{display:flex;align-items:center;gap:6px;flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.active-scroll{display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:2px 2px 4px}
 .active-scroll::-webkit-scrollbar{display:none}
 .filter-hint{color:var(--ink-2);font-size:13px;font-weight:700;white-space:nowrap}
-#activeChips .chip{display:inline-flex;align-items:center;max-width:100%;padding-right:10px}
-.chipbar.more .active-scroll{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+#activeChips .chip{flex:0 0 auto;display:inline-flex;align-items:center;min-width:0;max-width:min(148px,100%);padding-right:10px;overflow:hidden}
+.chipbar.more .active-scroll{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 16px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 16px),transparent)}
+.chipbar.before .active-scroll{-webkit-mask-image:linear-gradient(90deg,transparent,#000 16px);mask-image:linear-gradient(90deg,transparent,#000 16px)}
+.chipbar.before.more .active-scroll{-webkit-mask-image:linear-gradient(90deg,transparent,#000 16px,#000 calc(100% - 16px),transparent);mask-image:linear-gradient(90deg,transparent,#000 16px,#000 calc(100% - 16px),transparent)}
 #activeChips .chiplabel{min-width:0;overflow:hidden;text-overflow:ellipsis}
 #activeChips .xmark{flex:none;margin-left:6px;font-size:18px;line-height:1}
 .sheet-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 4px}
