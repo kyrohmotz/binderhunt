@@ -147,9 +147,11 @@ async function drain(label, opts = {}) {
   while (Date.now() - start < 240000) {
     const info = await ev(`(() => {
       const p = document.querySelector("#deck .empty-state p");
+      const end = document.querySelector("#deck [data-hunt-end]");
       const c = pile.find(x => x && !reserved.has(x.id));
       return {
         text: p ? p.textContent : "",
+        huntEnd: end ? end.getAttribute("data-hunt-end") : "",
         status: deck.dataset.status || "",
         matched, streamDone, loading, catalogBusy, serial: pullSerial,
         pile: pile.length, briefs: briefs.length, deferred: deferred.length,
@@ -163,7 +165,7 @@ async function drain(label, opts = {}) {
     }
     if (info.text === "No cards match yet.") throw new Error(label + " said no cards match yet after " + info.matched);
     if (info.text === "Still matching cards.") throw new Error(label + " paused early after " + info.matched);
-    if (info.text === "No more cards match.") {
+    if (info.huntEnd === "seen") {
       if (!info.matched) throw new Error(label + " finished with zero matches");
       if (opts.requireBusy && !info.busy) throw new Error(label + " end message appeared only after the busy window cleared");
       return { matched: info.matched, kept, hits: info.hits, busyAtEnd: !!info.busy, ms: Date.now() - start };

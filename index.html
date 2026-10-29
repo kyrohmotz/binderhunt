@@ -828,17 +828,10 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
     </div>
     <div id="viewHunt" class="view">
       <div class="hunt-align">
-      <div class="chipbar" id="chipbar">
-      <div class="chips" id="chips" role="toolbar" aria-label="Filters">
-        <button class="chip" type="button" data-filter="set">Set</button>
-        <button class="chip" type="button" data-filter="pokemon">Pokémon</button>
-        <button class="chip" type="button" data-filter="rarity">Rarity</button>
-        <button class="chip" type="button" data-filter="price">Price</button>
-        <button class="chip" type="button" data-filter="era">Era</button>
-        <button class="chip" type="button" data-filter="type">Type</button>
-        <button class="chip" type="button" id="gradedChip" aria-pressed="false">Graded only</button>
-        <button class="chip" type="button" id="resetFilters">Reset</button>
-      </div>
+      <div class="chipbar" id="chipbar" role="toolbar" aria-label="Filters">
+        <button class="chip" type="button" id="openFilters" aria-haspopup="dialog" aria-controls="filterSheet" aria-expanded="false">Filters<span class="filter-count" id="filterCount" hidden aria-hidden="true">0</span></button>
+        <div class="active-scroll" id="activeChips"></div>
+        <button class="chip" type="button" id="resetFilters" hidden>Clear</button>
       </div>
       <div class="discovery" id="discovery" hidden>
         <span>Adding to: <b id="discoveryName">Binder</b></span>
@@ -861,7 +854,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
         <button class="act undo" id="undo" type="button" aria-label="Undo last swipe" disabled>↺</button>
         <button class="act add" id="save" type="button" aria-label="Add to wishlist" disabled>♥</button>
       </div>
-      <p class="keyhint" aria-hidden="true"><kbd>←</kbd> pass <kbd>→</kbd> save <kbd>Z</kbd> undo <kbd>↑</kbd> details</p>
+      <p class="keyhint" aria-hidden="true"><kbd>←</kbd> pass <kbd>→</kbd> save <kbd>Z</kbd> undo <kbd>↑</kbd> details <kbd>F</kbd> filters</p>
       </div>
       </div>
     </div>
@@ -889,8 +882,11 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 </div>
 <div id="filterSheet" class="sheet" hidden>
   <button class="backdrop" type="button" aria-label="Close filters"></button>
-  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="filterTitle">
-    <h2 id="filterTitle">Filters</h2>
+  <div class="sheet-card tall" role="dialog" aria-modal="true" aria-labelledby="filterTitle">
+    <div class="sheet-top">
+      <h2 id="filterTitle">Filters</h2>
+      <button class="chip" type="button" id="filterDone">Done</button>
+    </div>
     <p class="fine" id="filterLive"></p>
     <div class="sheet-body" id="filterBody"></div>
   </div>
@@ -995,6 +991,7 @@ const MUST_SETS = [
   { id:"me02", name:"Phantasmal Flames", cardCount:{ official:94, total:130 }, logo:"https://assets.tcgdex.net/en/me/me02/logo" },
   { id:"base4", name:"Base Set 2", cardCount:{ official:130, total:130 }, logo:"https://assets.tcgdex.net/en/base/base4/logo" }
 ];
+const CARD_TYPES = ["Colorless","Darkness","Dragon","Fairy","Fighting","Fire","Grass","Lightning","Metal","Psychic","Water"];
 const ERA_ORDER = ["Mega Evolution","Scarlet & Violet","Sword & Shield","Sun & Moon","XY","Black & White","HeartGold & SoulSilver","Diamond & Pearl","EX","WOTC","Other"];
 const ERA_GROUPS = [
   { id:"vintage", label:"WotC / Vintage", eras:["WOTC"] },
@@ -1027,6 +1024,10 @@ const live = document.getElementById("live");
 const profileEl = document.getElementById("profile");
 const shell = document.getElementById("shell");
 let tab = "hunt";
+/* A set or type string the catalog has not confirmed yet. It is kept in
+   storage but not applied, so a bad value cannot empty the hunt. */
+let rememberedSet = "";
+let rememberedType = "";
 let filters = loadFilters();
 let wish = loadWish();
 let binderState = loadBinders();
@@ -1270,15 +1271,104 @@ function loadBinders(){
 function blankFilters(){
   return { set:"", rarities:[], era:"", type:"", names:[], min:null, max:null, pricePreset:"", graded:false };
 }
+function knownEra(value){
+  if (typeof value !== "string") return "";
+  const era = value.trim();
+  if (!era) return "";
+  if (ERA_GROUPS.some(g => g.id === era)) return era;
+  if (ERA_ORDER.includes(era)) return era;
+  return "";
+}
+function knownType(value){
+  if (typeof value !== "string") return "";
+  const type = value.trim();
+  if (!type) return "";
+  if (CARD_TYPES.includes(type)) return type;
+  if (meta.types && meta.types.includes(type)) return type;
+  return "";
+}
+function storedNames(value){
+  if (!Array.isArray(value)) return [];
+  const names = [];
+  value.forEach(item => {
+    if (typeof item !== "string" || names.length >= 24) return;
+    const name = item.trim().slice(0, 24);
+    if (name) names.push(name);
+  });
+  return names;
+}
+function storedRarities(value){
+  if (!Array.isArray(value)) return [];
+  const rarities = [];
+  value.forEach(item => {
+    if (typeof item !== "string") return;
+    const rarity = item.trim();
+    if (!rarity || rarity.length > 60 || rarity === "[object Object]" || rarities.includes(rarity)) return;
+    rarities.push(rarity);
+  });
+  return rarities;
+}
+function catalogHasSet(id){
+  if (!id) return false;
+  if (MUST_SETS.some(s => s.id === id)) return true;
+  return !!(meta.sets && meta.sets.some(s => s && s.id === id));
+}
 function loadFilters(){
   const blank = blankFilters();
+  rememberedSet = "";
+  rememberedType = "";
   try {
     const raw = JSON.parse(localStorage.getItem("bh.filters.v3") || "null");
-    if (!raw || typeof raw !== "object") return blank;
-    const preset = raw.pricePreset === "under10" || raw.pricePreset === "mid" || raw.pricePreset === "high" ? raw.pricePreset : "";
-    const names = Array.isArray(raw.names) ? raw.names.map(s => String(s).trim()).filter(Boolean).slice(0, 24) : [];
-    return { set:String(raw.set || ""), rarities:Array.isArray(raw.rarities) ? raw.rarities.map(String) : [], era:String(raw.era || ""), type:String(raw.type || ""), names, min:pos(raw.min), max:pos(raw.max), pricePreset:preset, graded:!!raw.graded };
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return blank;
+    const next = blank;
+    if (typeof raw.set === "string") {
+      const id = raw.set.trim();
+      if (id && id.length <= 40) {
+        if (MUST_SETS.some(s => s.id === id)) next.set = id;
+        else rememberedSet = id;
+      }
+    }
+    if (typeof raw.type === "string") {
+      const type = raw.type.trim();
+      if (CARD_TYPES.includes(type)) next.type = type;
+      else if (type && type.length <= 32) rememberedType = type;
+    }
+    next.names = storedNames(raw.names);
+    next.rarities = storedRarities(raw.rarities);
+    next.era = knownEra(raw.era);
+    next.min = pos(raw.min);
+    next.max = pos(raw.max);
+    next.pricePreset = raw.pricePreset === "under10" || raw.pricePreset === "mid" || raw.pricePreset === "high" ? raw.pricePreset : "";
+    next.graded = raw.graded === true;
+    return next;
   } catch (e) { return blank; }
+}
+function dropHeldFilters(){
+  rememberedSet = "";
+  rememberedType = "";
+}
+/* Once the catalog is in, keep a held set or type only if it is real.
+   Anything else is dropped. The hunt never searched with it. */
+function settleStoredFilters(){
+  if (!meta.complete) return;
+  const before = JSON.stringify(filters);
+  if (rememberedSet) {
+    const id = rememberedSet;
+    rememberedSet = "";
+    if (!filters.set && catalogHasSet(id)) filters.set = id;
+  }
+  if (filters.set && !catalogHasSet(filters.set)) filters.set = "";
+  if (rememberedType) {
+    const type = rememberedType;
+    rememberedType = "";
+    const known = knownType(type);
+    if (!filters.type && known) filters.type = known;
+  }
+  if (filters.type && !knownType(filters.type)) filters.type = "";
+  const changed = JSON.stringify(filters) !== before;
+  saveFilters();
+  if (changed && tab === "hunt") restart();
+  else paintChips();
 }
 function loadSettings(){
   const blank = { sound:false, haptics:true, reduce:"auto", currency:"USD" };
@@ -1291,9 +1381,25 @@ function loadSettings(){
     return { sound:!!raw.sound, haptics:raw.haptics !== false, reduce:raw.reduce === "on" || raw.reduce === "off" ? raw.reduce : "auto", currency:raw.currency === "EUR" ? "EUR" : "USD" };
   } catch (e) { return blank; }
 }
-function saveWish(){ try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {} paintContext(); if (tab === "binders") renderBinders(); }
+function saveWish(){ try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {} paintContext(); paintCount(); if (tab === "binders") renderBinders(); if (tab === "sets") renderSets(); }
 function saveBinders(){ try { localStorage.setItem("bh.binders.v1", JSON.stringify(binderState)); } catch (e) {} if (tab === "binders") renderBinders(); paintDiscovery(); paintRail(); }
-function saveFilters(){ try { localStorage.setItem("bh.filters.v3", JSON.stringify(filters)); } catch (e) {} paintChips(); }
+function saveFilters(){
+  if (filters.set) rememberedSet = "";
+  if (filters.type) rememberedType = "";
+  const payload = {
+    set: filters.set || rememberedSet || "",
+    rarities: filters.rarities || [],
+    era: filters.era || "",
+    type: filters.type || rememberedType || "",
+    names: filters.names || [],
+    min: filters.min,
+    max: filters.max,
+    pricePreset: filters.pricePreset || "",
+    graded: filters.graded === true
+  };
+  try { localStorage.setItem("bh.filters.v3", JSON.stringify(payload)); } catch (e) {}
+  paintChips();
+}
 function saveSettings(){ try { localStorage.setItem("bh.settings.v1", JSON.stringify(settings)); } catch (e) {} applyMotion(); }
 
 const OWNED_KEY = "bh.owned.v1";
@@ -1829,10 +1935,12 @@ function priceLabel(){
   if (filters.pricePreset === "under10") return "Under $10";
   if (filters.pricePreset === "mid") return "$10–50";
   if (filters.pricePreset === "high") return "$50+";
-  if (filters.min == null && filters.max == null) return "Price";
-  if (filters.min == null) return "Under " + money(filters.max);
-  if (filters.max == null) return money(filters.min) + "+";
-  return money(filters.min) + "–" + money(filters.max);
+  const lo = filters.min != null ? money(filters.min) : null;
+  const hi = filters.max != null ? money(filters.max) : null;
+  if (!lo && !hi) return "Price";
+  if (!lo) return "Under " + hi;
+  if (!hi) return lo + "+";
+  return lo + "–" + hi;
 }
 function priceOk(price){
   if (filters.pricePreset === "under10") return price != null && price < 10;
@@ -2171,6 +2279,7 @@ function loadMeta(){
     meta.sets = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
     meta.types = (types || []).filter(t => typeof t === "string");
     meta.rarities = (rarities || []).filter(r => !POCKET_RARITIES.has(r)).sort((a, b) => a.localeCompare(b));
+    meta.complete = true;
     meta.ready = true;
   })().catch(() => { meta.sets = MUST_SETS.slice(); meta.ready = true; });
   return metaPromise;
@@ -2724,6 +2833,7 @@ function showSkeleton(){
   if (deck.querySelector(".card")) return;
   if (busyHold && !pile.length) return;
   deck.dataset.status = "loading";
+  delete deck.dataset.huntEnd;
   deck.setAttribute("aria-busy", "true");
   deck.innerHTML = `<div class="skel"></div>`;
   const row = document.getElementById("deckCaption");
@@ -2733,9 +2843,10 @@ function showSkeleton(){
 function paintCount(){
   const el = document.getElementById("matchCount");
   if (!el) return;
-  el.textContent = streamDone ? (matched + (matched === 1 ? " card" : " cards")) : (matched ? matched + (matched === 1 ? " card" : " cards") + " found so far" : "Looking…");
-  const liveCount = document.getElementById("filterLive");
-  if (liveCount && !document.getElementById("filterSheet").hidden) liveCount.textContent = el.textContent;
+  let text = streamDone ? (matched + (matched === 1 ? " card" : " cards")) : (matched ? matched + (matched === 1 ? " card" : " cards") + " found so far" : "Looking…");
+  if (filters.set) text = setWishLine(filters.set) + " · " + text;
+  el.textContent = text;
+  paintFilterSummary();
 }
 function clearHuntWatch(){
   clearTimeout(huntWatch);
@@ -2928,8 +3039,9 @@ function restart(opts){
   setListHoldUntil = 0;
   huntBatch = [];
   deck.innerHTML = "";
+  delete deck.dataset.huntEnd;
   showSkeleton();
-  paintChips(); paintContext(); paintDiscovery();
+  paintChips(); paintContext(); paintDiscovery(); paintCount();
   abortStaleHuntFetches();
   huntInflight.forEach(job => job.ctrl.abort());
   huntInflight.clear();
@@ -3165,6 +3277,7 @@ function syncActs(){
   document.getElementById("save").setAttribute("aria-label", b ? "Add to wishlist and " + b.name : "Add to wishlist");
 }
 function renderDeck(){
+  delete deck.dataset.huntEnd;
   if (pile.length) busyHold = false;
   if (!pile.length && !pumpError && !streamDone && (busyHold || catalogBusy)) {
     busyHold = true;
@@ -3201,20 +3314,31 @@ function renderDeck(){
     deck.dataset.status = pumpError ? "error" : (paused && !noMatch ? "paused" : "empty");
     deck.removeAttribute("aria-busy");
     if (noMatch) {
-      const priceOn = !!(filters.pricePreset || filters.min != null || filters.max != null);
-      const eraOn = !!filters.era;
+      const facts = filterFacts();
+      const drop = widenTarget();
+      const huntEnd = matched > 0 ? "seen" : "none";
+      deck.dataset.huntEnd = huntEnd;
+      const headline = matched > 0 ? "You've seen every card that fits." : "Nothing fits these filters.";
+      const named = facts.map(f => f.label).join(", ");
+      const detail = matched > 0
+        ? (named ? named + " ran out. Widen the hunt and the pile fills back up." : "Widen the hunt and the pile fills back up.")
+        : (named ? named + " left the pile empty. Loosen one and cards come back." : "Loosen a filter and cards come back.");
       const actions = [];
-      if (priceOn) actions.push(`<button class="chip" id="widenBudget" type="button">Widen budget</button>`);
-      if (eraOn) actions.push(`<button class="chip" id="anyEra" type="button">Any era</button>`);
-      if (!actions.length) actions.push(`<button class="chip" id="retryDeck" type="button">Edit filters</button>`);
-      const headline = matched > 0 ? "No more cards match." : "No cards match yet.";
-      deck.innerHTML = `<div class="empty-state"><p>${headline}</p>${toad()}<div class="huntpicks">${actions.join("")}</div></div>`;
-      const widen = document.getElementById("widenBudget");
-      const anyEra = document.getElementById("anyEra");
-      const edit = document.getElementById("retryDeck");
-      if (widen) widen.onclick = () => { filters.pricePreset = ""; filters.min = null; filters.max = null; saveFilters(); restart(); };
-      if (anyEra) anyEra.onclick = () => { filters.era = ""; saveFilters(); restart(); };
-      if (edit) edit.onclick = () => openFilter("pokemon", document.querySelector("[data-filter=pokemon]"));
+      if (drop) actions.push(`<button class="chip" id="widenDeck" type="button">Drop ${esc(drop.label)}</button>`);
+      if (facts.some(f => !f.locked) && (!drop || facts.filter(f => !f.locked).length > 1)) actions.push(`<button class="chip" id="clearDeck" type="button">Clear filters</button>`);
+      if (!actions.length) actions.push(`<button class="chip" id="editDeck" type="button">Edit filters</button>`);
+      deck.innerHTML = `<div class="empty-state" role="status" data-hunt-end="${huntEnd}"><p><b>${headline}</b></p><p class="fine">${esc(detail)} Nothing stays hidden once the filters are clear.</p>${toad()}<div class="huntpicks">${actions.join("")}</div></div>`;
+      const widen = document.getElementById("widenDeck");
+      const clear = document.getElementById("clearDeck");
+      const edit = document.getElementById("editDeck");
+      if (widen && drop) widen.onclick = () => {
+        clearFilterKey(drop.key);
+        saveFilters();
+        restart();
+        announce(drop.label + " cleared. The hunt is wider now.");
+      };
+      if (clear) clear.onclick = () => clearAllFilters();
+      if (edit) edit.onclick = () => openFilter("all", document.getElementById("openFilters"));
     } else {
       const msg = navigator.onLine === false ? "<p>You're offline. Your wishlist and binders are still in this browser.</p>" : pumpError ? `<p class="warn">${esc(pumpError)}</p>` : catalogBusy ? "<p>Card source is busy, retrying…</p>" : paused ? "<p>Still matching cards.</p>" : "<p>The hunt is still shuffling the table.</p>";
       deck.innerHTML = `<div class="empty-state">${msg}${toad()}<button class="chip" id="retryDeck" type="button">Keep looking</button></div>`;
@@ -3420,8 +3544,99 @@ function playTone(freq){
   g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
   o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.14);
 }
+function themeLock(){
+  const theme = themeOf(discoveryBinder());
+  return { set:theme.kind === "set", type:theme.kind === "type", names:theme.kind === "pokemon" };
+}
+function filterFacts(){
+  const lock = themeLock();
+  const facts = [];
+  if (filters.set) facts.push({ key:"set", label:setName(filters.set) || "Set", locked:lock.set });
+  if ((filters.names || []).length) facts.push({ key:"names", label:namesLabel(), locked:lock.names });
+  if (filters.type) facts.push({ key:"type", label:filters.type, locked:lock.type });
+  if (filters.rarities.length) facts.push({ key:"rarities", label:filters.rarities.length === 1 ? filters.rarities[0] : filters.rarities.length + " rarities", locked:false });
+  if (filters.era) facts.push({ key:"era", label:eraLabel(filters.era), locked:false });
+  if (filters.pricePreset || filters.min != null || filters.max != null) facts.push({ key:"price", label:priceLabel(), locked:false });
+  if (filters.graded) facts.push({ key:"graded", label:"Graded only", locked:false });
+  return facts;
+}
+function widenTarget(){
+  const facts = filterFacts();
+  const order = ["graded", "rarities", "price", "type", "names", "set", "era"];
+  return order.map(key => facts.find(f => f.key === key && !f.locked)).find(Boolean) || null;
+}
+function clearFilterKey(key){
+  const lock = themeLock();
+  if (key === "graded") filters.graded = false;
+  else if (key === "rarities") filters.rarities = [];
+  else if (key === "price") { filters.pricePreset = ""; filters.min = null; filters.max = null; }
+  else if (key === "type" && !lock.type) { filters.type = ""; rememberedType = ""; }
+  else if (key === "names" && !lock.names) filters.names = [];
+  else if (key === "set" && !lock.set) { filters.set = ""; rememberedSet = ""; }
+  else if (key === "era") filters.era = "";
+}
+function clearAllFilters(){
+  const b = discoveryBinder();
+  dropHeldFilters();
+  filters = blankFilters();
+  if (b) {
+    const t = themeOf(b);
+    if (t.kind === "set") filters.set = t.setId;
+    if (t.kind === "type") filters.type = t.type;
+    if (t.kind === "pokemon" && t.name) filters.names = [t.name];
+  }
+  saveFilters();
+  restart();
+  if (!document.getElementById("filterSheet").hidden) openFilter("all", document.getElementById("openFilters"));
+  announce(filtersActive() ? "Cleared everything the binder hunt does not keep." : "Filters cleared. Every physical card can show up.");
+}
+function wishInSet(setId){
+  if (!setId) return 0;
+  let n = 0;
+  wish.forEach(c => {
+    if (!c) return;
+    const sid = c.setId || String(c.id || "").split("-")[0];
+    if (sid === setId) n++;
+  });
+  return n;
+}
+function setYear(set){
+  const raw = set && (set.releaseDate || set.year) || "";
+  const match = String(raw).match(/\d{4}/);
+  return match ? match[0] : "";
+}
+function setWishLine(setId){
+  const set = (meta.sets || []).find(s => s.id === setId);
+  const saved = wishInSet(setId);
+  const total = setTotal(set);
+  if (total) return saved + " of " + total + " saved";
+  return saved + " saved";
+}
+function wishBit(set){
+  const saved = wishInSet(set && set.id);
+  const total = setTotal(set);
+  const pct = total ? Math.max(0, Math.min(100, Math.round((saved / total) * 100))) : 0;
+  const full = total ? saved + " of " + total + " on your wishlist" : saved + " on your wishlist";
+  return { saved, total, pct, short:saved + " saved", full };
+}
+function setArtUrl(set){
+  if (!set) return "";
+  const raw = set.logo || set.symbol || "";
+  if (!raw || typeof raw !== "string") return "";
+  if (/\.(png|webp|jpe?g)(\?.*)?$/i.test(raw)) return raw;
+  return raw + ".webp";
+}
+function paintFilterSummary(){
+  const live = document.getElementById("filterLive");
+  const sheet = document.getElementById("filterSheet");
+  if (!live || !sheet || sheet.hidden) return;
+  const n = filterFacts().length;
+  const count = document.getElementById("matchCount");
+  const tail = count && count.textContent && count.textContent !== "Looking…" ? " · " + count.textContent : "";
+  live.textContent = (n ? n + (n === 1 ? " filter on." : " filters on.") : "No filters. Every physical card can show up.") + tail;
+}
 function syncChipFade(){
-  const el = document.getElementById("chips");
+  const el = document.getElementById("activeChips");
   const bar = document.getElementById("chipbar");
   if (!el || !bar) return;
   const more = el.scrollWidth > el.clientWidth + 2 && el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
@@ -3429,23 +3644,41 @@ function syncChipFade(){
   bar.classList.toggle("before", el.scrollLeft > 2);
 }
 function paintChips(){
-  document.querySelectorAll("[data-filter]").forEach(btn => {
-    const key = btn.dataset.filter;
-    const on = key === "set" ? !!filters.set : key === "rarity" ? filters.rarities.length > 0 : key === "price" ? filters.min != null || filters.max != null || !!filters.pricePreset : key === "era" ? !!filters.era : key === "pokemon" ? (filters.names || []).length > 0 : !!filters.type;
-    btn.classList.toggle("on", on);
-    if (key === "set") btn.textContent = filters.set ? setName(filters.set) : "Set";
-    else if (key === "pokemon") btn.textContent = namesLabel();
-    else if (key === "type") btn.textContent = filters.type || "Type";
-    else if (key === "era") btn.textContent = filters.era ? eraLabel(filters.era) : "Era";
-    else if (key === "price") btn.textContent = priceLabel();
-    else btn.textContent = "Rarity";
-    btn.title = btn.textContent;
-  });
-  const g = document.getElementById("gradedChip");
-  g.setAttribute("aria-pressed", filters.graded ? "true" : "false");
-  g.classList.toggle("on", filters.graded);
+  const host = document.getElementById("activeChips");
+  const open = document.getElementById("openFilters");
+  const reset = document.getElementById("resetFilters");
+  const facts = filterFacts();
+  const n = facts.length;
+  if (open) open.setAttribute("aria-label", n ? "Filters, " + n + " active" : "Filters, none active. All physical cards.");
+  const badge = document.getElementById("filterCount");
+  if (badge) {
+    badge.hidden = !n;
+    badge.textContent = n > 9 ? "9+" : String(n);
+  }
+  if (reset) reset.hidden = !n;
+  if (host) {
+    if (!n) host.innerHTML = `<span class="filter-hint">All physical cards</span>`;
+    else {
+      host.innerHTML = facts.map(f => {
+        if (f.locked) return `<span class="chip on" title="Kept by the binder you are filling">${esc(f.label)}</span>`;
+        return `<button type="button" class="chip on" data-clear="${esc(f.key)}" aria-label="Clear ${esc(f.label)} filter"><span class="chiplabel">${esc(f.label)}</span><span class="xmark" aria-hidden="true">×</span></button>`;
+      }).join("");
+      host.querySelectorAll("[data-clear]").forEach(btn => btn.onclick = () => {
+        const fact = filterFacts().find(f => f.key === btn.dataset.clear);
+        clearFilterKey(btn.dataset.clear);
+        saveFilters();
+        restart();
+        announce((fact ? fact.label : "Filter") + " cleared.");
+        const next = document.querySelector("#activeChips [data-clear]") || document.getElementById("openFilters");
+        if (next) next.focus();
+      });
+    }
+  }
   const find = document.getElementById("cardFind");
   if (find && document.activeElement !== find) find.value = (filters.names || []).length === 1 ? filters.names[0] : "";
+  const sheet = document.getElementById("filterSheet");
+  const opener = document.getElementById("openFilters");
+  if (opener && sheet) opener.setAttribute("aria-expanded", sheet.hidden ? "false" : "true");
   syncChipFade();
 }
 function paintContext(){
@@ -3458,8 +3691,17 @@ function paintContext(){
   else if (filters.set) label = setName(filters.set);
   else if ((filters.names || []).length) label = namesLabel();
   else if (filters.type) label = filters.type;
+  else if (filters.rarities.length === 1) label = filters.rarities[0];
+  else if (filters.rarities.length) label = filters.rarities.length + " rarities";
   else if (filters.era) label = eraLabel(filters.era);
-  document.getElementById("context").textContent = label;
+  else if (filters.pricePreset || filters.min != null || filters.max != null) label = priceLabel();
+  else if (filters.graded) label = "Graded only";
+  const context = document.getElementById("context");
+  context.textContent = label;
+  if (tab === "hunt") context.setAttribute("aria-label", "Open filters. Showing " + label);
+  else if (tab === "sets" && setView) context.setAttribute("aria-label", "Back to all sets");
+  else if (tab === "binders" && binderView) context.setAttribute("aria-label", "Back to binders");
+  else context.setAttribute("aria-label", label);
   paintRail();
   paintSide();
 }
@@ -3479,16 +3721,16 @@ function paintSide(){
 function setSideStats(){
   if (!setView) return null;
   const metaSet = (meta.sets || []).find(s => s.id === setView.id) || null;
-  const prog = metaSet ? setCompletion(metaSet) : { owned:0, total:0, pct:null };
+  const saved = wishInSet(setView.id);
   const loaded = (setView.cards || []).length;
-  const total = prog.total || loaded;
-  const owned = prog.total ? prog.owned : clampedOwned(countOwnedInSet(setView.id, setView.cards), total);
-  const pct = total ? Math.max(0, Math.min(100, Math.round((owned / total) * 100))) : null;
-  return { name:setView.name || "Set", owned, total, pct, release:setView.release || "" };
+  const total = (metaSet ? setTotal(metaSet) : 0) || loaded;
+  const owned = clampedOwned(countOwnedInSet(setView.id, setView.cards), total);
+  const pct = total ? Math.max(0, Math.min(100, Math.round((saved / total) * 100))) : null;
+  return { name:setView.name || "Set", saved, owned, total, pct, release:setView.release || "" };
 }
 function renderSetSide(){
   const stats = setSideStats();
-  const key = stats ? "set:" + setView.id + ":" + stats.owned + ":" + stats.total : "sets:" + ((meta.sets || []).length) + ":" + ownedIds.size;
+  const key = stats ? "set:" + setView.id + ":" + stats.saved + ":" + stats.owned + ":" + stats.total : "sets:" + ((meta.sets || []).length) + ":" + wish.length;
   if (key === sideKey && profileEl.querySelector("[data-side='sets']")) return;
   sideKey = key;
   summaryId = "";
@@ -3497,12 +3739,12 @@ function renderSetSide(){
   profileEl.removeAttribute("aria-modal");
   if (!stats) {
     const n = (meta.sets || []).length;
-    profileEl.innerHTML = `<div class="profile-scroll" data-side="sets"><p class="eyebrow">Sets</p><h2 class="pname" id="profileTitle">Browse sets</h2><p class="fine">${n ? n + " sets in the catalog." : "The catalog is still loading."}</p><p class="fine">Open a set and its owned progress stays in this panel.</p></div>`;
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="sets"><p class="eyebrow">Sets</p><h2 class="pname" id="profileTitle">Browse sets</h2><p class="fine">${n ? n + " sets, grouped by era." : "The catalog is still loading."}</p><p class="fine">Open a set to swipe it, or flip through its pages. Saved cards from that set show up here.</p></div>`;
     return;
   }
-  const pct = stats.pct == null ? "" : stats.pct + "% owned";
-  const count = stats.total ? stats.owned + " / " + stats.total : "Card count still loading";
-  profileEl.innerHTML = `<div class="profile-scroll" data-side="sets"><p class="eyebrow">Set</p><h2 class="pname" id="profileTitle">${esc(stats.name)}</h2><div class="side-progress">${ringMarkup(stats.owned, stats.total)}<div><p class="market-price">${esc(count)}</p><p class="fine">${esc(pct || "Owned progress shows once this set has a card count.")}</p></div></div>${stats.release ? `<p class="fine">${esc(stats.release)}</p>` : ""}</div>`;
+  const count = stats.total ? stats.saved + " / " + stats.total : String(stats.saved);
+  const fine = (stats.total ? "On your wishlist" : "On your wishlist so far") + (stats.owned ? " · " + stats.owned + " owned" : "");
+  profileEl.innerHTML = `<div class="profile-scroll" data-side="sets"><p class="eyebrow">Set</p><h2 class="pname" id="profileTitle">${esc(stats.name)}</h2><div class="side-progress">${ringMarkup(stats.saved, stats.total)}<div><p class="market-price">${esc(count)}</p><p class="fine">${esc(fine)}</p></div></div>${stats.release ? `<p class="fine">${esc(stats.release)}</p>` : ""}</div>`;
 }
 function binderSideKey(){
   if (!binderView) return "shelf:" + wish.length + ":" + binderState.binders.length + ":" + ownedIds.size;
@@ -3696,14 +3938,22 @@ function openSheet(id, anchor){
     sheet.style.setProperty("--pop-x", Math.max(12, x) + "px");
     sheet.style.setProperty("--pop-y", (r.bottom + 8) + "px");
   }
-  restoreFocus = document.activeElement;
+  if (!sheet.contains(document.activeElement)) restoreFocus = document.activeElement;
   const focus = sheet.querySelector(".sheet-card input, .sheet-card select, .sheet-card button, .sheet-card a");
   if (focus) focus.focus();
+  if (id === "filterSheet") {
+    const opener = document.getElementById("openFilters");
+    if (opener) opener.setAttribute("aria-expanded", "true");
+  }
   syncActs();
 }
 function closeSheet(id){
   const sheet = document.getElementById(id);
   sheet.hidden = true;
+  if (id === "filterSheet") {
+    const opener = document.getElementById("openFilters");
+    if (opener) opener.setAttribute("aria-expanded", "false");
+  }
   if (restoreFocus && restoreFocus.focus) restoreFocus.focus();
   syncActs();
 }
@@ -3725,16 +3975,24 @@ function togglePreset(pick){
   }
 }
 function drawPokemonFilter(body){
+  const host = body || document.getElementById("pokeHost");
+  if (!host) return;
+  const lock = themeLock();
+  if (lock.names) {
+    const theme = themeOf(discoveryBinder());
+    host.innerHTML = `<p class="fine">This hunt stays on ${esc(theme.name || "this Pokémon")}, including commons.</p>`;
+    return;
+  }
   const extras = (filters.names || []).filter(n => !HUNT_PICKS.some(p => presetOn(p) && p.names.some(x => sameName(x, n))));
-  body.innerHTML = `<div class="searchrow"><input id="monFind" type="search" placeholder="e.g. Pikachu" aria-label="Search a Pokémon"></div><div class="suggest" id="monSuggest"></div><div class="huntpicks" id="monPicks">${HUNT_PICKS.map(p => `<button type="button" class="huntpick ${presetOn(p) ? "on" : ""}" aria-pressed="${presetOn(p) ? "true" : "false"}" data-pick="${p.id}">${esc(p.label)}</button>`).join("")}${extras.map(n => `<button type="button" class="huntpick on" aria-pressed="true" data-extra="${esc(n)}">${esc(n)}</button>`).join("")}</div><p class="fine">Every print of a picked Pokémon stays in the hunt, including commons.</p>`;
-  const refresh = () => { drawPokemonFilter(body); saveFilters(); restart(); };
-  body.querySelectorAll("[data-pick]").forEach(btn => btn.onclick = () => {
+  host.innerHTML = `<div class="searchrow"><input id="monFind" type="search" placeholder="e.g. Pikachu" aria-label="Search a Pokémon" enterkeyhint="search" autocomplete="off"></div><div class="suggest" id="monSuggest"></div><div class="huntpicks" id="monPicks">${HUNT_PICKS.map(p => `<button type="button" class="huntpick ${presetOn(p) ? "on" : ""}" aria-pressed="${presetOn(p) ? "true" : "false"}" data-pick="${p.id}">${esc(p.label)}</button>`).join("")}${extras.map(n => `<button type="button" class="huntpick on" aria-pressed="true" data-extra="${esc(n)}">${esc(n)} ×</button>`).join("")}</div><p class="fine">Every print of a picked Pokémon stays in the hunt, including commons.</p>`;
+  const refresh = () => { drawPokemonFilter(host); saveFilters(); restart(); };
+  host.querySelectorAll("[data-pick]").forEach(btn => btn.onclick = () => {
     popBtn(btn);
     const pick = HUNT_PICKS.find(p => p.id === btn.dataset.pick);
     if (pick) togglePreset(pick);
     refresh();
   });
-  body.querySelectorAll("[data-extra]").forEach(btn => btn.onclick = () => {
+  host.querySelectorAll("[data-extra]").forEach(btn => btn.onclick = () => {
     popBtn(btn);
     filters.names = (filters.names || []).filter(n => !sameName(n, btn.dataset.extra));
     refresh();
@@ -3758,85 +4016,256 @@ function drawPokemonFilter(body){
   find.oninput = suggest;
   find.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); const name = cleanMon(find.value); if (!name) return; if (!(filters.names || []).some(n => sameName(n, name))) filters.names.push(name); refresh(); } };
 }
+function markPressed(nodes, picked){
+  nodes.forEach(btn => {
+    const on = picked(btn);
+    btn.classList.toggle("on", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+}
+function drawSetChoices(){
+  const box = document.getElementById("setChoices");
+  const find = document.getElementById("setSearch");
+  if (!box || !find) return;
+  const q = find.value.trim().toLowerCase();
+  const lock = themeLock();
+  const theme = themeOf(discoveryBinder());
+  if (!q) {
+    box.innerHTML = filters.set ? "" : `<p class="fine">Search for a set, or browse them grouped by era.</p>`;
+    return;
+  }
+  const hits = meta.sets.filter(s => !imageless.has(s.id) && (s.name.toLowerCase().includes(q) || String(s.id).toLowerCase().includes(q)));
+  if (!hits.length) { box.innerHTML = `<p class="fine">No sets match.</p>`; return; }
+  const groups = new Map();
+  hits.slice(0, 40).forEach(s => {
+    const era = eraOf(s.id);
+    if (!groups.has(era)) groups.set(era, []);
+    groups.get(era).push(s);
+  });
+  const html = [];
+  ERA_ORDER.forEach(era => {
+    const list = groups.get(era);
+    if (!list || !list.length) return;
+    html.push(`<h3 class="era-h">${esc(era)}</h3>`);
+    list.forEach(s => {
+      const on = filters.set === s.id;
+      const art = setArtUrl(s);
+      const saved = wishBit(s);
+      const disabled = lock.set && s.id !== theme.setId;
+      html.push(`<button type="button" class="setpick${on ? " on" : ""}" data-setpick="${esc(s.id)}" aria-pressed="${on ? "true" : "false"}"${disabled ? " disabled" : ""}>${art ? `<img alt="" src="${esc(art)}" data-symbol="${esc(s.symbol || "")}">` : ""}<span><b>${esc(s.name)}</b><span class="fine">${esc(saved.full)}</span></span></button>`);
+    });
+  });
+  box.innerHTML = html.join("");
+  bindSetArt(box);
+  box.querySelectorAll("[data-setpick]").forEach(btn => btn.onclick = () => {
+    if (lock.set && btn.dataset.setpick !== theme.setId) return;
+    const id = filters.set === btn.dataset.setpick ? "" : btn.dataset.setpick;
+    filters.set = id;
+    if (id && filters.era && !eraMatches(id, filters.era)) filters.era = "";
+    saveFilters();
+    restart();
+    syncFilterControls();
+    announce(id ? "Swiping " + setName(id) + "." : "Any set.");
+  });
+}
+function bindSetArt(root){
+  if (!root) return;
+  root.querySelectorAll("img").forEach(img => {
+    img.onerror = () => {
+      const symbol = img.dataset.symbol || "";
+      if (img.dataset.step !== "symbol" && symbol && img.src.indexOf(symbol) === -1) {
+        img.dataset.step = "symbol";
+        img.src = setArtUrl({ symbol });
+        return;
+      }
+      if (!img.dataset.fallback) {
+        img.dataset.fallback = "1";
+        img.src = img.src.replace(/\.webp(\?.*)?$/i, ".png");
+        return;
+      }
+      img.remove();
+    };
+  });
+}
+function syncFilterControls(){
+  const body = document.getElementById("filterBody");
+  if (!body || document.getElementById("filterSheet").hidden) return;
+  const anyPrice = !filters.pricePreset && filters.min == null && filters.max == null;
+  markPressed(body.querySelectorAll("[data-preset]"), btn => btn.dataset.preset ? filters.pricePreset === btn.dataset.preset : anyPrice);
+  markPressed(body.querySelectorAll("[data-era]"), btn => (btn.dataset.era || "") === (filters.era || ""));
+  markPressed(body.querySelectorAll("[data-type]"), btn => (btn.dataset.type || "") === (filters.type || ""));
+  markPressed(body.querySelectorAll("[data-rarity]"), btn => filters.rarities.includes(btn.dataset.rarity));
+  const graded = document.getElementById("gradedToggle");
+  if (graded) {
+    graded.classList.toggle("on", filters.graded);
+    graded.setAttribute("aria-pressed", filters.graded ? "true" : "false");
+  }
+  const min = document.getElementById("pMin");
+  const max = document.getElementById("pMax");
+  if (min && document.activeElement !== min) min.value = filters.pricePreset || filters.min == null ? "" : String(filters.min);
+  if (max && document.activeElement !== max) max.value = filters.pricePreset || filters.max == null ? "" : String(filters.max);
+  drawSetChoices();
+  paintSelectedSet();
+  paintFilterSummary();
+}
+function paintSelectedSet(){
+  const section = document.getElementById("filter-set");
+  const search = document.getElementById("setSearch");
+  if (!section || !search) return;
+  let chip = document.getElementById("clearSetPick");
+  const lock = themeLock();
+  if (!filters.set) { if (chip) chip.remove(); return; }
+  if (!chip) {
+    chip = document.createElement("button");
+    chip.type = "button";
+    chip.id = "clearSetPick";
+    section.insertBefore(chip, search);
+  }
+  chip.className = "setpick on";
+  chip.disabled = !!lock.set;
+  chip.innerHTML = `<span><b>${esc(setName(filters.set))}</b><span class="fine">${lock.set ? "Kept by the binder you are filling" : "Tap to swipe every set again"}</span></span>`;
+  chip.onclick = () => {
+    if (themeLock().set) return;
+    filters.set = "";
+    saveFilters();
+    restart();
+    syncFilterControls();
+    announce("Any set.");
+  };
+}
+function applyCustomPrice(){
+  const minEl = document.getElementById("pMin");
+  const maxEl = document.getElementById("pMax");
+  if (!minEl || !maxEl) return;
+  const rawMin = minEl.value.trim();
+  const rawMax = maxEl.value.trim();
+  const minN = rawMin === "" ? null : Number(rawMin);
+  const maxN = rawMax === "" ? null : Number(rawMax);
+  const warn = document.getElementById("pWarn");
+  if (minN != null && maxN != null && Number.isFinite(minN) && Number.isFinite(maxN) && minN > maxN) {
+    if (warn) warn.hidden = false;
+    return;
+  }
+  if (warn) warn.hidden = true;
+  filters.pricePreset = "";
+  filters.min = rawMin === "" ? null : pos(minN);
+  filters.max = rawMax === "" ? null : pos(maxN);
+  saveFilters();
+  restart();
+  syncFilterControls();
+}
 function openFilter(kind, anchor){
-  const titles = { set:"Set", pokemon:"Pokémon", rarity:"Rarity", price:"Price", era:"Era", type:"Type" };
-  document.getElementById("filterTitle").textContent = titles[kind] || "Filters";
+  document.getElementById("filterTitle").textContent = "Filters";
   const body = document.getElementById("filterBody");
   const b = discoveryBinder();
   const theme = themeOf(b);
-  if (kind === "set") {
-    body.innerHTML = `<input class="search" id="setSearch" placeholder="Search sets" aria-label="Search sets"><div id="setChoices"></div>`;
-    const draw = () => {
-      const q = document.getElementById("setSearch").value.trim().toLowerCase();
-      const locked = theme.kind === "set";
-      const any = locked || q ? "" : `<label class="choice"><input type="radio" name="setPick" value="" ${filters.set ? "" : "checked"}> Any set</label>`;
-      const rows = meta.sets.filter(s => !q || s.name.toLowerCase().includes(q)).slice(0, 80).map(s => `<label class="choice"><input type="radio" name="setPick" value="${esc(s.id)}" ${filters.set === s.id ? "checked" : ""} ${locked && s.id !== theme.setId ? "disabled" : ""}> ${esc(s.name)}</label>`).join("");
-      document.getElementById("setChoices").innerHTML = (any + rows) || `<p class="fine">No sets match.</p>`;
-      document.querySelectorAll("input[name=setPick]").forEach(input => input.onchange = () => {
-        if (theme.kind === "set" && input.value !== theme.setId) return;
-        filters.set = input.value; saveFilters(); restart();
-      });
-    };
-    document.getElementById("setSearch").oninput = draw;
-    draw();
-    if (theme.kind === "set") body.insertAdjacentHTML("afterbegin", `<p class="fine">This hunt is scoped to ${esc(setName(theme.setId))} by ${esc(b.name)}.</p>`);
-  } else if (kind === "rarity") {
-    body.innerHTML = meta.rarities.map(r => `<label class="choice"><input type="checkbox" value="${esc(r)}" ${filters.rarities.includes(r) ? "checked" : ""}> ${esc(r)}</label>`).join("") || `<p class="fine">Rarity list is still loading.</p>`;
-    body.querySelectorAll("input").forEach(input => input.onchange = () => {
-      filters.rarities = [...body.querySelectorAll("input:checked")].map(i => i.value);
-      saveFilters(); restart();
-    });
-  } else if (kind === "type") {
-    const locked = theme.kind === "type";
-    body.innerHTML = (locked ? `<p class="fine">This hunt is scoped to ${esc(theme.type)} by ${esc(b.name)}.</p>` : "") + meta.types.map(t => `<label class="choice"><input type="radio" name="typePick" value="${esc(t)}" ${filters.type === t ? "checked" : ""} ${locked && t !== theme.type ? "disabled" : ""}> ${esc(t)}</label>`).join("");
-    body.querySelectorAll("input[name=typePick]").forEach(input => input.onchange = () => { filters.type = input.value; saveFilters(); restart(); });
-  } else if (kind === "pokemon") {
-    if (theme.kind === "pokemon" && theme.name) {
-      body.innerHTML = `<p class="fine">This hunt is scoped to ${esc(theme.name)} by ${esc(b.name)}. Every ${esc(theme.name)} print is included, at any price.</p>`;
-    } else drawPokemonFilter(body);
-  } else if (kind === "era") {
-    const groups = `<p class="fine">Quick eras</p>` + ERA_GROUPS.map(g => `<label class="choice"><input type="radio" name="eraPick" value="${esc(g.id)}" ${filters.era === g.id ? "checked" : ""}> ${esc(g.label)}</label>`).join("") + `<label class="choice"><input type="radio" name="eraPick" value="" ${filters.era ? "" : "checked"}> All of it</label><p class="fine">Or one series</p>`;
-    body.innerHTML = groups + ERA_ORDER.map(era => `<label class="choice"><input type="radio" name="eraPick" value="${esc(era)}" ${filters.era === era ? "checked" : ""}> ${esc(era)}</label>`).join("");
-    body.querySelectorAll("input").forEach(input => input.onchange = () => { filters.era = input.value; saveFilters(); restart(); });
-  } else if (kind === "price") {
-    const presets = [["", "Any"], ["under10", "Under $10"], ["mid", "$10–50"], ["high", "$50+"]];
-    const anyOn = !filters.pricePreset && filters.min == null && filters.max == null;
-    body.innerHTML = `<div class="huntpicks">${presets.map(([id, label]) => { const on = id ? filters.pricePreset === id : anyOn; return `<button type="button" class="huntpick ${on ? "on" : ""}" aria-pressed="${on ? "true" : "false"}" data-preset="${id}">${label}</button>`; }).join("")}</div><div class="row2"><label class="field">Min USD<input id="pMin" inputmode="decimal" value="${filters.pricePreset ? "" : (filters.min != null ? filters.min : "")}"></label><label class="field">Max USD<input id="pMax" inputmode="decimal" value="${filters.pricePreset ? "" : (filters.max != null ? filters.max : "")}"></label></div><p class="warn" id="pWarn" hidden>Min price is higher than max price. These prices were not applied.</p><p class="fine">Any keeps every price, including cards under $10.</p>`;
-    body.querySelectorAll("[data-preset]").forEach(btn => btn.onclick = () => {
-      popBtn(btn);
-      filters.pricePreset = btn.dataset.preset || "";
-      filters.min = null;
-      filters.max = null;
-      document.getElementById("pMin").value = "";
-      document.getElementById("pMax").value = "";
-      body.querySelectorAll("[data-preset]").forEach(other => {
-        const on = other === btn;
-        other.classList.toggle("on", on);
-        other.setAttribute("aria-pressed", on ? "true" : "false");
-      });
-      saveFilters(); restart();
-    });
-    const apply = () => {
-      const min = pos(Number(document.getElementById("pMin").value));
-      const max = pos(Number(document.getElementById("pMax").value));
-      const rawMin = document.getElementById("pMin").value.trim();
-      const rawMax = document.getElementById("pMax").value.trim();
-      const minN = rawMin === "" ? null : Number(rawMin);
-      const maxN = rawMax === "" ? null : Number(rawMax);
-      const warn = document.getElementById("pWarn");
-      if (minN != null && maxN != null && Number.isFinite(minN) && Number.isFinite(maxN) && minN > maxN) { warn.hidden = false; return; }
-      warn.hidden = true;
-      filters.pricePreset = "";
-      filters.min = rawMin === "" ? null : min;
-      filters.max = rawMax === "" ? null : max;
-      saveFilters(); restart();
-    };
-    document.getElementById("pMin").oninput = apply;
-    document.getElementById("pMax").oninput = apply;
-  }
-  const liveCount = document.getElementById("filterLive");
-  if (liveCount) liveCount.textContent = document.getElementById("matchCount").textContent;
-  openSheet("filterSheet", anchor);
+  const lock = themeLock();
+  const presets = [["", "Any price"], ["under10", "Under $10"], ["mid", "$10–50"], ["high", "$50+"]];
+  const featured = ["Common", "Uncommon", "Rare", "Rare Holo", "Holo Rare", "Illustration rare", "Special illustration rare", "Ultra Rare", "Hyper rare", "Secret Rare"];
+  const known = meta.rarities.length ? meta.rarities : featured;
+  const featuredHave = featured.filter(r => known.includes(r));
+  const rest = known.filter(r => !featuredHave.includes(r));
+  const moreOpen = rest.some(r => filters.rarities.includes(r));
+  const priceButtons = presets.map(([id, label]) => `<button type="button" class="huntpick" data-preset="${id}">${label}</button>`).join("");
+  const eraButtons = [{ id:"", label:"All eras" }].concat(ERA_GROUPS).map(g => `<button type="button" class="huntpick" data-era="${esc(g.id)}">${esc(g.label)}</button>`).join("");
+  const seriesButtons = ERA_ORDER.map(era => `<button type="button" class="huntpick" data-era="${esc(era)}">${esc(era)}</button>`).join("");
+  const seriesOpen = ERA_ORDER.includes(filters.era);
+  const typeButtons = [`<button type="button" class="huntpick" data-type=""${lock.type ? " disabled" : ""}>Any type</button>`].concat(meta.types.map(t => `<button type="button" class="huntpick" data-type="${esc(t)}"${lock.type && t !== theme.type ? " disabled" : ""}>${esc(t)}</button>`)).join("");
+  const rarityButtons = featuredHave.map(r => `<button type="button" class="huntpick" data-rarity="${esc(r)}">${esc(r)}</button>`).join("");
+  const moreButtons = rest.map(r => `<button type="button" class="huntpick" data-rarity="${esc(r)}">${esc(r)}</button>`).join("");
+  const note = b && (lock.set || lock.type || lock.names) ? `<p class="fine">Some choices stay on because you are filling ${esc(b.name)}.</p>` : "";
+  body.innerHTML = `${note}
+    <section class="filter-sec" id="filter-price"><h3>Price</h3><div class="huntpicks">${priceButtons}</div><div class="row2"><label class="field">Min USD<input id="pMin" inputmode="decimal" aria-label="Minimum price in US dollars"></label><label class="field">Max USD<input id="pMax" inputmode="decimal" aria-label="Maximum price in US dollars"></label></div><p class="warn" id="pWarn" hidden>Min price is higher than max price. These prices were not applied.</p><p class="fine">Any price keeps cards under $10 in the hunt.</p></section>
+    <section class="filter-sec" id="filter-set"><h3>Set</h3>${filters.set ? `<button type="button" class="setpick on" id="clearSetPick"><span><b>${esc(setName(filters.set))}</b><span class="fine">Tap to swipe every set again</span></span></button>` : ""}<input class="search" id="setSearch" type="search" placeholder="Search sets" aria-label="Search sets" enterkeyhint="search" autocomplete="off"><div id="setChoices"></div><button class="chip" type="button" id="browseSets">Browse sets by era</button></section>
+    <section class="filter-sec" id="filter-era"><h3>Era</h3><div class="huntpicks">${eraButtons}</div><button class="chip" type="button" id="moreEras" aria-expanded="${seriesOpen ? "true" : "false"}">${seriesOpen ? "Fewer series" : "One series"}</button><div class="huntpicks" id="moreEraBox"${seriesOpen ? "" : " hidden"}>${seriesButtons}</div></section>
+    <section class="filter-sec" id="filter-rarity"><h3>Rarity</h3><div class="huntpicks">${rarityButtons || `<p class="fine">Rarity list is still loading.</p>`}</div>${moreButtons ? `<button class="chip" type="button" id="moreRarities" aria-expanded="${moreOpen ? "true" : "false"}">${moreOpen ? "Fewer rarities" : "More rarities"}</button><div class="huntpicks" id="moreRarityBox"${moreOpen ? "" : " hidden"}>${moreButtons}</div>` : ""}</section>
+    <section class="filter-sec" id="filter-type"><h3>Type</h3><div class="huntpicks">${typeButtons}</div></section>
+    <section class="filter-sec" id="filter-pokemon"><h3>Pokémon</h3><div id="pokeHost"></div></section>
+    <section class="filter-sec" id="filter-graded"><h3>Graded</h3><button type="button" class="huntpick" id="gradedToggle">Graded prices only</button><p class="fine">Uses cached graded prices. Leave this off and every raw card stays in the hunt.</p></section>
+    <button class="chip" type="button" id="sheetClear">Clear all filters</button>`;
+  body.querySelectorAll("[data-preset]").forEach(btn => btn.onclick = () => {
+    popBtn(btn);
+    filters.pricePreset = btn.dataset.preset || "";
+    filters.min = null;
+    filters.max = null;
+    saveFilters();
+    restart();
+    syncFilterControls();
+  });
+  body.querySelectorAll("[data-era]").forEach(btn => btn.onclick = () => {
+    popBtn(btn);
+    const era = btn.dataset.era || "";
+    if (lock.set && filters.set && era && !eraMatches(filters.set, era)) {
+      announce(setName(filters.set) + " stays, because this binder hunt is that set.");
+      return;
+    }
+    filters.era = era;
+    if (era && filters.set && !eraMatches(filters.set, era)) filters.set = "";
+    saveFilters();
+    restart();
+    syncFilterControls();
+  });
+  body.querySelectorAll("[data-type]").forEach(btn => btn.onclick = () => {
+    if (btn.disabled) return;
+    popBtn(btn);
+    filters.type = btn.dataset.type || "";
+    saveFilters();
+    restart();
+    syncFilterControls();
+  });
+  const toggleRarity = btn => {
+    popBtn(btn);
+    const rarity = btn.dataset.rarity;
+    if (filters.rarities.includes(rarity)) filters.rarities = filters.rarities.filter(r => r !== rarity);
+    else filters.rarities.push(rarity);
+    saveFilters();
+    restart();
+    syncFilterControls();
+  };
+  body.querySelectorAll("[data-rarity]").forEach(btn => btn.onclick = () => toggleRarity(btn));
+  const moreEras = document.getElementById("moreEras");
+  if (moreEras) moreEras.onclick = () => {
+    const box = document.getElementById("moreEraBox");
+    const open = box.hidden;
+    box.hidden = !open;
+    moreEras.setAttribute("aria-expanded", open ? "true" : "false");
+    moreEras.textContent = open ? "Fewer series" : "One series";
+  };
+  const more = document.getElementById("moreRarities");
+  if (more) more.onclick = () => {
+    const box = document.getElementById("moreRarityBox");
+    const open = box.hidden;
+    box.hidden = !open;
+    more.setAttribute("aria-expanded", open ? "true" : "false");
+    more.textContent = open ? "Fewer rarities" : "More rarities";
+  };
+  const graded = document.getElementById("gradedToggle");
+  if (graded) graded.onclick = () => {
+    popBtn(graded);
+    filters.graded = !filters.graded;
+    saveFilters();
+    restart();
+    syncFilterControls();
+  };
+  document.getElementById("pMin").oninput = applyCustomPrice;
+  document.getElementById("pMax").oninput = applyCustomPrice;
+  document.getElementById("setSearch").oninput = drawSetChoices;
+  document.getElementById("browseSets").onclick = () => {
+    closeSheet("filterSheet");
+    showTab("sets");
+    announce("Sets, grouped by era.");
+  };
+  document.getElementById("sheetClear").onclick = () => clearAllFilters();
+  drawPokemonFilter(document.getElementById("pokeHost"));
+  drawSetChoices();
+  openSheet("filterSheet", anchor || document.getElementById("openFilters"));
+  syncFilterControls();
+  const focusId = { price:"filter-price", era:"filter-era", set:"filter-set", rarity:"filter-rarity", type:"filter-type", pokemon:"filter-pokemon" }[kind];
+  const section = focusId ? document.getElementById(focusId) : null;
+  const focus = (section && section.querySelector("button, input")) || body.querySelector("[data-preset]");
+  if (focus) focus.focus();
+  if (section && kind && kind !== "all") section.scrollIntoView({ block:"start" });
+  if (!meta.ready) loadMeta().then(() => { if (!document.getElementById("filterSheet").hidden) openFilter(kind || "all", anchor); });
 }
 
 function renderSets(){
@@ -3847,27 +4276,35 @@ function renderSets(){
   const groups = new Map();
   meta.sets.forEach(s => {
     if (imageless.has(s.id)) return;
-    if (q && !s.name.toLowerCase().includes(q.toLowerCase())) return;
+    const year = setYear(s);
+    if (year) s.year = year;
+    const query = q.trim().toLowerCase();
+    const eraHit = query.length >= 3 && eraOf(s.id).toLowerCase().includes(query);
+    if (query && !s.name.toLowerCase().includes(query) && !String(s.id).toLowerCase().includes(query) && !eraHit) return;
     const era = eraOf(s.id);
     if (!groups.has(era)) groups.set(era, []);
     groups.get(era).push(s);
   });
-  const html = [`<input class="search" id="setFind" placeholder="Search sets" aria-label="Search sets" value="${esc(q)}">`];
+  const html = [`<input class="search" id="setFind" type="search" placeholder="Search sets" aria-label="Search sets" enterkeyhint="search" autocomplete="off" value="${esc(q)}">`,`<p class="fine setlead">Grouped by era. Open a set to flip through it, or swipe just that set.</p>`];
   ERA_ORDER.forEach(era => {
     const list = groups.get(era);
     if (!list || !list.length) return;
-    html.push(`<h2>${esc(era)}</h2><div class="set-grid">`);
+    html.push(`<h2 class="era-h">${esc(era)} <span class="fine">${list.length}</span></h2><div class="set-grid">`);
     list.forEach(s => {
-      const count = (s.cardCount && (s.cardCount.total || s.cardCount.official)) || "";
-      const comp = setCompletion(s);
-      const pctLabel = comp.pct == null ? "—" : comp.pct + "%";
-      const pctAria = comp.total ? comp.owned + " of " + comp.total + " owned, " + pctLabel : "Set size unknown";
-      const aria = [s.name, era, count ? count + " cards" : "", pctAria].filter(Boolean).join(", ");
-      html.push(`<button class="set-tile" type="button" data-set="${esc(s.id)}" aria-label="${esc(aria)}">${s.logo ? `<img alt="" src="${esc(s.logo + ".webp")}">` : ""}<b>${esc(s.name)}</b><span class="fine">${count ? count + " cards" : esc(era)}${s.year ? " · " + esc(s.year) : ""}</span><span class="setpct${comp.pct ? "" : " zero"}"><span class="bar" aria-hidden="true"><span style="width:${comp.pct == null ? 0 : comp.pct}%"></span></span><span class="pct">${esc(comp.pct ? pctLabel : comp.pct === 0 ? "Not started" : pctLabel)}</span></span></button>`);
+      const count = setTotal(s);
+      const wish = wishBit(s);
+      const year = setYear(s);
+      const owned = countOwnedInSet(s.id);
+      const metaLine = [count ? count + " cards" : era, year].filter(Boolean).join(" · ");
+      const ownedLine = owned ? owned + " owned" : "";
+      const aria = [s.name, era, count ? count + " cards" : "", wish.full, ownedLine].filter(Boolean).join(", ");
+      const art = setArtUrl(s);
+      html.push(`<button class="set-tile" type="button" data-set="${esc(s.id)}" aria-label="${esc(aria)}">${art ? `<img alt="" src="${esc(art)}" data-symbol="${esc(s.symbol || "")}">` : ""}<b>${esc(s.name)}</b><span class="fine">${esc(metaLine)}${ownedLine ? " · " + esc(ownedLine) : ""}</span><span class="setpct${wish.saved ? "" : " zero"}"><span class="bar" aria-hidden="true"><span style="width:${wish.pct}%"></span></span><span class="pct"><span class="wishheart" aria-hidden="true">${wish.saved ? "♥" : "♡"}</span> ${esc(wish.short)}</span></span></button>`);
     });
     html.push(`</div>`);
   });
-  if (html.length === 1) html.push(`<p class="empty-state">No sets match. ${toad()}</p>`);
+  if (!meta.ready && !meta.sets.length) html.push(`<p class="fine">The catalog is still loading.</p>`);
+  else if (html.length === 2) html.push(`<p class="empty-state">No sets match. ${toad()}</p>`);
   const focused = document.activeElement && document.activeElement.id === "setFind";
   const caret = focused ? document.activeElement.selectionStart : null;
   root.innerHTML = html.join("");
@@ -3877,12 +4314,7 @@ function renderSets(){
     if (focused) { find.focus(); if (caret != null) find.setSelectionRange(caret, caret); }
   }
   root.querySelectorAll("[data-set]").forEach(btn => btn.onclick = () => openSet(btn.dataset.set));
-  root.querySelectorAll(".set-tile img").forEach(img => {
-    img.onerror = () => {
-      if (!img.dataset.fallback) { img.dataset.fallback = "1"; img.src = img.src.replace(/\.webp(\?.*)?$/, ".png"); return; }
-      img.remove();
-    };
-  });
+  bindSetArt(root);
 }
 async function openSet(id){
   countEvent("set-mode");
@@ -3910,11 +4342,13 @@ function renderSetPage(root){
   const s = setView;
   const knownSet = meta.sets.find(x => x.id === s.id);
   const total = setTotal(knownSet) || s.cards.length || 0;
+  const saved = wishInSet(s.id);
   const owned = clampedOwned(countOwnedInSet(s.id, s.cards), total);
-  const pct = total ? Math.max(0, Math.min(100, Math.round(owned / total * 100))) : 0;
-  const progressLine = total ? pct + "% · " + owned + " / " + total + " owned" + (owned > 0 ? " · " + progressLabel(owned, total) : "") : "Owned progress shows once this set has a card count.";
+  const pct = total ? Math.max(0, Math.min(100, Math.round(saved / total * 100))) : 0;
+  const progressLine = (total ? saved + " of " + total : String(saved)) + " on your wishlist" + (owned ? " · " + owned + " owned" : "");
   if (s.mode !== "flip" && s.mode !== "about") s.mode = "flip";
-  const logo = knownSet && knownSet.logo ? `<img class="setlogo" alt="" src="${esc(knownSet.logo + ".webp")}" onerror="this.remove()">` : "";
+  const art = setArtUrl(knownSet);
+  const logo = art ? `<img class="setlogo" alt="" src="${esc(art)}" data-symbol="${esc((knownSet && knownSet.symbol) || "")}">` : "";
   root.innerHTML = `<div class="setpage"><div class="sethead"><button class="chip" id="backSets" type="button" aria-label="All sets">←</button>
     ${logo}<div class="setname"><h2>${esc(s.name)}</h2><p class="fine">${esc([s.release, eraOf(s.id), total ? total + " cards" : ""].filter(Boolean).join(" · "))}</p></div></div>
     <div class="setstats">
@@ -3922,10 +4356,12 @@ function renderSetPage(root){
       <button class="chip go" id="swipeSet" type="button">Swipe this set</button>
     </div>
     <div class="setflip" id="setBody"></div></div>`;
+  bindSetArt(root);
   document.getElementById("backSets").onclick = () => { setView = null; renderSets(); paintContext(); };
   document.getElementById("swipeSet").onclick = () => {
     binderState.discoveryId = "";
     saveBinders();
+    dropHeldFilters();
     filters = blankFilters();
     filters.set = s.id;
     saveFilters();
@@ -5091,6 +5527,7 @@ function startDiscovery(id){
   binderState.discoveryId = id;
   saveBinders();
   const theme = themeOf(binder);
+  dropHeldFilters();
   filters = blankFilters();
   if (theme.kind === "set") filters.set = theme.setId;
   if (theme.kind === "type") filters.type = theme.type;
@@ -5837,20 +6274,13 @@ function openSettingsPanel(){
 }
 document.querySelectorAll("[data-gear]").forEach(btn => btn.onclick = openSettingsPanel);
 document.getElementById("railWish").onclick = () => { binderView = { kind:"wish" }; flipPage = 0; showTab("binders"); };
-document.querySelectorAll(".backdrop").forEach(btn => btn.onclick = () => btn.parentElement.hidden = true);
-document.querySelectorAll("[data-filter]").forEach(btn => btn.onclick = () => openFilter(btn.dataset.filter, btn));
-document.getElementById("gradedChip").onclick = () => { filters.graded = !filters.graded; saveFilters(); restart(); };
-document.getElementById("resetFilters").onclick = () => {
-  const b = discoveryBinder();
-  filters = blankFilters();
-  if (b) {
-    const t = themeOf(b);
-    if (t.kind === "set") filters.set = t.setId;
-    if (t.kind === "type") filters.type = t.type;
-    if (t.kind === "pokemon" && t.name) filters.names = [t.name];
-  }
-  saveFilters(); restart();
-};
+document.querySelectorAll(".backdrop").forEach(btn => btn.onclick = () => {
+  const sheet = btn.parentElement;
+  if (sheet && sheet.id) closeSheet(sheet.id);
+});
+document.getElementById("openFilters").onclick = () => openFilter("all", document.getElementById("openFilters"));
+document.getElementById("filterDone").onclick = () => closeSheet("filterSheet");
+document.getElementById("resetFilters").onclick = () => clearAllFilters();
 document.getElementById("stopDiscovery").onclick = () => {
   const b = discoveryBinder();
   binderState.discoveryId = "";
@@ -5865,7 +6295,7 @@ document.getElementById("stopDiscovery").onclick = () => {
   paintDiscovery();
   restart();
 };
-document.getElementById("context").onclick = () => { if (tab === "hunt") openFilter(filters.set || discoveryBinder() ? "set" : "set", document.getElementById("context")); else if (tab === "sets" && setView) { setView = null; renderSets(); } else if (tab === "binders" && binderView) { binderView = null; renderBinders(); } };
+document.getElementById("context").onclick = () => { if (tab === "hunt") openFilter("all", document.getElementById("openFilters")); else if (tab === "sets" && setView) { setView = null; renderSets(); } else if (tab === "binders" && binderView) { binderView = null; renderBinders(); } };
 document.getElementById("skip").onclick = () => fly(-1);
 document.getElementById("save").onclick = () => fly(1);
 document.getElementById("undo").onclick = undo;
@@ -5919,7 +6349,7 @@ document.addEventListener("keydown", e => {
   }
   if (typingTarget(e.target) || blocking()) return;
   if (document.getElementById("showcase") && !document.getElementById("showcase").hidden) return;
-  if ((e.key === "f" || e.key === "F") && tab === "hunt") { e.preventDefault(); openFilter("set", document.querySelector("[data-filter=set]")); return; }
+  if ((e.key === "f" || e.key === "F") && tab === "hunt") { e.preventDefault(); openFilter("all", document.getElementById("openFilters")); return; }
   if (e.key === "z" || e.key === "Z") { if (tab === "hunt") undo(); return; }
   if (tab === "hunt" && !blocking()) {
     if (e.key === "ArrowLeft") fly(-1);
@@ -5941,7 +6371,7 @@ applyMotion();
 bindShowcase();
 syncProfilePane();
 matchMedia("(min-width: 1024px)").addEventListener("change", syncProfilePane);
-document.getElementById("chips").addEventListener("scroll", syncChipFade);
+document.getElementById("activeChips").addEventListener("scroll", syncChipFade);
 document.getElementById("cardSearch").onsubmit = e => {
   e.preventDefault();
   const name = cleanMon(document.getElementById("cardFind").value);
@@ -6110,6 +6540,7 @@ function skipOnboard(){
 function finishOnboard(){
   if (onboardStep === 1) { onboardStep = 2; renderOnboard(); return; }
   const names = namesFromOnboard();
+  dropHeldFilters();
   filters = blankFilters();
   filters.names = names;
   filters.era = onboardEra || "";
@@ -6138,10 +6569,14 @@ paintContext();
 paintDiscovery();
 loadScrydex();
 loadMeta().then(() => {
+  settleStoredFilters();
   backfillOwnedSets();
   quietSeedSets();
   if (tab === "sets") renderSets();
   if (tab === "binders") renderBinders();
+  paintChips();
+  paintCount();
+  paintContext();
 }).catch(() => {});
 const RECENT_KEY = "bh.recent.v1";
 const PWA_KEY = "bh.pwa.v1";
