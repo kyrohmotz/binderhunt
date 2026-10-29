@@ -194,7 +194,32 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 .grade span{font-size:12px;color:var(--ink-2)}
 .grade b{font-variant-numeric:tabular-nums;font-size:16px;margin-top:2px}
 .grade small{margin-top:2px}
+.grade b,.grade span,.grade small{overflow-wrap:anywhere}
+.grade-grid{list-style:none;padding:0;margin-left:0;margin-right:0;margin-bottom:0}
+.phead .thumb,.hero-row .thumb{width:56px;height:78px;min-width:56px;max-width:56px;max-height:78px;flex:0 0 56px}
+.hero-row .thumb{overflow:visible}
+.hero-row .thumb img{width:100%;height:100%;max-width:100%;border-radius:8px;object-fit:contain}
+#profile button:focus-visible,
+#profile a:focus-visible,
+#profile svg:focus-visible,
+#profile [tabindex="0"]:focus-visible{outline:3px solid #2FA9D9;outline-offset:3px}
+.price-hero{container-type:inline-size;margin-top:2px;min-width:0}
+.price-hero .market{margin-top:0;align-items:flex-start}
+.price-hero .market-price{font-size:40px;font-size:clamp(34px,13cqi,52px);line-height:1.02}
+.hero-row{align-items:flex-end;justify-content:space-between}
+.hero-row .market{flex:1;min-width:0;margin:0}
+.price-block{margin-top:14px;min-width:0}
+.price-block .ranges button{min-height:44px;max-width:100%}
+.price-block .ranges button.move.up:not([aria-pressed="true"]){background:var(--green)}
+.price-block .ranges button.move.down:not([aria-pressed="true"]){background:var(--rose)}
+.price-block .ranges button.move.flat:not([aria-pressed="true"]){background:var(--paper)}
+.quiet{margin:4px 0 0;color:var(--ink-2);font-size:14px;line-height:1.45}
+.profile-tools{position:sticky;top:0;z-index:3;justify-content:flex-end;background:var(--paper);margin:0 0 2px;padding:0 0 6px}
+.profile-rest{margin-top:16px;padding-top:12px;border-top:2px solid var(--line);min-width:0}
+.profile-rest .pname{font-size:22px}
+.phead-copy{min-width:0;flex:1}
 .chart-wrap{margin-top:8px;background:#fff;border:2.5px solid var(--ink);border-radius:16px;padding:8px;box-shadow:2px 2px 0 var(--ink)}
+#profile :focus-visible{outline:3px solid var(--sky-deep);outline-offset:3px}
 .rangebar{position:relative;min-width:0}
 .rangebar::after{content:"";position:absolute;top:0;right:0;bottom:0;width:36px;pointer-events:none;background:linear-gradient(90deg,rgba(255,255,255,0),#fff);opacity:0}
 .rangebar.more::after{opacity:1}
@@ -484,6 +509,7 @@ html.reduce .sleeve.holo img{transform:none}
 .ownrow .fine{margin:0;min-width:0}
 .ownchip{flex:none}
 .ownchip[aria-pressed="true"]{background:var(--green);color:var(--ink)}
+.wishchip,.wishchip[aria-pressed="true"]{background:var(--green);color:var(--ink)}
 /* Cloth-bound binder. Texture is a static image; motion is transform and opacity only. */
 :root{--cloth:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");--sage-thread:#ABB28D}
 .wish-row{position:relative;overflow:hidden;align-items:center;background:linear-gradient(180deg,rgba(255,255,255,.55),transparent 46%),linear-gradient(135deg,#f5fcff,#c9f0ff);border-radius:18px;padding:12px 12px 12px 22px}
@@ -1095,7 +1121,8 @@ let sideKey = "";
 let deckTopId = "";
 let deckTopSeen = false;
 let variantChoice = new Map();
-let chartRange = "3M";
+let chartRange = "90d";
+let historyPicked = false;
 let compareGrade = "";
 let reserved = new Set();
 let pendingSwipes = [];
@@ -5141,12 +5168,15 @@ function droppedCountMarkup(n){
   const label = n === 1 ? "1 wishlisted card dropped" : n + " wishlisted cards dropped";
   return `<span class="drop-badge drop-count"><span aria-hidden="true">Dropped ${n}</span><span class="sr-only">${esc(label)}</span></span>`;
 }
-function marketBlock(card, variant, shown, delta){
+function marketBlock(card, variant, shown){
   const badge = dropBadgeMarkup(priceDrop(card));
-  const move = !badge && delta != null && Number.isFinite(delta) ? delta : null;
-  const deltaHtml = move == null ? "" : `<span class="delta ${move < 0 ? "down" : ""}">${move < 0 ? "▼" : "▲"} ${Math.abs(move).toFixed(1)}%</span>`;
   const price = shown ? priceText(shown.amount, shown.currency) : "—";
-  return `<div class="market"><div class="market-copy"><p class="eyebrow">${esc(marketCaption(card, variant))}</p><div class="price-row"><p class="market-price">${esc(price)}</p>${badge}</div></div>${deltaHtml}</div>`;
+  const caption = settings.currency === "EUR" ? "Cardmarket average" : "Raw · ungraded";
+  const printing = marketCaption(card, variant);
+  const detail = settings.currency === "EUR"
+    ? (variant && variant.label ? variant.label : "European average")
+    : (printing && printing !== "Market (raw NM)" ? printing + " · near mint" : "Near mint · TCGplayer");
+  return `<div class="market"><div class="market-copy"><p class="eyebrow">${esc(caption)}</p><div class="price-row"><p class="market-price">${esc(price)}</p>${badge}</div>${detail ? `<p class="fine">${esc(detail)}</p>` : ""}</div></div>`;
 }
 function trendHistory(card){
   const variant = selectedVariant(card);
@@ -5214,7 +5244,7 @@ function ensureFx(){
 }
 function priceSeries(card){
   const sales = scryHistory(card);
-  if (sales.length >= 2) return { points:sales, source:"sales", currency:"USD", note:"Drag along the line for a day." };
+  if (sales.length >= 2) return { points:sales, source:"sales", currency:"USD", note:"Drag the line, or focus it and use the arrow keys, for a day." };
   const trend = trendHistory(card);
   if (trend.length >= 2) {
     if (settings.currency === "EUR") return { points:trend, source:"trend", currency:"EUR", note:"Cardmarket 30-day, 7-day, and 1-day averages, in euros. Not a daily sales history." };
@@ -5249,6 +5279,260 @@ function change30(points){
   const pct = (last.value - prev.value) / prev.value * 100;
   return Number.isFinite(pct) ? pct : null;
 }
+function seriesWindow(points, days){
+  if (!points || !points.length) return [];
+  const last = points[points.length - 1].t;
+  if (!(last > 0)) return [];
+  const span = days * 86400000;
+  return points.filter(p => p && p.t > 0 && p.value > 0 && last - p.t <= span);
+}
+function covered(points, minSpan){
+  if (!points || points.length < 2) return false;
+  const span = (points[points.length - 1].t - points[0].t) / 86400000;
+  return Number.isFinite(span) && span + 1e-6 >= minSpan;
+}
+// 30-day and 90-day moves use the cached series only. The baseline is the
+// newest point on or before the window, and it has to sit close to that
+// window so a short series is not labelled as a 90-day change.
+function windowMove(points, days, minLag, maxLag){
+  if (!points || points.length < 2) return null;
+  const last = points[points.length - 1];
+  if (!last || !(last.value > 0) || !(last.t > 0)) return null;
+  const target = last.t - days * 86400000;
+  let prev = null;
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i];
+    if (point && point.t <= target && point.value > 0) prev = point;
+  }
+  if (!prev && points[0] && points[0].value > 0) {
+    const lag0 = (last.t - points[0].t) / 86400000;
+    if (lag0 >= minLag && lag0 <= maxLag) prev = points[0];
+  }
+  if (!prev || !(prev.t > 0) || !(prev.value > 0)) return null;
+  const lag = (last.t - prev.t) / 86400000;
+  if (!(lag >= minLag && lag <= maxLag)) return null;
+  const pct = (last.value - prev.value) / prev.value * 100;
+  if (!Number.isFinite(pct)) return null;
+  const dir = pct >= 0.05 ? "up" : pct <= -0.05 ? "down" : "flat";
+  const shown = dir === "flat" ? 0 : Math.round(Math.abs(pct) * 10) / 10;
+  if (!Number.isFinite(shown) || (dir !== "flat" && shown <= 0)) return null;
+  return { pct, shown, dir, days:Math.round(lag) };
+}
+function historyView(points){
+  const pack = days => {
+    const windowed = seriesWindow(points, days);
+    const minSpan = days === 90 ? 75 : 30;
+    return { days, points:windowed, ok:covered(windowed, minSpan) };
+  };
+  const choice = chartRange === "30d" || chartRange === "1M" ? 30 : 90;
+  if (historyPicked) return pack(choice);
+  const quarter = pack(90);
+  if (quarter.ok) return quarter;
+  const month = pack(30);
+  if (month.ok) return month;
+  return quarter;
+}
+function moveWord(move){
+  const word = move.dir === "down" ? "down" : move.dir === "up" ? "up" : "unchanged";
+  return word + " " + move.shown.toFixed(1) + " percent";
+}
+function lineStroke(move){
+  if (!move || move.dir === "flat") return "#2FA9D9";
+  return move.dir === "down" ? "#8d4a4a" : "#737863";
+}
+function historyAria(view, currency, move30, move90){
+  const pts = view.points || [];
+  const bits = ["Raw price history"];
+  if (pts.length >= 2) {
+    const from = priceText(pts[0].value, currency);
+    const to = priceText(pts[pts.length - 1].value, currency);
+    if (from !== "—" && to !== "—") bits.push("from " + from + " to " + to);
+  }
+  if (move30) bits.push("30 day " + moveWord(move30));
+  if (move90) bits.push("90 day " + moveWord(move90));
+  return bits.join(", ");
+}
+function historyCaption(view){
+  const pts = view.points || [];
+  if (pts.length < 2 || !/^\d{4}/.test(String(pts[0].label || ""))) return "";
+  const day = label => String(label || "").slice(5).replace("-", "/");
+  const span = Math.round((pts[pts.length - 1].t - pts[0].t) / 86400000);
+  const length = Number.isFinite(span) && span > 0 ? span + " days · " : "";
+  return length + day(pts[0].label) + " – " + day(pts[pts.length - 1].label);
+}
+function rangeButton(days, move, pressed){
+  const id = days + "d";
+  const arrow = !move ? "" : move.dir === "down" ? "▼" : move.dir === "up" ? "▲" : "–";
+  const face = move ? id + " " + arrow + " " + move.shown.toFixed(1) + "%" : id;
+  const spoken = move ? days + " day change, " + moveWord(move) : days + " day change unavailable";
+  const tone = move ? "move " + move.dir : "";
+  return `<button type="button" class="${tone}" data-range="${id}" aria-pressed="${pressed ? "true" : "false"}" aria-label="${esc(spoken)}">${esc(face)}</button>`;
+}
+function gradeRank(grade){
+  const n = Number(grade);
+  return Number.isFinite(n) ? n : -1;
+}
+function rowsForCompany(facts, company){
+  return (facts.prices || []).filter(p => {
+    if (!p || p.company !== company) return false;
+    const market = pos(p.market);
+    if (!market) return false;
+    try { return !!money(market, p.currency || "USD"); }
+    catch (e) { return !!money(market, "USD"); }
+  });
+}
+function pickGrade(rows, grade){
+  return rows.find(p => String(p.grade) === String(grade)) || null;
+}
+function highestGrade(rows){
+  if (!rows.length) return null;
+  return rows.slice().sort((a, b) => gradeRank(b.grade) - gradeRank(a.grade) || String(a.grade).localeCompare(String(b.grade)))[0];
+}
+function gradeSlot(facts, row){
+  if (!row) return null;
+  const market = pos(row.market);
+  if (!market) return null;
+  let text = null;
+  try { text = money(market, row.currency || "USD"); }
+  catch (e) { text = money(market, "USD"); }
+  if (!text) return null;
+  const popReport = (facts.pops || []).find(p => p.company === row.company);
+  const pop = popReport && (popReport.grades || []).find(g => String(g.grade) === String(row.grade));
+  const count = pop && typeof pop.count === "number" && Number.isFinite(pop.count) && pop.count >= 0 ? pop.count : null;
+  return { company:row.company, grade:String(row.grade), text, count };
+}
+function headlineGrades(facts){
+  const out = [];
+  const push = row => {
+    const slot = gradeSlot(facts, row);
+    if (!slot) return;
+    if (out.some(s => s.company === slot.company && s.grade === slot.grade)) return;
+    out.push(slot);
+  };
+  const psa = rowsForCompany(facts, "PSA");
+  const psa10 = pickGrade(psa, "10");
+  const psa9 = pickGrade(psa, "9");
+  if (psa10) push(psa10);
+  if (psa9) push(psa9);
+  if (!psa10 && !psa9) push(highestGrade(psa));
+  ["BGS", "CGC"].forEach(company => {
+    const rows = rowsForCompany(facts, company);
+    push(pickGrade(rows, "10") || pickGrade(rows, "9.5") || pickGrade(rows, "9") || highestGrade(rows));
+  });
+  return out;
+}
+function gradedSection(facts, queued){
+  const head = `<section class="price-block" aria-label="Graded prices"><p class="eyebrow">Graded</p>`;
+  if (!scrydex.ready) return head + `<p class="fine">Checking graded prices…</p></section>`;
+  const slots = headlineGrades(facts);
+  if (!slots.length) {
+    return head + `<p class="quiet">No graded sales yet</p>${queued ? `<p class="fine">Queued for the next price batch.</p>` : ""}</section>`;
+  }
+  const cells = slots.map(slot => {
+    const pop = slot.count == null ? "" : `<small class="fine">Pop ${esc(groupNum(slot.count))}</small>`;
+    return `<li class="grade"><span>${esc(slot.company + " " + slot.grade)}</span><b>${esc(slot.text)}</b>${pop}</li>`;
+  }).join("");
+  return head + `<ul class="grade-grid">${cells}</ul></section>`;
+}
+function historySection(view, series, move30, move90, svg, scrubId){
+  const quiet = series.pendingFx ? "Checking the dollar rate…" : "Not enough price history";
+  const head = `<section class="price-block" aria-label="Price history"><p class="eyebrow">Price history</p>`;
+  if (!series.points || series.points.length < 2) return head + `<p class="quiet">${esc(quiet)}</p></section>`;
+  const buttons = `<div class="rangebar"><div class="ranges" role="group" aria-label="30 day and 90 day change">${rangeButton(30, move30, view.days === 30)}${rangeButton(90, move90, view.days === 90)}</div></div>`;
+  if (!view.ok || !svg) return head + buttons + `<p class="quiet">${esc(quiet)}</p></section>`;
+  const caption = [series.note, historyCaption(view)].filter(Boolean).join(" ");
+  return head + buttons + `<div class="chart-wrap">${svg}<p class="scrub" id="${scrubId}" aria-live="polite">${esc(caption)}</p></div></section>`;
+}
+function priceStory(card, opts){
+  const queued = !!(opts && opts.queued);
+  const summary = !!(opts && opts.summary);
+  const variant = selectedVariant(card);
+  const shown = printingMoney(card, variant);
+  const rawSeries = priceSeries(card);
+  const thinTrend = rawSeries.source === "trend" && !rawSeries.pendingFx && trendIsThin(rawSeries.points);
+  const series = thinTrend ? { points:[], source:"", currency:rawSeries.currency || "USD", note:"", pendingFx:!!rawSeries.pendingFx } : rawSeries;
+  const move30 = windowMove(series.points, 30, 30, 45);
+  const move90 = windowMove(series.points, 90, 75, 100);
+  const view = historyView(series.points);
+  const stroke = lineStroke(view.days === 30 ? move30 : move90);
+  const aria = historyAria(view, series.currency || "USD", move30, move90);
+  const svg = view.ok ? chartSvg(view.points, null, series.currency, aria, stroke) : "";
+  const facts = gradeFacts(card);
+  const banner = scanBanner(card);
+  const scrubId = summary ? "summaryScrub" : "scrub";
+  const thumbId = opts && opts.thumbId;
+  const thumb = thumbId ? `<button class="thumb" id="${thumbId}" type="button" aria-label="Look at ${esc(card.name || "this card")} up close"></button>` : "";
+  const html = `<section class="price-hero" aria-label="Raw ungraded market price"><div class="phead hero-row">${marketBlock(card, variant, shown)}${thumb}</div></section>${banner ? `<p class="note">${esc(banner)}</p>` : ""}${gradedSection(facts, queued)}${historySection(view, series, move30, move90, svg, scrubId)}`;
+  return { html, series, windowed:view.ok ? view.points : [], scrubId, variant };
+}
+function bindChart(svgEl, points, currency, scrub){
+  if (!svgEl || !points || points.length < 2) return;
+  const show = index => {
+    if (!scrub) return;
+    const i = Math.max(0, Math.min(points.length - 1, index));
+    const point = points[i];
+    if (!point || !(point.value > 0)) return;
+    const text = priceText(point.value, currency);
+    if (!text || text === "—") return;
+    scrub.textContent = (point.label || "") + " · " + text;
+    svgEl.dataset.index = String(i);
+  };
+  svgEl.addEventListener("pointermove", e => {
+    const rect = svgEl.getBoundingClientRect();
+    if (!(rect.width > 0)) return;
+    const x = (e.clientX - rect.left) / rect.width;
+    show(Math.round(x * (points.length - 1)));
+  });
+  svgEl.addEventListener("keydown", e => {
+    const current = Number(svgEl.dataset.index || points.length - 1);
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "Home" && e.key !== "End") return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === "ArrowRight") show((Number.isFinite(current) ? current : points.length - 1) + 1);
+    if (e.key === "ArrowLeft") show((Number.isFinite(current) ? current : points.length - 1) - 1);
+    if (e.key === "Home") show(0);
+    if (e.key === "End") show(points.length - 1);
+  });
+}
+function bindPriceStory(story, rerender){
+  profileEl.querySelectorAll("[data-range]").forEach(btn => btn.onclick = () => {
+    historyPicked = true;
+    chartRange = btn.dataset.range;
+    rerender();
+    const again = profileEl.querySelector('[data-range="' + chartRange + '"]');
+    if (again) again.focus();
+  });
+  const svgEl = profileEl.querySelector(".chart");
+  const scrub = document.getElementById(story.scrubId);
+  if (svgEl) bindChart(svgEl, story.windowed, story.series.currency, scrub);
+  const ranges = profileEl.querySelector(".ranges");
+  if (ranges) {
+    const fade = () => {
+      const wrap = ranges.parentElement;
+      if (!wrap) return;
+      wrap.classList.toggle("more", ranges.scrollWidth > ranges.clientWidth + 2 && ranges.scrollLeft + ranges.clientWidth < ranges.scrollWidth - 2);
+    };
+    ranges.addEventListener("scroll", fade, { passive:true });
+    requestAnimationFrame(fade);
+  }
+}
+function coreFacts(card){
+  return [
+    fact("Set", card.set),
+    fact("Number", card.number),
+    fact("Rarity", card.rarity),
+    fact("Artist", card.artist)
+  ].join("");
+}
+function variantToggle(card, variant){
+  const variants = (card.variants || []).filter(v => pos(v.market));
+  if (variants.length < 2) return "";
+  return `<div class="vtoggle" role="group" aria-label="Printings">${variants.map(v => `<button type="button" data-variant="${esc(v.key)}" aria-pressed="${variant && variant.key === v.key ? "true" : "false"}">${esc(v.label)}</button>`).join("")}</div>`;
+}
+function focusVariant(key){
+  const again = [...profileEl.querySelectorAll("[data-variant]")].find(btn => btn.dataset.variant === key);
+  if (again) again.focus();
+}
 function gradeFacts(card){
   const rec = scryRecord(card);
   const variant = selectedVariant(card);
@@ -5261,26 +5545,38 @@ function gradeFacts(card){
     pops: name ? (rec.pop || []).filter(p => p.variant === name) : []
   };
 }
-function chartSvg(points, guide, currency){
-  if (points.length < 2) return "";
+function chartSvg(points, guide, currency, label, stroke){
+  if (!points || points.length < 2) return "";
   const vals = points.map(p => p.value);
+  if (!vals.every(v => typeof v === "number" && Number.isFinite(v) && v > 0)) return "";
   let min = Math.min(...vals), max = Math.max(...vals);
-  if (guide) { min = Math.min(min, guide.value); max = Math.max(max, guide.value); }
+  if (guide && typeof guide.value === "number" && Number.isFinite(guide.value) && guide.value > 0) {
+    min = Math.min(min, guide.value);
+    max = Math.max(max, guide.value);
+  }
+  if (!(max > 0) || !Number.isFinite(min) || !Number.isFinite(max)) return "";
   if (min === max) { min *= 0.9; max *= 1.1; }
-  const w = 360, h = 148, padL = 56, padR = 10, padT = 14, padB = 26;
-  const xOf = i => padL + (points.length === 1 ? 0 : i * (w - padL - padR) / (points.length - 1));
+  if (!(max > min)) return "";
+  const w = 360, h = 124, padL = 56, padR = 10, padT = 16, padB = 24;
+  const xOf = i => padL + i * (w - padL - padR) / (points.length - 1);
   const yOf = v => padT + (1 - (v - min) / (max - min)) * (h - padT - padB);
   const d = points.map((p, i) => `${i ? "L" : "M"}${xOf(i).toFixed(1)},${yOf(p.value).toFixed(1)}`).join(" ");
   const ticks = [0, Math.round((points.length - 1) / 2), points.length - 1];
   const axis = [...new Set(ticks)].map(i => {
     const anchor = i === 0 ? "start" : i === points.length - 1 ? "end" : "middle";
     const raw = points[i].label || "";
-    const label = /^\d{4}/.test(raw) ? raw.slice(5).replace("-", "/") : raw.replace(" average", "").replace("-day avg", "d");
-    return `<text x="${i === 0 ? padL : i === points.length - 1 ? w - padR : xOf(i)}" y="${h - 6}" text-anchor="${anchor}" fill="#404241" font-size="11">${esc(label)}</text>`;
+    const text = /^\d{4}/.test(raw) ? raw.slice(5).replace("-", "/") : raw.replace(" average", "").replace("-day avg", "d");
+    return `<text x="${i === 0 ? padL : i === points.length - 1 ? w - padR : xOf(i)}" y="${h - 6}" text-anchor="${anchor}" fill="#404241" font-size="11">${esc(text)}</text>`;
   }).join("");
-  const guideLine = guide ? `<line x1="${padL}" x2="${w - padR}" y1="${yOf(guide.value).toFixed(1)}" y2="${yOf(guide.value).toFixed(1)}" stroke="#737863" stroke-dasharray="5 4" stroke-width="2"/>` : "";
+  const guideLine = guide && guide.value > 0 ? `<line x1="${padL}" x2="${w - padR}" y1="${yOf(guide.value).toFixed(1)}" y2="${yOf(guide.value).toFixed(1)}" stroke="#737863" stroke-dasharray="5 4" stroke-width="2"/>` : "";
   const moneyCur = currency || "USD";
-  return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Price history"><path d="${d}" fill="none" stroke="#2FA9D9" stroke-width="3" stroke-linejoin="round"/>${guideLine}<text x="4" y="14" fill="#404241" font-size="11">${esc(compactMoney(max, moneyCur))}</text><text x="4" y="${h - padB}" fill="#404241" font-size="11">${esc(compactMoney(min, moneyCur))}</text>${axis}</svg>`;
+  const hi = compactMoney(max, moneyCur);
+  const lo = compactMoney(min, moneyCur);
+  const line = stroke || "#2FA9D9";
+  const lastX = xOf(points.length - 1).toFixed(1);
+  const lastY = yOf(points[points.length - 1].value).toFixed(1);
+  const aria = label || "Price history";
+  return `<svg class="chart" tabindex="0" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(aria)}"><path d="${d}" fill="none" stroke="${line}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${lastX}" cy="${lastY}" r="4" fill="${line}"/>${guideLine}${hi ? `<text x="4" y="14" fill="#404241" font-size="11">${esc(hi)}</text>` : ""}${lo ? `<text x="4" y="${h - padB}" fill="#404241" font-size="11">${esc(lo)}</text>` : ""}${axis}</svg>`;
 }
 function currentTop(){
   const top = [...deck.querySelectorAll(".card")].reverse().find(el => el.card && !el.classList.contains("leaving"));
@@ -5321,59 +5617,39 @@ function renderSummary(card){
   profileEl.hidden = false;
   shell.classList.remove("no-profile");
   profileEl.removeAttribute("aria-modal");
-  const variant = selectedVariant(card);
-  const shown = printingMoney(card, variant);
-  const rawSeries = priceSeries(card);
-  const thinTrend = rawSeries.source === "trend" && !rawSeries.pendingFx && trendIsThin(rawSeries.points);
-  const series = thinTrend ? { points:[], source:"", currency:"USD" } : rawSeries;
-  const windowed = ranged(series.points);
-  const delta = series.source === "sales" ? change30(series.points) : change30(windowed);
-  const facts = gradeFacts(card);
-  const svg = chartSvg(windowed, null, series.currency);
-  const gradedReady = scrydex.ready;
-  const gradedKnown = gradedReady && gradesAvailable(facts);
-  const variants = (card.variants || []).filter(v => pos(v.market));
+  const story = priceStory(card, { summary:true });
   profileEl.innerHTML = `<div class="profile-scroll profile-summary" data-summary="1">
     <p class="eyebrow">On the table</p>
-    <div class="phead">
-      <div class="thumb" id="summaryThumb"></div>
-      <div style="min-width:0;flex:1"><h2 class="pname" id="profileTitle">${esc(card.name || "Card")}</h2><p class="fine">${esc([card.set, card.number ? "#" + card.number : "", card.rarity].filter(Boolean).join(" · "))}</p></div>
-    </div>
-    ${marketBlock(card, variant, shown, delta)}
-    ${variants.length > 1 ? `<div class="vtoggle" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${variants.map(v => `<button type="button" data-variant="${esc(v.key)}" aria-pressed="${variant && variant.key === v.key ? "true" : "false"}">${esc(v.label)}</button>`).join("")}</div>` : ""}
-    ${!gradedReady ? `<p class="fine">Checking graded prices…</p>` : gradedKnown ? `<div class="grade-grid">${GRADES.map(([company, grade]) => gradeCell(facts, company, grade)).join("")}</div>` : `<p class="note">No graded sales yet</p>`}
-    <div class="chart-wrap">
-      <div class="rangebar"><div class="ranges">${["1M","3M","1Y","All"].map(r => `<button type="button" data-range="${r}" aria-pressed="${chartRange === r ? "true" : "false"}">${r}</button>`).join("")}</div></div>
-      ${svg || `<p class="empty-state">${series.pendingFx ? "Checking the dollar rate…" : "Not enough price history"}</p>`}
-      <p class="scrub" id="summaryScrub">${esc(series.note || "")}</p>
-    </div>
-    <h2>Details</h2>
-    <div class="facts">
-      ${fact("Artist", card.artist)}
-      ${fact("Rarity", card.rarity)}
-      ${fact("HP", card.hp)}
-      ${fact("Type", (card.types || []).join(", "))}
-    </div>
-    <div class="summary-actions">
-      <button class="chip" id="openFullProfile" type="button">Full profile</button>
-      <p class="fine summary-note">Tap the card, or swipe it up, for links and the rest.</p>
+    ${story.html}
+    <div class="profile-rest">
+      <div class="phead">
+        <div class="thumb" id="summaryThumb"></div>
+        <div class="phead-copy"><h2 class="pname" id="profileTitle">${esc(card.name || "Card")}</h2></div>
+      </div>
+      <div class="facts">${coreFacts(card)}</div>
+      ${variantToggle(card, story.variant)}
+      <div class="summary-actions">
+        <button class="chip" id="openFullProfile" type="button">Full profile</button>
+        <p class="fine summary-note">Tap the card, or swipe it up, for links and the rest.</p>
+      </div>
     </div>
   </div>`;
   const thumb = document.getElementById("summaryThumb");
   if (thumb) paintArt(thumb, card);
-  profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => { variantChoice.set(card.id, btn.dataset.variant); summaryId = ""; renderSummary(card); summaryId = card.id; paintCaption(); refreshPocketPrice(card); });
-  profileEl.querySelectorAll("[data-range]").forEach(btn => btn.onclick = () => { chartRange = btn.dataset.range; summaryId = ""; renderSummary(card); });
+  profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => {
+    const key = btn.dataset.variant;
+    variantChoice.set(card.id, key);
+    summaryId = "";
+    renderSummary(card);
+    summaryId = card.id;
+    paintCaption();
+    refreshPocketPrice(card);
+    focusVariant(key);
+  });
+  bindPriceStory(story, () => { summaryId = ""; renderSummary(card); summaryId = card.id; });
   const full = document.getElementById("openFullProfile");
   if (full) full.onclick = () => openProfile(card);
-  const svgEl = profileEl.querySelector(".chart");
-  if (svgEl) svgEl.addEventListener("pointermove", e => {
-    const rect = svgEl.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const i = Math.max(0, Math.min(windowed.length - 1, Math.round(x * (windowed.length - 1))));
-    const p = windowed[i];
-    const scrub = document.getElementById("summaryScrub");
-    if (p && scrub) scrub.textContent = p.label + " · " + priceText(p.value, series.currency);
-  });
+  if (story.series.pendingFx) ensureFx().then(rate => { if (rate && !profilePinned) { summaryId = ""; paintDeckSummary(currentTop()); } });
 }
 function openProfile(card){
   ensureLabelFont();
@@ -5435,82 +5711,59 @@ function syncProfilePane(){
 }
 function renderProfile(card){
   profileCard = card;
-  const variant = selectedVariant(card);
-  const shown = printingMoney(card, variant);
-  const rawSeries = priceSeries(card);
-  const thinTrend = rawSeries.source === "trend" && !rawSeries.pendingFx && trendIsThin(rawSeries.points);
-  const series = thinTrend ? { points:[], source:"", currency:"USD" } : rawSeries;
-  const windowed = ranged(series.points);
-  const delta = series.source === "sales" ? change30(series.points) : change30(windowed);
-  const facts = gradeFacts(card);
-  const guide = compareGrade ? gradePrice(facts, compareGrade) : null;
-  const svg = chartSvg(windowed, guide, series.currency);
-  const gradedReady = scrydex.ready;
-  const gradedKnown = gradedReady && gradesAvailable(facts);
-  const priceQueued = gradedReady && needsPriceFetch(card.id) && !!priceProxyUrl();
-  const variants = (card.variants || []).filter(v => pos(v.market));
-  const banner = scanBanner(card);
+  const priceQueued = scrydex.ready && needsPriceFetch(card.id) && !!priceProxyUrl();
+  const story = priceStory(card, { thumbId:"profileThumb", queued:priceQueued });
   const onWish = wish.some(w => w.id === card.id);
   const owned = ownedIds.has(card.id);
   const ownLabel = owned ? "Got it · undo" : "Got it!";
   const ownAria = owned ? "Undo got it for " + (card.name || "this card") : "Got it! Mark " + (card.name || "this card") + " as owned";
+  const wishAria = onWish ? "Remove " + (card.name || "this card") + " from the wishlist" : "Save " + (card.name || "this card") + " to the wishlist";
   const binder = discoveryBinder();
   const inBinder = binder && binder.cards.some(c => c.id === card.id);
+  const legal = card.legal ? [card.legal.standard ? "Standard" : "", card.legal.expanded ? "Expanded" : ""].filter(Boolean).join(", ") || "Not legal" : "";
   profileEl.innerHTML = `<div class="profile-scroll">
-    <div class="phead">
-      <button class="thumb" id="profileThumb" type="button" aria-label="Look at ${esc(card.name || "this card")} up close"></button>
-      <div style="min-width:0;flex:1"><h2 class="pname" id="profileTitle">${esc(card.name || "Card")}</h2><p class="fine">${esc([card.set, card.number ? "#" + card.number : ""].filter(Boolean).join(" · "))}</p></div>
+    <div class="phead profile-tools">
       <button class="iconbtn" id="closeProfile" type="button" aria-label="Close profile">✕</button>
     </div>
-    ${banner ? `<p class="note">${esc(banner)}</p>` : ""}
-    ${marketBlock(card, variant, shown, delta)}
-    ${variants.length > 1 ? `<div class="vtoggle" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${variants.map(v => `<button type="button" data-variant="${esc(v.key)}" aria-pressed="${variant && variant.key === v.key ? "true" : "false"}">${esc(v.label)}</button>`).join("")}</div>` : ""}
-    <div class="ownrow mine">
-      <button class="chip ownchip" id="profileOwn" type="button" aria-pressed="${owned ? "true" : "false"}" aria-label="${esc(ownAria)}">${esc(ownLabel)}</button>
-      <button class="chip wishchip" id="profileWish" type="button" aria-pressed="${onWish ? "true" : "false"}">${onWish ? "♥ On wishlist" : "♡ Add to wishlist"}</button>
-      ${binder ? `<button class="chip" id="profileBinder" type="button">${inBinder ? "In " + esc(binder.name) : "Add to " + esc(binder.name)}</button>` : ""}
-      <p class="fine">${owned ? "You have it. Every binder shows it as owned." : "Tap Got it! once it's in your hands. Every binder updates."}</p>
-    </div>
-    ${!gradedReady ? `<p class="fine">Checking graded prices…</p>` : gradedKnown ? `<div class="grade-grid">${GRADES.map(([company, grade]) => gradeCell(facts, company, grade)).join("")}</div>` : `<p class="note">No graded sales yet</p>${priceQueued ? `<p class="fine">Queued for the next price batch.</p>` : ""}`}
-    <div class="chart-wrap">
-      <div class="rangebar"><div class="ranges">${["1M","3M","1Y","All"].map(r => `<button type="button" data-range="${r}" aria-pressed="${chartRange === r ? "true" : "false"}">${r}</button>`).join("")}</div>
-        ${gradedKnown ? `<div class="ranges">${`<button type="button" data-compare="" aria-pressed="${compareGrade ? "false" : "true"}">Raw</button>`}${GRADES.map(([c, g]) => `<button type="button" data-compare="${c} ${g}" aria-pressed="${compareGrade === c + " " + g ? "true" : "false"}">${c} ${g}</button>`).join("")}</div>` : ""}
+    ${story.html}
+    <div class="profile-rest">
+      <h2 class="pname" id="profileTitle">${esc(card.name || "Card")}</h2>
+      <div class="facts">
+        ${coreFacts(card)}
+        ${fact("HP", card.hp)}
+        ${fact("Type", (card.types || []).join(", "))}
+        ${fact("Release", card.releaseDate || "…")}
+        ${fact("Legality", legal)}
       </div>
-      ${svg || `<p class="empty-state">${series.pendingFx ? "Checking the dollar rate…" : "Not enough price history"}</p>`}
-      <p class="scrub" id="scrub">${guide ? esc(guide.label) + " latest cached " + esc(priceText(guide.value, "USD")) + ". The dashed line is that price, not a daily history." : esc(series.note || "")}</p>
+      ${variantToggle(card, story.variant)}
+      <div class="ownrow mine">
+        <button class="chip ownchip" id="profileOwn" type="button" aria-pressed="${owned ? "true" : "false"}" aria-label="${esc(ownAria)}">${esc(ownLabel)}</button>
+        <button class="chip wishchip" id="profileWish" type="button" aria-pressed="${onWish ? "true" : "false"}" aria-label="${esc(wishAria)}">${onWish ? "♥ On wishlist" : "♡ Add to wishlist"}</button>
+        ${binder ? `<button class="chip" id="profileBinder" type="button">${inBinder ? "In " + esc(binder.name) : "Add to " + esc(binder.name)}</button>` : ""}
+        <p class="fine">${owned ? "You have it. Every binder shows it as owned." : "Tap Got it! once it's in your hands. Every binder updates."}</p>
+      </div>
+      <div class="shoplinks"><p class="eyebrow">Check prices on</p><div class="links">${buyLinks(card).map(l => `<a class="buy-btn" href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label.replace(/^View on /, ""))} ↗</a>`).join("")}</div></div>
+      ${card.flavor ? `<p class="fine">${esc(card.flavor)}</p>` : ""}
+      <p class="fine">The big price is today's raw TCGplayer market. Graded prices, and the 30-day and 90-day changes, come from the cached Scrydex history for this printing. Prices are estimates, not financial advice. Buy links are not affiliate links yet.</p>
+      <button class="chip" id="copyLink" type="button">Copy link</button>
     </div>
-    <div class="shoplinks"><p class="eyebrow">Check prices on</p><div class="links">${buyLinks(card).map(l => `<a class="buy-btn" href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label.replace(/^View on /, ""))} ↗</a>`).join("")}</div></div>
-    <h2>Details</h2>
-    <div class="facts">
-      ${fact("Artist", card.artist)}
-      ${fact("Rarity", card.rarity)}
-      ${fact("HP", card.hp)}
-      ${fact("Type", (card.types || []).join(", "))}
-      ${fact("Release", card.releaseDate || "…")}
-      ${fact("Legality", card.legal ? [card.legal.standard ? "Standard" : "", card.legal.expanded ? "Expanded" : ""].filter(Boolean).join(", ") || "Not legal" : "")}
-    </div>
-    ${card.flavor ? `<p class="fine">${esc(card.flavor)}</p>` : ""}
-    <p class="fine">Prices are estimates, not financial advice. Raw market is TCGplayer. Graded prices and population are Scrydex for this printing only. Buy links are not affiliate links yet.</p>
-    <button class="chip" id="copyLink" type="button">Copy link</button>
   </div>`;
   const thumb = document.getElementById("profileThumb");
-  paintArt(thumb, card, { large:true });
-  thumb.onclick = () => openShowcase(card, thumb);
-  document.getElementById("closeProfile").onclick = closeProfile;
-  profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => { variantChoice.set(card.id, btn.dataset.variant); renderProfile(card); paintCaption(); refreshPocketPrice(card); });
-  profileEl.querySelectorAll("[data-range]").forEach(btn => btn.onclick = () => { chartRange = btn.dataset.range; renderProfile(card); });
-  profileEl.querySelectorAll("[data-compare]").forEach(btn => btn.onclick = () => { compareGrade = btn.dataset.compare; renderProfile(card); });
-  if (series.pendingFx) ensureFx().then(rate => { if (rate && profileCard && profileCard.id === card.id) renderProfile(cardCache.get(card.id) || card); });
-  const ranges = profileEl.querySelector(".ranges");
-  if (ranges) {
-    const fade = () => {
-      const wrap = ranges.parentElement;
-      if (!wrap) return;
-      wrap.classList.toggle("more", ranges.scrollWidth > ranges.clientWidth + 2 && ranges.scrollLeft + ranges.clientWidth < ranges.scrollWidth - 2);
-    };
-    ranges.addEventListener("scroll", fade, { passive:true });
-    requestAnimationFrame(fade);
+  if (thumb) {
+    paintArt(thumb, card, { large:true });
+    thumb.onclick = () => openShowcase(card, thumb);
   }
+  document.getElementById("closeProfile").onclick = closeProfile;
+  profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => {
+    const key = btn.dataset.variant;
+    variantChoice.set(card.id, key);
+    renderProfile(card);
+    paintCaption();
+    refreshPocketPrice(card);
+    focusVariant(key);
+  });
+  bindPriceStory(story, () => renderProfile(cardCache.get(card.id) || card));
+  if (story.series.pendingFx) ensureFx().then(rate => { if (rate && profileCard && profileCard.id === card.id) renderProfile(cardCache.get(card.id) || card); });
   document.getElementById("profileOwn").onclick = () => setOwned(card, !ownedIds.has(card.id), "profile");
   document.getElementById("profileWish").onclick = () => {
     if (onWish) removeFromWish(card.id); else addWish(card);
@@ -5524,14 +5777,6 @@ function renderProfile(card){
     try { await navigator.clipboard.writeText(u.toString()); announce("Link copied."); }
     catch (e) { announce("Link ready."); }
   };
-  const svgEl = profileEl.querySelector(".chart");
-  if (svgEl) svgEl.addEventListener("pointermove", e => {
-    const rect = svgEl.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const i = Math.max(0, Math.min(windowed.length - 1, Math.round(x * (windowed.length - 1))));
-    const p = windowed[i];
-    if (p) document.getElementById("scrub").textContent = p.label + " · " + priceText(p.value, series.currency);
-  });
   if (!card.releaseDate && card.setId) {
     getJson(TCGDEX + "/sets/" + encodeURIComponent(card.setId)).then(set => {
       card.releaseDate = set.releaseDate || "—";
@@ -5640,6 +5885,20 @@ document.addEventListener("keydown", e => {
     if (items.length) {
       const first = items[0], last = items[items.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  }
+  if (!open && !wide() && profilePinned && profileEl && !profileEl.hidden && e.key === "Tab") {
+    const items = [...profileEl.querySelectorAll("button, a[href], input, select, textarea, [tabindex='0']")].filter(el => {
+      if (el.disabled) return false;
+      const style = getComputedStyle(el);
+      return style.display !== "none" && style.visibility !== "hidden" && el.getClientRects().length > 0;
+    });
+    if (items.length) {
+      const first = items[0], last = items[items.length - 1];
+      const inside = items.includes(document.activeElement);
+      if (!inside) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
   }
