@@ -13774,6 +13774,16 @@
       "source": "tcgplayer",
       "eur": 3.35,
       "at": "2026-10-28T14:51:56Z"
+    },
+    "2026-10-31": {
+      "id": "sm115-31",
+      "price": 7.89,
+      "variant": "holofoil",
+      "printing": "Holofoil",
+      "alts": 1,
+      "source": "tcgplayer",
+      "eur": 5.82,
+      "at": "2026-10-29T14:57:21Z"
     }
   }
 }
