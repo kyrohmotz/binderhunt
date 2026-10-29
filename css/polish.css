@@ -116,28 +116,32 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 
 /* ---------- card details ---------- */
 
-/* The card is the point of the page: show it big, and tapping it lifts it
-   into the 3D view. */
+/* Tapping the small print lifts it into the 3D view. The price stays the
+   first thing on the page, so the print does not take the top of the phone. */
 #profile .phead{align-items:flex-start}
 #profile .phead .thumb{padding:0;cursor:zoom-in;width:72px;height:auto;aspect-ratio:63/88;border-radius:8px;transition:transform .16s cubic-bezier(.2,.8,.2,1)}
 #profile .phead .thumb:active{transform:scale(.97)}
 #profile .phead .thumb img{object-fit:cover}
-#profile .phead .thumb:focus-visible{outline:3px solid var(--sky,#86DEFF);outline-offset:2px}
+#profile .phead .thumb:focus-visible{outline:3px solid #2FA9D9;outline-offset:3px}
 @media (max-width:1023px){
-  #profile .phead{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"art close" "name name";gap:12px 10px;align-items:start}
-  #profile .phead .thumb{grid-area:art;justify-self:center;width:min(52vw,220px);margin-left:44px;border-radius:12px;box-shadow:4px 4px 0 var(--ink)}
-  #profile .phead > div{grid-area:name;text-align:center}
-  #profile .phead #closeProfile{grid-area:close}
+  #profile .profile-tools{display:flex;justify-content:flex-end;align-items:center}
+  #profile .profile-tools #closeProfile{grid-area:auto;justify-self:auto}
+  #profile .phead.hero-row{display:flex;flex-flow:row nowrap;align-items:flex-end;justify-content:space-between;gap:10px;text-align:left}
+  #profile .phead.hero-row .thumb{grid-area:auto;justify-self:auto;width:56px;height:78px;min-width:56px;max-width:56px;margin:0;aspect-ratio:auto;border-radius:12px;box-shadow:2px 2px 0 var(--ink)}
+  #profile .phead.hero-row > .market{grid-area:auto;flex:1 1 auto;min-width:0;text-align:left}
 }
 /* Your actions first, shopping links second and quieter. */
 #profile .ownrow.mine{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
 #profile .ownrow.mine .fine{flex-basis:100%;margin:0}
-#profile .wishchip[aria-pressed="true"]{background:var(--rose,#F6C9C9)}
+#profile .wishchip,#profile .wishchip[aria-pressed="true"]{background:var(--green,#ABB28D);color:var(--ink)}
 #profile .shoplinks{margin-top:14px}
 #profile .shoplinks .eyebrow{margin:0 0 4px}
 #profile .shoplinks .links{margin-top:0}
 #profile .shoplinks .buy-btn{min-height:40px;background:transparent;color:var(--ink);border:2px solid var(--ink);font-size:14px}
 #profile .shoplinks .buy-btn:hover{background:var(--paper-2)}
+#profile button:focus-visible,
+#profile a:focus-visible,
+#profile svg:focus-visible{outline:3px solid #2FA9D9;outline-offset:3px}
 #profile .ownrow.mine .chip{max-width:none;white-space:nowrap}
 #profile .ownrow.mine{margin:12px 0}
 
