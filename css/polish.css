@@ -69,8 +69,16 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 
 .set-tile{gap:3px}
 .set-tile img{height:42px;max-width:100%}
+.set-tile b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal}
+.setpct .pct{min-width:0;white-space:nowrap}
 .setpct.zero .bar{opacity:.35}
 .setpct.zero .pct{font-weight:600;color:var(--ink-2)}
+.wishheart{color:var(--green-deep)}
+.setpct.zero .wishheart{color:var(--ink-2)}
+.era-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:16px 2px 8px;font-size:18px}
+.era-h .fine{font-family:Nunito,sans-serif;font-style:normal;font-weight:800;letter-spacing:0;text-transform:none}
+#setFind{min-height:44px}
+.setlead{margin:0 2px 12px}
 
 /* ---------- daily drop: a card you can actually see ---------- */
 
@@ -98,9 +106,47 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 #setsScroll > #setFind{position:sticky;top:0;z-index:3;box-shadow:0 -16px 0 var(--paper),0 8px 0 var(--paper),0 14px 12px -8px rgba(31,31,30,.22)}
 #setsScroll{scroll-padding-top:60px}
 
-/* ---------- filters: show that the chip row scrolls ---------- */
+/* ---------- filters: what is on, and one tap to clear it ---------- */
 
-.chips{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);padding-right:28px}
+.chipbar{display:flex;align-items:center;gap:6px;padding:8px 12px 0;min-width:0}
+.chipbar::before,.chipbar::after{display:none}
+.context{min-height:44px}
+#openFilters,#resetFilters{flex:none;display:inline-flex;align-items:center;justify-content:center}
+#resetFilters[hidden],.filter-count[hidden]{display:none !important}
+#openFilters{gap:0}
+#resetFilters{background:var(--rose)}
+.filter-count{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:6px;padding:0 5px;border-radius:999px;border:2px solid var(--ink);background:var(--butter);font-family:Nunito,sans-serif;font-weight:900;font-size:12px;line-height:1}
+.filter-count[hidden]{display:none}
+.active-scroll{display:flex;align-items:center;gap:6px;flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.active-scroll::-webkit-scrollbar{display:none}
+.filter-hint{color:var(--ink-2);font-size:13px;font-weight:700;white-space:nowrap}
+#activeChips .chip{display:inline-flex;align-items:center;max-width:100%;padding-right:10px}
+.chipbar.more .active-scroll{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+#activeChips .chiplabel{min-width:0;overflow:hidden;text-overflow:ellipsis}
+#activeChips .xmark{flex:none;margin-left:6px;font-size:18px;line-height:1}
+.sheet-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 4px}
+.sheet-top h2{margin:0;min-width:0}
+#filterDone{flex:none}
+.huntpicks[hidden]{display:none !important}
+#filterBody .huntpick.on,#filterBody .huntpick[aria-pressed="true"]{background:var(--sky);color:var(--ink);border-color:var(--ink)}
+.sheet.popover .sheet-card.tall{max-height:min(78vh,680px)}
+.filter-sec{margin:0 0 16px}
+.filter-sec h3{margin:0 0 6px;font-size:16px}
+.filter-sec .search{min-height:44px;margin-top:0}
+.setpick{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;text-align:left;padding:6px 10px;margin:0 0 6px;background:#fff;border:2px solid var(--ink);border-radius:14px;box-shadow:2px 2px 0 var(--ink);font-family:var(--display);font-weight:600}
+.setpick img{width:36px;height:28px;object-fit:contain;flex:none}
+.setpick.on{background:var(--sky)}
+.setpick span{min-width:0;display:flex;flex-direction:column}
+.setpick b{display:block;font-size:14px;line-height:1.2}
+.setpick .fine{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#deck .empty-state{position:absolute;inset:8px 6px 10px;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;overflow:auto;border:2.5px solid var(--ink);border-radius:22px;background:var(--butter);box-shadow:3px 3px 0 var(--ink);padding:16px 12px;text-align:center}
+#deck .empty-state p{margin:0}
+#deck .empty-state .huntpicks{margin:4px 0 0}
+#deck .empty-state .chip{max-width:none;white-space:normal;text-align:center;height:auto;min-height:44px;padding:8px 12px}
+@media (min-width:1024px){
+  .hunt-align .chipbar{padding-left:0;padding-right:0}
+  #viewSets .set-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
 
 /* Phone: the whole row is the button, so the arrow goes and the copy gets
    the room. */
@@ -166,7 +212,7 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 #setsScroll .setflip .pocket img{object-fit:cover;background:transparent;border-radius:0}
 #setsScroll .setflip .pocket .art-missing{border-radius:4.6% / 3.3%}
 #setsScroll .setflip .pocket .iconish.heart{left:auto;right:4px;bottom:4px;top:auto;transform:none;width:30px;height:30px;min-height:30px;border-radius:999px;border:1.5px solid var(--ink);background:rgba(248,247,239,.94);font-size:15px;box-shadow:0 1px 3px rgba(0,0,0,.45)}
-#setsScroll .setflip .pocket .iconish.heart.on{background:#F6C9C9}
+#setsScroll .setflip .pocket .iconish.heart.on{background:var(--green,#ABB28D)}
 #setsScroll .setflip .pocket.owned{box-shadow:inset 0 0 0 2px #ABB28D,inset 0 2px 5px rgba(0,0,0,.6)}
 #setsScroll .setflip .owned-mark{position:absolute;left:5px;top:5px;width:18px;height:18px;border-radius:999px;border:1.5px solid var(--ink);background:#ABB28D;box-shadow:0 1px 2px rgba(0,0,0,.4)}
 #setsScroll .setflip .owned-mark::after{content:"";position:absolute;left:4px;top:3px;width:7px;height:4px;border-left:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:rotate(-45deg)}
