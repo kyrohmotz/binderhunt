@@ -112,6 +112,12 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 .stamp.like{left:12px;color:var(--ink);background:var(--green);border-color:var(--green-deep);transform:rotate(-8deg)}
 .stamp.nope{right:12px;color:#8d4a4a;border-color:#8d4a4a;transform:rotate(8deg)}
 .surprise{position:absolute;left:8px;bottom:8px;z-index:3;background:#fff;border:2px solid var(--ink);border-radius:999px;padding:2px 8px;font-size:11px;box-shadow:2px 2px 0 var(--ink);line-height:1.3}
+.gem-hint{position:absolute;left:8px;bottom:8px;z-index:3;max-width:calc(100% - 78px);background:var(--butter);color:var(--ink);border:2px solid var(--ink);border-radius:999px;padding:3px 8px;font-family:var(--label);font-style:italic;font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase;line-height:1.3;box-shadow:2px 2px 0 var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.gem-note{background:var(--butter);border:2px solid var(--ink);border-radius:14px;padding:8px 10px;margin:8px 0 0;box-shadow:2px 2px 0 var(--ink);font-size:14px;line-height:1.4}
+.gem-note b{font-family:var(--display);font-weight:700}
+.gem-lead{margin:2px 14px 0;font-size:13px;line-height:1.35;color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.gem-lead[hidden]{display:none !important}
+.chip.gem-toggle.on{background:var(--butter)}
 .deckcap{flex:none;display:flex;align-items:flex-end;justify-content:space-between;gap:8px;width:min(100%,420px);margin:0 auto;padding:8px 10px 2px;background:#F8F7EF;position:relative;z-index:5;min-height:52px}
 .deckcap[hidden]{display:none !important}
 .deckcap .cap{min-width:0;flex:1}
@@ -310,7 +316,7 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
   .discovery{margin:6px 16px 0}
   #viewHunt{min-height:0;container-type:size;container-name:hunt}
   .hunt-align{--card-h:min(76vh,760px,calc(100cqh - 248px));display:flex;flex-direction:column;align-items:center;flex:1 1 auto;min-height:0;width:min(100%,calc(var(--card-h) * 63 / 88));margin-inline:auto}
-  .hunt-align .chipbar,.hunt-align .cardsearch,.hunt-align .countline,.hunt-align .discovery,.deckcap,#viewHunt .actions{width:var(--deck-w,100%);max-width:100%;padding-left:0;padding-right:0;margin-left:0;margin-right:0}
+  .hunt-align .chipbar,.hunt-align .cardsearch,.hunt-align .countline,.hunt-align .gem-lead,.hunt-align .discovery,.deckcap,#viewHunt .actions{width:var(--deck-w,100%);max-width:100%;padding-left:0;padding-right:0;margin-left:0;margin-right:0}
   .hunt-align .chips{width:100%;padding-left:0;padding-right:0}
   .hunt-cluster{display:flex;flex-direction:column;justify-content:center;align-items:center;flex:1 1 auto;min-height:0;min-width:0;width:100%;padding:2px 0 10px}
   .deck-slot{display:flex;align-items:center;justify-content:center;flex:1 1 auto;min-height:0;width:100%;max-height:var(--card-h)}
@@ -843,6 +849,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
       <form class="cardsearch" id="cardSearch" role="search">
         <input id="cardFind" type="search" placeholder="e.g. Pikachu" aria-label="Search cards by name" enterkeyhint="search" autocomplete="off">
       </form>
+      <p class="gem-lead" id="gemLead" hidden>Hand-picked eras and rarities that fly under the radar.</p>
       <p class="countline" id="matchCount" aria-live="polite">Looking…</p>
       <div class="hunt-cluster">
       <div class="deck-slot">
@@ -980,6 +987,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 </div>
 <script src="js/binder-turn.js"></script>
 <script src="js/card-inspect.js"></script>
+<script src="js/gems.js"></script>
 <script>
 try {
   if (navigator.serviceWorker && navigator.serviceWorker.controller && navigator.onLine === false) navigator.serviceWorker.controller.postMessage("bh-offline");
@@ -1049,6 +1057,12 @@ let logState = { v:1, days:[], events:[] };
 let pile = [];
 let briefs = [];
 let seen = new Set();
+let gemCatalog = null;
+let gemCatalogPromise = null;
+let gemFx = null;
+let gemCycle = null;
+let gemNote = "";
+let gemNoteTimer = 0;
 let undoStack = [];
 let generation = 0;
 let loading = false;
@@ -1203,6 +1217,7 @@ function knownArt(card){
   push(card.img);
   const base = safeImg(card.image);
   if (base) push(base + "/low.webp");
+  push(card.backup);
   return urls;
 }
 function shuffle(list){
@@ -1282,7 +1297,7 @@ function loadBinders(){
   return { discoveryId:"", binders:[] };
 }
 function blankFilters(){
-  return { set:"", rarities:[], era:"", type:"", names:[], min:null, max:null, pricePreset:"", graded:false };
+  return { set:"", rarities:[], era:"", type:"", names:[], min:null, max:null, pricePreset:"", graded:false, gem:false };
 }
 function knownEra(value){
   if (typeof value !== "string") return "";
@@ -1353,6 +1368,7 @@ function loadFilters(){
     next.max = pos(raw.max);
     next.pricePreset = raw.pricePreset === "under10" || raw.pricePreset === "mid" || raw.pricePreset === "high" ? raw.pricePreset : "";
     next.graded = raw.graded === true;
+    next.gem = raw.gem === true;
     return next;
   } catch (e) { return blank; }
 }
@@ -1408,7 +1424,8 @@ function saveFilters(){
     min: filters.min,
     max: filters.max,
     pricePreset: filters.pricePreset || "",
-    graded: filters.graded === true
+    graded: filters.graded === true,
+    gem: filters.gem === true
   };
   try { localStorage.setItem("bh.filters.v3", JSON.stringify(payload)); } catch (e) {}
   paintChips();
@@ -2473,7 +2490,7 @@ function scryRecord(card){
 }
 
 function filtersActive(){
-  return !!(filters.set || filters.type || (filters.names || []).length || filters.rarities.length || filters.era || filters.graded || filters.min != null || filters.max != null || filters.pricePreset);
+  return !!(filters.gem || filters.set || filters.type || (filters.names || []).length || filters.rarities.length || filters.era || filters.graded || filters.min != null || filters.max != null || filters.pricePreset);
 }
 function raritiesForSet(id){
   const list = HUNT_RARITIES.slice();
@@ -2966,9 +2983,121 @@ function showSkeleton(){
   if (row) row.hidden = true;
   paintDeckSummary(null);
 }
+function paintGemChrome(){
+  const lead = document.getElementById("gemLead");
+  if (lead) {
+    lead.hidden = !filters.gem;
+    lead.textContent = gemNote || (window.BinderGems && BinderGems.EXPLAIN) || "Hand-picked eras and rarities that fly under the radar.";
+  }
+}
+function noteGemLap(){
+  gemNote = (window.BinderGems && BinderGems.WRAP_MESSAGE) || "That's the pocket. These gems are shuffled back in.";
+  announce(gemNote);
+  clearTimeout(gemNoteTimer);
+  gemNoteTimer = setTimeout(() => {
+    gemNote = "";
+    paintCount();
+  }, 4200);
+  paintCount();
+}
+function gemsForHunt(){
+  const G = window.BinderGems;
+  const heat = G ? G.saveHeat(logState && logState.events) : {};
+  const limit = G ? G.GEM_HEAT : 3;
+  return (gemCatalog || []).filter(card => {
+    if (!card || !card.id) return false;
+    if ((heat[card.id] || 0) >= limit) return false;
+    try { return keep(card); } catch (e) { return false; }
+  });
+}
+async function loadGemCatalog(){
+  if (gemCatalog) return gemCatalog;
+  if (gemCatalogPromise) return gemCatalogPromise;
+  const G = window.BinderGems;
+  if (!G) {
+    gemCatalog = [];
+    return gemCatalog;
+  }
+  gemCatalogPromise = (async () => {
+    const fxFile = await fetch("data/fx.json", { cache:"no-cache" }).then(res => res.ok ? res.json() : null).catch(() => null);
+    gemFx = fxFile && Number(fxFile.eurUsd);
+    const seedText = await fetch("data/scrydex-seed.txt", { cache:"no-cache" }).then(res => res.ok ? res.text() : "").catch(() => "");
+    let dailyPool = [];
+    try {
+      const daily = await fetch("data/daily.json", { cache:"no-cache" }).then(res => res.ok ? res.json() : null);
+      if (daily && Array.isArray(daily.pool)) dailyPool = daily.pool;
+    } catch (e) {}
+    const names = {};
+    dailyPool.forEach(card => { if (card && card.setId && card.set) names[card.setId] = card.set; });
+    await loadMeta();
+    (meta.sets || []).forEach(set => { if (set && set.id && set.name) names[set.id] = set.name; });
+    gemCatalog = G.buildCatalog({
+      seedText: seedText,
+      dailyPool: dailyPool,
+      names: names,
+      fx: gemFx,
+      heat: G.saveHeat(logState && logState.events),
+      opening: OPENING.reduce((all, row) => all.concat(row), [])
+    });
+    gemCatalog.forEach(card => {
+      if (card && !card.set) card.set = setName(card.setId) || "";
+    });
+    return gemCatalog;
+  })().catch(() => {
+    gemCatalog = [];
+    return gemCatalog;
+  });
+  return gemCatalogPromise;
+}
+async function pumpGems(my){
+  if (loading || my !== generation) return;
+  const epoch = ++pumpEpoch;
+  loading = true;
+  pumpError = "";
+  try {
+    await loadGemCatalog();
+    if (my !== generation || epoch !== pumpEpoch) return;
+    const G = window.BinderGems;
+    if (!G) throw new Error("gems");
+    if (!gemCycle) {
+      const cards = G.dealGems(gemsForHunt());
+      gemCycle = { cards: cards, cursor: 0, lap: 0 };
+    }
+    const holding = new Set(pile.map(card => card && card.id).filter(Boolean));
+    const pull = G.takeGemCycle(gemCycle, Math.max(0, 5 - pile.length), holding);
+    if (pull.wrapped) noteGemLap();
+    pull.cards.forEach(card => {
+      if (!card || pile.some(item => item.id === card.id)) return;
+      pile.push(card);
+      matched++;
+      lastFound = Date.now();
+    });
+    if (!gemCycle.cards.length) streamDone = true;
+    else streamDone = false;
+  } catch (e) {
+    if (my !== generation || epoch !== pumpEpoch) return;
+    pumpError = "Gemfinder couldn't read the saved card list.";
+    paused = true;
+  } finally {
+    if (my === generation && epoch === pumpEpoch) loading = false;
+  }
+  if (my !== generation || epoch !== pumpEpoch) return;
+  renderDeck();
+  paintCount();
+}
 function paintCount(){
   const el = document.getElementById("matchCount");
   if (!el) return;
+  paintGemChrome();
+  if (filters.gem) {
+    const pocket = gemCycle && gemCycle.cards ? gemCycle.cards.length : (gemCatalog ? gemsForHunt().length : 0);
+    let text = pocket ? ("Gemfinder · " + pocket + (pocket === 1 ? " card" : " cards")) : (loading ? "Gemfinder · looking…" : "Gemfinder");
+    if (gemNote) text = gemNote;
+    else if (filters.set) text = setWishLine(filters.set) + " · " + text;
+    el.textContent = text;
+    paintFilterSummary();
+    return;
+  }
   let text = streamDone ? (matched + (matched === 1 ? " card" : " cards")) : (matched ? matched + (matched === 1 ? " card" : " cards") + " found so far" : "Looking…");
   if (filters.set) text = setWishLine(filters.set) + " · " + text;
   el.textContent = text;
@@ -3025,6 +3154,7 @@ function pumpStale(epoch, my){
 }
 async function pump(my){
   if (loading || my !== generation) return;
+  if (filters.gem) return pumpGems(my);
   if (navigator.onLine === false) {
     loading = true;
     serveOfflineDeck();
@@ -3159,6 +3289,9 @@ function restart(opts){
   priceLane = 0; priceOrigin = 1; pricePage = 1; priceWrapped = false; laneOrder = null; laneStates = null; setWalk = null;
   feedExhausted = false; holdFeed = false; tailCursor = 0; tailDone = false;
   streamDone = false; paused = false; pumpError = ""; catalogBusy = false; busyStrike = 0; busyUntil = 0; clearTimeout(busyRenderTimer); effort = 0; loading = false; searchStarted = Date.now(); lastFound = Date.now();
+  gemCycle = null;
+  gemNote = "";
+  clearTimeout(gemNoteTimer);
   fetchFails.clear(); deferred = [];
   pendingSwipes = []; reserved = new Set(); swipeBusy = false;
   busyHold = false;
@@ -3196,6 +3329,7 @@ function artUrls(card, large){
   push(card.img);
   const base = safeImg(card.image);
   if (base) push(base + "/high.webp");
+  push(card.backup);
   urls.forEach(push);
   return out;
 }
@@ -3460,8 +3594,9 @@ function renderDeck(){
     el.draggable = false;
     el.card = card;
     const tag = card.spice ? `<span class="surprise">surprise pick</span>` : "";
-    if (card.spice) ensureLabelFont();
-    el.innerHTML = `<div class="frame"><div class="art"></div><span class="stamp like">${discoveryBinder() ? "BINDER!" : "WISH!"}</span><span class="stamp nope">PASS</span>${tag}</div>`;
+    const gem = card.gemHint ? `<span class="gem-hint">${esc(card.gemHint)}</span>` : "";
+    if (card.spice || card.gemHint) ensureLabelFont();
+    el.innerHTML = `<div class="frame"><div class="art"></div><span class="stamp like">${discoveryBinder() ? "BINDER!" : "WISH!"}</span><span class="stamp nope">PASS</span>${tag}${gem}</div>`;
     paintArt(el.querySelector(".art"), card, { large:true, priority: index === 0 ? "high" : "low" });
     deck.prepend(el);
     bindDrag(el);
@@ -3478,7 +3613,7 @@ function renderDeck(){
       const drop = widenTarget();
       const huntEnd = matched > 0 ? "seen" : "none";
       deck.dataset.huntEnd = huntEnd;
-      const headline = matched > 0 ? "You've seen every card that fits." : "Nothing fits these filters.";
+      const headline = filters.gem && matched === 0 ? "Nothing in this pocket fits." : (matched > 0 ? "You've seen every card that fits." : "Nothing fits these filters.");
       deck.setAttribute("aria-label", headline);
       const named = facts.map(f => f.label).join(", ");
       const detail = matched > 0
@@ -3840,7 +3975,10 @@ function paintFilterSummary(){
   const n = filterFacts().length;
   const count = document.getElementById("matchCount");
   const tail = count && count.textContent && count.textContent !== "Looking…" ? " · " + count.textContent : "";
-  live.textContent = (n ? n + (n === 1 ? " filter on." : " filters on.") : "No filters. Every physical card can show up.") + tail;
+  const base = filters.gem
+    ? "Gemfinder is on. Hand-picked eras and rarities that fly under the radar."
+    : (n ? n + (n === 1 ? " filter on." : " filters on.") : "No filters. Every physical card can show up.");
+  live.textContent = base + (filters.gem ? "" : tail);
 }
 function syncChipFade(){
   const el = document.getElementById("activeChips");
@@ -3849,6 +3987,21 @@ function syncChipFade(){
   const more = el.scrollWidth > el.clientWidth + 2 && el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
   bar.classList.toggle("more", more);
   bar.classList.toggle("before", el.scrollLeft > 2);
+}
+function setGemMode(on){
+  const next = !!on;
+  if (filters.gem === next) {
+    if (next && tab !== "hunt") showTab("hunt");
+    return;
+  }
+  filters.gem = next;
+  gemNote = "";
+  clearTimeout(gemNoteTimer);
+  saveFilters();
+  if (tab !== "hunt") showTab("hunt");
+  restart();
+  announce(next ? "Gemfinder. Hand-picked eras and rarities that fly under the radar." : "Gemfinder is off.");
+  if (!document.getElementById("filterSheet").hidden) syncFilterControls();
 }
 function paintChips(){
   const host = document.getElementById("activeChips");
@@ -3864,9 +4017,10 @@ function paintChips(){
   }
   if (reset) reset.hidden = !n;
   if (host) {
-    if (!n) host.innerHTML = `<span class="filter-hint">All physical cards</span>`;
+    const gemBtn = `<button type="button" class="chip gem-toggle${filters.gem ? " on" : ""}" id="gemMode" aria-pressed="${filters.gem ? "true" : "false"}" title="Hand-picked eras and rarities that fly under the radar." aria-label="Gemfinder. Hand-picked eras and rarities that fly under the radar.">Gemfinder</button>`;
+    if (!n) host.innerHTML = gemBtn + `<span class="filter-hint">${filters.gem ? "Overlooked holos" : "All physical cards"}</span>`;
     else {
-      host.innerHTML = facts.map(f => {
+      host.innerHTML = gemBtn + facts.map(f => {
         if (f.locked) return `<span class="chip on" title="Kept by the binder you are filling">${esc(f.label)}</span>`;
         return `<button type="button" class="chip on" data-clear="${esc(f.key)}" aria-label="Clear ${esc(f.label)} filter"><span class="chiplabel">${esc(f.label)}</span><span class="xmark" aria-hidden="true">×</span></button>`;
       }).join("");
@@ -3876,16 +4030,19 @@ function paintChips(){
         saveFilters();
         restart();
         announce((fact ? fact.label : "Filter") + " cleared.");
-        const next = document.querySelector("#activeChips [data-clear]") || document.getElementById("openFilters");
+        const next = document.querySelector("#activeChips [data-clear]") || document.getElementById("gemMode") || document.getElementById("openFilters");
         if (next) next.focus();
       });
     }
+    const gem = document.getElementById("gemMode");
+    if (gem) gem.onclick = () => setGemMode(!filters.gem);
   }
   const find = document.getElementById("cardFind");
   if (find && document.activeElement !== find) find.value = (filters.names || []).length === 1 ? filters.names[0] : "";
   const sheet = document.getElementById("filterSheet");
   const opener = document.getElementById("openFilters");
   if (opener && sheet) opener.setAttribute("aria-expanded", sheet.hidden ? "false" : "true");
+  paintGemChrome();
   syncChipFade();
 }
 function paintContext(){
@@ -3895,6 +4052,8 @@ function paintContext(){
   else if (tab === "binders") label = binderView ? (binderView.kind === "wish" ? "Wishlist" : (binderState.binders.find(x => x.id === binderView.id) || {}).name || "Binders") : "Binders";
   else if (tab === "daily") label = "Today's Drop";
   else if (b) label = b.name;
+  else if (filters.gem && filters.set) label = "Gemfinder · " + (setName(filters.set) || "Set");
+  else if (filters.gem) label = "Gemfinder";
   else if (filters.set) label = setName(filters.set);
   else if ((filters.names || []).length) label = namesLabel();
   else if (filters.type) label = filters.type;
@@ -4310,6 +4469,11 @@ function syncFilterControls(){
     graded.classList.toggle("on", filters.graded);
     graded.setAttribute("aria-pressed", filters.graded ? "true" : "false");
   }
+  const gemToggle = document.getElementById("gemSheetToggle");
+  if (gemToggle) {
+    gemToggle.classList.toggle("on", filters.gem);
+    gemToggle.setAttribute("aria-pressed", filters.gem ? "true" : "false");
+  }
   const min = document.getElementById("pMin");
   const max = document.getElementById("pMax");
   if (min && document.activeElement !== min) min.value = filters.pricePreset || filters.min == null ? "" : String(filters.min);
@@ -4385,6 +4549,7 @@ function openFilter(kind, anchor){
   const moreButtons = rest.map(r => `<button type="button" class="huntpick" data-rarity="${esc(r)}">${esc(r)}</button>`).join("");
   const note = b && (lock.set || lock.type || lock.names) ? `<p class="fine">Some choices stay on because you are filling ${esc(b.name)}.</p>` : "";
   body.innerHTML = `${note}
+    <section class="filter-sec" id="filter-gem"><h3>Gemfinder</h3><div class="huntpicks"><button type="button" class="huntpick${filters.gem ? " on" : ""}" id="gemSheetToggle" aria-pressed="${filters.gem ? "true" : "false"}">Gemfinder</button></div><p class="fine">Hand-picked eras and rarities that fly under the radar. Expedition, Aquapolis, and Skyridge holos, plus mid-era rarities, in a buyable price band from the cards already saved here. Not a grade-population report.</p></section>
     <section class="filter-sec" id="filter-price"><h3>Price</h3><div class="huntpicks">${priceButtons}</div><div class="row2"><label class="field">Min USD<input id="pMin" inputmode="decimal" aria-label="Minimum price in US dollars"></label><label class="field">Max USD<input id="pMax" inputmode="decimal" aria-label="Maximum price in US dollars"></label></div><p class="warn" id="pWarn" hidden>Min price is higher than max price. These prices were not applied.</p><p class="fine">Any price keeps cards under $10 in the hunt.</p></section>
     <section class="filter-sec" id="filter-set"><h3>Set</h3>${filters.set ? `<button type="button" class="setpick on" id="clearSetPick"><span><b>${esc(setName(filters.set))}</b><span class="fine">Tap to swipe every set again</span></span></button>` : ""}<input class="search" id="setSearch" type="search" placeholder="Search sets" aria-label="Search sets" enterkeyhint="search" autocomplete="off"><div id="setChoices"></div><button class="chip" type="button" id="browseSets">Browse sets by era</button></section>
     <section class="filter-sec" id="filter-era"><h3>Era</h3><div class="huntpicks">${eraButtons}</div><button class="chip" type="button" id="moreEras" aria-expanded="${seriesOpen ? "true" : "false"}">${seriesOpen ? "Fewer series" : "One series"}</button><div class="huntpicks" id="moreEraBox"${seriesOpen ? "" : " hidden"}>${seriesButtons}</div></section>
@@ -4393,6 +4558,8 @@ function openFilter(kind, anchor){
     <section class="filter-sec" id="filter-pokemon"><h3>Pokémon</h3><div id="pokeHost"></div></section>
     <section class="filter-sec" id="filter-graded"><h3>Graded</h3><button type="button" class="huntpick" id="gradedToggle">Graded prices only</button><p class="fine">Uses cached graded prices. Leave this off and every raw card stays in the hunt.</p></section>
     <button class="chip" type="button" id="sheetClear">Clear all filters</button>`;
+  const gemSheet = document.getElementById("gemSheetToggle");
+  if (gemSheet) gemSheet.onclick = () => { popBtn(gemSheet); setGemMode(!filters.gem); };
   body.querySelectorAll("[data-preset]").forEach(btn => btn.onclick = () => {
     popBtn(btn);
     filters.pricePreset = btn.dataset.preset || "";
@@ -4495,7 +4662,7 @@ function renderSets(){
     if (!groups.has(era)) groups.set(era, []);
     groups.get(era).push(s);
   });
-  const html = [`<input class="search" id="setFind" type="search" placeholder="Search sets" aria-label="Search sets" enterkeyhint="search" autocomplete="off" value="${esc(q)}">`,`<p class="fine setlead">Grouped by era. Open a set to flip through it, or swipe just that set.</p>`];
+  const html = [`<input class="search" id="setFind" type="search" placeholder="Search sets" aria-label="Search sets" enterkeyhint="search" autocomplete="off" value="${esc(q)}">`,`<p class="fine setlead">Grouped by era. Open a set to flip through it, or swipe just that set.</p>`,`<div class="modes"><button class="chip gem-toggle${filters.gem ? " on" : ""}" id="openGemfinder" type="button" aria-pressed="${filters.gem ? "true" : "false"}">Gemfinder</button></div>`];
   ERA_ORDER.forEach(era => {
     const list = groups.get(era);
     if (!list || !list.length) return;
@@ -4514,7 +4681,7 @@ function renderSets(){
     html.push(`</div>`);
   });
   if (!meta.ready && !meta.sets.length) html.push(`<p class="fine">The catalog is still loading.</p>`);
-  else if (html.length === 2) html.push(`<p class="empty-state">No sets match. ${toad()}</p>`);
+  else if (html.length === 3) html.push(`<p class="empty-state">No sets match. ${toad()}</p>`);
   const focused = document.activeElement && document.activeElement.id === "setFind";
   const caret = focused ? document.activeElement.selectionStart : null;
   root.innerHTML = html.join("");
@@ -4524,6 +4691,8 @@ function renderSets(){
     if (focused) { find.focus(); if (caret != null) find.setSelectionRange(caret, caret); }
   }
   root.querySelectorAll("[data-set]").forEach(btn => btn.onclick = () => openSet(btn.dataset.set));
+  const gemBtn = document.getElementById("openGemfinder");
+  if (gemBtn) gemBtn.onclick = () => setGemMode(true);
   bindSetArt(root);
 }
 async function openSet(id){
@@ -6266,8 +6435,10 @@ function renderSummary(card){
   shell.classList.remove("no-profile");
   markProfile(false);
   const story = priceStory(card, { summary:true });
+  const gemLine = card.gemHint ? `<p class="gem-note"><b>Why it's a gem.</b> ${esc(card.gemWhy || card.gemHint)}</p>` : "";
   profileEl.innerHTML = `<div class="profile-scroll profile-summary" data-summary="1">
     <p class="eyebrow">On the table</p>
+    ${gemLine}
     ${story.html}
     <div class="profile-rest">
       <div class="phead">
@@ -6305,8 +6476,13 @@ function openProfile(card){
   const already = dialog && profilePinned && profileEl && !profileEl.hidden;
   const opener = document.activeElement;
   if (dialog && !already && opener && opener !== document.body && !profileEl.contains(opener)) profileOpener = opener;
-  if (card && card.id && !card.variants) {
-    hydrate(card).then(full => { if (profilePinned && profileCard && profileCard.id === card.id) renderProfile(full); }).catch(() => { if (profilePinned && profileCard && profileCard.id === card.id) renderProfile(card); });
+  if (card && card.id && (!card.variants || card.gemReady)) {
+    const hint = card.gemHint || "";
+    const why = card.gemWhy || "";
+    hydrate(card).then(full => {
+      if (hint) { full.gemHint = hint; full.gemWhy = why; }
+      if (profilePinned && profileCard && profileCard.id === card.id) renderProfile(full);
+    }).catch(() => { if (profilePinned && profileCard && profileCard.id === card.id) renderProfile(card); });
   }
   profilePinned = true;
   syncReadingWide();
@@ -6381,6 +6557,7 @@ function renderProfile(card){
   const binder = discoveryBinder();
   const inBinder = binder && binder.cards.some(c => c.id === card.id);
   const legal = card.legal ? [card.legal.standard ? "Standard" : "", card.legal.expanded ? "Expanded" : ""].filter(Boolean).join(", ") || "Not legal" : "";
+  const gemLine = card.gemHint ? `<p class="gem-note"><b>Why it's a gem.</b> ${esc(card.gemWhy || card.gemHint)}</p>` : "";
   profileEl.innerHTML = `<div class="profile-scroll">
     <div class="phead profile-tools">
       <button class="iconbtn" id="closeProfile" type="button" aria-label="Close profile">✕</button>
@@ -6388,6 +6565,7 @@ function renderProfile(card){
     ${story.html}
     <div class="profile-rest">
       <h2 class="pname" id="profileTitle">${esc(card.name || "Card")}</h2>
+      ${gemLine}
       <div class="facts">
         ${coreFacts(card)}
         ${fact("HP", card.hp)}
