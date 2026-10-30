@@ -98,6 +98,7 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 .view[hidden]{display:none !important}
 #deck{position:relative;flex:1;min-height:0;margin:6px auto 0;width:min(100%,420px);touch-action:none;overflow:hidden;background:var(--paper);container-type:size}
 .card{position:absolute;left:0;right:0;bottom:18px;margin-inline:auto;width:min(calc(100% - 12px),calc((100cqh - 26px) * 63 / 88));aspect-ratio:63/88;height:auto;max-height:calc(100% - 22px);display:flex;flex-direction:column;user-select:none;touch-action:none;transform-origin:center bottom}
+.card.dragging,.card.leaving{will-change:transform}
 .frame{flex:1;min-height:0;margin:0 auto;width:100%;height:100%;aspect-ratio:63/88;background:var(--paper-2);border:2.5px solid var(--ink);border-radius:22px;box-shadow:3px 3px 0 var(--ink);overflow:hidden;position:relative;display:grid;place-items:center}
 .frame .art{position:absolute;inset:0;display:grid;place-items:center;min-width:0;min-height:0}
 .frame img,.card img{width:100%;height:100%;object-fit:contain;object-position:center;background:#fff;-webkit-user-drag:none;user-select:none;pointer-events:none}
@@ -202,7 +203,7 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 #profile button:focus-visible,
 #profile a:focus-visible,
 #profile svg:focus-visible,
-#profile [tabindex="0"]:focus-visible{outline:3px solid #2FA9D9;outline-offset:3px}
+#profile [tabindex="0"]:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
 .price-hero{container-type:inline-size;margin-top:2px;min-width:0}
 .price-hero .market{margin-top:0;align-items:flex-start}
 .price-hero .market-price{font-size:40px;font-size:clamp(34px,13cqi,52px);line-height:1.02}
@@ -219,7 +220,8 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 .profile-rest .pname{font-size:22px}
 .phead-copy{min-width:0;flex:1}
 .chart-wrap{margin-top:8px;background:#fff;border:2.5px solid var(--ink);border-radius:16px;padding:8px;box-shadow:2px 2px 0 var(--ink)}
-#profile :focus-visible{outline:3px solid var(--sky-deep);outline-offset:3px}
+#profile :focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.act:focus-visible{outline:3px solid var(--ink);outline-offset:4px}
 .rangebar{position:relative;min-width:0}
 .rangebar::after{content:"";position:absolute;top:0;right:0;bottom:0;width:36px;pointer-events:none;background:linear-gradient(90deg,rgba(255,255,255,0),#fff);opacity:0}
 .rangebar.more::after{opacity:1}
@@ -449,6 +451,7 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 }
 @media (prefers-reduced-motion:reduce){
   html:not(.motion-on) *{animation:none !important;transition:none !important}
+  html:not(.motion-on) .card.dragging,html:not(.motion-on) .card.leaving{will-change:auto}
 }
 html.reduce *{animation:none !important;transition:none !important}
 html.reduce .leaf.hot{transition:none}
@@ -787,7 +790,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 <div class="shell no-profile" id="shell">
   <aside class="rail">
     <div class="rail-brand">
-      <p class="word">BinderHunt</p>
+      <h1 class="word">BinderHunt</h1>
       <button class="iconbtn" data-gear type="button" aria-label="Settings">⚙</button>
     </div>
     <nav aria-label="Primary">
@@ -808,15 +811,15 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
       </div>
     </div>
     <div class="credit">
-      <img src="assets/brand/two-toads-logo.png" width="64" height="64" alt="Two Toads">
+      <img src="assets/brand/two-toads-logo.png" width="64" height="64" alt="Two Toads" decoding="async" fetchpriority="low">
       <p class="credit-brand">Two Toads</p>
       <p class="eyebrow">Cards · Snacks · Games</p>
       <p class="credit-legal">BinderHunt · made with 🐸 by Two Toads. Not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. Wishlists and binders stay in this browser. Sources: TCGdex, TCGplayer, Cardmarket, Scrydex.</p>
     </div>
   </aside>
-  <div class="stage">
+  <main class="stage">
     <header class="top">
-      <p class="word">BinderHunt</p>
+      <h1 class="word">BinderHunt</h1>
       <button class="context" id="context" type="button">All cards</button>
       <button class="iconbtn" id="gear" data-gear type="button" aria-label="Settings">⚙</button>
     </header>
@@ -843,17 +846,18 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
       <p class="countline" id="matchCount" aria-live="polite">Looking…</p>
       <div class="hunt-cluster">
       <div class="deck-slot">
-      <div id="deck" data-status="loading" aria-busy="true" tabindex="-1"></div>
+      <div id="deck" data-status="loading" aria-busy="true" tabindex="-1" role="region" aria-roledescription="swipe deck" aria-label="Card deck, loading" aria-describedby="deckHelp"></div>
       </div>
       <div id="deckCaption" class="deckcap" hidden>
         <div class="cap"><b id="capName"></b><small id="capSub"></small></div>
         <span class="pill" id="capPrice">—</span>
       </div>
-      <div class="actions">
-        <button class="act" id="skip" type="button" aria-label="Skip" disabled>✕</button>
-        <button class="act undo" id="undo" type="button" aria-label="Undo last swipe" disabled>↺</button>
-        <button class="act add" id="save" type="button" aria-label="Add to wishlist" disabled>♥</button>
+      <div class="actions" role="group" aria-label="Card actions">
+        <button class="act" id="skip" type="button" aria-keyshortcuts="ArrowLeft" aria-label="Skip" disabled>✕</button>
+        <button class="act undo" id="undo" type="button" aria-keyshortcuts="Z" aria-label="Undo last swipe" disabled>↺</button>
+        <button class="act add" id="save" type="button" aria-keyshortcuts="ArrowRight" aria-label="Add to wishlist" disabled>♥</button>
       </div>
+      <p id="deckHelp" class="sr-only">Skip and Save are under the card. Left arrow passes, right arrow saves, up arrow opens the card, Z undoes the last swipe.</p>
       <p class="keyhint" aria-hidden="true"><kbd>←</kbd> pass <kbd>→</kbd> save <kbd>Z</kbd> undo <kbd>↑</kbd> details <kbd>F</kbd> filters</p>
       </div>
       </div>
@@ -868,11 +872,11 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
       <div class="scroll" id="dailyScroll"></div>
     </div>
     <footer class="foot">
-      <img src="assets/brand/two-toads-logo.png" width="32" height="32" alt="Two Toads">
+      <img src="assets/brand/two-toads-logo.png" width="32" height="32" alt="Two Toads" decoding="async" fetchpriority="low">
       <p>BinderHunt · made with 🐸 by Two Toads<br>Not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. Wishlists and binders stay in this browser. Sources: TCGdex, TCGplayer, Cardmarket, Scrydex.</p>
     </footer>
-  </div>
-  <aside id="profile" hidden aria-labelledby="profileTitle"></aside>
+  </main>
+  <div id="profile" hidden aria-labelledby="profileTitle"></div>
   <nav class="tabs" aria-label="Primary">
     <button class="tabbtn" type="button" data-tab="hunt" aria-current="page">Hunt</button>
     <button class="tabbtn" type="button" data-tab="sets">Sets</button>
@@ -894,7 +898,10 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 <div id="settingsSheet" class="sheet" hidden>
   <button class="backdrop" type="button" aria-label="Close settings"></button>
   <div class="sheet-card tall" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-    <h2 id="settingsTitle">Settings</h2>
+    <div class="sheet-top">
+      <h2 id="settingsTitle">Settings</h2>
+      <button class="chip" type="button" id="settingsDone">Done</button>
+    </div>
     <div class="sheet-body" id="settingsBody"></div>
   </div>
 </div>
@@ -936,7 +943,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 <div id="dropPrompt" class="drop-prompt" hidden>
   <div class="drop-card" role="dialog" aria-modal="true" aria-labelledby="dropPromptTitle">
     <div class="toad-row">
-      <img src="assets/brand/two-toads-logo.png" width="72" height="72" alt="">
+      <img src="assets/brand/two-toads-logo.png" width="72" height="72" alt="" decoding="async" fetchpriority="low">
       <div class="bubble">
         <p class="kicker">Today's Drop</p>
         <h2 id="dropPromptTitle">Guess the price.</h2>
@@ -952,7 +959,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 <div id="onboard" class="onboard" hidden>
   <div class="onboard-card" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
     <div class="toad-row">
-      <img src="assets/brand/two-toads-logo.png" width="72" height="72" alt="">
+      <img src="assets/brand/two-toads-logo.png" width="72" height="72" alt="" decoding="async" fetchpriority="low">
       <div class="bubble">
         <p class="kicker" id="onboardStep">1 of 2</p>
         <h2 id="onboardTitle">Who are you hunting for?</h2>
@@ -1139,6 +1146,12 @@ let fillBinderId = "";
 let fillSelected = new Set();
 let menuCard = null;
 let restoreFocus = null;
+let profileOpener = null;
+let onboardOpener = null;
+let pricePointer = 0;
+window.addEventListener("pointerdown", () => { pricePointer++; }, true);
+window.addEventListener("pointerup", () => { pricePointer = Math.max(0, pricePointer - 1); }, true);
+window.addEventListener("pointercancel", () => { pricePointer = Math.max(0, pricePointer - 1); }, true);
 
 const COUNT_NS = "binderhunt.kyrohmotz.github.io";
 function doNotTrack(){
@@ -2284,20 +2297,132 @@ function loadMeta(){
   })().catch(() => { meta.sets = MUST_SETS.slice(); meta.ready = true; });
   return metaPromise;
 }
+function binderBusy(){
+  const showcase = document.getElementById("showcase");
+  const book = document.querySelector(".book");
+  return pricePointer > 0 || !!document.querySelector(".leaf.hot") || !!(book && book.dataset.curling) || !!(showcase && !showcase.hidden);
+}
+function applyScrydex(){
+  const busy = binderBusy();
+  paintDeckDrops();
+  if (!busy && profilePinned && profileCard && !profileEl.hidden) {
+    renderProfile(cardCache.get(profileCard.id) || profileCard);
+    queuePrice(profileCard.id);
+  } else if (!profilePinned) { summaryId = ""; paintDeckSummary(currentTop()); }
+  if (busy) { setTimeout(applyScrydex, 160); return; }
+  if (tab === "binders") renderBinders();
+  else paintRail();
+}
+/* The price cache is about 26MB. Parsing it on the page thread freezes swipes,
+   and downloading it with the first card blows the load. A worker parses it
+   and hands cards over in small batches after the top card is on screen. */
 function loadScrydex(){
   if (scrydexPromise) return scrydexPromise;
-  scrydexPromise = fetch("data/scrydex.json", { cache:"no-cache" }).then(r => r.ok ? r.json() : null).then(j => {
-    scrydex = { ready:true, cards:(j && j.cards) || {} };
-  }).catch(() => { scrydex = { ready:true, cards:{} }; }).then(() => {
-    paintDeckDrops();
-    if (profilePinned && profileCard && !profileEl.hidden) {
-      renderProfile(cardCache.get(profileCard.id) || profileCard);
-      queuePrice(profileCard.id);
-    } else { summaryId = ""; paintDeckSummary(currentTop()); }
-    if (tab === "binders") renderBinders();
-    else paintRail();
+  const finishEmpty = () => { scrydex = { ready:true, cards:{} }; applyScrydex(); };
+  scrydexPromise = new Promise(resolve => {
+    const finish = () => { scrydex.ready = true; applyScrydex(); resolve(); };
+    const fail = () => { finishEmpty(); resolve(); };
+    const absorb = (cards) => {
+      scrydex = { ready:false, cards:{} };
+      const ids = Object.keys(cards || {});
+      let i = 0;
+      const step = () => {
+        const end = Math.min(ids.length, i + 24);
+        for (; i < end; i++) scrydex.cards[ids[i]] = cards[ids[i]];
+        if (i < ids.length) { setTimeout(step, 0); return; }
+        finish();
+      };
+      step();
+    };
+    let worker = null;
+    try {
+      const src = [
+        "self.onmessage = async (event) => {",
+        "  try {",
+        "    const res = await fetch(event.data, { cache: 'no-cache' });",
+        "    if (!res.ok) throw new Error('status');",
+        "    const data = await res.json();",
+        "    const cards = (data && data.cards) || {};",
+        "    const ids = Object.keys(cards);",
+        "    const size = 2;",
+        "    for (let i = 0; i < ids.length; i += size) {",
+        "      const batch = {};",
+        "      const slice = ids.slice(i, i + size);",
+        "      for (let j = 0; j < slice.length; j++) batch[slice[j]] = cards[slice[j]];",
+        "      self.postMessage({ batch: batch, last: i + size >= ids.length });",
+        "    }",
+        "    if (!ids.length) self.postMessage({ batch: {}, last: true });",
+        "  } catch (e) { self.postMessage({ error: true }); }",
+        "};"
+      ].join("\n");
+      worker = new Worker(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+    } catch (e) { worker = null; }
+    if (!worker) {
+      fetch("data/scrydex.json", { cache:"no-cache" }).then(r => r.ok ? r.json() : null).then(j => {
+        absorb((j && j.cards) || {});
+      }).catch(fail);
+      return;
+    }
+    scrydex = { ready:false, cards:{} };
+    const queue = [];
+    let pumping = false;
+    const pumpQueue = () => {
+      pumping = false;
+      if (pricePointer > 0) {
+        pumping = true;
+        setTimeout(pumpQueue, 40);
+        return;
+      }
+      const start = performance.now();
+      while (queue.length && performance.now() - start < 8) {
+        const msg = queue.shift();
+        if (!msg) continue;
+        if (msg.error) { try { worker.terminate(); } catch (e) {} fail(); return; }
+        const batch = msg.batch || {};
+        const ids = Object.keys(batch);
+        for (let i = 0; i < ids.length; i++) scrydex.cards[ids[i]] = batch[ids[i]];
+        if (msg.last) { try { worker.terminate(); } catch (e) {} finish(); return; }
+      }
+      if (!queue.length) return;
+      pumping = true;
+      if (window.requestIdleCallback) requestIdleCallback(pumpQueue, { timeout: 60 });
+      else setTimeout(pumpQueue, 16);
+    };
+    worker.onmessage = (event) => {
+      queue.push(event.data || {});
+      if (pumping) return;
+      pumping = true;
+      if (window.requestIdleCallback) requestIdleCallback(pumpQueue, { timeout: 60 });
+      else setTimeout(pumpQueue, 16);
+    };
+    worker.onerror = () => { try { worker.terminate(); } catch (e) {} fail(); };
+    worker.postMessage(new URL("data/scrydex.json", location.href).href);
   });
   return scrydexPromise;
+}
+function scheduleScrydex(){
+  if (scrydexPromise) return scrydexPromise;
+  if (filters.graded) return loadScrydex();
+  let armed = false;
+  let timer = 0;
+  let waitId = 0;
+  const start = () => {
+    if (armed) return;
+    armed = true;
+    clearInterval(timer);
+    clearTimeout(waitId);
+    loadScrydex();
+  };
+  const sharpReady = () => {
+    const img = deck && deck.querySelector(".card:last-child img");
+    if (!img) return false;
+    const src = img.currentSrc || img.src || "";
+    if (!/\/high\.(webp|png)(\?|$)/.test(src) && !/images\.pokemontcg\.io\//.test(src)) return false;
+    return img.complete && img.naturalWidth > 40;
+  };
+  timer = setInterval(() => { if (sharpReady()) start(); }, 150);
+  waitId = setTimeout(start, 7000);
+  return null;
 }
 const DEMAND_KEY = "bh.priceDemand.v1";
 const priceAsked = new Set();
@@ -2835,6 +2960,7 @@ function showSkeleton(){
   deck.dataset.status = "loading";
   delete deck.dataset.huntEnd;
   deck.setAttribute("aria-busy", "true");
+  deck.setAttribute("aria-label", "Card deck, loading");
   deck.innerHTML = `<div class="skel"></div>`;
   const row = document.getElementById("deckCaption");
   if (row) row.hidden = true;
@@ -3092,7 +3218,8 @@ function paintArt(host, card, opts){
   const img = document.createElement("img");
   img.alt = altText(card || {});
   img.draggable = false;
-  img.decoding = "async";
+  img.decoding = opts && opts.priority === "high" ? "auto" : "async";
+  try { img.fetchPriority = (opts && opts.priority) || "auto"; } catch (e) {}
   if (opts && opts.lazy) img.loading = "lazy";
   img.addEventListener("dragstart", e => e.preventDefault());
   let at = 0;
@@ -3110,6 +3237,7 @@ function paintArt(host, card, opts){
     if (!url || !img.isConnected && i > 1) return;
     const hi = new Image();
     hi.decoding = "async";
+    try { hi.fetchPriority = (opts && opts.priority) || "low"; } catch (e) {}
     hi.onload = () => {
       sharpLoaded.add(url);
       if (sharpLoaded.size > 2000) sharpLoaded.clear();
@@ -3219,13 +3347,42 @@ function refreshPocketPrice(card){
   });
 }
 function topCard(){ const cards = deck.querySelectorAll(".card"); return cards[cards.length - 1] || null; }
+const deckWarmed = new Set();
+function warmArt(url, priority){
+  if (!url || deckWarmed.has(url)) return;
+  if (deckWarmed.size > 400) deckWarmed.clear();
+  deckWarmed.add(url);
+  const img = new Image();
+  img.decoding = "async";
+  try { img.fetchPriority = priority || "low"; } catch (e) {}
+  img.src = url;
+  if (img.decode) img.decode().catch(() => {});
+}
+/* The stack shows three cards. Warm the ones behind it so the next swipe is already decoded. */
+function warmDeck(){
+  pile.slice(1, 6).forEach((card, i) => {
+    const quick = knownArt(card);
+    if (quick[0]) warmArt(quick[0], "low");
+    if (i < 3) {
+      const sharp = artUrls(card, true).find(u => u && !/\/low\.webp$/.test(u));
+      if (sharp && sharp !== quick[0]) warmArt(sharp, "low");
+    }
+  });
+}
 function layoutStack(){
   const cards = [...deck.querySelectorAll(".card")];
   cards.forEach((el, i) => {
     const depth = cards.length - 1 - i;
     el.style.zIndex = String(10 + i);
+    const buried = depth > 0 || el.classList.contains("leaving");
+    if (buried) el.setAttribute("aria-hidden", "true");
+    else {
+      el.removeAttribute("aria-hidden");
+      const img = el.querySelector("img");
+      if (img) { try { if (img.fetchPriority !== "high") img.fetchPriority = "high"; } catch (e) {} }
+    }
     if (el.classList.contains("leaving") || el.classList.contains("dragging")) return;
-    el.style.transform = depth ? `translateY(${6 + depth * 3}px) scale(${1 - depth * 0.035})` : "";
+    el.style.transform = depth ? `translate3d(0, ${6 + depth * 3}px, 0) scale(${1 - depth * 0.035})` : "";
   });
   paintCaption();
   alignHuntColumn();
@@ -3262,10 +3419,12 @@ function paintCaption(){
   const shown = printingMoney(card);
   row.hidden = false;
   document.getElementById("capName").textContent = card.name || "Card";
-  document.getElementById("capSub").textContent = [card.set, card.number ? "#" + card.number : "", card.rarity].filter(Boolean).join(" · ");
+  const sub = [card.set, card.number ? "#" + card.number : "", card.rarity].filter(Boolean).join(" · ");
+  document.getElementById("capSub").textContent = sub;
   const pill = document.getElementById("capPrice");
   pill.textContent = shown ? priceText(shown.amount, shown.currency) : "—";
   pill.classList.toggle("missing", !shown);
+  deck.setAttribute("aria-label", [card.name || "Card", sub, shown ? priceText(shown.amount, shown.currency) : "Price unavailable"].filter(Boolean).join(", "));
   paintDeckSummary(card);
 }
 function syncActs(){
@@ -3292,8 +3451,9 @@ function renderDeck(){
   }
   if (!pile.length && (loading || (!streamDone && !paused && !pumpError))) { showSkeleton(); syncActs(); return; }
   deck.querySelectorAll(".skel,.empty-state").forEach(n => n.remove());
+  warmDeck();
   const have = new Set([...deck.querySelectorAll(".card")].map(el => el.card && el.card.id));
-  pile.slice(0, 3).forEach(card => {
+  pile.slice(0, 3).forEach((card, index) => {
     if (have.has(card.id)) return;
     const el = document.createElement("div");
     el.className = "card";
@@ -3302,7 +3462,7 @@ function renderDeck(){
     const tag = card.spice ? `<span class="surprise">surprise pick</span>` : "";
     if (card.spice) ensureLabelFont();
     el.innerHTML = `<div class="frame"><div class="art"></div><span class="stamp like">${discoveryBinder() ? "BINDER!" : "WISH!"}</span><span class="stamp nope">PASS</span>${tag}</div>`;
-    paintArt(el.querySelector(".art"), card, { large:true });
+    paintArt(el.querySelector(".art"), card, { large:true, priority: index === 0 ? "high" : "low" });
     deck.prepend(el);
     bindDrag(el);
   });
@@ -3319,6 +3479,7 @@ function renderDeck(){
       const huntEnd = matched > 0 ? "seen" : "none";
       deck.dataset.huntEnd = huntEnd;
       const headline = matched > 0 ? "You've seen every card that fits." : "Nothing fits these filters.";
+      deck.setAttribute("aria-label", headline);
       const named = facts.map(f => f.label).join(", ");
       const detail = matched > 0
         ? (named ? named + " ran out. Widen the hunt and the pile fills back up." : "Widen the hunt and the pile fills back up.")
@@ -3341,6 +3502,7 @@ function renderDeck(){
       if (edit) edit.onclick = () => openFilter("all", document.getElementById("openFilters"));
     } else {
       const msg = navigator.onLine === false ? "<p>You're offline. Your wishlist and binders are still in this browser.</p>" : pumpError ? `<p class="warn">${esc(pumpError)}</p>` : catalogBusy ? "<p>Card source is busy, retrying…</p>" : paused ? "<p>Still matching cards.</p>" : "<p>The hunt is still shuffling the table.</p>";
+      deck.setAttribute("aria-label", pumpError ? "Card deck, something went wrong" : "Card deck");
       deck.innerHTML = `<div class="empty-state">${msg}${toad()}<button class="chip" id="retryDeck" type="button">Keep looking</button></div>`;
       const btn = document.getElementById("retryDeck");
       if (btn) btn.onclick = () => {
@@ -3360,6 +3522,15 @@ function bindDrag(el){
   el.draggable = false;
   el.addEventListener("dragstart", e => e.preventDefault());
   const rot = x => Math.max(-12, Math.min(12, x / 18));
+  let frame = 0;
+  const like = el.querySelector(".like");
+  const nope = el.querySelector(".nope");
+  const paintDrag = () => {
+    frame = 0;
+    el.style.transform = `translate3d(${dx}px, ${dy}px, 0) rotate(${rot(dx)}deg)`;
+    if (like) like.style.opacity = String(Math.max(0, dx / 110));
+    if (nope) nope.style.opacity = String(Math.max(0, -dx / 110));
+  };
   el.addEventListener("pointerdown", e => {
     if (e.button != null && e.button !== 0) return;
     if (el !== topCard() || blocking() || el.classList.contains("leaving") || reserved.has(el.card.id)) return;
@@ -3375,16 +3546,14 @@ function bindDrag(el){
     dx = e.clientX - sx; dy = e.clientY - sy;
     if (!dragged && Math.hypot(dx, dy) > TAP_SLOP) { dragged = true; el.classList.add("dragging"); }
     if (!dragged) return;
-    el.style.transform = `translate3d(${dx}px, ${dy}px, 0) rotate(${rot(dx)}deg)`;
-    const like = el.querySelector(".like"), nope = el.querySelector(".nope");
-    if (like) like.style.opacity = String(Math.max(0, dx / 110));
-    if (nope) nope.style.opacity = String(Math.max(0, -dx / 110));
+    if (!frame) frame = requestAnimationFrame(paintDrag);
   }
   function up(e){
     if (e.pointerId !== pid) return;
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", up);
     window.removeEventListener("pointercancel", up);
+    if (frame) { cancelAnimationFrame(frame); frame = 0; if (dragged) paintDrag(); }
     pid = null;
     if (!dragged) { openProfile(el.card); return; }
     el.classList.remove("dragging");
@@ -3439,7 +3608,8 @@ function runSwipe(){
   el.classList.add("leaving");
   layoutStack();
   const w = deck.clientWidth || 320;
-  const fast = pendingSwipes.length > 0 || reduceMotion();
+  const motion = reduceMotion();
+  const fast = pendingSwipes.length > 0 || motion;
   let doneOnce = false;
   const done = () => {
     if (doneOnce) return;
@@ -3451,9 +3621,17 @@ function runSwipe(){
     runSwipe();
     if (pile.length < 4 && !loading && !streamDone) pump(generation);
   };
-  el.style.transition = fast ? "transform .16s ease-out" : "transform .22s cubic-bezier(.2,1.3,.4,1)";
+  el.style.transition = motion ? "none" : (fast ? "transform .16s ease-out" : "transform .22s cubic-bezier(.2,1.3,.4,1)");
   el.style.transform = `translate3d(${job.dir * (w + 80)}px, -20px, 0) rotate(${Math.max(-12, Math.min(12, job.dir * 10))}deg)`;
-  setTimeout(done, fast ? 170 : 240);
+  if (motion) { done(); return; }
+  const ms = fast ? 170 : 240;
+  const onEnd = (ev) => {
+    if (ev && ev.propertyName && ev.propertyName !== "transform") return;
+    el.removeEventListener("transitionend", onEnd);
+    done();
+  };
+  el.addEventListener("transitionend", onEnd);
+  setTimeout(() => { el.removeEventListener("transitionend", onEnd); done(); }, ms + 50);
 }
 function undo(){
   if (blocking() || !undoStack.length) return;
@@ -3502,10 +3680,39 @@ function removeFromWish(id){
   announce("Removed from your wishlist. Binders that include it are unchanged.");
 }
 
+function markProfile(dialog){
+  if (!profileEl) return;
+  if (dialog) {
+    profileEl.setAttribute("role", "dialog");
+    profileEl.setAttribute("aria-modal", "true");
+  } else {
+    profileEl.setAttribute("role", "complementary");
+    profileEl.removeAttribute("aria-modal");
+  }
+}
+function outsideModal(){
+  return ["filterSheet","settingsSheet","binderSheet","fillSheet","onboard","dropPrompt","showcase"].some(id => {
+    const el = document.getElementById(id);
+    return el && !el.hidden;
+  });
+}
+function syncInert(){
+  const shell = document.getElementById("shell");
+  if (!shell) return;
+  const profileDialog = !wide() && profilePinned && profileEl && !profileEl.hidden;
+  if (outsideModal()) {
+    shell.inert = true;
+    shell.querySelectorAll(":scope > .stage, :scope > .rail, :scope > .tabs").forEach(el => { el.inert = false; });
+    return;
+  }
+  shell.inert = false;
+  shell.querySelectorAll(":scope > .stage, :scope > .rail, :scope > .tabs").forEach(el => { el.inert = !!profileDialog; });
+}
 function blocking(){
   const prompt = document.getElementById("dropPrompt");
   const daily = document.getElementById("viewDaily");
-  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (prompt && !prompt.hidden) || (daily && !daily.hidden) || (!profileEl.hidden && !wide());
+  const showcase = document.getElementById("showcase");
+  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (prompt && !prompt.hidden) || (showcase && !showcase.hidden) || (daily && !daily.hidden) || (!profileEl.hidden && !wide());
 }
 function keepSwipeFocus(trigger){
   const box = document.getElementById("hapticSwitch");
@@ -3736,7 +3943,7 @@ function renderSetSide(){
   summaryId = "";
   profileEl.hidden = false;
   shell.classList.remove("no-profile");
-  profileEl.removeAttribute("aria-modal");
+  markProfile(false);
   if (!stats) {
     const n = (meta.sets || []).length;
     profileEl.innerHTML = `<div class="profile-scroll" data-side="sets"><p class="eyebrow">Sets</p><h2 class="pname" id="profileTitle">Browse sets</h2><p class="fine">${n ? n + " sets, grouped by era." : "The catalog is still loading."}</p><p class="fine">Open a set to swipe it, or flip through its pages. Saved cards from that set show up here.</p></div>`;
@@ -3773,7 +3980,7 @@ function renderBinderSide(){
   summaryId = "";
   profileEl.hidden = false;
   shell.classList.remove("no-profile");
-  profileEl.removeAttribute("aria-modal");
+  markProfile(false);
   if (!binderView) {
     /* The shelf already lists the binders, so the side panel answers what
        a collector checks next: what got cheaper and what is worth most. */
@@ -3826,7 +4033,7 @@ function renderDailySide(){
   summaryId = "";
   profileEl.hidden = false;
   shell.classList.remove("no-profile");
-  profileEl.removeAttribute("aria-modal");
+  markProfile(false);
   let result = `<p class="fine">Opening today's drop…</p>`;
   if (model && model.ready && model.empty) result = `<p class="fine">No priced card for today.</p>`;
   else if (model && model.ready && done) result = `<p class="market-price">${esc(priceText(model.price, "USD"))}</p><p class="fine">${solved ? "You landed it." : "That's the raw price."} Same number for everyone.</p>`;
@@ -3945,6 +4152,7 @@ function openSheet(id, anchor){
     const opener = document.getElementById("openFilters");
     if (opener) opener.setAttribute("aria-expanded", "true");
   }
+  syncInert();
   syncActs();
 }
 function closeSheet(id){
@@ -3954,7 +4162,9 @@ function closeSheet(id){
     const opener = document.getElementById("openFilters");
     if (opener) opener.setAttribute("aria-expanded", "false");
   }
+  syncInert();
   if (restoreFocus && restoreFocus.focus) restoreFocus.focus();
+  restoreFocus = null;
   syncActs();
 }
 function sameName(a, b){ return String(a).toLowerCase() === String(b).toLowerCase(); }
@@ -5375,10 +5585,11 @@ function openShowcase(card, from, opts){
     missing: () => binderMissingArt(card),
     backHtml: inspectBack(card, sealed),
     onDetails: sealed ? null : () => openProfile(card),
-    onClose: () => { if (showcaseCardRef === card) showcaseCardRef = null; }
+    onClose: () => { if (showcaseCardRef === card) showcaseCardRef = null; syncInert(); }
   });
   if (!ok) { openProfile(card); return; }
   showcaseCardRef = card;
+  syncInert();
   if (settings.haptics) haptic(8);
 }
 function closeShowcase(){
@@ -5774,7 +5985,7 @@ function moveWord(move){
   return word + " " + move.shown.toFixed(1) + " percent";
 }
 function lineStroke(move){
-  if (!move || move.dir === "flat") return "#2FA9D9";
+  if (!move || move.dir === "flat") return "#146f96";
   return move.dir === "down" ? "#8d4a4a" : "#737863";
 }
 function historyAria(view, currency, move30, move90){
@@ -6009,7 +6220,7 @@ function chartSvg(points, guide, currency, label, stroke){
   const moneyCur = currency || "USD";
   const hi = compactMoney(max, moneyCur);
   const lo = compactMoney(min, moneyCur);
-  const line = stroke || "#2FA9D9";
+  const line = stroke || "#146f96";
   const lastX = xOf(points.length - 1).toFixed(1);
   const lastY = yOf(points[points.length - 1].value).toFixed(1);
   const aria = label || "Price history";
@@ -6047,13 +6258,13 @@ function paintDeckSummary(card){
 function paintSummaryEmpty(){
   profileEl.hidden = false;
   shell.classList.remove("no-profile");
-  profileEl.removeAttribute("aria-modal");
+  markProfile(false);
   profileEl.innerHTML = `<div class="profile-scroll" data-summary-empty="1"><p class="eyebrow">On the table</p><p class="empty-state">The next card's price lands here. ${toad()}</p></div>`;
 }
 function renderSummary(card){
   profileEl.hidden = false;
   shell.classList.remove("no-profile");
-  profileEl.removeAttribute("aria-modal");
+  markProfile(false);
   const story = priceStory(card, { summary:true });
   profileEl.innerHTML = `<div class="profile-scroll profile-summary" data-summary="1">
     <p class="eyebrow">On the table</p>
@@ -6090,6 +6301,10 @@ function renderSummary(card){
 }
 function openProfile(card){
   ensureLabelFont();
+  const dialog = !wide();
+  const already = dialog && profilePinned && profileEl && !profileEl.hidden;
+  const opener = document.activeElement;
+  if (dialog && !already && opener && opener !== document.body && !profileEl.contains(opener)) profileOpener = opener;
   if (card && card.id && !card.variants) {
     hydrate(card).then(full => { if (profilePinned && profileCard && profileCard.id === card.id) renderProfile(full); }).catch(() => { if (profilePinned && profileCard && profileCard.id === card.id) renderProfile(card); });
   }
@@ -6100,8 +6315,7 @@ function openProfile(card){
   profileCard = card;
   profileEl.hidden = false;
   shell.classList.toggle("no-profile", false);
-  if (!wide()) profileEl.setAttribute("role", "dialog"), profileEl.setAttribute("aria-modal", "true");
-  else profileEl.removeAttribute("aria-modal");
+  markProfile(!wide());
   renderProfile(card);
   noteDemand(card.id);
   queuePrice(card.id);
@@ -6109,10 +6323,14 @@ function openProfile(card){
   const scroller = profileEl.querySelector(".profile-scroll");
   if (scroller) scroller.scrollTop = 0;
   const close = document.getElementById("closeProfile");
-  if (close && !wide()) close.focus();
+  if (close && dialog) close.focus();
+  syncInert();
   syncActs();
 }
 function closeProfile(){
+  const dialog = !wide();
+  const back = profileOpener;
+  profileOpener = null;
   profilePinned = false;
   profileCard = null;
   pinnedTopId = "";
@@ -6120,6 +6338,11 @@ function closeProfile(){
   sideKey = "";
   if (wide()) paintSide();
   else { profileEl.hidden = true; shell.classList.add("no-profile"); }
+  syncInert();
+  if (dialog) {
+    if (back && back.isConnected && back !== document.body && typeof back.focus === "function") back.focus();
+    else if (deck) deck.focus();
+  }
   syncActs();
 }
 function paintEmptyProfile(){
@@ -6130,7 +6353,7 @@ function syncProfilePane(){
     if (profilePinned && profileCard) {
       profileEl.hidden = false;
       shell.classList.remove("no-profile");
-      profileEl.removeAttribute("aria-modal");
+      markProfile(false);
     } else {
       summaryId = "";
       sideKey = "";
@@ -6142,9 +6365,9 @@ function syncProfilePane(){
   } else {
     profileEl.hidden = false;
     shell.classList.remove("no-profile");
-    profileEl.setAttribute("role", "dialog");
-    profileEl.setAttribute("aria-modal", "true");
+    markProfile(true);
   }
+  syncInert();
 }
 function renderProfile(card){
   profileCard = card;
@@ -6262,7 +6485,7 @@ function openSettingsPanel(){
     <p class="fine">BinderHunt is not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. There is no account. Wishlists, binders, owned marks, filters, settings, and the daily streak stay in this browser.</p>
     <p class="fine">A public hit counter records page views, one visit a day, and a few actions, including playing the daily drop. It sets no cookies and sends no identifier, and it stays off when Do Not Track is on.</p>
     <p class="fine">Card text and images come from TCGdex. US prices come from TCGplayer. European prices come from Cardmarket. Commons and cards under $10 use those catalog prices. Graded prices and population come from a Scrydex cache for chase cards and cards you open or save often, and only for the printing on screen. Prices are estimates, not financial advice. TCGplayer, eBay, and Cardmarket links are not affiliate links yet.</p>
-    <p class="fine"><img src="assets/brand/two-toads-logo.png" width="32" height="32" alt="Two Toads"> BinderHunt · made with 🐸 by Two Toads</p>`;
+    <p class="fine"><img src="assets/brand/two-toads-logo.png" width="32" height="32" alt="Two Toads" decoding="async" fetchpriority="low"> BinderHunt · made with 🐸 by Two Toads</p>`;
   document.getElementById("setMotion").value = settings.reduce;
   document.getElementById("setCur").value = settings.currency;
   document.getElementById("setSound").onchange = e => { settings.sound = e.target.checked; saveSettings(); if (settings.sound) playTone(520); };
@@ -6271,6 +6494,8 @@ function openSettingsPanel(){
   document.getElementById("setCur").onchange = e => { settings.currency = e.target.value; saveSettings(); summaryId = ""; renderDeck(); if (profilePinned && profileCard && !profileEl.hidden) renderProfile(profileCard); };
   document.getElementById("retakeOnboard").onclick = () => { closeSheet("settingsSheet"); openOnboard("retake"); };
   openSheet("settingsSheet");
+  const firstSetting = document.getElementById("setSound");
+  if (firstSetting) firstSetting.focus();
 }
 document.querySelectorAll("[data-gear]").forEach(btn => btn.onclick = openSettingsPanel);
 document.getElementById("railWish").onclick = () => { binderView = { kind:"wish" }; flipPage = 0; showTab("binders"); };
@@ -6280,6 +6505,7 @@ document.querySelectorAll(".backdrop").forEach(btn => btn.onclick = () => {
 });
 document.getElementById("openFilters").onclick = () => openFilter("all", document.getElementById("openFilters"));
 document.getElementById("filterDone").onclick = () => closeSheet("filterSheet");
+document.getElementById("settingsDone").onclick = () => closeSheet("settingsSheet");
 document.getElementById("resetFilters").onclick = () => clearAllFilters();
 document.getElementById("stopDiscovery").onclick = () => {
   const b = discoveryBinder();
@@ -6310,6 +6536,23 @@ function typingTarget(el){
 }
 document.addEventListener("keydown", e => {
   const open = ["fillSheet","binderSheet","settingsSheet","filterSheet","dropPrompt"].map(id => document.getElementById(id)).find(el => el && !el.hidden);
+  const onboardLayer = document.getElementById("onboard");
+  const showcaseLayer = document.getElementById("showcase");
+  const layer = !open && onboardLayer && !onboardLayer.hidden ? onboardLayer : (!open && showcaseLayer && !showcaseLayer.hidden ? showcaseLayer : null);
+  if (layer && e.key === "Tab") {
+    const items = [...layer.querySelectorAll("button, a[href], input, select, textarea, [tabindex='0']")].filter(el => {
+      if (el.disabled || el.getAttribute("aria-hidden") === "true") return false;
+      const style = getComputedStyle(el);
+      return style.display !== "none" && style.visibility !== "hidden" && el.getClientRects().length > 0;
+    });
+    if (items.length) {
+      const first = items[0], last = items[items.length - 1];
+      const inside = items.includes(document.activeElement);
+      if (!inside) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  }
   if (open && e.key === "Tab") {
     const items = [...open.querySelectorAll(".sheet-card button, .sheet-card input, .sheet-card select, .sheet-card a, .drop-card button, .drop-card input, .drop-card select, .drop-card a")].filter(el => !el.disabled && el.offsetParent);
     if (items.length) {
@@ -6523,11 +6766,19 @@ function openOnboard(mode){
     onboardEra = "";
     onboardBudget = "";
   }
+  const opener = document.activeElement;
+  if (opener && opener !== document.body && !document.getElementById("onboard").contains(opener)) onboardOpener = opener;
   document.getElementById("onboard").hidden = false;
   renderOnboard();
+  syncInert();
 }
 function closeOnboard(){
   document.getElementById("onboard").hidden = true;
+  const back = onboardOpener;
+  onboardOpener = null;
+  syncInert();
+  if (back && back.isConnected && typeof back.focus === "function") back.focus();
+  else if (deck) deck.focus();
   syncActs();
 }
 function skipOnboard(){
@@ -6567,7 +6818,7 @@ if (ownedInlineMigrated) {
 paintChips();
 paintContext();
 paintDiscovery();
-loadScrydex();
+scheduleScrydex();
 loadMeta().then(() => {
   settleStoredFilters();
   backfillOwnedSets();

@@ -73,7 +73,7 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 .setpct .pct{min-width:0;white-space:nowrap}
 .setpct.zero .bar{opacity:.35}
 .setpct.zero .pct{font-weight:600;color:var(--ink-2)}
-.wishheart{color:var(--green-deep)}
+.wishheart{color:#445238}
 .setpct.zero .wishheart{color:var(--ink-2)}
 .era-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:16px 2px 8px;font-size:18px}
 .era-h .fine{font-family:Nunito,sans-serif;font-style:normal;font-weight:800;letter-spacing:0;text-transform:none}
@@ -172,7 +172,7 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 #profile .phead .thumb{padding:0;cursor:zoom-in;width:72px;height:auto;aspect-ratio:63/88;border-radius:8px;transition:transform .16s cubic-bezier(.2,.8,.2,1)}
 #profile .phead .thumb:active{transform:scale(.97)}
 #profile .phead .thumb img{object-fit:cover}
-#profile .phead .thumb:focus-visible{outline:3px solid #2FA9D9;outline-offset:3px}
+#profile .phead .thumb:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
 @media (max-width:1023px){
   #profile .profile-tools{display:flex;justify-content:flex-end;align-items:center}
   #profile .profile-tools #closeProfile{grid-area:auto;justify-self:auto}
@@ -191,7 +191,7 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 #profile .shoplinks .buy-btn:hover{background:var(--paper-2)}
 #profile button:focus-visible,
 #profile a:focus-visible,
-#profile svg:focus-visible{outline:3px solid #2FA9D9;outline-offset:3px}
+#profile svg:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
 #profile .ownrow.mine .chip{max-width:none;white-space:nowrap}
 #profile .ownrow.mine{margin:12px 0}
 
@@ -231,7 +231,7 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 /* Sniglet's zero reads as a dot; numbers use Nunito. */
 .daily-streak b{font-family:Nunito,sans-serif;font-weight:900}
 .daily-frame[role="button"]{cursor:zoom-in}
-.daily-frame[role="button"]:focus-visible{outline:3px solid var(--sky,#86DEFF);outline-offset:3px}
+.daily-frame[role="button"]:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
 .daily-frame img{object-fit:cover}
 .money-in{position:relative;display:block}
 .money-in > span{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-family:Nunito,sans-serif;font-weight:900;font-size:18px;color:var(--ink);pointer-events:none}

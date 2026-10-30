@@ -168,7 +168,7 @@
       return `<text x="${x}" y="${h - 4}" text-anchor="${anchor}" fill="#404241" font-size="11">${esc(text)}</text>`;
     };
     const marks = [0, Math.round(last / 2), last];
-    return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Price history"><path d="${d}" fill="none" stroke="#2FA9D9" stroke-width="3" stroke-linejoin="round"/>${[...new Set(marks)].map(index => label(points[index], index)).join("")}</svg>`;
+    return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Price history"><path d="${d}" fill="none" stroke="#146f96" stroke-width="3" stroke-linejoin="round"/>${[...new Set(marks)].map(index => label(points[index], index)).join("")}</svg>`;
   }
 
   function seriesOf(card) {
