@@ -13784,6 +13784,16 @@
       "source": "tcgplayer",
       "eur": 5.82,
       "at": "2026-10-29T14:57:21Z"
+    },
+    "2026-11-01": {
+      "id": "bw1-113",
+      "price": 100.91,
+      "variant": "holofoil",
+      "printing": "Holofoil",
+      "alts": 1,
+      "source": "tcgplayer",
+      "eur": 44.81,
+      "at": "2026-10-30T14:50:41Z"
     }
   }
 }
