@@ -2497,6 +2497,11 @@ function raritiesForSet(id){
   if (VINTAGE_SET.test(id || "")) list.push("Rare");
   return list;
 }
+function gemTypeOk(card){
+  const gemCard = !!(card && (card.gemHint || card.gemReady));
+  if (gemCard && window.BinderGems && typeof BinderGems.typeMatches === "function") return BinderGems.typeMatches(card, filters.type);
+  return (card && card.types || []).includes(filters.type);
+}
 function keep(card){
   if (!card || isDigital(card) || !knownArt(card).length) return false;
   if (discoveryBinder() && savedIds().has(card.id)) return false;
@@ -2504,7 +2509,7 @@ function keep(card){
   if (!surprise) {
     if (filters.set && card.setId !== filters.set) return false;
     if ((filters.names || []).length && !nameHit(card)) return false;
-    if (filters.type && !(card.types || []).includes(filters.type)) return false;
+    if (filters.type && !gemTypeOk(card)) return false;
   }
   if (filters.era && !eraMatches(card.setId, filters.era)) return false;
   if (filters.rarities.length && !filters.rarities.includes(card.rarity)) return false;
@@ -4549,7 +4554,7 @@ function openFilter(kind, anchor){
   const moreButtons = rest.map(r => `<button type="button" class="huntpick" data-rarity="${esc(r)}">${esc(r)}</button>`).join("");
   const note = b && (lock.set || lock.type || lock.names) ? `<p class="fine">Some choices stay on because you are filling ${esc(b.name)}.</p>` : "";
   body.innerHTML = `${note}
-    <section class="filter-sec" id="filter-gem"><h3>Gemfinder</h3><div class="huntpicks"><button type="button" class="huntpick${filters.gem ? " on" : ""}" id="gemSheetToggle" aria-pressed="${filters.gem ? "true" : "false"}">Gemfinder</button></div><p class="fine">Hand-picked eras and rarities that fly under the radar. Expedition, Aquapolis, and Skyridge holos, plus mid-era rarities, in a buyable price band from the cards already saved here. Not a grade-population report.</p></section>
+    <section class="filter-sec" id="filter-gem"><h3>Gemfinder</h3><div class="huntpicks"><button type="button" class="huntpick${filters.gem ? " on" : ""}" id="gemSheetToggle" aria-pressed="${filters.gem ? "true" : "false"}">Gemfinder</button></div><p class="fine">Hand-picked eras and rarities that fly under the radar. Expedition, Aquapolis, and Skyridge holos, plus older EX, DP, HGSS, and Call of Legends holos, LV.X, Prime, and LEGEND, in a buyable price band from the cards already saved here. Not a grade-population report.</p></section>
     <section class="filter-sec" id="filter-price"><h3>Price</h3><div class="huntpicks">${priceButtons}</div><div class="row2"><label class="field">Min USD<input id="pMin" inputmode="decimal" aria-label="Minimum price in US dollars"></label><label class="field">Max USD<input id="pMax" inputmode="decimal" aria-label="Maximum price in US dollars"></label></div><p class="warn" id="pWarn" hidden>Min price is higher than max price. These prices were not applied.</p><p class="fine">Any price keeps cards under $10 in the hunt.</p></section>
     <section class="filter-sec" id="filter-set"><h3>Set</h3>${filters.set ? `<button type="button" class="setpick on" id="clearSetPick"><span><b>${esc(setName(filters.set))}</b><span class="fine">Tap to swipe every set again</span></span></button>` : ""}<input class="search" id="setSearch" type="search" placeholder="Search sets" aria-label="Search sets" enterkeyhint="search" autocomplete="off"><div id="setChoices"></div><button class="chip" type="button" id="browseSets">Browse sets by era</button></section>
     <section class="filter-sec" id="filter-era"><h3>Era</h3><div class="huntpicks">${eraButtons}</div><button class="chip" type="button" id="moreEras" aria-expanded="${seriesOpen ? "true" : "false"}">${seriesOpen ? "Fewer series" : "One series"}</button><div class="huntpicks" id="moreEraBox"${seriesOpen ? "" : " hidden"}>${seriesButtons}</div></section>
@@ -6479,10 +6484,19 @@ function openProfile(card){
   if (card && card.id && (!card.variants || card.gemReady)) {
     const hint = card.gemHint || "";
     const why = card.gemWhy || "";
-    hydrate(card).then(full => {
-      if (hint) { full.gemHint = hint; full.gemWhy = why; }
-      if (profilePinned && profileCard && profileCard.id === card.id) renderProfile(full);
-    }).catch(() => { if (profilePinned && profileCard && profileCard.id === card.id) renderProfile(card); });
+    const repaintGem = full => {
+      if (!(profilePinned && profileCard && profileCard.id === card.id)) return;
+      const closeWasFocused = !!(document.activeElement && document.activeElement.id === "closeProfile");
+      if (full) {
+        if (hint) { full.gemHint = hint; full.gemWhy = why; }
+        renderProfile(full);
+      } else renderProfile(card);
+      if (closeWasFocused && !wide()) {
+        const close = document.getElementById("closeProfile");
+        if (close) close.focus();
+      }
+    };
+    hydrate(card).then(repaintGem).catch(() => repaintGem(null));
   }
   profilePinned = true;
   syncReadingWide();

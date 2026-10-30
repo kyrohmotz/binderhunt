@@ -13,7 +13,7 @@ import gems from "../js/gems.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const {
-  judgeGem, buildCatalog, dealGems, takeGemCycle, saveHeat, gemArt,
+  judgeGem, buildCatalog, dealGems, takeGemCycle, saveHeat, gemArt, typeMatches,
   GEM_MIN, GEM_MAX, GEM_HEAT, EXPLAIN, WRAP_MESSAGE
 } = gems;
 
@@ -106,6 +106,19 @@ check("price band and printing rules", () => {
   }));
   assert.equal(tekno.hint, "Tekno Chrome");
 
+  assert.equal(judgeGem(card({ id: "xy2-12", setId: "xy2", name: "Charizard EX", rarity: "Ultra Rare", price: 20 })).reason, "printing");
+  assert.equal(judgeGem(card({ id: "sm9-165", setId: "sm9", name: "Lugia GX", rarity: "Ultra Rare", price: 40 })).gem, false);
+  assert.equal(judgeGem(card({ id: "bw1-114", setId: "bw1", name: "Zekrom", rarity: "Ultra Rare", price: 40 })).reason, "printing");
+  assert.equal(judgeGem(card({ id: "xy1-5", setId: "xy1", rarity: "Rare Holo", price: 18 })).hint, "XY holo");
+  assert.equal(judgeGem(card({ id: "bw4-8", setId: "bw4", rarity: "Holo Rare", price: 16 })).hint, "BW holo");
+  assert.equal(judgeGem(card({ id: "col1-17", setId: "col1", name: "Ninetales", rarity: "Holo Rare", price: 71 })).hint, "Call of Legends holo");
+  assert.equal(judgeGem(card({ id: "hgss1-7", setId: "hgss1", name: "Ninetales", rarity: "Holo Rare", price: 60 })).hint, "HGSS holo");
+  assert.equal(judgeGem(card({ id: "dp3-3", setId: "dp3", rarity: "Rare Holo LV.X", price: 30 })).hint, "DP LV.X");
+  assert.equal(judgeGem(card({ id: "hgss1-110", setId: "hgss1", rarity: "Rare PRIME", price: 40 })).hint, "HGSS Prime");
+  assert.equal(judgeGem(card({ id: "hgss2-1", setId: "hgss2", rarity: "LEGEND", price: 40 })).hint, "HGSS LEGEND");
+  assert.equal(judgeGem(card({ id: "hgss1-ONE", setId: "hgss1", rarity: "Ultra Rare", price: 40 })).hint, "HGSS ultra");
+  assert.equal(judgeGem(card({ id: "ex5-100", setId: "ex5", rarity: "Rare Holo EX", price: 30 })).gem, true);
+
   const warm = saveHeat([{ k: "save", id: "dp7-6" }, { k: "save", id: "dp7-6" }, { k: "own", id: "dp7-6" }]);
   assert.equal(judgeGem(card(), { heat: warm }).gem, true);
   warm["dp7-6"] = GEM_HEAT;
@@ -152,6 +165,60 @@ check("a small pocket deals again and never comes back empty", () => {
   assert.equal(WRAP_MESSAGE.length > 10, true);
 });
 
+check("a pocket of four sets wrapped when the next lap deals a card", () => {
+  const four = ["a", "b", "c", "d"].map((id, index) => card({
+    id, setId: "ecard3", set: "Skyridge", number: "H" + (index + 1), rarity: "Holo Rare", price: 40
+  }));
+  const cycle = { cards: four, cursor: 0, lap: 0 };
+  const first = takeGemCycle(cycle, 5, new Set());
+  assert.equal(first.cards.length, 4);
+  assert.equal(first.wrapped, false);
+  assert.equal(first.dry, false);
+  assert.equal(cycle.cursor, four.length);
+  const next = takeGemCycle(cycle, 1, new Set(["b", "c", "d"]));
+  assert.equal(next.wrapped, true);
+  assert.equal(next.cards.length, 1);
+  assert.equal(next.cards[0].id, "a");
+  assert.equal(next.dry, false);
+  const solo = { cards: [card({ id: "only" })], cursor: 0, lap: 0 };
+  const fill = takeGemCycle(solo, 5, new Set());
+  assert.equal(fill.cards.length, 1);
+  assert.equal(fill.wrapped, false);
+  const again = takeGemCycle(solo, 1, new Set());
+  assert.equal(again.wrapped, true);
+  assert.equal(again.cards[0].id, "only");
+});
+
+check("local types fill a gem and an unknown type still matches a filter", () => {
+  const seed = [
+    "B ecard1-21  # Ninetales · Holo Rare · 40 USD",
+    "B ex2-5  # Flareon · Holo Rare · 40 USD",
+    "B dp7-6  # Magnezone · Rare Holo · 24 USD",
+    "B hgss3-5  # Houndoom · Holo Rare · 38 USD",
+    "B ecard1-26  # Rapidash · Holo Rare · 40 USD"
+  ].join("\n");
+  const dailyPool = [
+    { id: "lc-17", name: "Ninetales", setId: "lc", num: "17", rarity: "Holo Rare", price: 10, types: ["Fire"] },
+    { id: "lc-10", name: "Flareon", setId: "lc", num: "10", rarity: "Holo Rare", price: 10, types: ["Fire"] },
+    { id: "dp7-6", name: "Magnezone", setId: "dp7", num: "6", rarity: "Rare Holo", price: 24, types: ["Metal"] },
+    { id: "xy-fire", name: "Houndoom", setId: "xy8", num: "1", rarity: "Rare Holo", price: 12, types: ["Fire"] },
+    { id: "col-dark", name: "Houndoom", setId: "col1", num: "10", rarity: "Holo Rare", price: 12, types: ["Darkness"] }
+  ];
+  const pocket = buildCatalog({ seedText: seed, dailyPool, fx: 1 });
+  const byId = Object.fromEntries(pocket.map(row => [row.id, row]));
+  assert.deepEqual(byId["ecard1-21"].types, ["Fire"]);
+  assert.deepEqual(byId["ex2-5"].types, ["Fire"]);
+  assert.deepEqual(byId["dp7-6"].types, ["Metal"]);
+  assert.deepEqual(byId["hgss3-5"].types, []);
+  assert.deepEqual(byId["ecard1-26"].types, []);
+  assert.equal(typeMatches(byId["ecard1-21"], "Fire"), true);
+  assert.equal(typeMatches(byId["ecard1-21"], "Water"), false);
+  assert.equal(typeMatches(byId["dp7-6"], "Fire"), false);
+  assert.equal(typeMatches(byId["hgss3-5"], "Fire"), true);
+  assert.equal(typeMatches(byId["ecard1-26"], "Fire"), true);
+  assert.equal(typeMatches(byId["ecard1-26"], ""), true);
+});
+
 const fx = JSON.parse(readFileSync(resolve(root, "data/fx.json"), "utf8"));
 const seedText = readFileSync(resolve(root, "data/scrydex-seed.txt"), "utf8");
 const daily = JSON.parse(readFileSync(resolve(root, "data/daily.json"), "utf8"));
@@ -165,14 +232,46 @@ check("the saved lists produce a real pocket inside the band", () => {
   assert.ok(catalog.some(card => card.setId === "ecard2" && card.gemHint === "Aquapolis holo"));
   assert.ok(catalog.some(card => card.setId === "ecard3" && card.gemHint === "Skyridge holo"));
   assert.ok(catalog.some(card => card.setId === "ecard1"));
+  ["XY ultra", "SM ultra", "BW ultra"].forEach(hint => assert.equal(hints[hint] || 0, 0, hint));
+  assert.equal(hints["Call of Legends holo"], 13);
+  assert.ok(hints["Skyridge holo"] >= 1);
+  assert.ok(hints["Aquapolis holo"] >= 1);
+  assert.ok(hints["Expedition holo"] >= 1);
+  assert.ok(hints["EX holo"] >= 1);
+  assert.ok(hints["DP holo"] >= 1);
+  assert.ok(hints["DP LV.X"] >= 1);
+  assert.ok(hints["HGSS holo"] >= 1);
+  assert.ok(hints["HGSS Prime"] >= 1);
+  assert.ok(hints["HGSS LEGEND"] >= 1);
+  const fireNames = catalog.filter(row => row.name === "Ninetales" || row.name === "Flareon");
+  assert.ok(fireNames.length >= 2);
+  fireNames.forEach(row => assert.ok(row.types.includes("Fire"), row.id + " " + JSON.stringify(row.types)));
+  const unknown = catalog.filter(row => !row.types.length);
+  assert.ok(unknown.length > 0, "unknown types");
+  unknown.forEach(row => assert.equal(typeMatches(row, "Fire"), true));
+  const other = catalog.filter(row => row.types.length && !row.types.includes("Fire"));
+  assert.ok(other.length > 0);
+  other.forEach(row => assert.equal(typeMatches(row, "Fire"), false));
   catalog.forEach(card => {
     assert.ok(card.price >= GEM_MIN && card.price <= GEM_MAX, card.id + " " + card.price);
     assert.equal(Number.isFinite(card.price), true);
     assert.notEqual(card.price, 0);
     assert.ok(card.gemHint);
+    assert.equal(/^(XY|SM|BW) ultra$/.test(card.gemHint), false, card.id + " " + card.gemHint);
+    if (card.setId === "col1") assert.equal(card.gemHint, "Call of Legends holo", card.id);
     assert.ok(card.thumb && card.img);
     assert.equal(/Illustration rare|Special illustration rare|Hyper rare/.test(card.rarity), false);
   });
+  const sky = catalog.filter(row => row.setId === "ecard3");
+  assert.equal(sky.length, 4);
+  const skyCycle = { cards: sky, cursor: 0, lap: 0 };
+  const skyFill = takeGemCycle(skyCycle, 5, []);
+  assert.equal(skyFill.cards.length, 4);
+  assert.equal(skyFill.wrapped, false);
+  const skyLap = takeGemCycle(skyCycle, 1, new Set(skyFill.cards.slice(1).map(row => row.id)));
+  assert.equal(skyLap.wrapped, true);
+  assert.equal(skyLap.cards.length, 1);
+  assert.equal(skyLap.cards[0].id, skyFill.cards[0].id);
   const order = dealGems(catalog, () => 0.5);
   assert.equal(order[0].setId.slice(0, 5), "ecard");
   const cycle = { cards: order, cursor: 0, lap: 0 };
@@ -462,10 +561,60 @@ const sheet = await page.evaluate(() => {
     visible: rect.height > 8 && rect.top >= 0 && rect.bottom <= window.innerHeight + 2
   };
 });
-note(/Not a grade-population report/.test(sheet.text) && /Aquapolis/.test(sheet.text), "filter sheet explains the pocket honestly", sheet.text);
+note(/Not a grade-population report/.test(sheet.text) && /Aquapolis/.test(sheet.text) && /Call of Legends/.test(sheet.text) && /LV\.X/.test(sheet.text), "filter sheet explains the pocket honestly", sheet.text);
 await page.screenshot({ path: shotDir + "/gemfinder-sheet-phone.png" });
 console.log("screenshot", shotDir + "/gemfinder-sheet-phone.png");
 await page.locator("#filterDone").click();
+
+await page.keyboard.press("ArrowUp");
+await page.waitForFunction(() => {
+  const close = document.getElementById("closeProfile");
+  if (!close || document.activeElement !== close) return false;
+  window.__gemClose = close;
+  return true;
+});
+await page.waitForFunction(() => {
+  const old = window.__gemClose;
+  if (!old || old.isConnected) return false;
+  const note = document.querySelector("#profile .gem-note");
+  return !!(document.activeElement && document.activeElement.id === "closeProfile" && note && /Why it's a gem/.test(note.textContent));
+});
+note(true, "Close stays focused after the gem profile hydrates");
+await page.evaluate(() => closeProfile());
+
+const typed = await page.evaluate(() => {
+  filters.type = "Fire";
+  const cards = gemsForHunt();
+  const names = cards.map(row => row.name);
+  return {
+    count: cards.length,
+    ninetales: cards.filter(row => row.name === "Ninetales").map(row => ({ id: row.id, types: row.types })),
+    flareon: cards.filter(row => row.name === "Flareon").map(row => ({ id: row.id, types: row.types })),
+    water: cards.filter(row => (row.types || []).includes("Water") && !(row.types || []).includes("Fire")).length,
+    unknown: cards.filter(row => !(row.types || []).length).length,
+    chase: cards.filter(row => /^(XY|SM|BW) ultra$/.test(row.gemHint)).length,
+    hasNinetales: names.includes("Ninetales"),
+    hasFlareon: names.includes("Flareon")
+  };
+});
+console.log("fire filter", JSON.stringify(typed));
+note(typed.hasNinetales && typed.ninetales.every(row => row.types.includes("Fire")), "Fire filter keeps Ninetales holos", JSON.stringify(typed.ninetales));
+note(typed.hasFlareon && typed.flareon.every(row => row.types.includes("Fire")), "Fire filter keeps Flareon", JSON.stringify(typed.flareon));
+note(typed.water === 0, "Fire filter hides gems whose stored type is not Fire", String(typed.water));
+note(typed.unknown > 0, "Fire filter keeps gems with no stored type", String(typed.unknown));
+note(typed.chase === 0 && typed.count > 2, "Fire filter is not just the two Charizard EX", String(typed.count));
+await page.evaluate(() => restart());
+await page.waitForFunction(() => {
+  const top = topCard();
+  const img = top && top.querySelector("img");
+  return !!(filters.type === "Fire" && filters.gem && top && top.card && img && img.complete && img.naturalWidth > 40);
+});
+const fireTop = await page.evaluate(() => {
+  const top = topCard();
+  return { id: top.card.id, name: top.card.name, types: top.card.types || [], hint: top.card.gemHint };
+});
+console.log("fire top", JSON.stringify(fireTop));
+note(!/^(XY|SM|BW) ultra$/.test(fireTop.hint), "the Fire deck deals a gem, not a dropped ultra", fireTop.hint);
 
 const pageErrors = errors.filter(line => !/scrydex\.json/i.test(line));
 note(!pageErrors.length, "no console errors", pageErrors.slice(0, 6).join(" | "));

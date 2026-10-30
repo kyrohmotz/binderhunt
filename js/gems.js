@@ -15,12 +15,21 @@
       - e-Card holo: Expedition (ecard1), Aquapolis (ecard2), or Skyridge
         (ecard3), and the rarity contains "Holo" or the collector number
         starts with H (the e-Card holo slot).
-      - Mid-era rarity: set id starts with ex, pop, dp, pl, hgss, col, bw,
-        xy, or sm, and the rarity is Rare Holo, Holo Rare, Rare Holo EX,
-        Rare Holo LV.X, Rare PRIME, LEGEND, or Ultra Rare.
+      - Older holo or special rarity: set id starts with ex, pop, dp, pl,
+        hgss, col, bw, xy, or sm, and the rarity is Rare Holo, Holo Rare,
+        Rare Holo EX, Rare Holo LV.X, Rare PRIME, or LEGEND.
+      - Ultra Rare only for EX, POP, DP, Platinum, HGSS, and Call of
+        Legends (set id starts with ex, pop, dp, pl, hgss, or col).
+        BW, XY, and SM Ultra Rares are full-art chase cards (EX, GX, and
+        full-art supporters), so that whole group stays out.
       - Topps Chrome / Tekno: the set id, set name, or card name contains
         "topps" or "tekno". The seed and the daily pool have none today.
         The rule stays so a later list is picked up without a new definition.
+      Call of Legends holos (set col1) are badged "Call of Legends holo",
+      not "HGSS holo". Seed lines have no types. buildCatalog copies a
+      type from the daily pool when the card id matches, or when every
+      saved card with that exact name agrees. A gem left with no types is
+      unknown, and a type filter keeps it.
    2. Cached raw price is a buy. USD from 8 through 150 inclusive, using the
       cheapest positive TCGplayer market on the card, or the seed's USD
       quote. An EUR-only quote counts only when multiplied by the eurUsd
@@ -37,8 +46,10 @@
 
    The deck built from this list is finite. takeGemCycle walks it and, once
    every card has been served, starts again at the top. A fill that only
-   stacks the whole small pool does not count as that lap. WRAP_MESSAGE is
-   the line to show when a new lap actually deals another card. */
+   stacks the whole small pool does not count as that lap. wrapped is set
+   when a card from the next lap is dealt, including a pocket of 4 or
+   fewer whose cursor was left at the end. WRAP_MESSAGE is the line to
+   show then. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === "object" && module.exports) module.exports = api;
@@ -70,9 +81,9 @@
     "Rare Holo EX": 1,
     "Rare Holo LV.X": 1,
     "Rare PRIME": 1,
-    "LEGEND": 1,
-    "Ultra Rare": 1
+    "LEGEND": 1
   };
+  const OLD_ULTRA = /^(?:ex|pop|dp|pl|hgss|col)/;
   const OPENING = {
     "sv08": 1, "sv04.5": 1, "sv07": 1, "sv06": 1, "sv01": 1, "me02": 1, "sv02": 1,
     "swsh7": 1, "swsh12.5": 1, "swsh11": 1, "swsh12": 1, "swsh8": 1,
@@ -162,7 +173,9 @@
   function isMid(card) {
     const setId = setIdOf(card);
     if (!/^(?:ex|pop|dp|pl|hgss|col|bw|xy|sm)/.test(setId)) return false;
-    return !!MID_RARITY[String(card && card.rarity || "")];
+    const rarity = String(card && card.rarity || "");
+    if (MID_RARITY[rarity]) return true;
+    return rarity === "Ultra Rare" && OLD_ULTRA.test(setId);
   }
 
   function eraKey(setId) {
@@ -183,7 +196,7 @@
     if (setId === "ecard1") return "Expedition holo";
     const rarity = String(card && card.rarity || "");
     const era = {
-      ex: "EX", pop: "EX", dp: "DP", pl: "DP", hgss: "HGSS", col: "HGSS",
+      ex: "EX", pop: "EX", dp: "DP", pl: "DP", hgss: "HGSS", col: "Call of Legends",
       bw: "BW", xy: "XY", sm: "SM"
     }[eraKey(setId)] || "Mid-era";
     if (rarity === "Rare Holo LV.X") return era + " LV.X";
@@ -334,7 +347,8 @@
     const list = [];
     const seen = {};
     parseSeed(options.seedText || "", ctx, names, list, seen);
-    (Array.isArray(options.dailyPool) ? options.dailyPool : []).forEach(card => {
+    const dailyPool = Array.isArray(options.dailyPool) ? options.dailyPool : [];
+    dailyPool.forEach(card => {
       if (!card || !card.id) return;
       if (card.setId && card.set) names[card.setId] = card.set;
       consider(list, seen, {
@@ -352,6 +366,7 @@
     list.forEach(card => {
       if (!card.set) card.set = names[card.setId] || SET_NAMES[card.setId] || "";
     });
+    applyLocalTypes(list, dailyPool);
     return list;
   }
 
@@ -367,8 +382,8 @@
     return copy;
   }
 
-  /* Oldest overlooked era first, then the next, so a fresh pocket does not
-     open on a pile of only Sun & Moon ultras. */
+  /* Oldest overlooked era first, then the next, so a fresh pocket opens
+     on e-Card holos before later holos. */
   function dealGems(cards, rng) {
     const groups = {};
     ERA_ORDER.forEach(key => { groups[key] = []; });
@@ -393,10 +408,64 @@
     return out;
   }
 
+  function cleanTypes(types) {
+    if (!Array.isArray(types)) return [];
+    const out = [];
+    types.forEach(type => {
+      if (typeof type !== "string") return;
+      const text = type.trim();
+      if (text && out.indexOf(text) === -1) out.push(text);
+    });
+    return out;
+  }
+
+  /* Unknown types match. A stored list has to include the selected type. */
+  function typeMatches(card, type) {
+    const wanted = typeof type === "string" ? type.trim() : "";
+    if (!wanted) return true;
+    const types = cleanTypes(card && card.types);
+    if (!types.length) return true;
+    return types.indexOf(wanted) !== -1;
+  }
+
+  /* Seed lines carry no types. The daily pool does. An exact id wins.
+     A name is used only when every saved card with that name agrees.
+     Anything left blank stays unknown. */
+  function applyLocalTypes(list, dailyPool) {
+    const byId = {};
+    const byName = {};
+    (Array.isArray(dailyPool) ? dailyPool : []).forEach(card => {
+      if (!card) return;
+      const types = cleanTypes(card.types);
+      if (!types.length) return;
+      if (card.id && !byId[card.id]) byId[card.id] = types;
+      const name = String(card.name || "").trim().toLowerCase();
+      if (!name) return;
+      const key = types.slice().sort().join("|");
+      const prev = byName[name];
+      if (!prev) byName[name] = { key: key, types: types };
+      else if (prev.key !== key) byName[name] = { key: "", types: null };
+    });
+    (Array.isArray(list) ? list : []).forEach(card => {
+      if (!card || cleanTypes(card.types).length) return;
+      const fromId = card.id && byId[card.id];
+      if (fromId) {
+        card.types = fromId.slice();
+        return;
+      }
+      const name = String(card.name || "").trim().toLowerCase();
+      const fromName = name && byName[name];
+      if (fromName && fromName.types) card.types = fromName.types.slice();
+    });
+  }
+
   /* Walk `cycle.cards`. `holding` is the ids already on the table, so a
-     small pool is not stacked twice in one fill. wrapped is true only when
-     a card from a new lap is actually dealt. An empty catalog is dry. A
-     catalog that is merely all on the table is not. */
+     small pool is not stacked twice in one fill. wrapped is true when a
+     card from the next lap is actually dealt. A pocket of 4 or fewer
+     follows the same rule: the cursor stays at the end when this fill
+     cannot deal another lap, and the next call that deals one sets
+     wrapped. An empty catalog is dry. A catalog that is merely all on
+     the table is not. */
   function takeGemCycle(cycle, count, holding) {
     const hold = holding instanceof Set ? holding : new Set(holding || []);
     const out = [];
@@ -407,19 +476,21 @@
     if (!Number.isFinite(cycle.cursor) || cycle.cursor < 0) cycle.cursor = 0;
     if (!Number.isFinite(cycle.lap) || cycle.lap < 0) cycle.lap = 0;
     let wrapped = false;
+    let pendingWrap = false;
     let guard = 0;
     const max = cycle.cards.length * 2 + count + 2;
     while (out.length < count && guard < max) {
       guard++;
       if (cycle.cursor >= cycle.cards.length) {
-        cycle.cursor = 0;
         const free = cycle.cards.some(card => card && card.id && !hold.has(card.id) && !out.some(item => item.id === card.id));
         if (!free) break;
+        cycle.cursor = 0;
         cycle.lap += 1;
-        wrapped = true;
+        pendingWrap = true;
       }
       const card = cycle.cards[cycle.cursor++];
       if (!card || !card.id || hold.has(card.id) || out.some(item => item.id === card.id)) continue;
+      if (pendingWrap) wrapped = true;
       out.push(card);
     }
     return { cards: out, wrapped: wrapped, dry: false, lap: cycle.lap };
@@ -439,6 +510,7 @@
     judgeGem: judgeGem,
     gemArt: gemArt,
     hintFor: hintFor,
+    typeMatches: typeMatches,
     buildCatalog: buildCatalog,
     dealGems: dealGems,
     takeGemCycle: takeGemCycle,
