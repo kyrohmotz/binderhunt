@@ -189,34 +189,40 @@ check("a pocket of four sets wrapped when the next lap deals a card", () => {
   assert.equal(again.cards[0].id, "only");
 });
 
-check("local types fill a gem and an unknown type still matches a filter", () => {
+check("exact id copies a type and a shared Pokémon name does not", () => {
   const seed = [
     "B ecard1-21  # Ninetales · Holo Rare · 40 USD",
     "B ex2-5  # Flareon · Holo Rare · 40 USD",
     "B dp7-6  # Magnezone · Rare Holo · 24 USD",
-    "B hgss3-5  # Houndoom · Holo Rare · 38 USD",
-    "B ecard1-26  # Rapidash · Holo Rare · 40 USD"
+    "B col1-11  # Jirachi · Holo Rare · 43 USD",
+    "B ex5-8  # Jirachi · Holo Rare · 40 USD",
+    "B hgss2-84  # Crobat · Holo Rare · 40 USD",
+    "B hgss4-3  # Celebi · Holo Rare · 40 USD"
   ].join("\n");
   const dailyPool = [
     { id: "lc-17", name: "Ninetales", setId: "lc", num: "17", rarity: "Holo Rare", price: 10, types: ["Fire"] },
     { id: "lc-10", name: "Flareon", setId: "lc", num: "10", rarity: "Holo Rare", price: 10, types: ["Fire"] },
     { id: "dp7-6", name: "Magnezone", setId: "dp7", num: "6", rarity: "Rare Holo", price: 24, types: ["Metal"] },
-    { id: "xy-fire", name: "Houndoom", setId: "xy8", num: "1", rarity: "Rare Holo", price: 12, types: ["Fire"] },
-    { id: "col-dark", name: "Houndoom", setId: "col1", num: "10", rarity: "Holo Rare", price: 12, types: ["Darkness"] }
+    { id: "later-jirachi", name: "Jirachi", setId: "sv1", num: "1", rarity: "Rare Holo", price: 12, types: ["Metal"] },
+    { id: "later-crobat", name: "Crobat", setId: "sv1", num: "2", rarity: "Rare Holo", price: 12, types: ["Darkness"] },
+    { id: "later-celebi", name: "Celebi", setId: "sv1", num: "3", rarity: "Rare Holo", price: 12, types: ["Grass"] }
   ];
   const pocket = buildCatalog({ seedText: seed, dailyPool, fx: 1 });
   const byId = Object.fromEntries(pocket.map(row => [row.id, row]));
-  assert.deepEqual(byId["ecard1-21"].types, ["Fire"]);
-  assert.deepEqual(byId["ex2-5"].types, ["Fire"]);
   assert.deepEqual(byId["dp7-6"].types, ["Metal"]);
-  assert.deepEqual(byId["hgss3-5"].types, []);
-  assert.deepEqual(byId["ecard1-26"].types, []);
+  assert.deepEqual(byId["ecard1-21"].types, []);
+  assert.deepEqual(byId["ex2-5"].types, []);
+  assert.deepEqual(byId["col1-11"].types, []);
+  assert.deepEqual(byId["ex5-8"].types, []);
+  assert.deepEqual(byId["hgss2-84"].types, []);
+  assert.deepEqual(byId["hgss4-3"].types, []);
   assert.equal(typeMatches(byId["ecard1-21"], "Fire"), true);
-  assert.equal(typeMatches(byId["ecard1-21"], "Water"), false);
+  assert.equal(typeMatches(byId["ex2-5"], "Fire"), true);
+  assert.equal(typeMatches(byId["ecard1-21"], "Water"), true);
   assert.equal(typeMatches(byId["dp7-6"], "Fire"), false);
-  assert.equal(typeMatches(byId["hgss3-5"], "Fire"), true);
-  assert.equal(typeMatches(byId["ecard1-26"], "Fire"), true);
-  assert.equal(typeMatches(byId["ecard1-26"], ""), true);
+  assert.equal(typeMatches(byId["dp7-6"], "Metal"), true);
+  assert.equal(typeMatches(byId["col1-11"], "Psychic"), true);
+  assert.equal(typeMatches(byId["ex5-8"], "Psychic"), true);
 });
 
 const fx = JSON.parse(readFileSync(resolve(root, "data/fx.json"), "utf8"));
@@ -245,7 +251,27 @@ check("the saved lists produce a real pocket inside the band", () => {
   assert.ok(hints["HGSS LEGEND"] >= 1);
   const fireNames = catalog.filter(row => row.name === "Ninetales" || row.name === "Flareon");
   assert.ok(fireNames.length >= 2);
-  fireNames.forEach(row => assert.ok(row.types.includes("Fire"), row.id + " " + JSON.stringify(row.types)));
+  fireNames.forEach(row => {
+    assert.equal(typeMatches(row, "Fire"), true, row.id);
+    assert.ok(!row.types.length || row.types.includes("Fire"), row.id + " " + JSON.stringify(row.types));
+  });
+  [
+    ["col1-11", "Jirachi", "Metal"],
+    ["ex5-8", "Jirachi", "Metal"],
+    ["hgss2-84", "Crobat", "Darkness"],
+    ["hgss4-3", "Celebi", "Grass"]
+  ].forEach(([id, name, wrong]) => {
+    const row = catalog.find(card => card.id === id);
+    assert.ok(row, id);
+    assert.equal(row.name, name);
+    assert.deepEqual(row.types, [], id + " was stamped " + wrong + " from another " + name);
+    assert.notDeepEqual(row.types, [wrong], id);
+    assert.equal(row.types.includes(wrong), false, id);
+    assert.equal(typeMatches(row, "Fire"), true, id);
+    assert.equal(typeMatches(row, wrong), true, id);
+  });
+  const exJirachi = catalog.find(card => card.id === "ex5-8");
+  assert.notDeepEqual(exJirachi.types, ["Metal"]);
   const unknown = catalog.filter(row => !row.types.length);
   assert.ok(unknown.length > 0, "unknown types");
   unknown.forEach(row => assert.equal(typeMatches(row, "Fire"), true));
@@ -598,8 +624,8 @@ const typed = await page.evaluate(() => {
   };
 });
 console.log("fire filter", JSON.stringify(typed));
-note(typed.hasNinetales && typed.ninetales.every(row => row.types.includes("Fire")), "Fire filter keeps Ninetales holos", JSON.stringify(typed.ninetales));
-note(typed.hasFlareon && typed.flareon.every(row => row.types.includes("Fire")), "Fire filter keeps Flareon", JSON.stringify(typed.flareon));
+note(typed.hasNinetales && typed.ninetales.every(row => !row.types.length || row.types.includes("Fire")), "Fire filter keeps Ninetales holos", JSON.stringify(typed.ninetales));
+note(typed.hasFlareon && typed.flareon.every(row => !row.types.length || row.types.includes("Fire")), "Fire filter keeps Flareon", JSON.stringify(typed.flareon));
 note(typed.water === 0, "Fire filter hides gems whose stored type is not Fire", String(typed.water));
 note(typed.unknown > 0, "Fire filter keeps gems with no stored type", String(typed.unknown));
 note(typed.chase === 0 && typed.count > 2, "Fire filter is not just the two Charizard EX", String(typed.count));

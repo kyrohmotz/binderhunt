@@ -27,9 +27,9 @@
         The rule stays so a later list is picked up without a new definition.
       Call of Legends holos (set col1) are badged "Call of Legends holo",
       not "HGSS holo". Seed lines have no types. buildCatalog copies a
-      type from the daily pool when the card id matches, or when every
-      saved card with that exact name agrees. A gem left with no types is
-      unknown, and a type filter keeps it.
+      type from the daily pool only when the card id matches. A Pokémon
+      name is not enough, because a later printing can be a different
+      type. A gem left with no types is unknown, and a type filter keeps it.
    2. Cached raw price is a buy. USD from 8 through 150 inclusive, using the
       cheapest positive TCGplayer market on the card, or the seed's USD
       quote. An EUR-only quote counts only when multiplied by the eurUsd
@@ -428,34 +428,22 @@
     return types.indexOf(wanted) !== -1;
   }
 
-  /* Seed lines carry no types. The daily pool does. An exact id wins.
-     A name is used only when every saved card with that name agrees.
-     Anything left blank stays unknown. */
+  /* Seed lines carry no types. Copy types from the daily pool only when
+     the card id is the same. A shared Pokémon name is not a match: a
+     later printing can be a different type. Anything left blank stays
+     unknown, and a type filter keeps it. */
   function applyLocalTypes(list, dailyPool) {
     const byId = {};
-    const byName = {};
     (Array.isArray(dailyPool) ? dailyPool : []).forEach(card => {
-      if (!card) return;
+      if (!card || !card.id || byId[card.id]) return;
       const types = cleanTypes(card.types);
       if (!types.length) return;
-      if (card.id && !byId[card.id]) byId[card.id] = types;
-      const name = String(card.name || "").trim().toLowerCase();
-      if (!name) return;
-      const key = types.slice().sort().join("|");
-      const prev = byName[name];
-      if (!prev) byName[name] = { key: key, types: types };
-      else if (prev.key !== key) byName[name] = { key: "", types: null };
+      byId[card.id] = types;
     });
     (Array.isArray(list) ? list : []).forEach(card => {
       if (!card || cleanTypes(card.types).length) return;
       const fromId = card.id && byId[card.id];
-      if (fromId) {
-        card.types = fromId.slice();
-        return;
-      }
-      const name = String(card.name || "").trim().toLowerCase();
-      const fromName = name && byName[name];
-      if (fromName && fromName.types) card.types = fromName.types.slice();
+      if (fromId) card.types = fromId.slice();
     });
   }
 
