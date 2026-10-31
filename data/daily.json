@@ -13794,6 +13794,16 @@
       "source": "tcgplayer",
       "eur": 44.81,
       "at": "2026-10-30T14:50:41Z"
+    },
+    "2026-11-02": {
+      "id": "xy11-24",
+      "price": 3.54,
+      "variant": "holofoil",
+      "printing": "Holofoil",
+      "alts": 1,
+      "source": "tcgplayer",
+      "eur": 3.66,
+      "at": "2026-10-31T14:18:47Z"
     }
   }
 }
