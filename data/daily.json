@@ -13804,6 +13804,16 @@
       "source": "tcgplayer",
       "eur": 3.66,
       "at": "2026-10-31T14:18:47Z"
+    },
+    "2026-11-03": {
+      "id": "cel25-11",
+      "price": 2.71,
+      "variant": "holofoil",
+      "printing": "Holofoil",
+      "alts": 1,
+      "source": "tcgplayer",
+      "eur": 2.19,
+      "at": "2026-11-01T14:45:06Z"
     }
   }
 }
