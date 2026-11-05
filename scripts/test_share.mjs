@@ -1,6 +1,14 @@
-// Share-link encoding for a binder or wishlist. No network, no DOM.
+// Share-link encoding for a binder or wishlist, and the storage a received
+// link is allowed to touch. The browser half serves the page locally and
+// does not call Scrydex.
 // Run: npx -y node@22 scripts/test_share.mjs
 import assert from "node:assert/strict";
+import { spawn, spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { existsSync, mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { setTimeout as sleep } from "node:timers/promises";
 import share from "../js/share.js";
 
 const {
@@ -11,6 +19,16 @@ const {
 function check(name, fn) {
   try {
     fn();
+    console.log("ok", name);
+  } catch (error) {
+    console.error("FAIL", name);
+    throw error;
+  }
+}
+
+async function checkAsync(name, fn) {
+  try {
+    await fn();
     console.log("ok", name);
   } catch (error) {
     console.error("FAIL", name);
@@ -214,4 +232,146 @@ check("a count smaller than the pockets does not hide a card", () => {
   assert.equal(back.cards.length, 2);
 });
 
+console.log("share encoding checks passed");
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const PORT = 8797;
+const vendor = "/tmp/binderhunt-playwright";
+if (!existsSync(vendor + "/node_modules/playwright-core/package.json")) {
+  mkdirSync(vendor, { recursive: true });
+  const install = spawnSync("npm", ["install", "--prefix", vendor, "playwright-core"], { stdio: "inherit" });
+  if (install.status) process.exit(install.status || 1);
+}
+const require = createRequire(vendor + "/node_modules/playwright-core/package.json");
+const { chromium } = require("playwright-core");
+
+const server = spawn("python3", ["-m", "http.server", String(PORT), "--bind", "127.0.0.1"], { cwd: root, stdio: "ignore" });
+let browser;
+function shutdown(code) {
+  return (browser ? browser.close().catch(() => {}) : Promise.resolve()).finally(() => {
+    try { server.kill(); } catch (e) {}
+    process.exit(code);
+  });
+}
+process.on("exit", () => { try { server.kill(); } catch (e) {} });
+
+async function waitServer() {
+  for (let i = 0; i < 50; i++) {
+    try {
+      const res = await fetch("http://127.0.0.1:" + PORT + "/index.html", { signal: AbortSignal.timeout(500) });
+      if (res.ok) return;
+    } catch (e) {}
+    await sleep(100);
+  }
+  throw new Error("local server did not start");
+}
+
+const ownedStored = JSON.stringify({ v:1, ids:["base1-4"], sets:{"base1-4":"base1"}, celebrated:["binder:jungle"], seeded:true });
+const filtersStored = JSON.stringify({ set:"base4", rarities:["Rare Holo"], era:"vintage", type:"Fire", names:["Charizard"], min:2, max:40, pricePreset:"", graded:false, gem:true });
+const wishStored = JSON.stringify([{ id:"base1-4", name:"Charizard", set:"Base", setId:"base1", number:"4" }]);
+const bindersStored = JSON.stringify({ discoveryId:"", binders:[{ id:"jungle", name:"Jungle", color:"#ABB28D", theme:{ kind:"none" }, cards:[{ id:"base1-4", name:"Charizard", set:"Base", setId:"base1", number:"4" }], charm:"none" }] });
+const freshOwned = JSON.stringify({ v:1, ids:[], sets:{}, celebrated:[], seeded:true });
+const freshFilters = JSON.stringify({ set:"", rarities:[], era:"", type:"", names:[], min:null, max:null, pricePreset:"", graded:false, gem:false });
+
+const binderQuery = "share=binder&name=Jungle&color=ABB28D&n=1&got=1&pocket=base1-4~Charizard~Base~4~1~d:en/base/base1/4/low.webp";
+const wishQuery = "share=wish&name=Wishlist&n=1&got=0&pocket=base1-4~Charizard~Base~4~0~d:en/base/base1/4/low.webp";
+
+await waitServer();
+browser = await chromium.launch({
+  executablePath: "/usr/local/bin/google-chrome",
+  headless: true,
+  args: ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
+});
+
+async function openApp(width, height, query, init) {
+  const scrydex = [];
+  const context = await browser.newContext({
+    viewport: { width, height },
+    deviceScaleFactor: 1,
+    isMobile: width < 600,
+    hasTouch: width < 600
+  });
+  await context.route("**/*", route => {
+    const url = route.request().url();
+    if (/scrydex\.com/i.test(url)) scrydex.push(url);
+    if (/scrydex\.com|api\.tcgdex\.net|api\.pokemontcg\.io|abacus\.jasoncameron\.dev/i.test(url)) return route.abort();
+    return route.continue();
+  });
+  const page = await context.newPage();
+  page.setDefaultTimeout(15000);
+  if (init) await page.addInitScript(init);
+  const target = "http://127.0.0.1:" + PORT + "/index.html" + (query ? "?" + query : "");
+  await page.goto(target, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => typeof meta !== "undefined" && meta.ready && typeof settleStoredFilters === "function" && typeof quietSeedSets === "function");
+  await sleep(50);
+  const stored = await page.evaluate(() => {
+    meta.complete = true;
+    if (!Array.isArray(meta.sets)) meta.sets = [];
+    settleStoredFilters();
+    backfillOwnedSets();
+    quietSeedSets();
+    const sheet = document.getElementById("shareSheet");
+    return {
+      owned: localStorage.getItem("bh.owned.v1"),
+      filters: localStorage.getItem("bh.filters.v3"),
+      wish: localStorage.getItem("binderhuntWish"),
+      binders: localStorage.getItem("bh.binders.v1"),
+      shareOpen: !!(sheet && !sheet.hidden),
+      shareTitle: (document.getElementById("shareTitle") || {}).textContent || ""
+    };
+  });
+  await context.close();
+  return { stored, scrydex };
+}
+
+try {
+  await checkAsync("a received binder at phone size does not create owned or filters", async () => {
+    const { stored, scrydex } = await openApp(390, 844, binderQuery);
+    assert.equal(stored.shareOpen, true);
+    assert.equal(stored.shareTitle, "Shared binder");
+    assert.equal(stored.owned, null);
+    assert.equal(stored.filters, null);
+    assert.equal(stored.wish, null);
+    assert.equal(stored.binders, null);
+    assert.equal(scrydex.length, 0);
+  });
+
+  await checkAsync("a received wishlist at desktop size does not create owned or filters", async () => {
+    const { stored, scrydex } = await openApp(1440, 900, wishQuery);
+    assert.equal(stored.shareOpen, true);
+    assert.equal(stored.shareTitle, "Shared wishlist");
+    assert.equal(stored.owned, null);
+    assert.equal(stored.filters, null);
+    assert.equal(stored.wish, null);
+    assert.equal(stored.binders, null);
+    assert.equal(scrydex.length, 0);
+  });
+
+  await checkAsync("a received share leaves an existing collection untouched", async () => {
+    const init = `localStorage.setItem("bh.owned.v1", ${JSON.stringify(ownedStored)});
+localStorage.setItem("bh.filters.v3", ${JSON.stringify(filtersStored)});
+localStorage.setItem("binderhuntWish", ${JSON.stringify(wishStored)});
+localStorage.setItem("bh.binders.v1", ${JSON.stringify(bindersStored)});`;
+    const { stored } = await openApp(390, 844, binderQuery, init);
+    assert.equal(stored.shareOpen, true);
+    assert.equal(stored.owned, ownedStored);
+    assert.equal(stored.filters, filtersStored);
+    assert.equal(stored.wish, wishStored);
+    assert.equal(stored.binders, bindersStored);
+  });
+
+  await checkAsync("a normal first visit still stores an empty collection and blank filters", async () => {
+    const { stored } = await openApp(390, 844, "");
+    assert.equal(stored.shareOpen, false);
+    assert.equal(stored.owned, freshOwned);
+    assert.equal(stored.filters, freshFilters);
+    assert.equal(stored.wish, null);
+    assert.equal(stored.binders, null);
+  });
+} catch (error) {
+  console.error(error);
+  await shutdown(1);
+}
+
 console.log("share checks passed");
+await shutdown(0);

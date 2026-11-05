@@ -1054,6 +1054,12 @@ const ownedSetById = new Map();
 const celebrated = new Set();
 let ownedNeedsSeed = false;
 let ownedInlineMigrated = false;
+/* A shared link is only a picture of someone else's cards. Boot still runs
+   before that sheet opens, and it must not invent a collection or a filter
+   record in a browser that did not have one. */
+let receivedShareAtOpen = false;
+let ownedMissingAtOpen = false;
+let filtersMissingAtOpen = false;
 const pendingCelebrate = [];
 let logState = { v:1, days:[], events:[] };
 let pile = [];
@@ -1397,6 +1403,13 @@ function settleStoredFilters(){
   }
   if (filters.type && !knownType(filters.type)) filters.type = "";
   const changed = JSON.stringify(filters) !== before;
+  /* The blank filter object is not a choice the person made. Leave the key
+     unset when this visit arrived as a share and nothing was stored. */
+  if (receivedShareAtOpen && filtersMissingAtOpen) {
+    if (changed && tab === "hunt") restart({ skipFilterWrite:true });
+    else paintChips();
+    return;
+  }
   saveFilters();
   if (changed && tab === "hunt") restart();
   else paintChips();
@@ -1471,6 +1484,10 @@ function loadOwned(){
     return;
   }
   ownedNeedsSeed = true;
+  if (receivedShareAtOpen && ownedMissingAtOpen) {
+    ownedNeedsSeed = false;
+    return;
+  }
   ownedInlineMigrated = migrateInlineOwned();
   saveOwned();
 }
@@ -3288,7 +3305,7 @@ function restart(opts){
   spice = !!(opts && opts.keepSpice);
   generation++;
   enforceTheme();
-  saveFilters();
+  if (!(opts && opts.skipFilterWrite)) saveFilters();
   pile = []; briefs = []; seen = new Set(); matched = 0; pageNo = 1; queryDone = false;
   openingOrder = []; openingCursor = 0; openingDone = false; chasePage = 1; chaseDone = false; bulkCursor = 0; gradedCursor = 0;
   mixTurn = 0; mixCursor = 0; mixExhausted = false; mixOrder = []; nameOrder = 0;
@@ -7032,6 +7049,14 @@ function finishOnboard(){
 document.getElementById("onboardSkip").onclick = skipOnboard;
 document.getElementById("onboardBack").onclick = () => { onboardStep = 1; renderOnboard(); };
 document.getElementById("onboardNext").onclick = finishOnboard;
+receivedShareAtOpen = !!(window.BinderShare && typeof BinderShare.readQuery === "function" && BinderShare.readQuery(location.search));
+try {
+  ownedMissingAtOpen = localStorage.getItem(OWNED_KEY) == null;
+  filtersMissingAtOpen = localStorage.getItem("bh.filters.v3") == null;
+} catch (e) {
+  ownedMissingAtOpen = false;
+  filtersMissingAtOpen = false;
+}
 loadCollectionState();
 if (ownedInlineMigrated) {
   try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {}
@@ -7242,7 +7267,7 @@ function bootPwa(){
     setInterval(look, 30 * 60 * 1000);
   }).catch(() => {});
 }
-restart();
+restart(receivedShareAtOpen && filtersMissingAtOpen ? { skipFilterWrite:true } : undefined);
 const deepId = new URLSearchParams(location.search).get("card");
 const shareView = window.BinderShare ? BinderShare.readQuery(location.search) : null;
 const returning = wish.length > 0 || binderState.binders.length > 0;
