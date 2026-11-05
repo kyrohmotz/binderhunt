@@ -1,0 +1,199 @@
+/* Share a binder or the wishlist. Sits beside the shelf and the open book.
+   Two Toads pastel: paper, sage Save, ink type. No odds, no packs. */
+@font-face{
+  font-family:Lato;
+  src:url("../fonts/lato-700-italic.woff2") format("woff2");
+  font-weight:700;
+  font-style:italic;
+  font-display:swap;
+}
+
+.cover-slot{position:relative;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:6px}
+.cover-slot > .cover{width:100%}
+.cover-share,.cover-share-spacer{flex:none;min-height:44px}
+.cover-share-spacer{display:block}
+.cover-share{
+  width:100%;
+  min-width:44px;
+  padding:0 12px;
+  border:2.5px solid var(--ink);
+  border-radius:999px;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--display);
+  font-weight:700;
+  font-size:15px;
+  line-height:1;
+  box-shadow:2px 2px 0 var(--ink);
+  touch-action:manipulation;
+}
+.cover-share:active{transform:scale(.96)}
+
+.wish-slot{display:flex;flex-direction:column;align-items:stretch;gap:8px}
+.wish-slot .wish-share{align-self:end;min-height:44px;touch-action:manipulation}
+#bindersScroll .booktools #shareCollection{min-height:44px;touch-action:manipulation}
+
+.share-sheet{z-index:92}
+.share-panel{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  max-height:calc(100dvh - 12px - env(safe-area-inset-top));
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+  background:var(--paper-2);
+  border:2.5px solid var(--ink);
+  border-bottom:0;
+  border-radius:22px 22px 0 0;
+  box-shadow:3px 3px 0 var(--ink);
+  padding:12px 12px calc(16px + env(safe-area-inset-bottom));
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.share-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.share-top h2{font-family:var(--display);font-weight:700;font-size:22px;line-height:1.2;margin:0}
+.share-poster{
+  background:#F8F7EF;
+  color:#1F1F1E;
+  border:2.5px solid #1F1F1E;
+  border-radius:18px;
+  box-shadow:3px 3px 0 #1F1F1E;
+  padding:12px;
+}
+.share-band{border:2.5px solid #1F1F1E;border-radius:14px;padding:10px 12px}
+.share-kicker{
+  margin:0;
+  font-family:Lato,Nunito,sans-serif;
+  font-style:italic;
+  font-weight:700;
+  font-size:12px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:#1F1F1E;
+}
+.share-title{
+  margin:2px 0;
+  font-family:var(--display);
+  font-weight:800;
+  font-size:26px;
+  line-height:1.15;
+  overflow-wrap:anywhere;
+  color:#1F1F1E;
+}
+.share-count{margin:0;font-family:Nunito,sans-serif;font-weight:800;font-size:14px;color:#1F1F1E}
+.share-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:10px}
+.share-grid[data-n="1"]{grid-template-columns:minmax(0,46%);justify-content:center}
+.share-grid[data-n="2"]{grid-template-columns:repeat(2,minmax(0,1fr));max-width:72%;margin-inline:auto}
+.share-pocket{
+  position:relative;
+  margin:0;
+  background:#fff;
+  border:2px solid #1F1F1E;
+  border-radius:8px;
+  overflow:hidden;
+  aspect-ratio:63/88;
+}
+.share-pocket img{width:100%;height:100%;object-fit:cover;display:block;background:#fff}
+.share-fallback{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100%;
+  padding:6px;
+  text-align:center;
+  font-family:var(--display);
+  font-weight:700;
+  font-size:13px;
+  line-height:1.2;
+  overflow-wrap:anywhere;
+  color:#1F1F1E;
+  background:#F1F1E4;
+}
+.share-got{
+  position:absolute;
+  top:4px;
+  right:4px;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:#ABB28D;
+  border:2px solid #1F1F1E;
+}
+.share-got::after{
+  content:"";
+  position:absolute;
+  left:4px;
+  top:4px;
+  width:6px;
+  height:3px;
+  border-left:2px solid #1F1F1E;
+  border-bottom:2px solid #1F1F1E;
+  transform:rotate(-45deg);
+}
+.share-empty{margin:14px 0 6px;text-align:center;font-family:var(--display);font-weight:700;color:#1F1F1E}
+.share-brand{margin:10px 0 0;text-align:center;font-family:var(--display);font-weight:800;font-size:16px;color:#1F1F1E}
+.share-note{margin:0;color:#1F1F1E}
+.share-actions{display:flex;flex-wrap:wrap;gap:8px}
+.share-actions button{min-height:44px;touch-action:manipulation}
+.share-actions button[hidden]{display:none !important}
+.share-save{
+  min-height:44px;
+  border:2.5px solid #1F1F1E;
+  border-radius:999px;
+  padding:0 16px;
+  background:#ABB28D;
+  color:#1F1F1E;
+  font-family:var(--display);
+  font-weight:700;
+  box-shadow:2px 2px 0 #1F1F1E;
+}
+.share-save:active{transform:scale(.96)}
+.share-save:disabled{opacity:.6}
+.share-link-label{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  font-family:var(--display);
+  font-weight:700;
+  font-size:14px;
+  color:#1F1F1E;
+}
+.share-link{
+  width:100%;
+  min-height:44px;
+  border:2.5px solid #1F1F1E;
+  border-radius:12px;
+  padding:8px 10px;
+  background:#fff;
+  color:#1F1F1E;
+  font-family:Nunito,sans-serif;
+  font-weight:700;
+  font-size:13px;
+}
+.share-status{min-height:1.2em;margin:0;font-family:Nunito,sans-serif;font-weight:800;color:#1F1F1E}
+.share-status:empty{min-height:0}
+
+@media (max-width:1023px){
+  .share-panel{gap:8px;padding-top:10px}
+  .share-poster{padding:8px}
+  .share-band{padding:8px 10px}
+  .share-title{font-size:22px}
+  .share-grid{margin-top:8px;gap:4px}
+  .share-brand{margin-top:6px;font-size:15px}
+  .share-note{font-size:13px}
+}
+@media (min-width:1024px){
+  .share-panel{
+    left:50%;
+    right:auto;
+    bottom:auto;
+    top:50%;
+    transform:translate(-50%,-50%);
+    width:min(520px,calc(100vw - 48px));
+    max-height:min(860px,calc(100dvh - 48px));
+    border-radius:22px;
+    border-bottom:2.5px solid var(--ink);
+  }
+}
