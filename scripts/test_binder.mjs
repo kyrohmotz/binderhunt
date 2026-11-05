@@ -464,6 +464,11 @@ note(swiped, "swiping the card down dismisses it", String(swiped));
 
 // Card art: no CORS request, every URL is tried, and a dead card gets the
 // dark binder blank, never the toad.
+// images.pokemontcg.io answers zz-missing/none.png with HTTP 404 and a real
+// PNG body. Chrome paints that body, so the pocket never reaches the blank.
+// Block the fixture URL; the src is unchanged, and the load fails.
+await cdp.send("Network.enable");
+await cdp.send("Network.setBlockedURLs", { urls: ["*zz-missing*"] });
 const art = await ev(`(async () => {
   const dead = { id: "art-dead", name: "Ghost Card", set: "Nowhere", setId: "x", number: "1", rarity: "Common", price: 2,
     img: "https://images.pokemontcg.io/zz-missing/none_hires.png", thumb: "https://images.pokemontcg.io/zz-missing/none.png" };

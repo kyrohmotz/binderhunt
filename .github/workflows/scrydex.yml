@@ -24,6 +24,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history, same as the Daily Drop job. A shallow clone can
+          # fail to rebase when that job pushes main during this sync.
+          fetch-depth: 0
 
       - name: Require Scrydex secrets
         env:
@@ -68,37 +72,30 @@ jobs:
             exit 0
           fi
           git commit -m "Update cached Scrydex prices"
-          # The Daily Drop quote also pushes main at 09:00 UTC, just after this
-          # 08:15 UTC sync. If that quote lands first, the push below is rejected
-          # as a non-fast-forward. Replay this commit onto the new main and
-          # retry. Any other push failure stops the job.
+          # The Daily Drop quote also pushes main around 09:00 UTC, just after
+          # this 08:15 UTC sync. If that quote lands first, the push is rejected.
+          # Fetch, rebase onto the new main, and retry, the same way the Daily
+          # Drop extend job does. Credit caps above are untouched.
           base=$(git rev-parse HEAD)
           ok=0
           for delay in 0 4 8 16 32; do
             if [ "$delay" -ne 0 ]; then
-              echo "rebase and push retry in ${delay}s"
+              echo "pull --rebase and push retry in ${delay}s"
               sleep "$delay"
               git reset --hard "$base"
             fi
-            git fetch --deepen=32 origin main || git fetch origin main
+            git fetch origin main
             if ! git pull --rebase origin main; then
               git rebase --abort || true
               continue
             fi
-            push_log=$(mktemp)
-            if git push origin HEAD:main >"$push_log" 2>&1; then
-              cat "$push_log"
+            if git push origin HEAD:main; then
               ok=1
               break
             fi
-            cat "$push_log"
-            if ! grep -Eqi 'non-fast-forward|Updates were rejected' "$push_log"; then
-              echo "push failed for a reason other than a non-fast-forward rejection"
-              exit 1
-            fi
           done
           if [ "$ok" -ne 1 ]; then
-            echo "push failed after non-fast-forward retries"
+            echo "push failed after retries"
             exit 1
           fi
           echo "changed=true" >> "$GITHUB_OUTPUT"
