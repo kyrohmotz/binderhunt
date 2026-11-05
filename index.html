@@ -789,6 +789,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 <link rel="stylesheet" href="css/daily.css">
 <link rel="stylesheet" href="css/binder.css">
 <link rel="stylesheet" href="css/polish.css">
+<link rel="stylesheet" href="css/share.css">
 </head>
 <body>
 <div id="live" class="sr-only" aria-live="polite"></div>
@@ -988,6 +989,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 <script src="js/binder-turn.js"></script>
 <script src="js/card-inspect.js"></script>
 <script src="js/gems.js"></script>
+<script src="js/share.js"></script>
 <script>
 try {
   if (navigator.serviceWorker && navigator.serviceWorker.controller && navigator.onLine === false) navigator.serviceWorker.controller.postMessage("bh-offline");
@@ -4851,7 +4853,7 @@ function renderBinders(){
   const wishLabel = "Wishlist" + (wish.length ? ", " + cardsWord(wish.length) : ", nothing saved") + (dropped ? ", " + dropped + " dropped" : "");
   const wishMeta = wish.length ? cardsWord(wish.length) + (total ? " · " + priceText(total, "USD") : "") : "Nothing saved yet";
   const wishSub = wish.length ? (wantedN ? wantedN + " still to find" : "You have every card") + (ownedN ? " · " + ownedN + " got" : "") : "Swipe right on a card and it lands here.";
-  root.innerHTML = `<button class="wish-row" id="openWish" type="button" aria-label="${esc(wishLabel)}">${peekMarkup(wish, "wish-peek")}<span class="wish-copy"><span class="eyebrow">All saved cards</span><b>Wishlist</b><span class="wish-meta">${esc(wishMeta)}</span><span class="fine">${esc(wishSub)}</span></span>${droppedCountMarkup(dropped)}<span class="wish-go" aria-hidden="true">Open →</span></button>
+  root.innerHTML = `<div class="wish-slot"><button class="wish-row" id="openWish" type="button" aria-label="${esc(wishLabel)}">${peekMarkup(wish, "wish-peek")}<span class="wish-copy"><span class="eyebrow">All saved cards</span><b>Wishlist</b><span class="wish-meta">${esc(wishMeta)}</span><span class="fine">${esc(wishSub)}</span></span>${droppedCountMarkup(dropped)}<span class="wish-go" aria-hidden="true">Open →</span></button><button class="chip wish-share" id="shareWish" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button></div>
     <div class="shelf-head"><h2 class="shelf-title">Your binders</h2><p class="fine">Sort cards by theme. A card can sit in more than one binder and still stays on your wishlist.</p></div>
     <div class="shelf-scene"><div class="shelf" id="shelf"></div></div>`;
   const shelf = document.getElementById("shelf");
@@ -4867,7 +4869,19 @@ function renderBinders(){
     btn.dataset.progress = p.owned + "/" + p.total;
     btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board">${peekMarkup(b.cards, "cover-peek")}<b class="binder-name">${esc(b.name)}</b>${b.cards.length ? ringMarkup(p.owned, p.total) : ""}<span class="binder-count">${esc(b.cards.length ? cardsWord(b.cards.length) : "Empty")}</span></span><span class="binder-fore"></span></span>${charm}<span class="sr-only">${esc(b.name + ". " + (p.total ? p.owned + " of " + p.total + " owned" : "No cards yet"))}</span>`;
     btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); renderBinders(); };
-    shelf.append(btn);
+    const slot = document.createElement("div");
+    slot.className = "cover-slot";
+    const share = document.createElement("button");
+    share.type = "button";
+    share.className = "cover-share";
+    share.setAttribute("aria-haspopup", "dialog");
+    share.setAttribute("aria-label", "Share " + b.name);
+    share.textContent = "Share";
+    share.onclick = () => {
+      if (window.BinderShare) BinderShare.openCollection({ kind:"binder", name:b.name, color:b.color, cards:b.cards, ownedIds });
+    };
+    slot.append(btn, share);
+    shelf.append(slot);
   });
   const add = document.createElement("button");
   add.type = "button";
@@ -4875,8 +4889,17 @@ function renderBinders(){
   add.style.setProperty("--cover", "#F1F1E4");
   add.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board"><span class="cover-add-label">+ New binder<small>${binderState.binders.length ? "Another set, Pokémon or theme" : "One for a set, a Pokémon, or anything you collect"}</small></span></span><span class="binder-fore"></span></span>`;
   add.onclick = openBinderForm;
-  shelf.append(add);
+  const addSlot = document.createElement("div");
+  addSlot.className = "cover-slot";
+  const spacer = document.createElement("span");
+  spacer.className = "cover-share-spacer";
+  spacer.setAttribute("aria-hidden", "true");
+  addSlot.append(add, spacer);
+  shelf.append(addSlot);
   document.getElementById("openWish").onclick = () => { binderView = { kind:"wish" }; flipPage = 0; renderBinders(); };
+  document.getElementById("shareWish").onclick = () => {
+    if (window.BinderShare) BinderShare.openCollection({ kind:"wish", name:"Wishlist", color:"#E4E7DA", cards:wish, ownedIds });
+  };
   paintContext();
 }
 function pagesOf(list){ return Math.max(1, Math.ceil(list.length / 9) || 1); }
@@ -5106,8 +5129,8 @@ function renderCollection(root){
   const tools = document.createElement("div");
   tools.className = "booktools";
   tools.innerHTML = `<button class="chip" id="backBinders" type="button">All binders</button>` +
-    (wishMode ? `<button class="chip" id="copyList" type="button">Copy list</button>`
-      : `<button class="chip" id="fillFrom" type="button">Fill from wishlist</button><button class="chip" id="discover" type="button">Swipe to discover</button><button class="chip" id="renameBinder" type="button">Rename</button><button class="chip" id="recolorBinder" type="button">Cover</button><button class="chip" id="copyList" type="button">Copy list</button>`);
+    (wishMode ? `<button class="chip" id="copyList" type="button">Copy list</button><button class="chip" id="shareCollection" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button>`
+      : `<button class="chip" id="fillFrom" type="button">Fill from wishlist</button><button class="chip" id="discover" type="button">Swipe to discover</button><button class="chip" id="renameBinder" type="button">Rename</button><button class="chip" id="recolorBinder" type="button">Cover</button><button class="chip" id="copyList" type="button">Copy list</button><button class="chip" id="shareCollection" type="button" aria-haspopup="dialog">Share</button>`);
   const stage = document.createElement("div");
   stage.className = "bookstage";
   const book = document.createElement("div");
@@ -5668,6 +5691,13 @@ function renderCollection(root){
     try { await navigator.clipboard.writeText(text); announce("List copied."); }
     catch (err) { announce("List ready. Clipboard was blocked."); }
   };
+  const shareCollection = document.getElementById("shareCollection");
+  if (shareCollection && window.BinderShare) {
+    if (!wishMode) shareCollection.setAttribute("aria-label", "Share " + binder.name);
+    shareCollection.onclick = () => BinderShare.openCollection(wishMode
+      ? { kind:"wish", name:"Wishlist", color:"#E4E7DA", cards:wish, ownedIds }
+      : { kind:"binder", name:binder.name, color:binder.color, cards:binder.cards, ownedIds });
+  }
   if (!wishMode) {
     document.getElementById("fillFrom").onclick = () => openFill(binder.id);
     document.getElementById("discover").onclick = () => startDiscovery(binder.id);
@@ -7214,11 +7244,13 @@ function bootPwa(){
 }
 restart();
 const deepId = new URLSearchParams(location.search).get("card");
+const shareView = window.BinderShare ? BinderShare.readQuery(location.search) : null;
 const returning = wish.length > 0 || binderState.binders.length > 0;
-if (!deepId && !returning && !(loadOnboard() || {}).done) openOnboard("first");
+if (!deepId && !shareView && !returning && !(loadOnboard() || {}).done) openOnboard("first");
 countPage();
 bootPwa();
-if (deepId) hydrate({ id:deepId }).then(card => { if (card && !card.digital) openProfile(card); }).catch(() => announce("That card link didn't load."));
+if (deepId && !shareView) hydrate({ id:deepId }).then(card => { if (card && !card.digital) openProfile(card); }).catch(() => announce("That card link didn't load."));
+if (shareView && window.BinderShare) BinderShare.present(shareView, { received:true });
 
 window.BHDailyHost = {
   get filters(){ return filters; },
