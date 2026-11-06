@@ -6,7 +6,7 @@
    index.html, js, or css. Any change to this file is a new worker: it
    calls skipWaiting immediately and takes over, and the page asks before
    it reloads. */
-const VERSION = "bh-10";
+const VERSION = "bh-11";
 const SHELL = "bh-shell-" + VERSION;
 const DATA = "bh-data-" + VERSION;
 const IMG = "bh-img-" + VERSION;
@@ -24,6 +24,7 @@ const SHELL_FILES = [
   "js/gems.js",
   "js/share.js",
   "js/themed-binders.js",
+  "js/pocket-art.js",
   "css/themes.css",
   "css/share.css",
   "data/scrydex-seed.txt",

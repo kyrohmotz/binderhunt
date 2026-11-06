@@ -43,6 +43,13 @@
 #bindersScroll .book.leather{--case:color-mix(in srgb,var(--cover,#2a2b31) 24%,#17181d)}
 #bindersScroll .book.folio{--case:#1a1b21}
 #bindersScroll .book.solo{--gutter:12px;--pad:8px;--ratio:.755;--chrome:66px;border-radius:18px}
+/* An open spread takes the desk. A phone page keeps its card-shaped ratio. */
+#bindersScroll .book.spread{
+  width:100%;
+  height:calc(100cqb - var(--chrome) - 6px);
+  max-height:calc(100cqb - var(--chrome) - 6px);
+  aspect-ratio:auto;
+}
 /* Stitching around the padded edge. */
 #bindersScroll .book::before{content:"";position:absolute;inset:4px;border-radius:18px;border:1.5px dashed rgba(255,255,255,.13);pointer-events:none;z-index:0}
 #bindersScroll .book.solo::before{inset:3px;border-radius:15px}
@@ -76,9 +83,9 @@
   display:block;grid-row:1;grid-column:2;position:relative;z-index:0;
   border:0;border-radius:0;
   background:
-    linear-gradient(90deg,rgba(0,0,0,.72),rgba(0,0,0,.2) 26%,rgba(255,255,255,.06) 50%,rgba(0,0,0,.2) 74%,rgba(0,0,0,.72)),
-    var(--case);
-  box-shadow:none;
+    linear-gradient(90deg,rgba(0,0,0,.88),rgba(0,0,0,.34) 18%,rgba(255,255,255,.07) 50%,rgba(0,0,0,.34) 82%,rgba(0,0,0,.88)),
+    #101116;
+  box-shadow:inset 0 0 18px rgba(0,0,0,.72),inset 8px 0 12px rgba(0,0,0,.28),inset -8px 0 12px rgba(0,0,0,.28);
 }
 #bindersScroll .book .spine i{display:none}
 #bindersScroll .book .spine::before{content:"";position:absolute;top:12px;bottom:12px;left:50%;margin-left:-.75px;border-left:1.5px dashed rgba(255,255,255,.17)}
@@ -112,9 +119,9 @@
 #bindersScroll .book .face.page-left{border-radius:11px 4px 4px 11px}
 #bindersScroll .book .face.page-right{border-radius:4px 11px 11px 4px}
 /* The page dips into the gutter. */
-#bindersScroll .book .face.page-left::after,#bindersScroll .book .face.page-right::after{content:"";position:absolute;top:0;bottom:0;width:16%;pointer-events:none;z-index:5}
-#bindersScroll .book .face.page-right::after{left:0;background:linear-gradient(90deg,rgba(0,0,0,.5),rgba(0,0,0,.16) 30%,transparent)}
-#bindersScroll .book .face.page-left::after{right:0;background:linear-gradient(270deg,rgba(0,0,0,.5),rgba(0,0,0,.16) 30%,transparent)}
+#bindersScroll .book .face.page-left::after,#bindersScroll .book .face.page-right::after{content:"";position:absolute;top:0;bottom:0;width:20%;pointer-events:none;z-index:5}
+#bindersScroll .book .face.page-right::after{left:0;background:linear-gradient(90deg,rgba(0,0,0,.62),rgba(0,0,0,.22) 36%,transparent)}
+#bindersScroll .book .face.page-left::after{right:0;background:linear-gradient(270deg,rgba(0,0,0,.62),rgba(0,0,0,.22) 36%,transparent)}
 #bindersScroll .book .face.blank::after{width:22%}
 #bindersScroll .book .face h3{display:none}
 #bindersScroll .book .page-num{position:absolute;bottom:clamp(2px,.9cqmin,6px);z-index:6;font-family:Nunito,sans-serif;font-weight:700;font-size:clamp(9px,2.1cqmin,12px);letter-spacing:.06em;color:rgba(255,255,255,.34);pointer-events:none;font-variant-numeric:tabular-nums}
@@ -127,7 +134,7 @@
   --pa:.738;
   flex:none;margin:auto;display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));
-  gap:clamp(4px,1.5cqmin,10px);
+  gap:clamp(3px,1.05cqmin,7px);
   width:min(100cqi,calc(100cqb * var(--pa)));
   height:min(100cqb,calc(100cqi / var(--pa)));
   max-height:none;align-self:center;
@@ -147,13 +154,33 @@
 /* The sleeve's welded seam and open lip, faint as clear plastic. */
 #bindersScroll .book .sleeve::before{content:"";position:absolute;left:3px;right:3px;top:6%;height:1px;z-index:5;background:linear-gradient(90deg,transparent,rgba(255,255,255,.13) 12%,rgba(255,255,255,.13) 88%,transparent);pointer-events:none}
 #bindersScroll .book .sleeve::after{content:"";display:block;position:absolute;inset:0;z-index:4;height:auto;pointer-events:none;border-radius:inherit;background:linear-gradient(122deg,rgba(255,255,255,.075),rgba(255,255,255,.01) 30%,transparent 62%,rgba(255,255,255,.035));box-shadow:inset 0 0 0 1px rgba(255,255,255,.03)}
-#bindersScroll .book .sleeve.empty .sleeve-weld,#bindersScroll .book .sleeve.empty .gloss,#bindersScroll .book .sleeve.empty .glare,#bindersScroll .book .sleeve .ghost-card,#bindersScroll .book .sleeve .sleeve-tag{display:none}
+#bindersScroll .book .sleeve.empty .sleeve-weld,#bindersScroll .book .sleeve.empty .gloss,#bindersScroll .book .sleeve.empty .glare,#bindersScroll .book .sleeve .ghost-card,#bindersScroll .book .sleeve .sleeve-tag,#bindersScroll .book .sleeve .cardback,#bindersScroll .book .sleeve .toad{display:none}
+/* An empty pocket is a clear sleeve: a recessed well and a faint plastic lip.
+   No card face, no cream, no white frame. */
+#bindersScroll .book .slot > .sleeve.empty{
+  background:
+    linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,.16) 46%,rgba(255,255,255,.02)),
+    #121318;
+  box-shadow:
+    inset 0 10px 16px rgba(0,0,0,.58),
+    inset 0 0 0 1px rgba(255,255,255,.12),
+    inset 0 1px 0 rgba(255,255,255,.16),
+    0 1px 0 rgba(255,255,255,.03);
+}
+#bindersScroll .book .sleeve.empty::before{
+  left:10%;right:10%;top:8%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.26),transparent);
+}
+#bindersScroll .book .sleeve.empty::after{
+  background:linear-gradient(155deg,rgba(255,255,255,.055),transparent 36%,transparent 74%,rgba(0,0,0,.2));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.045);
+}
 #bindersScroll .book .sleeve.sunk .cardhit{transform:scale(.985)}
 
 /* The card sits snug in the sleeve. */
 #bindersScroll .book .sleeve .cardhit{
   position:absolute;inset:0;margin:auto;
-  height:95%;width:auto;max-width:96%;aspect-ratio:63/88;
+  height:99%;width:auto;max-width:99%;aspect-ratio:63/88;
   padding:0;border:0;display:block;z-index:1;
   border-radius:4.6% / 3.3%;overflow:hidden;
   background:transparent;box-shadow:0 1px 2px rgba(0,0,0,.45);
@@ -177,7 +204,7 @@
 }
 
 /* A card whose art never loaded: a dark blank card with its name. */
-#bindersScroll .art-missing,.inspect .art-missing{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;padding:9% 8%;background:linear-gradient(160deg,#30323b,#1d1e24 62%,#25262d);color:rgba(255,255,255,.82);font-family:Nunito,sans-serif;text-align:left;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+#bindersScroll .art-missing,.inspect .art-missing{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;padding:9% 8%;background:linear-gradient(165deg,rgba(255,255,255,.045),transparent 42%),#1c1d24;color:rgba(255,255,255,.82);font-family:Nunito,sans-serif;text-align:left;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
 #bindersScroll .art-missing b,.inspect .art-missing b{font-family:Nunito,sans-serif;font-weight:800;font-size:clamp(9px,1.4vmin,15px);line-height:1.15;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 #bindersScroll .art-missing span,.inspect .art-missing span{font-size:clamp(8px,1.1vmin,12px);color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #bindersScroll .book .cardback{display:none}
@@ -227,18 +254,24 @@
 @media (min-width:1024px){
   .shell.reading-wide{grid-template-columns:248px minmax(0,1fr)}
   .shell.reading-wide #profile{display:none}
-  #bindersScroll.reading{padding:4px 20px 10px}
-  #bindersScroll .book.spread{--gutter:34px;--pad:15px;--ratio:1.49;--chrome:58px;border-radius:26px}
+  .shell.reading-wide .stage > .top{display:none}
+  #bindersScroll.reading{padding:6px 12px 8px}
+  #bindersScroll .book.spread{--gutter:48px;--pad:22px;--chrome:60px;border-radius:28px}
   /* Desktop: tools, the page count and the page controls share one bar. */
-  #bindersScroll .bookbar{display:flex;align-items:center;gap:12px;flex:none;width:min(100%,calc((100cqb - 58px) * 1.49));min-width:0}
+  #bindersScroll .bookbar{display:flex;align-items:center;gap:12px;flex:none;width:100%;min-width:0}
   #bindersScroll .bookbar .booktools{order:0;width:auto;flex:none;padding:0;overflow:visible}
   #bindersScroll .bookbar .pagefoot{order:0;flex:1 1 auto;min-width:0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #bindersScroll .bookbar .booknav{order:0;width:auto;flex:none}
   #bindersScroll .bookbar .dots{flex:none;max-width:180px}
-  #bindersScroll .book.spread::before{inset:5px;border-radius:21px}
+  #bindersScroll .book.spread::before{inset:7px;border-radius:22px}
+}
+@media (min-width:1600px){
+  #bindersScroll.reading{padding:8px 16px 8px}
+  #bindersScroll .book.spread{--gutter:58px;--pad:28px;--chrome:60px;border-radius:32px}
+  #bindersScroll .book.spread::before{inset:8px;border-radius:24px}
 }
 @media (min-width:1024px) and (max-height:820px){
-  #bindersScroll .book.spread{--pad:11px;--gutter:28px}
+  #bindersScroll .book.spread{--pad:16px;--gutter:36px;--chrome:56px}
 }
 
 /* ---------- motion preferences ---------- */
