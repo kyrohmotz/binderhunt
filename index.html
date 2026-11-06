@@ -790,6 +790,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 <link rel="stylesheet" href="css/binder.css">
 <link rel="stylesheet" href="css/polish.css">
 <link rel="stylesheet" href="css/share.css">
+<link rel="stylesheet" href="css/themes.css">
 </head>
 <body>
 <div id="live" class="sr-only" aria-live="polite"></div>
@@ -844,8 +845,12 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
         <button class="chip" type="button" id="resetFilters" hidden>Clear</button>
       </div>
       <div class="discovery" id="discovery" hidden>
-        <span>Adding to: <b id="discoveryName">Binder</b></span>
-        <button class="chip" id="stopDiscovery" type="button">Done</button>
+        <span class="discovery-copy"><b id="discoveryName">Binder</b><small id="discoveryTheme">Also on your wishlist</small></span>
+        <span class="discovery-actions">
+          <button class="chip" id="switchDiscovery" type="button">Switch</button>
+          <button class="chip" id="shareDiscovery" type="button" aria-haspopup="dialog">Share</button>
+          <button class="chip" id="stopDiscovery" type="button">Done</button>
+        </span>
       </div>
       <form class="cardsearch" id="cardSearch" role="search">
         <input id="cardFind" type="search" placeholder="e.g. Pikachu" aria-label="Search cards by name" enterkeyhint="search" autocomplete="off">
@@ -990,6 +995,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 <script src="js/card-inspect.js"></script>
 <script src="js/gems.js"></script>
 <script src="js/share.js"></script>
+<script src="js/themed-binders.js"></script>
 <script>
 try {
   if (navigator.serviceWorker && navigator.serviceWorker.controller && navigator.onLine === false) navigator.serviceWorker.controller.postMessage("bh-offline");
@@ -1297,9 +1303,13 @@ function loadWish(){
   try { const raw = JSON.parse(localStorage.getItem("binderhuntWish") || "[]"); return Array.isArray(raw) ? raw.filter(c => c && c.id) : []; }
   catch (e) { return []; }
 }
+function binderStorageKey(){
+  return (window.BinderThemes && BinderThemes.KEYS && BinderThemes.KEYS.binders) || "bh.binders.v1";
+}
 function loadBinders(){
   try {
-    const raw = JSON.parse(localStorage.getItem("bh.binders.v1") || "null");
+    const raw = JSON.parse(localStorage.getItem(binderStorageKey()) || "null");
+    if (window.BinderThemes) return BinderThemes.normalizeState(raw);
     if (raw && Array.isArray(raw.binders)) return { discoveryId: raw.discoveryId || "", binders: raw.binders.filter(b => b && b.id && b.name) };
   } catch (e) {}
   return { discoveryId:"", binders:[] };
@@ -1426,7 +1436,7 @@ function loadSettings(){
   } catch (e) { return blank; }
 }
 function saveWish(){ try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {} paintContext(); paintCount(); if (tab === "binders") renderBinders(); if (tab === "sets") renderSets(); }
-function saveBinders(){ try { localStorage.setItem("bh.binders.v1", JSON.stringify(binderState)); } catch (e) {} if (tab === "binders") renderBinders(); paintDiscovery(); paintRail(); }
+function saveBinders(){ try { localStorage.setItem(binderStorageKey(), JSON.stringify(binderState)); } catch (e) {} if (tab === "binders") renderBinders(); paintDiscovery(); paintRail(); }
 function saveFilters(){
   if (filters.set) rememberedSet = "";
   if (filters.type) rememberedType = "";
@@ -1943,8 +1953,9 @@ function snapshot(card){
   };
 }
 function discoveryBinder(){ return binderState.binders.find(b => b.id === binderState.discoveryId) || null; }
-function themeOf(b){ return (b && b.theme) || { kind:"none" }; }
+function themeOf(b){ return window.BinderThemes ? BinderThemes.themeOf(b) : ((b && b.theme) || { kind:"none" }); }
 function speciesHit(cardName, species){
+  if (window.BinderThemes) return BinderThemes.speciesHit(cardName, species);
   const n = String(cardName || "").toLowerCase();
   const s = String(species || "").toLowerCase().trim();
   if (!s) return false;
@@ -2000,11 +2011,20 @@ function priceOk(price){
   return true;
 }
 function matchesTheme(card, theme){
+  if (window.BinderThemes) return BinderThemes.matchesTheme(card, theme);
   if (!theme || !theme.kind || theme.kind === "none") return true;
-  if (theme.kind === "set") return !!theme.setId && card.setId === theme.setId;
-  if (theme.kind === "type") return !!theme.type && (card.types || []).includes(theme.type);
+  if (theme.kind === "set") return !!theme.setId && card && card.setId === theme.setId;
+  if (theme.kind === "type") return !!theme.type && card && (card.types || []).includes(theme.type);
   if (theme.kind === "pokemon") return !!theme.name && speciesHit(card && card.name, theme.name);
   return true;
+}
+function themePatch(binder){
+  const theme = themeOf(binder);
+  if (window.BinderThemes) return BinderThemes.huntFilters(theme);
+  if (theme.kind === "set" && theme.setId) return { set:theme.setId, type:"", names:[] };
+  if (theme.kind === "type" && theme.type) return { set:"", type:theme.type, names:[] };
+  if (theme.kind === "pokemon" && theme.name) return { set:"", type:"", names:[theme.name] };
+  return { set:"", type:"", names:[] };
 }
 function themeLabel(theme){
   if (!theme || theme.kind === "none" || !theme.kind) return "Any card";
@@ -2330,7 +2350,12 @@ function loadMeta(){
     meta.rarities = (rarities || []).filter(r => !POCKET_RARITIES.has(r)).sort((a, b) => a.localeCompare(b));
     meta.complete = true;
     meta.ready = true;
-  })().catch(() => { meta.sets = MUST_SETS.slice(); meta.ready = true; });
+  })().catch(() => {
+    meta.sets = MUST_SETS.slice();
+    meta.types = CARD_TYPES.slice();
+    meta.rarities = [];
+    meta.ready = true;
+  });
   return metaPromise;
 }
 function binderBusy(){
@@ -2544,10 +2569,10 @@ function keep(card){
 function enforceTheme(){
   const b = discoveryBinder();
   if (!b) return;
-  const t = themeOf(b);
-  if (t.kind === "set" && t.setId) filters.set = t.setId;
-  if (t.kind === "type" && t.type) filters.type = t.type;
-  if (t.kind === "pokemon" && t.name) filters.names = [t.name];
+  const patch = themePatch(b);
+  if (patch.set) filters.set = patch.set;
+  if (patch.type) filters.type = patch.type;
+  if (patch.names.length) filters.names = patch.names.slice();
 }
 async function pullSet(id){
   if (!setLists.has(id)) {
@@ -3820,18 +3845,29 @@ function addWish(card){
   return true;
 }
 function addToBinder(binder, card){
-  if (!binder || binder.cards.some(c => c.id === card.id)) return false;
+  if (!binder || !card) return false;
+  if (!Array.isArray(binder.cards)) binder.cards = [];
+  if (binder.cards.some(c => c && c.id === card.id)) return false;
   noteDemand(card.id);
-  binder.cards.push(snapshot(card));
+  const stored = snapshot(card);
+  const added = window.BinderThemes ? BinderThemes.addCard(binder, stored) : (binder.cards.push(stored), true);
+  if (!added) return false;
   if (binder.cards.length % 9 === 0) pendingSparkle = Math.floor((binder.cards.length - 1) / 9);
   saveBinders();
   logEvent("save", card.id);
   return true;
 }
 function removeFromBinder(binder, id){
-  binder.cards = binder.cards.filter(c => c.id !== id);
+  if (!binder) return false;
+  const removed = window.BinderThemes ? BinderThemes.removeCard(binder, id) : (Array.isArray(binder.cards) && binder.cards.some(c => c && c.id === id));
+  if (window.BinderThemes) {
+    if (!removed) return false;
+  } else if (Array.isArray(binder.cards)) {
+    binder.cards = binder.cards.filter(c => c && c.id !== id);
+  }
   saveBinders();
   announce("Removed from " + binder.name + ". It is still on your wishlist if you saved it there.");
+  return true;
 }
 function removeFromWish(id){
   wish = wish.filter(c => c.id !== id);
@@ -3946,10 +3982,10 @@ function clearAllFilters(){
   dropHeldFilters();
   filters = blankFilters();
   if (b) {
-    const t = themeOf(b);
-    if (t.kind === "set") filters.set = t.setId;
-    if (t.kind === "type") filters.type = t.type;
-    if (t.kind === "pokemon" && t.name) filters.names = [t.name];
+    const patch = themePatch(b);
+    if (patch.set) filters.set = patch.set;
+    if (patch.type) filters.type = patch.type;
+    if (patch.names.length) filters.names = patch.names.slice();
   }
   saveFilters();
   restart();
@@ -4140,7 +4176,8 @@ function binderSideKey(){
   if (!binderView) return "shelf:" + wish.length + ":" + binderState.binders.length + ":" + ownedIds.size;
   if (binderView.kind === "wish") return "wish:" + wish.length + ":" + ownedIds.size;
   const b = binderState.binders.find(x => x.id === binderView.id);
-  return "binder:" + binderView.id + ":" + ((b && b.cards) || []).length + ":" + ownedIds.size + ":" + (b ? b.name : "");
+  const theme = b ? themeOf(b) : null;
+  return "binder:" + binderView.id + ":" + ((b && b.cards) || []).length + ":" + ownedIds.size + ":" + (b ? b.name : "") + ":" + (b ? b.color : "") + ":" + (theme ? theme.kind + theme.setId + theme.type + theme.name : "") + ":" + (b && binderState.discoveryId === b.id ? "1" : "0");
 }
 function binderSideMeter(list){
   const p = progressOf(list);
@@ -4195,7 +4232,10 @@ function renderBinderSide(){
     return;
   }
   const pages = Math.max(1, Math.ceil(((binder.cards || []).length || 1) / 9));
-  profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Binder</p><h2 class="pname" id="profileTitle">${esc(binder.name)}</h2>${binderSideMeter(binder.cards)}<p class="fine">${(binder.cards || []).length} cards · ${pages} ${pages === 1 ? "page" : "pages"}</p></div>`;
+  const theme = themeOf(binder);
+  const themeBit = theme.kind !== "none" ? themeLabel(theme) : "Any card";
+  const huntBit = binderState.discoveryId === binder.id ? "Hunt saves into this binder and your wishlist." : "Swipe to discover saves into this binder and your wishlist.";
+  profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Binder</p><h2 class="pname" id="profileTitle">${esc(binder.name)}</h2>${binderSideMeter(binder.cards)}<p class="fine">${esc(themeBit)} · ${(binder.cards || []).length} cards · ${pages} ${pages === 1 ? "page" : "pages"}</p><p class="fine">${esc(huntBit)}</p></div>`;
 }
 function renderDailySide(){
   const model = typeof window.dailySideModel === "function" ? window.dailySideModel() : null;
@@ -4281,8 +4321,10 @@ function paintRail(){
     btn.type = "button";
     btn.className = "rail-binder";
     btn.style.setProperty("--cover", coverColor(b.color));
-    btn.setAttribute("aria-label", b.name + ", " + p.label);
-    btn.innerHTML = `<span class="rail-binder-copy"><b>${esc(b.name)}</b><span class="fine">${esc(p.label)}</span></span>${ringMarkup(p.owned, p.total)}`;
+    const hunting = binderState.discoveryId === b.id;
+    if (hunting) btn.classList.add("is-hunting");
+    btn.setAttribute("aria-label", b.name + (hunting ? ", hunting into this binder" : "") + ", " + p.label);
+    btn.innerHTML = `<span class="rail-binder-copy"><b>${esc(b.name)}</b><span class="fine">${esc((hunting ? "Hunting · " : "") + p.label)}</span></span>${ringMarkup(p.owned, p.total)}`;
     btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); showTab("binders"); };
     host.append(btn);
   });
@@ -4296,9 +4338,34 @@ function paintRail(){
 function paintDiscovery(){
   const b = discoveryBinder();
   const el = document.getElementById("discovery");
+  if (!el) return;
   el.hidden = !b || tab !== "hunt";
-  if (b) document.getElementById("discoveryName").textContent = b.name;
+  if (b) {
+    const name = document.getElementById("discoveryName");
+    const theme = document.getElementById("discoveryTheme");
+    if (name) name.textContent = b.name;
+    const t = themeOf(b);
+    if (theme) theme.textContent = (t.kind !== "none" ? themeLabel(t) + " · " : "") + "Also on your wishlist";
+    const share = document.getElementById("shareDiscovery");
+    if (share) share.setAttribute("aria-label", "Share " + b.name);
+    el.style.setProperty("--cover", coverColor(b.color));
+  }
   syncActs();
+}
+function stopDiscoveryHunt(){
+  const b = discoveryBinder();
+  if (window.BinderThemes) BinderThemes.switchActive(binderState, "");
+  else binderState.discoveryId = "";
+  saveBinders();
+  if (b) {
+    const patch = themePatch(b);
+    if (patch.set) filters.set = "";
+    if (patch.type) filters.type = "";
+    if (patch.names.length) filters.names = [];
+  }
+  saveFilters();
+  paintDiscovery();
+  restart();
 }
 function showTab(name){
   closeShowcase();
@@ -4871,7 +4938,7 @@ function renderBinders(){
   const wishMeta = wish.length ? cardsWord(wish.length) + (total ? " · " + priceText(total, "USD") : "") : "Nothing saved yet";
   const wishSub = wish.length ? (wantedN ? wantedN + " still to find" : "You have every card") + (ownedN ? " · " + ownedN + " got" : "") : "Swipe right on a card and it lands here.";
   root.innerHTML = `<div class="wish-slot"><button class="wish-row" id="openWish" type="button" aria-label="${esc(wishLabel)}">${peekMarkup(wish, "wish-peek")}<span class="wish-copy"><span class="eyebrow">All saved cards</span><b>Wishlist</b><span class="wish-meta">${esc(wishMeta)}</span><span class="fine">${esc(wishSub)}</span></span>${droppedCountMarkup(dropped)}<span class="wish-go" aria-hidden="true">Open →</span></button><button class="chip wish-share" id="shareWish" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button></div>
-    <div class="shelf-head"><h2 class="shelf-title">Your binders</h2><p class="fine">Sort cards by theme. A card can sit in more than one binder and still stays on your wishlist.</p></div>
+    <div class="shelf-head"><h2 class="shelf-title">Your binders</h2><p class="fine">Right-swipe always lands on your wishlist. A themed binder is another home for the same card.</p></div>
     <div class="shelf-scene"><div class="shelf" id="shelf"></div></div>`;
   const shelf = document.getElementById("shelf");
   binderState.binders.forEach(b => {
@@ -4882,9 +4949,16 @@ function renderBinders(){
     btn.style.setProperty("--cover", cloth);
     const p = progressOf(b.cards);
     if (p.total && p.owned >= p.total) btn.classList.add("complete");
+    const hunting = binderState.discoveryId === b.id;
+    if (hunting) btn.classList.add("is-hunting");
+    const theme = themeOf(b);
+    const countBits = [];
+    if (hunting) countBits.push("Hunting");
+    countBits.push(b.cards.length ? cardsWord(b.cards.length) : "Empty");
+    if (theme.kind !== "none") countBits.push(themeLabel(theme));
     const charm = b.charm === "toad" ? `<span class="cover-charm">${toad()}</span>` : b.charm === "sticker" ? `<span class="cover-charm star" aria-hidden="true">★</span>` : "";
     btn.dataset.progress = p.owned + "/" + p.total;
-    btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board">${peekMarkup(b.cards, "cover-peek")}<b class="binder-name">${esc(b.name)}</b>${b.cards.length ? ringMarkup(p.owned, p.total) : ""}<span class="binder-count">${esc(b.cards.length ? cardsWord(b.cards.length) : "Empty")}</span></span><span class="binder-fore"></span></span>${charm}<span class="sr-only">${esc(b.name + ". " + (p.total ? p.owned + " of " + p.total + " owned" : "No cards yet"))}</span>`;
+    btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board">${peekMarkup(b.cards, "cover-peek")}<b class="binder-name">${esc(b.name)}</b>${b.cards.length ? ringMarkup(p.owned, p.total) : ""}<span class="binder-count">${esc(countBits.join(" · "))}</span></span><span class="binder-fore"></span></span>${charm}<span class="sr-only">${esc(b.name + (hunting ? ". Hunting into this binder." : "") + (theme.kind !== "none" ? " " + themeLabel(theme) + "." : "") + " " + (p.total ? p.owned + " of " + p.total + " owned" : "No cards yet"))}</span>`;
     btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); renderBinders(); };
     const slot = document.createElement("div");
     slot.className = "cover-slot";
@@ -5147,7 +5221,7 @@ function renderCollection(root){
   tools.className = "booktools";
   tools.innerHTML = `<button class="chip" id="backBinders" type="button">All binders</button>` +
     (wishMode ? `<button class="chip" id="copyList" type="button">Copy list</button><button class="chip" id="shareCollection" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button>`
-      : `<button class="chip" id="fillFrom" type="button">Fill from wishlist</button><button class="chip" id="discover" type="button">Swipe to discover</button><button class="chip" id="renameBinder" type="button">Rename</button><button class="chip" id="recolorBinder" type="button">Cover</button><button class="chip" id="copyList" type="button">Copy list</button><button class="chip" id="shareCollection" type="button" aria-haspopup="dialog">Share</button>`);
+      : `<button class="chip" id="fillFrom" type="button">Fill from wishlist</button><button class="chip" id="discover" type="button">Swipe to discover</button><button class="chip" id="switchBinder" type="button">Switch</button><button class="chip" id="renameBinder" type="button">Rename</button><button class="chip" id="recolorBinder" type="button">Cover</button><button class="chip danger" id="deleteBinder" type="button">Delete</button><button class="chip" id="copyList" type="button">Copy list</button><button class="chip" id="shareCollection" type="button" aria-haspopup="dialog">Share</button>`);
   const stage = document.createElement("div");
   stage.className = "bookstage";
   const book = document.createElement("div");
@@ -5725,7 +5799,9 @@ function renderCollection(root){
       document.getElementById("saveRename").onclick = () => {
         const next = document.getElementById("renameInput").value.trim();
         if (!next) return;
-        binder.name = next;
+        if (window.BinderThemes) {
+          if (!BinderThemes.renameBinder(binderState, binder.id, next)) return;
+        } else binder.name = next;
         saveBinders();
         closeSheet("binderSheet");
         renderBinders();
@@ -5734,15 +5810,20 @@ function renderCollection(root){
     document.getElementById("recolorBinder").onclick = () => {
       const current = coverColor(binder.color);
       document.getElementById("binderSheetTitle").textContent = "Cover color";
-      document.getElementById("binderSheetBody").innerHTML = `<p class="fine">Pick a cloth. The cards in this binder stay where they are.</p><div class="swatches" id="swatches">${COLORS.map((c, i) => `<button type="button" class="swatch" data-color="${c}" style="background:${c}" aria-label="Cover ${i + 1}" aria-pressed="${current === c ? "true" : "false"}"></button>`).join("")}</div>`;
+      document.getElementById("binderSheetBody").innerHTML = `<p class="fine">Pick a cloth. The cards in this binder stay where they are.</p><div class="swatches" id="swatches">${COLORS.map((c, i) => `<button type="button" class="swatch" data-color="${c}" style="background:${c}" aria-label="Cover ${i + 1}" aria-pressed="${current.toLowerCase() === c.toLowerCase() ? "true" : "false"}"></button>`).join("")}</div>`;
       openSheet("binderSheet");
       document.querySelectorAll("#binderSheet .swatch").forEach(btn => btn.onclick = () => {
-        binder.color = btn.dataset.color;
+        if (window.BinderThemes) BinderThemes.recolorBinder(binderState, binder.id, btn.dataset.color);
+        else binder.color = btn.dataset.color;
         closeSheet("binderSheet");
         saveBinders();
         if (settings.haptics) haptic(8);
       });
     };
+    const deleteBtn = document.getElementById("deleteBinder");
+    deleteBtn.setAttribute("aria-label", "Delete " + binder.name + ". Cards stay on your wishlist.");
+    deleteBtn.onclick = () => openDeleteBinder(binder);
+    document.getElementById("switchBinder").onclick = () => openBinderSwitch("view");
   }
   warmPages(list, flipPage, step, total);
   prebuild();
@@ -5824,11 +5905,12 @@ function openMenu(anchor, card, binder){
   const r = anchor.getBoundingClientRect();
   menu.hidden = false;
   menu.style.left = Math.min(r.left, window.innerWidth - 200) + "px";
-  menu.style.top = Math.min(r.bottom + 4, window.innerHeight - 180) + "px";
+  menu.style.top = Math.min(r.bottom + 4, window.innerHeight - 230) + "px";
   const owned = ownedIds.has(card.id);
   menu.innerHTML = `<button type="button" id="menuOwn">${owned ? "Undo got it" : "Got it!"}</button>` + (binder
     ? `<button type="button" id="menuRemove">Remove from ${esc(binder.name)}</button>`
-    : `<button type="button" id="menuRemove">Remove from wishlist</button>`);
+    : `<button type="button" id="menuRemove">Remove from wishlist</button>`) +
+    `<button type="button" id="menuBinders">In binders</button>`;
   const ownBtn = document.getElementById("menuOwn");
   ownBtn.setAttribute("aria-label", owned ? "Undo got it for " + (card.name || "this card") : "Got it! Mark " + (card.name || "this card") + " as owned");
   ownBtn.onclick = () => {
@@ -5841,24 +5923,126 @@ function openMenu(anchor, card, binder){
     menu.hidden = true;
     renderBinders();
   };
+  document.getElementById("menuBinders").onclick = () => {
+    menu.hidden = true;
+    openMembership(card);
+  };
   menu.querySelector("button").focus();
+}
+const THEME_PRESETS = {
+  jungle: { name:"Jungle", color:"#ABB28D", kind:"set", setId:"base2", setLabel:"Jungle" },
+  water: { name:"Water", color:"#86DEFF", kind:"type", type:"Water" },
+  iono: { name:"Iono", color:"#F6C9C9", kind:"pokemon", mon:"Iono" }
+};
+function binderChoiceMarkup(activeId){
+  return binderState.binders.map(b => {
+    const on = b.id === activeId;
+    const theme = themeOf(b);
+    const sub = theme.kind !== "none" ? themeLabel(theme) : (b.cards.length === 1 ? "1 card" : b.cards.length + " cards");
+    return `<button type="button" class="binder-choice${on ? " on" : ""}" data-id="${esc(b.id)}" aria-pressed="${on ? "true" : "false"}"><i style="background:${coverColor(b.color)}"></i><span><b>${esc(b.name)}</b><small>${esc(sub)}</small></span></button>`;
+  }).join("");
+}
+function openBinderSwitch(mode){
+  const hunting = mode === "hunt";
+  document.getElementById("binderSheetTitle").textContent = hunting ? "Hunt into a binder" : "Switch binder";
+  const active = hunting ? binderState.discoveryId : (binderView && binderView.kind === "binder" ? binderView.id : "");
+  const choices = binderState.binders.length ? `<div class="binder-choices">${binderChoiceMarkup(active)}</div>` : `<p class="fine">No themed binders yet.</p>`;
+  const extra = hunting
+    ? `<button class="chip" id="huntWishlistOnly" type="button">Wishlist only</button>`
+    : `<button type="button" class="binder-choice" data-kind="wish"><i style="background:#E4E7DA"></i><span><b>Wishlist</b><small>Every saved card</small></span></button>`;
+  document.getElementById("binderSheetBody").innerHTML = `<p class="fine">${hunting ? "Right-swipes still join your wishlist, and also this binder." : "Opening another binder leaves your wishlist where it is."}</p>${extra}${choices}`;
+  document.querySelectorAll("#binderSheetBody .binder-choice").forEach(btn => btn.onclick = () => {
+    if (btn.dataset.kind === "wish") {
+      closeSheet("binderSheet");
+      binderView = { kind:"wish" };
+      flipPage = 0;
+      showTab("binders");
+      return;
+    }
+    const id = btn.dataset.id;
+    if (!id) return;
+    closeSheet("binderSheet");
+    if (hunting) {
+      if (id !== binderState.discoveryId) startDiscovery(id);
+      return;
+    }
+    binderView = { kind:"binder", id };
+    flipPage = 0;
+    binderOpenAnim = true;
+    showTab("binders");
+  });
+  const only = document.getElementById("huntWishlistOnly");
+  if (only) only.onclick = () => { closeSheet("binderSheet"); stopDiscoveryHunt(); };
+  openSheet("binderSheet");
+}
+function openDeleteBinder(binder){
+  if (!binder) return;
+  document.getElementById("binderSheetTitle").textContent = "Delete " + binder.name + "?";
+  document.getElementById("binderSheetBody").innerHTML = `<p class="fine">This removes the ${esc(binder.name)} binder only. Every card stays on your wishlist, and any other binder that has it keeps it.</p><button class="chip" id="cancelDelete" type="button">Keep it</button><button class="chip danger" id="confirmDelete" type="button">Delete binder</button>`;
+  document.getElementById("cancelDelete").onclick = () => closeSheet("binderSheet");
+  document.getElementById("confirmDelete").onclick = () => {
+    const wasHunt = binderState.discoveryId === binder.id;
+    if (window.BinderThemes) BinderThemes.deleteBinder(binderState, binder.id);
+    else {
+      binderState.binders = binderState.binders.filter(b => b.id !== binder.id);
+      if (wasHunt) binderState.discoveryId = "";
+    }
+    if (binderView && binderView.kind === "binder" && binderView.id === binder.id) binderView = null;
+    if (wasHunt) {
+      const patch = themePatch(binder);
+      if (patch.set) filters.set = "";
+      if (patch.type) filters.type = "";
+      if (patch.names.length) filters.names = [];
+      saveFilters();
+    }
+    closeSheet("binderSheet");
+    saveBinders();
+    if (wasHunt && tab === "hunt") restart();
+    announce(binder.name + " was deleted. Your wishlist still has every card.");
+  };
+  openSheet("binderSheet");
+}
+function openMembership(card){
+  if (!card) return;
+  document.getElementById("binderSheetTitle").textContent = card.name ? card.name : "Binders";
+  const rows = binderState.binders.map(b => {
+    const on = (b.cards || []).some(c => c && c.id === card.id);
+    return `<label class="choice binder-member"><input type="checkbox" data-binder="${esc(b.id)}" ${on ? "checked" : ""}><i class="swatch-dot" style="background:${coverColor(b.color)}"></i><span>${esc(b.name)}</span></label>`;
+  }).join("");
+  const empty = binderState.binders.length ? "" : `<p class="fine">No themed binders yet.</p><button class="chip" id="membershipCreate" type="button">New binder</button>`;
+  document.getElementById("binderSheetBody").innerHTML = `<p class="fine">A card can sit in more than one binder. Taking it out of a binder leaves it on your wishlist.</p>${rows}${empty}<button class="chip" id="membershipDone" type="button">Done</button>`;
+  document.querySelectorAll("#binderSheetBody input[data-binder]").forEach(input => {
+    input.onchange = () => {
+      const target = binderState.binders.find(b => b.id === input.dataset.binder);
+      if (!target) return;
+      if (input.checked) addToBinder(target, card);
+      else removeFromBinder(target, card.id);
+    };
+  });
+  const create = document.getElementById("membershipCreate");
+  if (create) create.onclick = () => { closeSheet("binderSheet"); openBinderForm(); };
+  document.getElementById("membershipDone").onclick = () => closeSheet("binderSheet");
+  openSheet("binderSheet");
 }
 async function openBinderForm(){
   await loadMeta();
   document.getElementById("binderSheetTitle").textContent = "New binder";
-  const sets = meta.sets.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join("");
-  const types = meta.types.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
-  document.getElementById("binderSheetBody").innerHTML = `<p class="fine">A theme preset scopes discovery. Jungle can be a set. Water can be a type. Scyther finds every Scyther print. None hunts the whole catalog.</p>
-    <label class="field">Name<input id="bName" maxlength="40" placeholder="Jungle binder"></label>
-    <fieldset><legend>Theme preset</legend>
-      <label class="choice"><input type="radio" name="theme" value="none" checked> None</label>
+  const setList = Array.isArray(meta.sets) ? meta.sets : [];
+  const typeList = (Array.isArray(meta.types) && meta.types.length ? meta.types : CARD_TYPES).filter(t => typeof t === "string");
+  const sets = setList.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join("");
+  const types = typeList.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
+  document.getElementById("binderSheetBody").innerHTML = `<p class="fine">Name a theme and a pastel cover. Jungle can be a set, Water a type, Iono a card name. Right-swipes still land on your wishlist.</p>
+    <div class="preset-row" id="binderPresets"><button type="button" class="chip" data-preset="jungle">Jungle</button><button type="button" class="chip" data-preset="water">Water</button><button type="button" class="chip" data-preset="iono">Iono</button></div>
+    <label class="field">Name<input id="bName" maxlength="40" placeholder="Jungle"></label>
+    <fieldset><legend>Theme</legend>
+      <label class="choice"><input type="radio" name="theme" value="none" checked> Any card</label>
       <label class="choice"><input type="radio" name="theme" value="set"> A set</label>
       <label class="choice"><input type="radio" name="theme" value="type"> A type</label>
-      <label class="choice"><input type="radio" name="theme" value="pokemon"> A Pokémon</label>
+      <label class="choice"><input type="radio" name="theme" value="pokemon"> A name</label>
     </fieldset>
     <label class="field" id="setField" hidden>Set<select id="bSet">${sets}</select></label>
     <label class="field" id="typeField" hidden>Type<select id="bType">${types}</select></label>
-    <label class="field" id="monField" hidden>Pokémon<input id="bMon" maxlength="24" placeholder="Scyther"></label>
+    <label class="field" id="monField" hidden>Card name<input id="bMon" maxlength="24" placeholder="Iono"></label>
     <p class="fine">Cover</p>
     <div class="swatches" id="swatches">${COLORS.map((c, i) => `<button type="button" class="swatch" data-color="${c}" style="background:${c}" aria-label="Cover ${i + 1}" aria-pressed="${i === 0 ? "true" : "false"}"></button>`).join("")}</div>
     <fieldset><legend>Charm</legend>
@@ -5869,30 +6053,64 @@ async function openBinderForm(){
     <button class="chip" id="createBinder" type="button">Create binder</button>`;
   let color = COLORS[0];
   const syncThemeFields = () => {
-    const kind = (document.querySelector("input[name=theme]:checked") || {}).value || "none";
+    const kind = (document.querySelector("#binderSheet input[name=theme]:checked") || {}).value || "none";
     document.getElementById("setField").hidden = kind !== "set";
     document.getElementById("typeField").hidden = kind !== "type";
     document.getElementById("monField").hidden = kind !== "pokemon";
   };
   document.querySelectorAll("input[name=theme]").forEach(input => input.onchange = syncThemeFields);
-  document.querySelectorAll(".swatch").forEach(btn => btn.onclick = () => {
-    color = btn.dataset.color;
-    document.querySelectorAll(".swatch").forEach(s => s.setAttribute("aria-pressed", s === btn ? "true" : "false"));
+  const paintSwatch = () => {
+    document.querySelectorAll("#binderSheet .swatch").forEach(s => s.setAttribute("aria-pressed", s.dataset.color === color ? "true" : "false"));
+  };
+  document.querySelectorAll("#binderSheet .swatch").forEach(btn => btn.onclick = () => { color = btn.dataset.color; paintSwatch(); });
+  document.querySelectorAll("#binderPresets [data-preset]").forEach(btn => btn.onclick = () => {
+    const preset = THEME_PRESETS[btn.dataset.preset];
+    if (!preset) return;
+    document.getElementById("bName").value = preset.name;
+    color = preset.color;
+    paintSwatch();
+    const radio = document.querySelector(`#binderSheet input[name=theme][value="${preset.kind}"]`);
+    if (radio) radio.checked = true;
+    syncThemeFields();
+    if (preset.kind === "set") {
+      const sel = document.getElementById("bSet");
+      if (![...sel.options].some(o => o.value === preset.setId)) {
+        const opt = document.createElement("option");
+        opt.value = preset.setId;
+        opt.textContent = preset.setLabel || preset.setId;
+        sel.append(opt);
+      }
+      sel.value = preset.setId;
+    }
+    if (preset.kind === "type") {
+      const sel = document.getElementById("bType");
+      if (![...sel.options].some(o => o.value === preset.type)) {
+        const opt = document.createElement("option");
+        opt.value = preset.type;
+        opt.textContent = preset.type;
+        sel.append(opt);
+      }
+      sel.value = preset.type;
+    }
+    if (preset.kind === "pokemon") document.getElementById("bMon").value = preset.mon || "";
   });
   document.getElementById("createBinder").onclick = () => {
     const name = document.getElementById("bName").value.trim();
     if (!name) { announce("Name the binder first."); return; }
-    const kind = (document.querySelector("input[name=theme]:checked") || {}).value || "none";
+    const kind = (document.querySelector("#binderSheet input[name=theme]:checked") || {}).value || "none";
     const setId = kind === "set" ? document.getElementById("bSet").value : "";
     const type = kind === "type" ? document.getElementById("bType").value : "";
     const mon = kind === "pokemon" ? cleanMon(document.getElementById("bMon").value) : "";
     if (kind === "set" && !setId) { announce("Pick a set for this theme."); return; }
     if (kind === "type" && !type) { announce("Pick a type for this theme."); return; }
-    if (kind === "pokemon" && !mon) { announce("Name the Pokémon for this theme."); return; }
+    if (kind === "pokemon" && !mon) { announce("Name the card for this theme."); return; }
     const theme = { kind, setId, type, name: mon };
-    const charm = (document.querySelector("input[name=charm]:checked") || {}).value || "none";
-    const binder = { id:"b" + Date.now().toString(36), name, color, theme, cards:[], charm };
-    binderState.binders.push(binder);
+    const charm = (document.querySelector("#binderSheet input[name=charm]:checked") || {}).value || "none";
+    const binder = window.BinderThemes
+      ? BinderThemes.createBinder(binderState, { name, color, theme, charm })
+      : { id:"b" + Date.now().toString(36), name, color, theme, cards:[], charm };
+    if (!binder) { announce("Name the binder first."); return; }
+    if (!window.BinderThemes) binderState.binders.push(binder);
     saveBinders();
     countEvent("binder-created");
     noteBinderEngagement();
@@ -5956,19 +6174,23 @@ function drawFill(){
 function startDiscovery(id){
   const binder = binderState.binders.find(b => b.id === id);
   if (!binder) return;
-  binderState.discoveryId = id;
+  if (window.BinderThemes) {
+    if (!BinderThemes.switchActive(binderState, id)) return;
+  } else binderState.discoveryId = id;
   saveBinders();
-  const theme = themeOf(binder);
+  const patch = themePatch(binder);
   dropHeldFilters();
   filters = blankFilters();
-  if (theme.kind === "set") filters.set = theme.setId;
-  if (theme.kind === "type") filters.type = theme.type;
-  if (theme.kind === "pokemon" && theme.name) filters.names = [theme.name];
+  filters.set = patch.set;
+  filters.type = patch.type;
+  filters.names = patch.names.slice();
   saveFilters();
   binderView = null;
   showTab("hunt");
   restart();
-  announce("Adding to " + binder.name + ". Right-swipes also join your wishlist.");
+  const theme = themeOf(binder);
+  const extra = theme.kind !== "none" ? " Hunting " + themeLabel(theme) + "." : "";
+  announce("Adding to " + binder.name + ". Right-swipes also join your wishlist." + extra);
 }
 
 function parseDay(s){
@@ -6746,19 +6968,11 @@ document.getElementById("openFilters").onclick = () => openFilter("all", documen
 document.getElementById("filterDone").onclick = () => closeSheet("filterSheet");
 document.getElementById("settingsDone").onclick = () => closeSheet("settingsSheet");
 document.getElementById("resetFilters").onclick = () => clearAllFilters();
-document.getElementById("stopDiscovery").onclick = () => {
+document.getElementById("stopDiscovery").onclick = () => stopDiscoveryHunt();
+document.getElementById("switchDiscovery").onclick = () => openBinderSwitch("hunt");
+document.getElementById("shareDiscovery").onclick = () => {
   const b = discoveryBinder();
-  binderState.discoveryId = "";
-  saveBinders();
-  if (b) {
-    const t = themeOf(b);
-    if (t.kind === "set") filters.set = "";
-    if (t.kind === "type") filters.type = "";
-    if (t.kind === "pokemon") filters.names = [];
-  }
-  saveFilters();
-  paintDiscovery();
-  restart();
+  if (b && window.BinderShare) BinderShare.openCollection({ kind:"binder", name:b.name, color:b.color, cards:b.cards || [], ownedIds });
 };
 document.getElementById("context").onclick = () => { if (tab === "hunt") openFilter("all", document.getElementById("openFilters")); else if (tab === "sets" && setView) { setView = null; renderSets(); } else if (tab === "binders" && binderView) { binderView = null; renderBinders(); } };
 document.getElementById("skip").onclick = () => fly(-1);
