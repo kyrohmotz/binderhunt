@@ -996,6 +996,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 <script src="js/gems.js"></script>
 <script src="js/share.js"></script>
 <script src="js/themed-binders.js"></script>
+<script src="js/pocket-art.js"></script>
 <script>
 try {
   if (navigator.serviceWorker && navigator.serviceWorker.controller && navigator.onLine === false) navigator.serviceWorker.controller.postMessage("bh-offline");
@@ -1221,6 +1222,7 @@ function safeImg(url){
   return "";
 }
 function knownArt(card){
+  if (window.PocketArt) return PocketArt.pocketSources(card, false);
   const urls = [];
   const push = value => {
     const url = safeImg(value);
@@ -3368,6 +3370,7 @@ function placeholder(card){
 }
 /* Every art URL we know for a card, sharpest first when large is set. */
 function artUrls(card, large){
+  if (window.PocketArt) return PocketArt.pocketSources(card, !!large);
   const urls = knownArt(card);
   if (!large || !card) return urls;
   const out = [];
@@ -3393,7 +3396,11 @@ function paintArt(host, card, opts){
   const large = !!(opts && opts.large);
   const quick = knownArt(card);
   const sharp = large ? artUrls(card, true).filter(u => !/\/low\.webp$/.test(u) && !/images\.pokemontcg\.io\/[^/]+\/[^/_]+\.png$/.test(u)) : [];
-  const missing = () => (opts && opts.missing ? opts.missing(card) : placeholder(card));
+  const missing = () => {
+    if (opts && opts.missing) return opts.missing(card);
+    if (host.closest && host.closest("#bindersScroll")) return binderMissingArt(card);
+    return placeholder(card);
+  };
   /* Already sharp in this session: skip the preview step. */
   const ready = sharp.find(u => sharpLoaded.has(u));
   const urls = ready ? [ready].concat(quick.filter(u => u !== ready)) : quick.length ? quick : sharp;
@@ -3406,10 +3413,15 @@ function paintArt(host, card, opts){
   if (opts && opts.lazy) img.loading = "lazy";
   img.addEventListener("dragstart", e => e.preventDefault());
   let at = 0;
-  img.onerror = () => {
+  const failArt = () => {
     at++;
     if (at < urls.length) { img.src = urls[at]; return; }
-    img.replaceWith(missing());
+    if (img.isConnected) img.replaceWith(missing());
+  };
+  img.onerror = failArt;
+  img.onload = () => {
+    if (!img.isConnected || !window.PocketArt) return;
+    if (PocketArt.isPlaceholderSize(img.naturalWidth, img.naturalHeight)) failArt();
   };
   img.src = urls[0];
   host.append(img);
