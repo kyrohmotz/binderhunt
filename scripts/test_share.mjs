@@ -259,7 +259,7 @@ async function waitServer() {
   for (let i = 0; i < 50; i++) {
     try {
       const res = await fetch("http://127.0.0.1:" + PORT + "/index.html", { signal: AbortSignal.timeout(500) });
-      if (res.ok) return;
+      if (res.ok) { await res.arrayBuffer(); return; }
     } catch (e) {}
     await sleep(100);
   }

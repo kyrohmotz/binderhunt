@@ -613,9 +613,15 @@
 
   function dismissPrompt() {
     const prompt = document.getElementById("dropPrompt");
-    if (prompt) prompt.hidden = true;
+    const back = prompt && prompt._opener;
+    if (prompt) { prompt._opener = null; prompt.hidden = true; }
     setShellQuiet(false);
     if (typeof syncActs === "function") syncActs();
+    if (back && back.isConnected && typeof back.focus === "function") back.focus();
+    else {
+      const deck = document.getElementById("deck");
+      if (deck && typeof deck.focus === "function") deck.focus();
+    }
   }
 
   function maybePrompt() {
@@ -633,6 +639,7 @@
     state.prompted = iso;
     saveState(state);
     setShellQuiet(true);
+    prompt._opener = document.activeElement;
     prompt.hidden = false;
     const play = document.getElementById("dropPlay");
     if (play) play.focus();
