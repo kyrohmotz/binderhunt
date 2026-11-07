@@ -26,6 +26,23 @@ chase seed has room. Everything else keeps the TCGdex catalog price.
 Catalog ids from TCGdex are mapped before the request (sv03-223 becomes
 sv3-223). The record is stored under the catalog id. Secrets are read from
 the environment and sent only as headers. They are never printed.
+
+HTTP 402 on a card lookup, on price history, or on /account/v1/usage
+is a hard stop. Credits already spent are recorded, cards refreshed
+earlier in the run are written, and the process exits nonzero. The
+workflow commits those files and the job stays red. The annotation is:
+
+  Scrydex returned 402 Payment Required; check the shared Scrydex account.
+
+A 5xx on one card is skipped. No record is written for that id, and the
+credits still count. Three 5xx responses in a row stop the loop and the
+process exits nonzero, after the partial cache and ledger are written.
+The account usage read must establish the store reserve. Anything other
+than HTTP 200 with a remaining-credit field fails the run before any
+card request. That includes an empty body, JSON null, a non-object,
+and every status other than 200. There is no fallback to the local
+ledger. The usage read is recorded as 1 credit. HTTP 401 and 403 still
+abort the run. HTTP 429 on a card still stops that run.
 """
 
 from __future__ import annotations
@@ -59,6 +76,16 @@ DEMAND_HOURS = 24 * 90
 DEMAND_MIN = 2
 MISSING_HOURS = 24 * 30
 REQUEST_PAUSE_SEC = 0.35
+# A 5xx skips that card. This many in a row stops the loop and fails the
+# job, so an outage does not walk the rest of the due list. HTTP 402 is
+# not a skip: the first one stops the run.
+SKIP_STREAK_LIMIT = 3
+# Provider code/message copied out of a 402 or 5xx body. Headers are never
+# included. Secrets in the text are redacted before this cap is applied.
+PROVIDER_DETAIL_LIMIT = 200
+PAYMENT_REQUIRED_MESSAGE = (
+    "Scrydex returned 402 Payment Required; check the shared Scrydex account."
+)
 # TCGdex zero-pads set numbers and writes special sets as ".5".
 # Scrydex uses the Pokémon TCG API form: sv03 -> sv3, sv03.5 -> sv3pt5, me02 -> me2.
 _SET_RE = re.compile(r"^([a-z]+)(\d+)(\.5)?$")
@@ -69,6 +96,129 @@ class ScrydexError(Exception):
     def __init__(self, message: str, credits: int = 0):
         super().__init__(message)
         self.credits = credits
+
+
+class PaymentRequired(ScrydexError):
+    """HTTP 402 on the shared Scrydex account. The run must fail."""
+
+    def __init__(self, stage: str, detail: str = "", credits: int = 0, card_id: str | None = None):
+        self.stage = stage
+        self.detail = detail
+        self.card_id = card_id
+        self.status = 402
+        super().__init__(PAYMENT_REQUIRED_MESSAGE, credits=credits)
+
+
+class CardSkip(ScrydexError):
+    """One card failed with a 5xx the rest of the run can skip."""
+
+    def __init__(self, card_id: str, status: int, credits: int = 0, stage: str = "", detail: str = ""):
+        self.card_id = card_id
+        self.status = status
+        self.stage = stage
+        self.detail = detail
+        message = f"{card_id}: skipped HTTP {status}, credits={credits}"
+        if stage:
+            message += f", stage={stage}"
+        if detail:
+            message += f", provider={detail}"
+        super().__init__(message, credits=credits)
+
+
+def skippable_status(status: int) -> bool:
+    """Transient 5xx skips one card. 402, auth, and rate-limit stay hard."""
+    return 500 <= status <= 599
+
+
+def _plain_text(value) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, bool) or value is None:
+        return ""
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float) and value == int(value):
+        return str(int(value))
+    return ""
+
+
+def extract_provider_error(body, depth: int = 0) -> tuple[str, str]:
+    """Return (code, message) from a JSON error body. Ignores every other field."""
+    if depth > 4:
+        return "", ""
+    if isinstance(body, str):
+        return "", body.strip()
+    if not isinstance(body, dict):
+        return "", ""
+    code = ""
+    for key in ("code", "error_code", "errorCode", "type"):
+        found = _plain_text(body.get(key))
+        if found:
+            code = found
+            break
+    message = ""
+    for key in ("message", "error", "detail", "title", "description"):
+        value = body.get(key)
+        if isinstance(value, dict):
+            nested_code, nested_message = extract_provider_error(value, depth + 1)
+            if nested_code or nested_message:
+                message = nested_message
+                if not code:
+                    code = nested_code
+                break
+            continue
+        found = _plain_text(value)
+        if found:
+            message = found
+            break
+    if not code and not message:
+        nested = body.get("data")
+        if isinstance(nested, dict):
+            return extract_provider_error(nested, depth + 1)
+    return code, message
+
+
+def _redact_secrets(text: str) -> str:
+    for name in ("SCRYDEX_API_KEY", "SCRYDEX_TEAM_ID"):
+        secret = os.environ.get(name, "").strip()
+        if len(secret) < 6 or secret not in text:
+            continue
+        text = text.replace(secret, "[redacted]")
+    text = re.sub(
+        r"(?i)\b(x-api-key|x-team-id|authorization|api[-_ ]?key|bearer)\b\s*[:=]?\s*\S+",
+        r"\1 [redacted]",
+        text,
+    )
+    return text
+
+
+def sanitize_provider_detail(body) -> str:
+    """Short code and message from a provider body. At most 200 characters.
+
+    Only error code/message fields are read. Headers are not accepted.
+    Secret values and header-like tokens are redacted before the cap.
+    """
+    code, message = extract_provider_error(body)
+    code = re.sub(r"\s+", " ", "".join(char if char.isprintable() else " " for char in code)).strip()
+    message = re.sub(r"\s+", " ", "".join(char if char.isprintable() else " " for char in message)).strip()
+    parts = []
+    if code:
+        parts.append(f"code={code}")
+    if message and message != code:
+        parts.append(f"message={message}")
+    text = _redact_secrets(" ".join(parts)).strip()
+    if len(text) > PROVIDER_DETAIL_LIMIT:
+        text = text[:PROVIDER_DETAIL_LIMIT].rstrip()
+    return text
+
+
+def announce_provider_failure(stage: str, status: int, body, card_id: str | None = None) -> str:
+    """Log the endpoint stage and a bounded provider detail. Return the detail."""
+    detail = sanitize_provider_detail(body)
+    subject = f"{stage} for {card_id}" if card_id else stage
+    suffix = detail if detail else "no provider error message"
+    print(f"Scrydex HTTP {status} on {subject}: {suffix}")
+    return detail
 
 
 def map_scrydex_id(catalog_id: str) -> str:
@@ -435,6 +585,11 @@ def fetch_card(card_id: str, headers: dict, now: datetime) -> tuple[dict, bool, 
 
     At most two card lookups. History (3 credits) runs only after a hit.
     Each completed card lookup counts as 1 credit. A history response counts as 3.
+
+    HTTP 402 raises PaymentRequired. Credits already spent are on the
+    exception, and no record is returned. The caller stops the run.
+    A 5xx raises CardSkip. HTTP 401 and 403 still raise ScrydexError.
+    HTTP 429 raises RATE_LIMIT on lookup, or returns stop on price history.
     """
     credits = 0
     payload = None
@@ -469,6 +624,12 @@ def fetch_card(card_id: str, headers: dict, now: datetime) -> tuple[dict, bool, 
                 "missing": True,
                 "lookup_id": map_scrydex_id(card_id),
             }, False, credits
+        if status == 402:
+            detail = announce_provider_failure("card lookup", status, body, card_id)
+            raise PaymentRequired("card lookup", detail=detail, credits=credits, card_id=card_id)
+        if skippable_status(status):
+            detail = announce_provider_failure("card lookup", status, body, card_id)
+            raise CardSkip(card_id, status, credits, stage="card lookup", detail=detail)
         fail(f"Card {card_id} lookup failed with HTTP {status}.")
     if payload is None or used is None:
         fail(f"Card {card_id} lookup failed.")
@@ -484,6 +645,12 @@ def fetch_card(card_id: str, headers: dict, now: datetime) -> tuple[dict, bool, 
             f"Scrydex rejected the credentials (HTTP {h_status}) on price history. "
             "Check SCRYDEX_API_KEY and SCRYDEX_TEAM_ID. The secret values were not printed."
         )
+    if h_status == 402:
+        detail = announce_provider_failure("price history", h_status, history_payload, card_id)
+        raise PaymentRequired("price history", detail=detail, credits=credits, card_id=card_id)
+    if skippable_status(h_status):
+        detail = announce_provider_failure("price history", h_status, history_payload, card_id)
+        raise CardSkip(card_id, h_status, credits, stage="price history", detail=detail)
     stop = False
     history: list[dict] = []
     truncated = False
@@ -571,34 +738,52 @@ def remaining_credits(body: dict) -> int | None:
     return None
 
 
-def read_account_remaining(headers: dict) -> tuple[int | None, int, bool]:
-    """Return (credits left, cost of this read, whether to skip).
+def _usage_unreadable(status: int, body, why: str) -> None:
+    """Fail closed on a non-200 usage response. The call costs 1 credit."""
+    detail = announce_provider_failure("account usage", status, body)
+    extra = f" ({detail})" if detail else ""
+    raise ScrydexError(
+        f"Scrydex account usage returned HTTP {status}{extra}. {why}",
+        credits=1,
+    )
 
-    A 404 means the endpoint is not offered, so the local ledger is enough.
-    A 200 without a remaining-credit field skips the run.
+
+def read_account_remaining(headers: dict) -> tuple[int, int]:
+    """Return (credits left, cost of this read).
+
+    Only HTTP 200 with an object that includes a remaining-credit field
+    establishes the store reserve. Every other response raises. The caller
+    must not request any cards. There is no local-ledger fallback.
+    A response costs 1 credit.
     """
     status, body = request_json(USAGE_API, headers)
-    if status == 404:
-        print("Scrydex account usage is not offered (HTTP 404). Using the local monthly ledger.")
-        return None, 0, False
     if status in (401, 403):
         raise ScrydexError(
             f"Scrydex rejected the credentials (HTTP {status}) on account usage. "
             "Check SCRYDEX_API_KEY and SCRYDEX_TEAM_ID. The secret values were not printed.",
             credits=1,
         )
-    if status != 200 or not isinstance(body, dict):
-        print(f"Scrydex account usage returned HTTP {status}. Using the local monthly ledger.")
-        return None, 0, False
+    if status == 402:
+        detail = announce_provider_failure("account usage", status, body)
+        raise PaymentRequired("account usage", detail=detail, credits=1)
+    refused = "The store reserve could not be read, so no cards were requested."
+    if status != 200:
+        _usage_unreadable(status, body, refused)
+    if not isinstance(body, dict):
+        raise ScrydexError(
+            "Scrydex account usage returned HTTP 200 without a remaining-credit object. "
+            + refused,
+            credits=1,
+        )
     remaining = remaining_credits(body)
     if remaining is None:
-        keys = ",".join(sorted(str(key) for key in body.keys()))
-        print(
-            f"Scrydex account usage did not include a remaining-credit field ({keys}). "
-            "Skipping so the store balance is not guessed."
+        keys = ",".join(sorted(str(key)[:40] for key in list(body.keys())[:20]))[:200]
+        raise ScrydexError(
+            "Scrydex account usage did not include a remaining-credit field "
+            f"({keys}). {refused}",
+            credits=1,
         )
-        return None, 1, True
-    return remaining, 1, False
+    return remaining, 1
 
 
 def sync(now: datetime | None = None) -> int:
@@ -616,7 +801,7 @@ def sync(now: datetime | None = None) -> int:
         print(f"Skipping. BinderHunt has logged {spent_month} credits in {month}, and the cap is {monthly_cap}.")
         return 0
     try:
-        remaining, check_credits, usage_skip = read_account_remaining(headers)
+        remaining, check_credits = read_account_remaining(headers)
     except ScrydexError as exc:
         if exc.credits:
             add_usage(usage, month, exc.credits, now)
@@ -627,10 +812,6 @@ def sync(now: datetime | None = None) -> int:
         add_usage(usage, month, check_credits, now)
         spent_month += check_credits
         write_usage(usage)
-    if usage_skip:
-        print(f"credits this run: {run_credits}")
-        print(f"credits this month ({month}): {spent_month} / {monthly_cap}")
-        return 0
     if remaining is not None and remaining - store_reserve < 2:
         print(
             f"Skipping. Scrydex has {remaining} credits left. "
@@ -670,6 +851,7 @@ def sync(now: datetime | None = None) -> int:
     refreshed = 0
     card_credits = 0
     rate_limited = False
+    skip_streak = 0
     try:
         for card_id in due:
             worst = max_card_credits(card_id)
@@ -685,11 +867,24 @@ def sync(now: datetime | None = None) -> int:
                 card_credits += exc.credits
                 spent_month += exc.credits
                 add_usage(usage, month, exc.credits, now)
+                if isinstance(exc, CardSkip):
+                    skip_streak += 1
+                    print(f"  {exc}")
+                    if skip_streak >= SKIP_STREAK_LIMIT:
+                        raise ScrydexError(
+                            f"Scrydex returned HTTP {exc.status} on {skip_streak} cards in a row "
+                            f"(last card {exc.card_id}, stage {exc.stage or 'card'}). "
+                            "Stopped so this run does not keep requesting. "
+                            "Cards refreshed earlier in this run are kept."
+                        ) from None
+                    time.sleep(REQUEST_PAUSE_SEC)
+                    continue
                 if str(exc) == "RATE_LIMIT":
                     rate_limited = True
                     print("Scrydex returned HTTP 429. Stopped so this run does not spend more credits.")
                     break
                 raise
+            skip_streak = 0
             card_credits += credits
             spent_month += credits
             add_usage(usage, month, credits, now)

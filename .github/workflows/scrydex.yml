@@ -60,9 +60,15 @@ jobs:
           SCRYDEX_RUN_CARD_CAP: ${{ vars.SCRYDEX_RUN_CARD_CAP || '100' }}
         run: python3 scripts/sync_scrydex.py
 
+      # A 402 or three card 5xx responses exit nonzero only after scrydex.json
+      # and the credit ledger are written. always() still commits those files
+      # when they changed. The failed refresh step keeps the job red.
+      # !cancelled() skips the push when the run was cancelled mid-request.
+      # Pages deploy below still requires a green refresh, so this red run
+      # saves the files and the next successful run publishes them.
       - name: Commit cache
         id: commit
-        if: github.ref == 'refs/heads/main'
+        if: "${{ always() && !cancelled() && github.ref == 'refs/heads/main' }}"
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

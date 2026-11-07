@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+import io
 import json
 import os
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -258,6 +260,156 @@ class IdMapTests(unittest.TestCase):
         self.assertEqual(str(caught.exception), "RATE_LIMIT")
         self.assertEqual(len(calls), 1)
 
+    def test_skippable_status_is_5xx_only(self):
+        for status in (500, 503, 599):
+            self.assertTrue(sync.skippable_status(status), status)
+        for status in (200, 400, 401, 402, 403, 404, 429, 499):
+            self.assertFalse(sync.skippable_status(status), status)
+
+    def test_provider_detail_is_bounded_and_drops_headers(self):
+        secret = "super-secret-value"
+        team = "team-secret-value"
+        old_key = os.environ.get("SCRYDEX_API_KEY")
+        old_team = os.environ.get("SCRYDEX_TEAM_ID")
+        os.environ["SCRYDEX_API_KEY"] = secret
+        os.environ["SCRYDEX_TEAM_ID"] = team
+        try:
+            body = {
+                "code": "payment_required",
+                "message": "account " + secret + " down\n" + ("x" * 500),
+                "Authorization": "Bearer " + team,
+                "X-Api-Key": secret,
+            }
+            detail = sync.sanitize_provider_detail(body)
+        finally:
+            if old_key is None:
+                os.environ.pop("SCRYDEX_API_KEY", None)
+            else:
+                os.environ["SCRYDEX_API_KEY"] = old_key
+            if old_team is None:
+                os.environ.pop("SCRYDEX_TEAM_ID", None)
+            else:
+                os.environ["SCRYDEX_TEAM_ID"] = old_team
+        self.assertLessEqual(len(detail), 200)
+        self.assertNotIn(secret, detail)
+        self.assertNotIn(team, detail)
+        self.assertNotIn("Authorization", detail)
+        self.assertNotIn("Bearer", detail)
+        self.assertNotIn("X-Api-Key", detail)
+        self.assertNotIn("\n", detail)
+        self.assertIn("code=payment_required", detail)
+        self.assertIn("[redacted]", detail)
+        self.assertNotIn("x" * 250, detail)
+        nested = sync.sanitize_provider_detail({"error": {"code": "E1", "message": "nope"}})
+        self.assertEqual(nested, "code=E1 message=nope")
+
+    def _fetch(self, card_id, fake):
+        original = sync.request_json
+        original_sleep = sync.time.sleep
+        sync.request_json = fake
+        sync.time.sleep = lambda *args, **kwargs: None
+        try:
+            return sync.fetch_card(card_id, {}, datetime(2026, 10, 16, tzinfo=timezone.utc))
+        finally:
+            sync.request_json = original
+            sync.time.sleep = original_sleep
+
+    def test_fetch_402_is_a_hard_stop_without_a_fallback(self):
+        calls = []
+
+        def fake(url, headers):
+            calls.append(url)
+            return 402, {"error": "payment required", "Authorization": "Bearer sekrit"}
+
+        out = io.StringIO()
+        with redirect_stdout(out):
+            with self.assertRaises(sync.PaymentRequired) as caught:
+                self._fetch("ex11-3", fake)
+        self.assertNotIsInstance(caught.exception, sync.CardSkip)
+        self.assertIsInstance(caught.exception, sync.ScrydexError)
+        self.assertEqual(caught.exception.card_id, "ex11-3")
+        self.assertEqual(caught.exception.stage, "card lookup")
+        self.assertEqual(caught.exception.status, 402)
+        self.assertEqual(caught.exception.credits, 1)
+        self.assertEqual(str(caught.exception), sync.PAYMENT_REQUIRED_MESSAGE)
+        self.assertIn("message=payment required", caught.exception.detail)
+        self.assertLessEqual(len(caught.exception.detail), 200)
+        self.assertEqual(len(calls), 1)
+        logged = out.getvalue()
+        self.assertIn("Scrydex HTTP 402 on card lookup for ex11-3:", logged)
+        self.assertNotIn("Authorization", logged)
+        self.assertNotIn("Bearer", logged)
+        self.assertNotIn("sekrit", logged)
+
+    def test_fetch_402_after_a_404_does_not_write_a_miss(self):
+        calls = []
+
+        def fake(url, headers):
+            calls.append(url)
+            if "/sv3-223?" in url:
+                return 404, {}
+            return 402, {}
+
+        with self.assertRaises(sync.PaymentRequired) as caught:
+            self._fetch("sv03-223", fake)
+        self.assertNotIsInstance(caught.exception, sync.CardSkip)
+        self.assertEqual(caught.exception.status, 402)
+        self.assertEqual(caught.exception.credits, 2)
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(any("price_history" in url for url in calls))
+
+    def test_fetch_price_history_402_is_a_hard_stop(self):
+        def fake(url, headers):
+            if "price_history" in url:
+                return 402, {"message": "history blocked"}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        out = io.StringIO()
+        with redirect_stdout(out):
+            with self.assertRaises(sync.PaymentRequired) as caught:
+                self._fetch("ex11-3", fake)
+        self.assertEqual(caught.exception.stage, "price history")
+        self.assertEqual(caught.exception.status, 402)
+        self.assertEqual(caught.exception.credits, 4)
+        self.assertIn("message=history blocked", caught.exception.detail)
+        self.assertIn("Scrydex HTTP 402 on price history for ex11-3:", out.getvalue())
+
+    def test_fetch_soft_skips_http_500(self):
+        calls = []
+
+        def fake(url, headers):
+            calls.append(url)
+            return 503, {}
+
+        with self.assertRaises(sync.CardSkip) as caught:
+            self._fetch("sv03-223", fake)
+        self.assertEqual(caught.exception.status, 503)
+        self.assertEqual(caught.exception.credits, 1)
+        self.assertEqual(len(calls), 1)
+
+    def test_fetch_auth_errors_still_raise(self):
+        for status in (401, 403):
+            def fake(url, headers, status=status):
+                return status, {}
+
+            with self.assertRaises(sync.ScrydexError) as caught:
+                self._fetch("ex11-3", fake)
+            self.assertNotIsInstance(caught.exception, sync.CardSkip)
+            self.assertIn(f"HTTP {status}", str(caught.exception))
+            self.assertEqual(caught.exception.credits, 1)
+
+    def test_price_history_auth_errors_still_raise(self):
+        def fake(url, headers):
+            if "price_history" in url:
+                return 403, {}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        with self.assertRaises(sync.ScrydexError) as caught:
+            self._fetch("ex11-3", fake)
+        self.assertNotIsInstance(caught.exception, sync.CardSkip)
+        self.assertIn("HTTP 403", str(caught.exception))
+        self.assertEqual(caught.exception.credits, 4)
+
 
 class BudgetTests(unittest.TestCase):
     def setUp(self):
@@ -343,6 +495,451 @@ class BudgetTests(unittest.TestCase):
         self.assertEqual(json.loads(self.usage.read_text())["months"]["2026-10"]["credits"], 5)
         self.assertIn("base1-4", json.loads(self.cache.read_text())["cards"])
         self.assertNotIn("sv03-223", json.loads(self.cache.read_text())["cards"])
+
+    def _sync(self, fake, when=None):
+        sync.request_json = fake
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = sync.sync(when or datetime(2026, 10, 17, tzinfo=timezone.utc))
+        return code, buf.getvalue()
+
+    def _main(self, fake):
+        sync.request_json = fake
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = sync.main()
+        return code, out.getvalue(), err.getvalue()
+
+    def _ledger(self) -> int:
+        if not self.usage.exists():
+            return 0
+        data = json.loads(self.usage.read_text(encoding="utf-8"))
+        total = 0
+        for row in data.get("months", {}).values():
+            if isinstance(row, dict) and isinstance(row.get("credits"), int):
+                total += row["credits"]
+        return total
+
+    def _cards(self) -> dict:
+        return json.loads(self.cache.read_text(encoding="utf-8"))["cards"]
+
+    def test_402_stops_on_the_first_response_and_fails(self):
+        self.seed.write_text(
+            "A base1-4\nA ex11-1\nA ex11-2\nA ex11-3\nA swsh7-215\n",
+            encoding="utf-8",
+        )
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-" in url:
+                return 402, {"message": "payment required"}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        code, out, err = self._main(fake)
+        self.assertEqual(code, 1)
+        self.assertIn(f"::error::{sync.PAYMENT_REQUIRED_MESSAGE}", err)
+        self.assertIn("Scrydex HTTP 402 on card lookup for ex11-1:", out)
+        self.assertIn("message=payment required", out)
+        self.assertTrue(any("/ex11-1" in url for url in self.calls))
+        self.assertFalse(any("/ex11-2" in url for url in self.calls))
+        self.assertFalse(any("/ex11-3" in url for url in self.calls))
+        self.assertFalse(any("/swsh7-215" in url for url in self.calls))
+        self.assertEqual(list(self._cards()), ["base1-4"])
+        self.assertEqual(self._ledger(), 6)
+        self.assertNotIn("super-secret-value", out + err)
+        self.assertNotIn("team-secret-value", out + err)
+
+    def test_opening_402_fails_and_records_credits(self):
+        self.seed.write_text("A ex11-1\nA ex11-2\nA ex11-3\nA base1-4\n", encoding="utf-8")
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-" in url:
+                return 402, {"message": "payment required"}
+            raise AssertionError(url)
+
+        code, out, err = self._main(fake)
+        self.assertEqual(code, 1)
+        self.assertIn(f"::error::{sync.PAYMENT_REQUIRED_MESSAGE}", err)
+        self.assertIn("card lookup for ex11-1", out)
+        self.assertFalse(self.cache.exists())
+        self.assertFalse(any("/ex11-2" in url for url in self.calls))
+        self.assertFalse(any("/base1-4" in url for url in self.calls))
+        self.assertEqual(self._ledger(), 2)
+        self.assertNotIn("super-secret-value", self.usage.read_text(encoding="utf-8"))
+
+    def test_first_card_402_fails_the_job(self):
+        self.seed.write_text("A ex11-3\nA base1-4\n", encoding="utf-8")
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-3" in url:
+                return 402, {"code": "payment_required", "message": "payment required"}
+            raise AssertionError(url)
+
+        code, out, err = self._main(fake)
+        self.assertEqual(code, 1)
+        self.assertIn(f"::error::{sync.PAYMENT_REQUIRED_MESSAGE}", err)
+        self.assertIn("Scrydex HTTP 402 on card lookup for ex11-3: code=payment_required message=payment required", out)
+        self.assertFalse(self.cache.exists())
+        self.assertFalse(any("/base1-4" in url for url in self.calls))
+        self.assertEqual(self.calls, [sync.USAGE_API, f"{sync.API}/ex11-3?include=prices,pop_reports"])
+        self.assertEqual(self._ledger(), 2)
+
+    def test_partial_cache_and_ledger_are_written_on_402(self):
+        self.seed.write_text("A base1-4\nA ex11-3\nA swsh7-215\n", encoding="utf-8")
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-3" in url:
+                return 402, {"error": "payment required"}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        code, out, err = self._main(fake)
+        self.assertEqual(code, 1)
+        self.assertIn(f"::error::{sync.PAYMENT_REQUIRED_MESSAGE}", err)
+        self.assertIn("card lookup for ex11-3", out)
+        self.assertIn("message=payment required", out)
+        cards = self._cards()
+        self.assertIn("base1-4", cards)
+        self.assertNotIn("ex11-3", cards)
+        self.assertNotIn("swsh7-215", cards)
+        self.assertFalse(any("/swsh7-215" in url for url in self.calls))
+        self.assertEqual(self._ledger(), 6)
+        self.assertNotIn("super-secret-value", out + err)
+        self.assertNotIn("super-secret-value", self.cache.read_text(encoding="utf-8"))
+        self.assertNotIn("super-secret-value", self.usage.read_text(encoding="utf-8"))
+
+    def test_main_fails_when_a_later_card_is_402(self):
+        self.seed.write_text("A base1-4\nA ex11-3\n", encoding="utf-8")
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-3" in url:
+                return 402, {}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        code, out, err = self._main(fake)
+        self.assertEqual(code, 1)
+        self.assertIn(f"::error::{sync.PAYMENT_REQUIRED_MESSAGE}", err)
+        self.assertIn(sync.PAYMENT_REQUIRED_MESSAGE, err)
+        self.assertIn("no provider error message", out)
+        cards = self._cards()
+        self.assertIn("base1-4", cards)
+        self.assertNotIn("ex11-3", cards)
+        self.assertGreaterEqual(self._ledger(), 5)
+
+    def test_usage_402_fails_closed_without_card_requests(self):
+        secret = os.environ["SCRYDEX_API_KEY"]
+        team = os.environ["SCRYDEX_TEAM_ID"]
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 402, {
+                    "code": "payment_required",
+                    "message": "account " + secret + " inactive " + ("y" * 300),
+                    "X-Api-Key": secret,
+                    "Authorization": "Bearer " + team,
+                }
+            raise AssertionError(url)
+
+        code, out, err = self._main(fake)
+        self.assertEqual(code, 1)
+        self.assertEqual(self.calls, [sync.USAGE_API])
+        self.assertFalse(self.cache.exists())
+        self.assertIn(f"::error::{sync.PAYMENT_REQUIRED_MESSAGE}", err)
+        self.assertIn("Scrydex HTTP 402 on account usage:", out)
+        detail = out.split("Scrydex HTTP 402 on account usage: ", 1)[1].splitlines()[0]
+        self.assertLessEqual(len(detail), 200)
+        self.assertIn("code=payment_required", detail)
+        self.assertIn("[redacted]", detail)
+        self.assertNotIn(secret, out + err + detail)
+        self.assertNotIn(team, out + err + detail)
+        self.assertNotIn("Authorization", out + err)
+        self.assertNotIn("Bearer", out + err)
+        self.assertNotIn("X-Api-Key", out + err)
+        self.assertNotIn("y" * 250, out + err)
+        self.assertEqual(self._ledger(), 1)
+        self.assertNotIn(secret, self.usage.read_text(encoding="utf-8"))
+
+    def test_usage_5xx_fails_closed_without_card_requests(self):
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 503, {"error": {"code": "upstream", "message": "unavailable"}}
+            raise AssertionError(url)
+
+        code, out, err = self._main(fake)
+        self.assertEqual(code, 1)
+        self.assertEqual(self.calls, [sync.USAGE_API])
+        self.assertFalse(self.cache.exists())
+        self.assertIn("::error::", err)
+        self.assertIn("HTTP 503", err)
+        self.assertIn("no cards were requested", err)
+        self.assertIn("account usage", out)
+        self.assertIn("code=upstream", out)
+        self.assertIn("message=unavailable", out)
+        self.assertIn("code=upstream", err)
+        self.assertEqual(self._ledger(), 1)
+        self.assertNotIn("super-secret-value", out + err)
+        self.assertNotIn("team-secret-value", out + err)
+
+    def test_usage_missing_balance_fails_closed(self):
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"plan": "growth"}
+            raise AssertionError(url)
+
+        code, _out, err = self._main(fake)
+        self.assertEqual(code, 1)
+        self.assertEqual(self.calls, [sync.USAGE_API])
+        self.assertFalse(self.cache.exists())
+        self.assertIn("::error::", err)
+        self.assertIn("remaining-credit field", err)
+        self.assertIn("no cards were requested", err)
+        self.assertIn("plan", err)
+        self.assertNotIn("growth", err)
+        self.assertEqual(self._ledger(), 1)
+
+    def test_zero_credit_usage_makes_no_card_requests(self):
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 0}
+            raise AssertionError(url)
+
+        code, log = self._sync(fake)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.calls, [sync.USAGE_API])
+        self.assertFalse(self.cache.exists())
+        self.assertIn("Scrydex has 0 credits left", log)
+        self.assertIn("15000", log)
+        self.assertEqual(self._ledger(), 1)
+
+    def _usage_response_fails_closed(self, status: int, raw: bytes, needle: str):
+        """Drive the real response parser. No live Scrydex call."""
+        calls = []
+        original = sync.urllib.request.urlopen
+
+        class Response:
+            def __init__(self):
+                self.status = status
+
+            def read(self):
+                return raw
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        def fake_open(request, timeout=30):
+            calls.append(request.full_url)
+            if not request.full_url.endswith("/usage"):
+                raise AssertionError(request.full_url)
+            if status >= 400:
+                raise sync.urllib.error.HTTPError(
+                    request.full_url, status, "error", None, io.BytesIO(raw)
+                )
+            return Response()
+
+        sync.urllib.request.urlopen = fake_open
+        try:
+            out, err = io.StringIO(), io.StringIO()
+            with redirect_stdout(out), redirect_stderr(err):
+                code = sync.main()
+        finally:
+            sync.urllib.request.urlopen = original
+        logged = out.getvalue() + err.getvalue()
+        self.assertEqual(code, 1)
+        self.assertEqual(calls, [sync.USAGE_API])
+        self.assertFalse(any("/cards/" in url for url in calls))
+        self.assertFalse(self.cache.exists())
+        self.assertIn("::error::", err.getvalue())
+        self.assertIn(needle, err.getvalue())
+        self.assertIn("no cards were requested", err.getvalue())
+        self.assertEqual(self._ledger(), 1)
+        self.assertNotIn("super-secret-value", logged)
+        self.assertNotIn("team-secret-value", logged)
+
+    def test_usage_200_empty_body_fails_closed(self):
+        self._usage_response_fails_closed(200, b"", "HTTP 200")
+
+    def test_usage_200_null_fails_closed(self):
+        self._usage_response_fails_closed(200, b"null", "HTTP 200")
+
+    def test_usage_200_array_fails_closed(self):
+        self._usage_response_fails_closed(200, b"[]", "HTTP 200")
+
+    def test_usage_200_number_fails_closed(self):
+        self._usage_response_fails_closed(200, b"12", "HTTP 200")
+
+    def test_usage_429_fails_closed(self):
+        self._usage_response_fails_closed(429, b'{"message":"slow down"}', "HTTP 429")
+
+    def test_usage_400_fails_closed(self):
+        self._usage_response_fails_closed(400, b'{"message":"bad request"}', "HTTP 400")
+
+    def test_usage_404_fails_closed(self):
+        self._usage_response_fails_closed(404, b"{}", "HTTP 404")
+
+    def test_http_500_is_a_per_card_skip(self):
+        self.seed.write_text("A base1-4\nA ex11-3\nA swsh7-215\n", encoding="utf-8")
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-3" in url:
+                return 500, {}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        code, log = self._sync(fake)
+        self.assertEqual(code, 0)
+        self.assertIn("ex11-3: skipped HTTP 500, credits=1", log)
+        cards = json.loads(self.cache.read_text(encoding="utf-8"))["cards"]
+        self.assertIn("base1-4", cards)
+        self.assertIn("swsh7-215", cards)
+        self.assertNotIn("ex11-3", cards)
+
+    def test_http_401_still_fails_the_run(self):
+        self.seed.write_text("A base1-4\nA ex11-3\n", encoding="utf-8")
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-3" in url:
+                return 401, {}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        sync.request_json = fake
+        with redirect_stdout(io.StringIO()):
+            with self.assertRaises(sync.ScrydexError) as caught:
+                sync.sync(datetime(2026, 10, 17, tzinfo=timezone.utc))
+        self.assertNotIsInstance(caught.exception, sync.CardSkip)
+        self.assertIn("HTTP 401", str(caught.exception))
+        cards = json.loads(self.cache.read_text(encoding="utf-8"))["cards"]
+        self.assertIn("base1-4", cards)
+        self.assertNotIn("ex11-3", cards)
+        self.assertEqual(json.loads(self.usage.read_text(encoding="utf-8"))["months"]["2026-10"]["credits"], 6)
+
+    def test_price_history_402_fails_and_keeps_earlier_cards(self):
+        self.seed.write_text("A base1-4\nA ex11-3\nA swsh7-215\n", encoding="utf-8")
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-3" in url and "price_history" in url:
+                return 402, {"message": "history blocked"}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        code, out, err = self._main(fake)
+        self.assertEqual(code, 1)
+        self.assertIn(f"::error::{sync.PAYMENT_REQUIRED_MESSAGE}", err)
+        self.assertIn("Scrydex HTTP 402 on price history for ex11-3:", out)
+        self.assertIn("message=history blocked", out)
+        cards = self._cards()
+        self.assertIn("base1-4", cards)
+        self.assertNotIn("ex11-3", cards)
+        self.assertNotIn("swsh7-215", cards)
+        self.assertFalse(any("/swsh7-215" in url for url in self.calls))
+        self.assertEqual(self._ledger(), 9)
+
+    def test_three_5xx_in_a_row_fails_and_keeps_earlier_cards(self):
+        self.seed.write_text(
+            "A base1-4\nA ex11-1\nA ex11-2\nA ex11-3\nA swsh7-215\n",
+            encoding="utf-8",
+        )
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-" in url:
+                return 503, {"error": {"code": "upstream", "message": "bad gateway"}}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        code, out, err = self._main(fake)
+        self.assertEqual(code, 1)
+        self.assertIn("::error::", err)
+        self.assertIn("HTTP 503 on 3 cards in a row", err)
+        self.assertIn("stage card lookup", err)
+        self.assertIn("Scrydex HTTP 503 on card lookup for ex11-1:", out)
+        self.assertIn("code=upstream", out)
+        self.assertIn("message=bad gateway", out)
+        self.assertIn("ex11-3: skipped HTTP 503, credits=1, stage=card lookup", out)
+        self.assertTrue(any("/ex11-3" in url for url in self.calls))
+        self.assertFalse(any("/swsh7-215" in url for url in self.calls))
+        self.assertEqual(list(self._cards()), ["base1-4"])
+        self.assertEqual(self._ledger(), 8)
+        self.assertNotIn("super-secret-value", out + err)
+
+    def test_two_5xx_do_not_fail_the_run(self):
+        self.seed.write_text("A ex11-1\nA ex11-2\nA base1-4\n", encoding="utf-8")
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-" in url:
+                return 500, {"message": "temp"}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        code, out, err = self._main(fake)
+        self.assertEqual(code, 0)
+        self.assertEqual(err, "")
+        self.assertIn("stage=card lookup", out)
+        self.assertIn("message=temp", out)
+        cards = self._cards()
+        self.assertIn("base1-4", cards)
+        self.assertNotIn("ex11-1", cards)
+        self.assertNotIn("ex11-2", cards)
+
+
+class WorkflowGuardTests(unittest.TestCase):
+    def test_commit_runs_after_a_failed_refresh(self):
+        text = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "scrydex.yml").read_text(encoding="utf-8")
+        self.assertIn("always() && !cancelled()", text)
+        self.assertNotIn("continue-on-error", text)
+        self.assertIn("git diff --cached --quiet", text)
+        self.assertIn("data/scrydex.json data/scrydex-usage.json", text)
+        self.assertIn("SCRYDEX_MONTHLY_CAP: ${{ vars.SCRYDEX_MONTHLY_CAP || '15000' }}", text)
+        self.assertIn("SCRYDEX_STORE_RESERVE: ${{ vars.SCRYDEX_STORE_RESERVE || '15000' }}", text)
+        sync_text = Path(__file__).resolve().with_name("sync_scrydex.py").read_text(encoding="utf-8")
+        self.assertIn("MONTHLY_CAP = 15000", sync_text)
+        self.assertIn("STORE_RESERVE = 15000", sync_text)
+        self.assertIn(sync.PAYMENT_REQUIRED_MESSAGE, sync_text)
 
 
 class CacheWriteTests(unittest.TestCase):
