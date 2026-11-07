@@ -37,10 +37,12 @@ workflow commits those files and the job stays red. The annotation is:
 A 5xx on one card is skipped. No record is written for that id, and the
 credits still count. Three 5xx responses in a row stop the loop and the
 process exits nonzero, after the partial cache and ledger are written.
-The account usage read must establish the store reserve. A 402, a 5xx,
-or a body with no remaining-credit field fails the run before any card
-request. It does not fall back to the local ledger. HTTP 401 and 403
-still abort the run. HTTP 429 still stops it.
+The account usage read must establish the store reserve. Anything other
+than HTTP 200 with a remaining-credit field fails the run before any
+card request. That includes an empty body, JSON null, a non-object,
+and every status other than 200. There is no fallback to the local
+ledger. The usage read is recorded as 1 credit. HTTP 401 and 403 still
+abort the run. HTTP 429 on a card still stops that run.
 """
 
 from __future__ import annotations
@@ -736,20 +738,25 @@ def remaining_credits(body: dict) -> int | None:
     return None
 
 
-def read_account_remaining(headers: dict) -> tuple[int | None, int]:
+def _usage_unreadable(status: int, body, why: str) -> None:
+    """Fail closed on a non-200 usage response. The call costs 1 credit."""
+    detail = announce_provider_failure("account usage", status, body)
+    extra = f" ({detail})" if detail else ""
+    raise ScrydexError(
+        f"Scrydex account usage returned HTTP {status}{extra}. {why}",
+        credits=1,
+    )
+
+
+def read_account_remaining(headers: dict) -> tuple[int, int]:
     """Return (credits left, cost of this read).
 
-    A 404 means the endpoint is not offered, so the local ledger is enough
-    and the result is (None, 0).
-
-    HTTP 402, a 5xx, or a 200 without a remaining-credit field cannot
-    establish the store reserve. Those raise. The caller must not request
-    any cards and must not fall back to the local ledger.
+    Only HTTP 200 with an object that includes a remaining-credit field
+    establishes the store reserve. Every other response raises. The caller
+    must not request any cards. There is no local-ledger fallback.
+    A response costs 1 credit.
     """
     status, body = request_json(USAGE_API, headers)
-    if status == 404:
-        print("Scrydex account usage is not offered (HTTP 404). Using the local monthly ledger.")
-        return None, 0
     if status in (401, 403):
         raise ScrydexError(
             f"Scrydex rejected the credentials (HTTP {status}) on account usage. "
@@ -759,23 +766,21 @@ def read_account_remaining(headers: dict) -> tuple[int | None, int]:
     if status == 402:
         detail = announce_provider_failure("account usage", status, body)
         raise PaymentRequired("account usage", detail=detail, credits=1)
-    if 500 <= status <= 599:
-        detail = announce_provider_failure("account usage", status, body)
-        extra = f" ({detail})" if detail else ""
+    refused = "The store reserve could not be read, so no cards were requested."
+    if status != 200:
+        _usage_unreadable(status, body, refused)
+    if not isinstance(body, dict):
         raise ScrydexError(
-            f"Scrydex account usage returned HTTP {status}{extra}. "
-            "The store reserve could not be read, so no cards were requested.",
+            "Scrydex account usage returned HTTP 200 without a remaining-credit object. "
+            + refused,
             credits=1,
         )
-    if status != 200 or not isinstance(body, dict):
-        print(f"Scrydex account usage returned HTTP {status}. Using the local monthly ledger.")
-        return None, 0
     remaining = remaining_credits(body)
     if remaining is None:
         keys = ",".join(sorted(str(key)[:40] for key in list(body.keys())[:20]))[:200]
         raise ScrydexError(
             "Scrydex account usage did not include a remaining-credit field "
-            f"({keys}). The store reserve could not be read, so no cards were requested.",
+            f"({keys}). {refused}",
             credits=1,
         )
     return remaining, 1

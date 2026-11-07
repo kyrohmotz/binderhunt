@@ -734,23 +734,73 @@ class BudgetTests(unittest.TestCase):
         self.assertIn("15000", log)
         self.assertEqual(self._ledger(), 1)
 
-    def test_usage_404_still_uses_the_local_ledger(self):
-        os.environ["SCRYDEX_RUN_CARD_CAP"] = "1"
+    def _usage_response_fails_closed(self, status: int, raw: bytes, needle: str):
+        """Drive the real response parser. No live Scrydex call."""
+        calls = []
+        original = sync.urllib.request.urlopen
 
-        def fake(url, headers):
-            self.calls.append(url)
-            if url.endswith("/usage"):
-                return 404, {}
-            if "price_history" in url:
-                return 200, {"count": 0, "total_count": 0, "data": []}
-            return 200, {"data": {"name": "Card", "variants": []}}
+        class Response:
+            def __init__(self):
+                self.status = status
 
-        code, log = self._sync(fake)
-        self.assertEqual(code, 0)
-        self.assertIn("HTTP 404", log)
-        self.assertIn("local monthly ledger", log)
-        self.assertEqual(sum("/cards/" in url for url in self.calls), 2)
-        self.assertEqual(self._ledger(), 4)
+            def read(self):
+                return raw
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        def fake_open(request, timeout=30):
+            calls.append(request.full_url)
+            if not request.full_url.endswith("/usage"):
+                raise AssertionError(request.full_url)
+            if status >= 400:
+                raise sync.urllib.error.HTTPError(
+                    request.full_url, status, "error", None, io.BytesIO(raw)
+                )
+            return Response()
+
+        sync.urllib.request.urlopen = fake_open
+        try:
+            out, err = io.StringIO(), io.StringIO()
+            with redirect_stdout(out), redirect_stderr(err):
+                code = sync.main()
+        finally:
+            sync.urllib.request.urlopen = original
+        logged = out.getvalue() + err.getvalue()
+        self.assertEqual(code, 1)
+        self.assertEqual(calls, [sync.USAGE_API])
+        self.assertFalse(any("/cards/" in url for url in calls))
+        self.assertFalse(self.cache.exists())
+        self.assertIn("::error::", err.getvalue())
+        self.assertIn(needle, err.getvalue())
+        self.assertIn("no cards were requested", err.getvalue())
+        self.assertEqual(self._ledger(), 1)
+        self.assertNotIn("super-secret-value", logged)
+        self.assertNotIn("team-secret-value", logged)
+
+    def test_usage_200_empty_body_fails_closed(self):
+        self._usage_response_fails_closed(200, b"", "HTTP 200")
+
+    def test_usage_200_null_fails_closed(self):
+        self._usage_response_fails_closed(200, b"null", "HTTP 200")
+
+    def test_usage_200_array_fails_closed(self):
+        self._usage_response_fails_closed(200, b"[]", "HTTP 200")
+
+    def test_usage_200_number_fails_closed(self):
+        self._usage_response_fails_closed(200, b"12", "HTTP 200")
+
+    def test_usage_429_fails_closed(self):
+        self._usage_response_fails_closed(429, b'{"message":"slow down"}', "HTTP 429")
+
+    def test_usage_400_fails_closed(self):
+        self._usage_response_fails_closed(400, b'{"message":"bad request"}', "HTTP 400")
+
+    def test_usage_404_fails_closed(self):
+        self._usage_response_fails_closed(404, b"{}", "HTTP 404")
 
     def test_http_500_is_a_per_card_skip(self):
         self.seed.write_text("A base1-4\nA ex11-3\nA swsh7-215\n", encoding="utf-8")
