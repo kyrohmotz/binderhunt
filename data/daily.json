@@ -13857,13 +13857,23 @@
     },
     "2026-11-08": {
       "id": "dp1-6",
-      "price": 44.81,
+      "price": 44.77,
       "variant": "reverse-holofoil",
       "printing": "Reverse Holofoil",
       "alts": 2,
       "source": "tcgplayer",
       "eur": 17.17,
-      "at": "2026-11-06T15:41:03Z"
+      "at": "2026-11-07T14:40:51Z"
+    },
+    "2026-11-09": {
+      "id": "sm1-147",
+      "price": 41.64,
+      "variant": "holofoil",
+      "printing": "Holofoil",
+      "alts": 1,
+      "source": "tcgplayer",
+      "eur": 36.78,
+      "at": "2026-11-07T14:40:51Z"
     }
   }
 }
