@@ -26,6 +26,12 @@ chase seed has room. Everything else keeps the TCGdex catalog price.
 Catalog ids from TCGdex are mapped before the request (sv03-223 becomes
 sv3-223). The record is stored under the catalog id. Secrets are read from
 the environment and sent only as headers. They are never printed.
+
+HTTP 402 and transient 5xx on one card are skipped. Credits for that
+attempt still count, no record is written for that id, and the run
+continues. Three such skips in a row stop the card loop early. The
+process still exits 0, so a partial cache and the usage ledger can be
+committed. HTTP 401 and 403 still abort the run. HTTP 429 still stops it.
 """
 
 from __future__ import annotations
@@ -59,6 +65,9 @@ DEMAND_HOURS = 24 * 90
 DEMAND_MIN = 2
 MISSING_HOURS = 24 * 30
 REQUEST_PAUSE_SEC = 0.35
+# One 402 or 5xx skips that card. This many in a row ends the loop early
+# so a payment failure or outage does not walk the rest of the due list.
+SKIP_STREAK_LIMIT = 3
 # TCGdex zero-pads set numbers and writes special sets as ".5".
 # Scrydex uses the Pokémon TCG API form: sv03 -> sv3, sv03.5 -> sv3pt5, me02 -> me2.
 _SET_RE = re.compile(r"^([a-z]+)(\d+)(\.5)?$")
@@ -69,6 +78,23 @@ class ScrydexError(Exception):
     def __init__(self, message: str, credits: int = 0):
         super().__init__(message)
         self.credits = credits
+
+
+class CardSkip(ScrydexError):
+    """One card failed with a status the rest of the run can skip."""
+
+    def __init__(self, card_id: str, status: int, credits: int = 0):
+        self.card_id = card_id
+        self.status = status
+        super().__init__(
+            f"{card_id}: skipped HTTP {status}, credits={credits}",
+            credits=credits,
+        )
+
+
+def skippable_status(status: int) -> bool:
+    """402 and transient 5xx skip one card. Auth and rate-limit stay hard."""
+    return status == 402 or 500 <= status <= 599
 
 
 def map_scrydex_id(catalog_id: str) -> str:
@@ -435,6 +461,11 @@ def fetch_card(card_id: str, headers: dict, now: datetime) -> tuple[dict, bool, 
 
     At most two card lookups. History (3 credits) runs only after a hit.
     Each completed card lookup counts as 1 credit. A history response counts as 3.
+
+    HTTP 402 and 5xx raise CardSkip. Credits already spent are on the
+    exception, and no record is returned. HTTP 401 and 403 still raise
+    ScrydexError. HTTP 429 raises RATE_LIMIT on lookup, or returns stop
+    on price history.
     """
     credits = 0
     payload = None
@@ -469,6 +500,8 @@ def fetch_card(card_id: str, headers: dict, now: datetime) -> tuple[dict, bool, 
                 "missing": True,
                 "lookup_id": map_scrydex_id(card_id),
             }, False, credits
+        if skippable_status(status):
+            raise CardSkip(card_id, status, credits)
         fail(f"Card {card_id} lookup failed with HTTP {status}.")
     if payload is None or used is None:
         fail(f"Card {card_id} lookup failed.")
@@ -484,6 +517,8 @@ def fetch_card(card_id: str, headers: dict, now: datetime) -> tuple[dict, bool, 
             f"Scrydex rejected the credentials (HTTP {h_status}) on price history. "
             "Check SCRYDEX_API_KEY and SCRYDEX_TEAM_ID. The secret values were not printed."
         )
+    if skippable_status(h_status):
+        raise CardSkip(card_id, h_status, credits)
     stop = False
     history: list[dict] = []
     truncated = False
@@ -670,6 +705,7 @@ def sync(now: datetime | None = None) -> int:
     refreshed = 0
     card_credits = 0
     rate_limited = False
+    skip_streak = 0
     try:
         for card_id in due:
             worst = max_card_credits(card_id)
@@ -685,11 +721,23 @@ def sync(now: datetime | None = None) -> int:
                 card_credits += exc.credits
                 spent_month += exc.credits
                 add_usage(usage, month, exc.credits, now)
+                if isinstance(exc, CardSkip):
+                    skip_streak += 1
+                    print(f"  {exc}")
+                    if skip_streak >= SKIP_STREAK_LIMIT:
+                        print(
+                            f"Stopping after {skip_streak} cards in a row were skipped "
+                            f"(last HTTP {exc.status}). Cards refreshed earlier in this run are kept."
+                        )
+                        break
+                    time.sleep(REQUEST_PAUSE_SEC)
+                    continue
                 if str(exc) == "RATE_LIMIT":
                     rate_limited = True
                     print("Scrydex returned HTTP 429. Stopped so this run does not spend more credits.")
                     break
                 raise
+            skip_streak = 0
             card_credits += credits
             spent_month += credits
             add_usage(usage, month, credits, now)

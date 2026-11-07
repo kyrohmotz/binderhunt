@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+import io
 import json
 import os
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -258,6 +260,102 @@ class IdMapTests(unittest.TestCase):
         self.assertEqual(str(caught.exception), "RATE_LIMIT")
         self.assertEqual(len(calls), 1)
 
+    def test_skippable_status_is_402_and_5xx_only(self):
+        for status in (402, 500, 503, 599):
+            self.assertTrue(sync.skippable_status(status), status)
+        for status in (200, 400, 401, 403, 404, 429, 499):
+            self.assertFalse(sync.skippable_status(status), status)
+
+    def _fetch(self, card_id, fake):
+        original = sync.request_json
+        original_sleep = sync.time.sleep
+        sync.request_json = fake
+        sync.time.sleep = lambda *args, **kwargs: None
+        try:
+            return sync.fetch_card(card_id, {}, datetime(2026, 10, 16, tzinfo=timezone.utc))
+        finally:
+            sync.request_json = original
+            sync.time.sleep = original_sleep
+
+    def test_fetch_soft_skips_http_402_without_a_fallback(self):
+        calls = []
+
+        def fake(url, headers):
+            calls.append(url)
+            return 402, {"error": "payment required"}
+
+        with self.assertRaises(sync.CardSkip) as caught:
+            self._fetch("ex11-3", fake)
+        self.assertEqual(caught.exception.card_id, "ex11-3")
+        self.assertEqual(caught.exception.status, 402)
+        self.assertEqual(caught.exception.credits, 1)
+        self.assertEqual(str(caught.exception), "ex11-3: skipped HTTP 402, credits=1")
+        self.assertEqual(len(calls), 1)
+        self.assertIsInstance(caught.exception, sync.ScrydexError)
+
+    def test_fetch_402_after_a_404_does_not_write_a_miss(self):
+        calls = []
+
+        def fake(url, headers):
+            calls.append(url)
+            if "/sv3-223?" in url:
+                return 404, {}
+            return 402, {}
+
+        with self.assertRaises(sync.CardSkip) as caught:
+            self._fetch("sv03-223", fake)
+        self.assertEqual(caught.exception.status, 402)
+        self.assertEqual(caught.exception.credits, 2)
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(any("price_history" in url for url in calls))
+
+    def test_fetch_soft_skips_price_history_402(self):
+        def fake(url, headers):
+            if "price_history" in url:
+                return 402, {}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        with self.assertRaises(sync.CardSkip) as caught:
+            self._fetch("ex11-3", fake)
+        self.assertEqual(caught.exception.status, 402)
+        self.assertEqual(caught.exception.credits, 4)
+
+    def test_fetch_soft_skips_http_500(self):
+        calls = []
+
+        def fake(url, headers):
+            calls.append(url)
+            return 503, {}
+
+        with self.assertRaises(sync.CardSkip) as caught:
+            self._fetch("sv03-223", fake)
+        self.assertEqual(caught.exception.status, 503)
+        self.assertEqual(caught.exception.credits, 1)
+        self.assertEqual(len(calls), 1)
+
+    def test_fetch_auth_errors_still_raise(self):
+        for status in (401, 403):
+            def fake(url, headers, status=status):
+                return status, {}
+
+            with self.assertRaises(sync.ScrydexError) as caught:
+                self._fetch("ex11-3", fake)
+            self.assertNotIsInstance(caught.exception, sync.CardSkip)
+            self.assertIn(f"HTTP {status}", str(caught.exception))
+            self.assertEqual(caught.exception.credits, 1)
+
+    def test_price_history_auth_errors_still_raise(self):
+        def fake(url, headers):
+            if "price_history" in url:
+                return 403, {}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        with self.assertRaises(sync.ScrydexError) as caught:
+            self._fetch("ex11-3", fake)
+        self.assertNotIsInstance(caught.exception, sync.CardSkip)
+        self.assertIn("HTTP 403", str(caught.exception))
+        self.assertEqual(caught.exception.credits, 4)
+
 
 class BudgetTests(unittest.TestCase):
     def setUp(self):
@@ -343,6 +441,171 @@ class BudgetTests(unittest.TestCase):
         self.assertEqual(json.loads(self.usage.read_text())["months"]["2026-10"]["credits"], 5)
         self.assertIn("base1-4", json.loads(self.cache.read_text())["cards"])
         self.assertNotIn("sv03-223", json.loads(self.cache.read_text())["cards"])
+
+    def _sync(self, fake, when=None):
+        sync.request_json = fake
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = sync.sync(when or datetime(2026, 10, 17, tzinfo=timezone.utc))
+        return code, buf.getvalue()
+
+    def test_http_402_keeps_earlier_cards_and_exits_zero(self):
+        self.seed.write_text("A base1-4\nA ex11-3\nA swsh7-215\n", encoding="utf-8")
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-3" in url:
+                return 402, {"error": "payment required"}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        code, log = self._sync(fake)
+        self.assertEqual(code, 0)
+        self.assertIn("ex11-3: skipped HTTP 402, credits=1", log)
+        cards = json.loads(self.cache.read_text(encoding="utf-8"))["cards"]
+        self.assertIn("base1-4", cards)
+        self.assertIn("swsh7-215", cards)
+        self.assertNotIn("ex11-3", cards)
+        self.assertEqual(json.loads(self.usage.read_text(encoding="utf-8"))["months"]["2026-10"]["credits"], 10)
+        self.assertTrue(any("/swsh7-215" in url for url in self.calls))
+        self.assertNotIn("super-secret-value", log)
+        self.assertNotIn("super-secret-value", self.usage.read_text(encoding="utf-8"))
+
+    def test_main_returns_zero_when_a_later_card_is_402(self):
+        self.seed.write_text("A base1-4\nA ex11-3\n", encoding="utf-8")
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-3" in url:
+                return 402, {}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        sync.request_json = fake
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = sync.main()
+        self.assertEqual(code, 0)
+        self.assertIn("ex11-3: skipped HTTP 402, credits=1", buf.getvalue())
+        cards = json.loads(self.cache.read_text(encoding="utf-8"))["cards"]
+        self.assertIn("base1-4", cards)
+        self.assertNotIn("ex11-3", cards)
+        usage = json.loads(self.usage.read_text(encoding="utf-8"))
+        self.assertTrue(any(row.get("credits", 0) >= 5 for row in usage["months"].values()))
+
+    def test_three_402s_stop_early_and_still_exit_zero(self):
+        self.seed.write_text(
+            "A base1-4\nA ex11-1\nA ex11-2\nA ex11-3\nA swsh7-215\n",
+            encoding="utf-8",
+        )
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-" in url:
+                return 402, {}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        code, log = self._sync(fake)
+        self.assertEqual(code, 0)
+        self.assertIn("Stopping after 3 cards in a row were skipped (last HTTP 402).", log)
+        cards = json.loads(self.cache.read_text(encoding="utf-8"))["cards"]
+        self.assertEqual(list(cards), ["base1-4"])
+        self.assertFalse(any("/swsh7-215" in url for url in self.calls))
+        self.assertEqual(json.loads(self.usage.read_text(encoding="utf-8"))["months"]["2026-10"]["credits"], 8)
+
+    def test_opening_402s_record_credits_and_exit_zero(self):
+        self.seed.write_text("A ex11-1\nA ex11-2\nA ex11-3\nA base1-4\n", encoding="utf-8")
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-" in url:
+                return 402, {}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        code, log = self._sync(fake)
+        self.assertEqual(code, 0)
+        self.assertIn("ex11-1: skipped HTTP 402, credits=1", log)
+        self.assertFalse(self.cache.exists())
+        self.assertFalse(any("/base1-4" in url for url in self.calls))
+        self.assertEqual(json.loads(self.usage.read_text(encoding="utf-8"))["months"]["2026-10"]["credits"], 4)
+
+    def test_http_500_is_a_per_card_skip(self):
+        self.seed.write_text("A base1-4\nA ex11-3\nA swsh7-215\n", encoding="utf-8")
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-3" in url:
+                return 500, {}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        code, log = self._sync(fake)
+        self.assertEqual(code, 0)
+        self.assertIn("ex11-3: skipped HTTP 500, credits=1", log)
+        cards = json.loads(self.cache.read_text(encoding="utf-8"))["cards"]
+        self.assertIn("base1-4", cards)
+        self.assertIn("swsh7-215", cards)
+        self.assertNotIn("ex11-3", cards)
+
+    def test_http_401_still_fails_the_run(self):
+        self.seed.write_text("A base1-4\nA ex11-3\n", encoding="utf-8")
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-3" in url:
+                return 401, {}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        sync.request_json = fake
+        with redirect_stdout(io.StringIO()):
+            with self.assertRaises(sync.ScrydexError) as caught:
+                sync.sync(datetime(2026, 10, 17, tzinfo=timezone.utc))
+        self.assertNotIsInstance(caught.exception, sync.CardSkip)
+        self.assertIn("HTTP 401", str(caught.exception))
+        cards = json.loads(self.cache.read_text(encoding="utf-8"))["cards"]
+        self.assertIn("base1-4", cards)
+        self.assertNotIn("ex11-3", cards)
+        self.assertEqual(json.loads(self.usage.read_text(encoding="utf-8"))["months"]["2026-10"]["credits"], 6)
+
+    def test_price_history_402_does_not_store_the_card(self):
+        self.seed.write_text("A base1-4\nA ex11-3\n", encoding="utf-8")
+
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "/ex11-3" in url and "price_history" in url:
+                return 402, {}
+            if "price_history" in url:
+                return 200, {"count": 0, "total_count": 0, "data": []}
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        code, log = self._sync(fake)
+        self.assertEqual(code, 0)
+        self.assertIn("ex11-3: skipped HTTP 402, credits=4", log)
+        cards = json.loads(self.cache.read_text(encoding="utf-8"))["cards"]
+        self.assertIn("base1-4", cards)
+        self.assertNotIn("ex11-3", cards)
+        self.assertEqual(json.loads(self.usage.read_text(encoding="utf-8"))["months"]["2026-10"]["credits"], 9)
 
 
 class CacheWriteTests(unittest.TestCase):
