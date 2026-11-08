@@ -13867,13 +13867,23 @@
     },
     "2026-11-09": {
       "id": "sm1-147",
-      "price": 41.64,
+      "price": 41.38,
       "variant": "holofoil",
       "printing": "Holofoil",
       "alts": 1,
       "source": "tcgplayer",
       "eur": 36.78,
-      "at": "2026-11-07T14:40:51Z"
+      "at": "2026-11-08T14:46:54Z"
+    },
+    "2026-11-10": {
+      "id": "bw2-98",
+      "price": 23.48,
+      "variant": "holofoil",
+      "printing": "Holofoil",
+      "alts": 1,
+      "source": "tcgplayer",
+      "eur": 10.41,
+      "at": "2026-11-08T14:46:54Z"
     }
   }
 }
