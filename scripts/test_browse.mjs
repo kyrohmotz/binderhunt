@@ -59,10 +59,10 @@ assert.equal(Browse.artFor("ecard3-H30").thumb, "https://images.pokemontcg.io/ec
 const cache = JSON.parse(readFileSync(resolve(root, "data/scrydex.json"), "utf8"));
 const index = Browse.buildIndex(cache.cards);
 console.log("illustrator coverage", index.coverage);
-assert.equal(index.coverage.withIllustrator, 0);
 assert.ok(index.coverage.cards >= 2000, "cached card count");
 assert.ok(index.coverage.priced >= 1500, "priced card count");
-assert.equal(index.artistList.length, 0);
+assert.ok(index.coverage.withIllustrator / index.coverage.cards >= 0.5, "illustrator coverage " + index.coverage.withIllustrator + " of " + index.coverage.cards);
+assert.ok(index.artistList.length > 0, "illustrator shelf has names");
 const charizards = Browse.cardsForSpecies(index, "Charizard");
 assert.ok(charizards.length >= 8, "charizard shelf " + charizards.length);
 assert.ok(charizards.every(card => card.price > 0 && Number.isFinite(card.price)));
@@ -70,8 +70,7 @@ assert.ok(charizards.every((card, i) => i === 0 || charizards[i - 1].price >= ca
 index.species.forEach(group => {
   group.cards.forEach(card => assert.ok(Browse.speciesHit(card.name, group.name), card.name + " / " + group.name));
 });
-assert.equal(Browse.cardsForArtist(index, "Mitsuhiro Arita").length, 0);
-assert.equal(Browse.cardsForArtist(index, "Kagemaru Himeno").length, 0);
+assert.ok(Browse.cardsForArtist(index, "Mitsuhiro Arita").length > 0, "Arita cards are on the illustrator shelf");
 
 const PORT = 8798;
 const vendor = "/tmp/binderhunt-playwright";
