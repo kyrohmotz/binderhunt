@@ -48,6 +48,11 @@ const live = document.getElementById("live");
 const profileEl = document.getElementById("profile");
 const shell = document.getElementById("shell");
 let tab = "hunt";
+let browseIndex = null;
+let browseReady = false;
+let browseMode = null;
+let browseBuildStarted = false;
+let nameCacheDone = false;
 /* A set or type string the catalog has not confirmed yet. It is kept in
    storage but not applied, so a bad value cannot empty the hunt. */
 let rememberedSet = "";
@@ -316,7 +321,7 @@ function loadBinders(){
   return { discoveryId:"", binders:[] };
 }
 function blankFilters(){
-  return { set:"", rarities:[], era:"", type:"", names:[], min:null, max:null, pricePreset:"", graded:false, gem:false };
+  return { set:"", rarities:[], era:"", type:"", names:[], artist:"", min:null, max:null, pricePreset:"", graded:false, gem:false };
 }
 function knownEra(value){
   if (typeof value !== "string") return "";
@@ -343,6 +348,12 @@ function storedNames(value){
     if (name) names.push(name);
   });
   return names;
+}
+function storedArtist(value){
+  if (typeof value !== "string") return "";
+  const name = value.replace(/\s+/g, " ").trim().slice(0, 80);
+  if (!name || name === "[object Object]") return "";
+  return name;
 }
 function storedRarities(value){
   if (!Array.isArray(value)) return [];
@@ -381,6 +392,7 @@ function loadFilters(){
       else if (type && type.length <= 32) rememberedType = type;
     }
     next.names = storedNames(raw.names);
+    next.artist = storedArtist(raw.artist);
     next.rarities = storedRarities(raw.rarities);
     next.era = knownEra(raw.era);
     next.min = pos(raw.min);
@@ -453,6 +465,7 @@ function saveFilters(){
     graded: filters.graded === true,
     gem: filters.gem === true
   };
+  if (filters.artist) payload.artist = filters.artist;
   try { localStorage.setItem("bh.filters.v3", JSON.stringify(payload)); } catch (e) {}
   paintChips();
 }
@@ -965,9 +978,13 @@ function speciesHit(cardName, species){
   const s = String(species || "").toLowerCase().trim();
   if (!s) return false;
   if (n === s) return true;
-  if (n.startsWith(s + " ") || n.startsWith(s + "-")) return true;
-  if (n.endsWith(" " + s)) return true;
-  if (n.includes(" " + s + " ")) return true;
+  const edges = [" ", "-"];
+  for (let i = 0; i < edges.length; i++) {
+    if (n.startsWith(s + edges[i]) || n.endsWith(edges[i] + s)) return true;
+    for (let j = 0; j < edges.length; j++) {
+      if (n.includes(edges[i] + s + edges[j])) return true;
+    }
+  }
   return false;
 }
 function nameHit(card){
@@ -1354,6 +1371,7 @@ async function hydrate(brief, opts){
   if (!card.setId) card.setId = String(brief.id).split("-")[0];
   card.digital = isDigital(card);
   cardCache.set(brief.id, card);
+  rememberIllustrator(card);
   return card;
 }
 function loadMeta(){
@@ -1385,6 +1403,10 @@ function binderBusy(){
   return pricePointer > 0 || !!document.querySelector(".leaf.hot") || !!(book && book.dataset.curling) || !!(showcase && !showcase.hidden);
 }
 function applyScrydex(){
+  if (scrydex.ready && !browseBuildStarted && !window.__bhFreezeBrowse) {
+    browseBuildStarted = true;
+    buildBrowseFromCache();
+  }
   const busy = binderBusy();
   paintDeckDrops();
   if (!busy && profilePinned && profileCard && !profileEl.hidden) {
@@ -1557,7 +1579,7 @@ function scryRecord(card){
 }
 
 function filtersActive(){
-  return !!(filters.gem || filters.set || filters.type || (filters.names || []).length || filters.rarities.length || filters.era || filters.graded || filters.min != null || filters.max != null || filters.pricePreset);
+  return !!(filters.gem || filters.set || filters.type || filters.artist || (filters.names || []).length || filters.rarities.length || filters.era || filters.graded || filters.min != null || filters.max != null || filters.pricePreset);
 }
 function raritiesForSet(id){
   const list = HUNT_RARITIES.slice();
@@ -1578,6 +1600,7 @@ function keep(card){
     if ((filters.names || []).length && !nameHit(card)) return false;
     if (filters.type && !gemTypeOk(card)) return false;
   }
+  if (filters.artist && !artistOk(card)) return false;
   if (filters.era && !eraMatches(card.setId, filters.era)) return false;
   if (filters.rarities.length && !filters.rarities.includes(card.rarity)) return false;
   if (!priceOk(usdOf(card))) return false;
@@ -1588,6 +1611,11 @@ function keep(card){
   const b = discoveryBinder();
   if (b && !matchesTheme(card, themeOf(b))) return false;
   return true;
+}
+function artistOk(card){
+  if (!filters.artist) return true;
+  if (window.BinderBrowse) return BinderBrowse.artistAllowed(card && card.artist, filters.artist);
+  return false;
 }
 function enforceTheme(){
   const b = discoveryBinder();
@@ -1997,12 +2025,63 @@ function setDrained(id){
   const bag = setLists.get(id);
   return !(bag.cards || []).some(c => c && c.id && c.image && !seen.has(c.id));
 }
+function pullPrepared(rows){
+  const fresh = [];
+  (rows || []).forEach(row => {
+    if (!row || !row.id || seen.has(row.id) || isDigital({ id: row.id })) return;
+    const card = cardFromBrowse(row);
+    if (!card || !keep(card)) return;
+    fresh.push({ row, card });
+  });
+  fresh.slice(0, 8).forEach(item => {
+    pushBrief({ id: item.row.id, name: item.row.name, image: item.row.image || item.row.thumb, localId: item.row.number }, { prepared: item.card });
+  });
+  return Math.min(8, fresh.length);
+}
+function pullCachedNames(names){
+  const B = window.BinderBrowse;
+  if (!B || !browseIndex) return 0;
+  const rows = [];
+  const have = new Set();
+  names.forEach(name => {
+    B.cardsForSpecies(browseIndex, name).forEach(row => {
+      if (!row || have.has(row.id)) return;
+      have.add(row.id);
+      rows.push(row);
+    });
+  });
+  return pullPrepared(rows);
+}
+function pullCachedArtist(name){
+  const B = window.BinderBrowse;
+  if (!B || !browseIndex) return 0;
+  const rows = B.cardsForArtist(browseIndex, name).filter(row => {
+    if (!row) return false;
+    if (filters.set && row.setId !== filters.set) return false;
+    if ((filters.names || []).length && !nameHit({ name: row.name })) return false;
+    return true;
+  });
+  return pullPrepared(rows);
+}
 async function pullMore(){
   holdFeed = false;
   await loadMeta();
   if ((filters.names || []).length) {
+    if (!nameCacheDone) {
+      if (!browseReady) nameCacheDone = true;
+      else {
+        const cached = pullCachedNames(filters.names);
+        if (cached) return cached;
+        nameCacheDone = true;
+      }
+    }
     const n = await pullNames(filters.names);
     if (!n && namesExhausted()) feedExhausted = true;
+    return n;
+  }
+  if (filters.artist) {
+    const n = pullCachedArtist(filters.artist);
+    if (!n) feedExhausted = true;
     return n;
   }
   if (filters.graded && !filters.set && !filters.type && !filters.rarities.length) {
@@ -2263,7 +2342,7 @@ async function pump(my){
         if (pumpStale(epoch, my)) return;
         const requested = pullSerial !== mark;
         if (!added && !briefs.length) {
-          const broad = !filters.set && !(filters.names || []).length && !filters.type && !filters.rarities.length && !filters.era && !priceHunt() && !filters.graded;
+          const broad = !filters.set && !(filters.names || []).length && !filters.artist && !filters.type && !filters.rarities.length && !filters.era && !priceHunt() && !filters.graded;
           const broadOpen = broad && (!openingDone || !chaseDone || !mixExhausted);
           if (setListHoldUntil > Date.now()) break;
           if (broadOpen && requested) { steps++; continue; }
@@ -2284,6 +2363,7 @@ async function pump(my){
       const placed = new Set();
       const outcomes = await Promise.all(batch.map(async b => {
         try {
+          if (b && b.prepared) return { brief: b, card: keep(b.prepared) ? b.prepared : null };
           const card = await hydrate(b, { hunt:true });
           if (pumpStale(epoch, my)) return { brief:b, stale:true };
           fetchFails.delete(b.id);
@@ -2375,7 +2455,7 @@ function restart(opts){
   if (!(opts && opts.skipFilterWrite)) saveFilters();
   pile = []; briefs = []; seen = new Set(); matched = 0; pageNo = 1; queryDone = false;
   openingOrder = []; openingCursor = 0; openingDone = false; chasePage = 1; chaseDone = false; bulkCursor = 0; gradedCursor = 0;
-  mixTurn = 0; mixCursor = 0; mixExhausted = false; mixOrder = []; nameOrder = 0;
+  mixTurn = 0; mixCursor = 0; mixExhausted = false; mixOrder = []; nameOrder = 0; nameCacheDone = false;
   mixBags.clear(); namePages.clear(); setPools.clear(); bulkBags.clear();
   priceLane = 0; priceOrigin = 1; pricePage = 1; priceWrapped = false; laneOrder = null; laneStates = null; setWalk = null;
   feedExhausted = false; holdFeed = false; tailCursor = 0; tailDone = false;
@@ -2845,7 +2925,10 @@ function renderDeck(){
       const headline = filters.gem && matched === 0 ? "Nothing in this pocket fits." : (matched > 0 ? "You've seen every card that fits." : "Nothing fits these filters.");
       deck.setAttribute("aria-label", headline);
       const named = facts.map(f => f.label).join(", ");
-      const detail = matched > 0
+      const illustratorGap = !!(filters.artist && matched === 0 && browseIndex && browseIndex.coverage.withIllustrator === 0);
+      const detail = illustratorGap
+        ? filters.artist + " isn't in the saved price file, which doesn't list illustrators. Drop that filter and the hunt opens back up."
+        : matched > 0
         ? (named ? named + " ran out. Widen the hunt and the pile fills back up." : "Widen the hunt and the pile fills back up.")
         : (named ? named + " left the pile empty. Loosen one and cards come back." : "Loosen a filter and cards come back.");
       const actions = [];
@@ -3135,6 +3218,7 @@ function filterFacts(){
   const facts = [];
   if (filters.set) facts.push({ key:"set", label:setName(filters.set) || "Set", locked:lock.set });
   if ((filters.names || []).length) facts.push({ key:"names", label:namesLabel(), locked:lock.names });
+  if (filters.artist) facts.push({ key:"artist", label:filters.artist, locked:false });
   if (filters.type) facts.push({ key:"type", label:filters.type, locked:lock.type });
   if (filters.rarities.length) facts.push({ key:"rarities", label:filters.rarities.length === 1 ? filters.rarities[0] : filters.rarities.length + " rarities", locked:false });
   if (filters.era) facts.push({ key:"era", label:eraLabel(filters.era), locked:false });
@@ -3144,7 +3228,7 @@ function filterFacts(){
 }
 function widenTarget(){
   const facts = filterFacts();
-  const order = ["graded", "rarities", "price", "type", "names", "set", "era"];
+  const order = ["graded", "rarities", "price", "type", "artist", "names", "set", "era"];
   return order.map(key => facts.find(f => f.key === key && !f.locked)).find(Boolean) || null;
 }
 function clearFilterKey(key){
@@ -3153,6 +3237,7 @@ function clearFilterKey(key){
   else if (key === "rarities") filters.rarities = [];
   else if (key === "price") { filters.pricePreset = ""; filters.min = null; filters.max = null; }
   else if (key === "type" && !lock.type) { filters.type = ""; rememberedType = ""; }
+  else if (key === "artist") filters.artist = "";
   else if (key === "names" && !lock.names) filters.names = [];
   else if (key === "set" && !lock.set) { filters.set = ""; rememberedSet = ""; }
   else if (key === "era") filters.era = "";
@@ -3288,7 +3373,12 @@ function paintChips(){
 function paintContext(){
   const b = discoveryBinder();
   let label = "All cards";
-  if (tab === "sets") label = setView ? (setView.name || "Set") : "Sets";
+  if (tab === "sets") {
+    if (browseMode && browseMode.name) label = browseMode.name;
+    else if (browseMode && browseMode.kind === "illustrator") label = "Illustrators";
+    else if (browseMode) label = "Pokémon";
+    else label = setView ? (setView.name || "Set") : "Sets";
+  }
   else if (tab === "binders") label = binderView ? (binderView.kind === "wish" ? "Wishlist" : (binderState.binders.find(x => x.id === binderView.id) || {}).name || "Binders") : "Binders";
   else if (tab === "daily") label = "Today's Drop";
   else if (b) label = b.name;
@@ -3296,6 +3386,7 @@ function paintContext(){
   else if (filters.gem) label = "Gemfinder";
   else if (filters.set) label = setName(filters.set);
   else if ((filters.names || []).length) label = namesLabel();
+  else if (filters.artist) label = filters.artist;
   else if (filters.type) label = filters.type;
   else if (filters.rarities.length === 1) label = filters.rarities[0];
   else if (filters.rarities.length) label = filters.rarities.length + " rarities";
@@ -3305,6 +3396,8 @@ function paintContext(){
   const context = document.getElementById("context");
   context.textContent = label;
   if (tab === "hunt") context.setAttribute("aria-label", "Open filters. Showing " + label);
+  else if (tab === "sets" && browseMode && browseMode.name) context.setAttribute("aria-label", browseMode.kind === "illustrator" ? "All illustrators" : "All Pokémon");
+  else if (tab === "sets" && browseMode) context.setAttribute("aria-label", "Back to sets");
   else if (tab === "sets" && setView) context.setAttribute("aria-label", "Back to all sets");
   else if (tab === "binders" && binderView) context.setAttribute("aria-label", "Back to binders");
   else context.setAttribute("aria-label", label);
@@ -3335,6 +3428,7 @@ function setSideStats(){
   return { name:setView.name || "Set", saved, owned, total, pct, release:setView.release || "" };
 }
 function renderSetSide(){
+  if (browseMode) { renderBrowseSide(); return; }
   const stats = setSideStats();
   const key = stats ? "set:" + setView.id + ":" + stats.saved + ":" + stats.owned + ":" + stats.total : "sets:" + ((meta.sets || []).length) + ":" + wish.length;
   if (key === sideKey && profileEl.querySelector("[data-side='sets']")) return;
@@ -3829,7 +3923,8 @@ function openFilter(kind, anchor){
     <section class="filter-sec" id="filter-era"><h3>Era</h3><div class="huntpicks">${eraButtons}</div><button class="chip" type="button" id="moreEras" aria-expanded="${seriesOpen ? "true" : "false"}">${seriesOpen ? "Fewer series" : "One series"}</button><div class="huntpicks" id="moreEraBox"${seriesOpen ? "" : " hidden"}>${seriesButtons}</div></section>
     <section class="filter-sec" id="filter-rarity"><h3>Rarity</h3><div class="huntpicks">${rarityButtons || `<p class="fine">Rarity list is still loading.</p>`}</div>${moreButtons ? `<button class="chip" type="button" id="moreRarities" aria-expanded="${moreOpen ? "true" : "false"}">${moreOpen ? "Fewer rarities" : "More rarities"}</button><div class="huntpicks" id="moreRarityBox"${moreOpen ? "" : " hidden"}>${moreButtons}</div>` : ""}</section>
     <section class="filter-sec" id="filter-type"><h3>Type</h3><div class="huntpicks">${typeButtons}</div></section>
-    <section class="filter-sec" id="filter-pokemon"><h3>Pokémon</h3><div id="pokeHost"></div></section>
+    <section class="filter-sec" id="filter-pokemon"><h3>Pokémon</h3><div id="pokeHost"></div><button class="chip" type="button" id="browsePokemon">Browse Pokémon</button></section>
+    <section class="filter-sec" id="filter-illustrator"><h3>Illustrator</h3><p class="fine" id="illustratorFine"></p><button class="chip" type="button" id="browseIllustrators">Browse illustrators</button></section>
     <section class="filter-sec" id="filter-graded"><h3>Graded</h3><button type="button" class="huntpick" id="gradedToggle">Graded prices only</button><p class="fine">Uses cached graded prices. Leave this off and every raw card stays in the hunt.</p></section>
     <button class="chip" type="button" id="sheetClear">Clear all filters</button>`;
   const gemSheet = document.getElementById("gemSheetToggle");
@@ -3903,9 +3998,16 @@ function openFilter(kind, anchor){
   document.getElementById("setSearch").oninput = drawSetChoices;
   document.getElementById("browseSets").onclick = () => {
     closeSheet("filterSheet");
+    browseMode = null;
     showTab("sets");
     announce("Sets, grouped by era.");
   };
+  const browsePokemon = document.getElementById("browsePokemon");
+  if (browsePokemon) browsePokemon.onclick = () => openBrowse("pokemon", "");
+  const browseIllustrators = document.getElementById("browseIllustrators");
+  if (browseIllustrators) browseIllustrators.onclick = () => openBrowse("illustrator", "");
+  const illustratorFine = document.getElementById("illustratorFine");
+  if (illustratorFine) illustratorFine.textContent = illustratorNote();
   document.getElementById("sheetClear").onclick = () => clearAllFilters();
   drawPokemonFilter(document.getElementById("pokeHost"));
   drawSetChoices();
@@ -3919,8 +4021,296 @@ function openFilter(kind, anchor){
   if (!meta.ready) loadMeta().then(() => { if (!document.getElementById("filterSheet").hidden) openFilter(kind || "all", anchor); });
 }
 
+function cleanBrowseName(kind, name){
+  const B = window.BinderBrowse;
+  const text = B ? B.cleanPerson(name) : String(name || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  return kind === "illustrator" ? text : text.slice(0, 40);
+}
+function illustratorNote(){
+  if (!browseReady || !browseIndex) return "Reading the saved price file…";
+  const coverage = browseIndex.coverage || { cards:0, withIllustrator:0 };
+  const total = coverage.cards || 0;
+  const have = coverage.withIllustrator || 0;
+  if (!total) return "The saved price file has no cards yet.";
+  const line = "The saved price file names an illustrator on " + groupNum(have) + " of " + groupNum(total) + " cards.";
+  if (!have) return line + " Open a card and its illustrator shows up here when the catalog has one. Cards without an illustrator stay off this shelf.";
+  return line + " Cards without an illustrator stay off this shelf.";
+}
+function cardFromBrowse(row){
+  if (!row || !row.id || !(row.price > 0) || !Number.isFinite(row.price)) return null;
+  const setId = row.setId || "";
+  return {
+    id:row.id, name:row.name || "", set:setName(setId) || setId || "", setId,
+    number:row.number || "", img:row.img || "", thumb:row.thumb || "", image:row.image || "", backup:row.backup || "",
+    artist:row.artist || "", rarity:"", types:[],
+    variants:[{ key:"recent", label:"Recent", market:row.price }],
+    source:row.source || "cache"
+  };
+}
+function rememberIllustrator(card){
+  const B = window.BinderBrowse;
+  if (!B || !browseIndex || !card || !card.id) return false;
+  const artist = B.cleanPerson(card.artist);
+  if (!artist) return false;
+  return B.noteArtist(browseIndex, card.id, artist, {
+    name:card.name, price:pos(usdOf(card)), setId:card.setId || "", number:card.number || "",
+    image:card.image || "", img:card.img || "", thumb:card.thumb || ""
+  });
+}
+function foldOpenedArtists(){
+  if (!browseIndex) return;
+  const seenIds = new Set();
+  const take = card => {
+    if (!card || !card.id || seenIds.has(card.id)) return;
+    seenIds.add(card.id);
+    rememberIllustrator(card);
+  };
+  wish.forEach(take);
+  binderState.binders.forEach(binder => ((binder && binder.cards) || []).forEach(take));
+  cardCache.forEach(take);
+}
+function buildBrowseFromCache(){
+  const B = window.BinderBrowse;
+  const run = () => {
+    if (window.__bhFreezeBrowse) { browseReady = true; return; }
+    browseIndex = B ? B.buildIndex(scrydex.cards || {}) : null;
+    foldOpenedArtists();
+    browseReady = true;
+    if (tab === "sets" && browseMode) renderSets();
+    else if (wide() && tab === "sets") paintSide();
+    const illustratorFine = document.getElementById("illustratorFine");
+    if (illustratorFine) illustratorFine.textContent = illustratorNote();
+    if (tab === "hunt" && filters.artist && streamDone && !pile.length && !deck.querySelector(".card")) restart();
+  };
+  if (window.requestIdleCallback) requestIdleCallback(run, { timeout:1500 });
+  else setTimeout(run, 0);
+}
+function browseSpeciesOf(card){
+  const B = window.BinderBrowse;
+  if (!B || !card) return "";
+  const species = B.pokemonSpecies(card.name);
+  if (!species) return "";
+  const listed = MON_LIST.some(item => item.toLowerCase() === species.toLowerCase());
+  const known = !!(browseIndex && browseIndex.species && browseIndex.species.has(species.toLowerCase()));
+  return listed || known ? species : "";
+}
+function nameHeading(card){
+  const title = card && card.name || "Card";
+  const species = browseSpeciesOf(card);
+  if (!species) return `<h2 class="pname" id="profileTitle">${esc(title)}</h2>`;
+  return `<h2 class="pname" id="profileTitle"><button type="button" class="name-link" id="browseSpecies" aria-label="${esc("Browse " + species + " cards")}">${esc(title)}</button></h2>`;
+}
+function artistFact(card){
+  const B = window.BinderBrowse;
+  const artist = B ? B.cleanPerson(card && card.artist) : "";
+  if (!artist) return "";
+  return `<div class="fact"><span>Artist</span><button type="button" class="fact-link" id="browseArtist" aria-label="${esc("Browse cards illustrated by " + artist)}">${esc(artist)}</button></div>`;
+}
+function bindProfileBrowse(card){
+  const speciesBtn = document.getElementById("browseSpecies");
+  const artistBtn = document.getElementById("browseArtist");
+  if (speciesBtn) speciesBtn.onclick = () => openBrowse("pokemon", browseSpeciesOf(card));
+  if (artistBtn) artistBtn.onclick = () => {
+    rememberIllustrator(card);
+    openBrowse("illustrator", card.artist);
+  };
+}
+function openBrowse(kind, name){
+  if (kind !== "pokemon" && kind !== "illustrator") return;
+  const clean = cleanBrowseName(kind, name);
+  closeProfile();
+  const sheet = document.getElementById("filterSheet");
+  if (sheet && !sheet.hidden) closeSheet("filterSheet");
+  setView = null;
+  browseMode = { kind, name:clean };
+  if (tab !== "sets") showTab("sets");
+  else renderSets();
+  announce(clean ? (kind === "illustrator" ? "Illustrator " + clean + "." : clean + " cards.") : (kind === "illustrator" ? "Browse illustrators." : "Browse Pokémon."));
+}
+function swipeBrowse(kind, name){
+  const clean = cleanBrowseName(kind, name);
+  if (!clean) return;
+  if (window.BinderThemes) BinderThemes.switchActive(binderState, "");
+  else binderState.discoveryId = "";
+  saveBinders();
+  dropHeldFilters();
+  filters = blankFilters();
+  if (kind === "illustrator") filters.artist = clean;
+  else filters.names = [clean.slice(0, 24)];
+  saveFilters();
+  showTab("hunt");
+  restart();
+  announce("Swiping " + clean + ".");
+}
+function widenBrowse(){
+  dropHeldFilters();
+  filters = blankFilters();
+  saveFilters();
+  browseMode = null;
+  showTab("hunt");
+  restart();
+  announce("Filters cleared. Every physical card can show up.");
+}
+function browseModeButtons(current){
+  const sets = current === "sets";
+  const pokemon = current === "pokemon";
+  const artist = current === "illustrator";
+  return `<button class="chip${sets ? " on" : ""}" id="modeSets" type="button" role="tab" aria-selected="${sets ? "true" : "false"}">Sets</button><button class="chip${pokemon ? " on" : ""}" id="modePokemon" type="button" role="tab" aria-selected="${pokemon ? "true" : "false"}">Pokémon</button><button class="chip${artist ? " on" : ""}" id="modeArtists" type="button" role="tab" aria-selected="${artist ? "true" : "false"}">Illustrators</button>`;
+}
+function bindBrowseModes(root){
+  if (!root) return;
+  const sets = root.querySelector("#modeSets");
+  const pokemon = root.querySelector("#modePokemon");
+  const artists = root.querySelector("#modeArtists");
+  if (sets) sets.onclick = () => { browseMode = null; setView = null; renderSets(); };
+  if (pokemon) pokemon.onclick = () => openBrowse("pokemon", "");
+  if (artists) artists.onclick = () => openBrowse("illustrator", "");
+}
+function browseChoices(){
+  const B = window.BinderBrowse;
+  if (!B || !browseMode) return [];
+  if (browseMode.kind === "illustrator") return (browseIndex && browseIndex.artistList) || [];
+  return MON_LIST.concat((browseIndex && browseIndex.speciesList) || []);
+}
+function renderBrowseSide(){
+  const kind = browseMode.kind === "illustrator" ? "illustrator" : "pokemon";
+  const name = browseMode.name || "";
+  const B = window.BinderBrowse;
+  const rows = name && browseIndex && B ? (kind === "illustrator" ? B.cardsForArtist(browseIndex, name) : B.cardsForSpecies(browseIndex, name)) : [];
+  const key = "browse:" + kind + ":" + name + ":" + rows.length + ":" + (browseReady ? 1 : 0);
+  if (key === sideKey && profileEl.querySelector("[data-side='browse']")) return;
+  sideKey = key;
+  summaryId = "";
+  profileEl.hidden = false;
+  shell.classList.remove("no-profile");
+  markProfile(false);
+  const eyebrow = kind === "illustrator" ? "Illustrator" : "Pokémon";
+  const title = name || (kind === "illustrator" ? "Illustrators" : "Pokémon");
+  const top = rows[0] && rows[0].price > 0 ? priceText(rows[0].price, "USD") : "";
+  const count = name
+    ? (rows.length ? rows.length + (rows.length === 1 ? " priced card" : " priced cards") : "No priced cards saved")
+    : (kind === "illustrator" ? illustratorNote() : "Search a name, then swipe that shelf.");
+  profileEl.innerHTML = `<div class="profile-scroll" data-side="browse"><p class="eyebrow">${esc(eyebrow)}</p><h2 class="pname" id="profileTitle">${esc(title)}</h2>${top ? `<p class="market-price">${esc(top)}</p><p class="fine">Highest recent raw price on this shelf.</p>` : ""}<p class="fine">${esc(count)}</p></div>`;
+}
+function fewBrowseCopy(kind, name, count){
+  if (count > 6) return "";
+  if (!count) {
+    if (kind === "illustrator") return name + " has no priced cards on this shelf. The price file doesn't list illustrators for most cards. Swipe the cards already opened under this name, or widen the hunt.";
+    return "No priced " + name + " cards are in the saved file. Swipe to look through the catalog, or widen the hunt.";
+  }
+  const noun = count === 1 ? "priced card is" : "priced cards are";
+  return "Only " + count + " " + noun + " saved for " + name + ". Swipe " + (count === 1 ? "it" : "them") + ", or widen the hunt so more cards can show up.";
+}
+function renderBrowse(root){
+  const kind = browseMode.kind === "illustrator" ? "illustrator" : "pokemon";
+  if (!browseMode.name) renderBrowseDirectory(root, kind);
+  else renderBrowseShelf(root, kind, browseMode.name);
+}
+function renderBrowseDirectory(root, kind){
+  const B = window.BinderBrowse;
+  const finding = document.activeElement && document.activeElement.id === "browseFind";
+  const query = finding ? document.activeElement.value : "";
+  const caret = finding ? document.activeElement.selectionStart : null;
+  const label = kind === "illustrator" ? "Search illustrators" : "Search Pokémon";
+  const placeholder = kind === "illustrator" ? "e.g. Mitsuhiro Arita" : "e.g. Pikachu";
+  const options = B ? B.suggest(browseChoices(), query, 8) : [];
+  const popularNames = kind === "pokemon" && browseReady && B && browseIndex ? B.popular(browseIndex, 8) : [];
+  const note = kind === "illustrator" ? illustratorNote() : (browseReady ? "Pick a Pokémon to see every priced copy in the saved file, then swipe them." : "Reading saved prices… You can still search a name.");
+  const suggestions = `<div class="suggest" id="browseList" role="listbox" aria-label="${esc(label)}">${options.map((item, i) => `<button type="button" class="huntpick" role="option" id="browseOpt${i}" data-browse="${esc(item)}">${esc(item)}</button>`).join("")}</div>`;
+  const picks = popularNames.length ? `<div class="huntpicks" id="browsePicks">${popularNames.map(item => `<button type="button" class="huntpick" data-browse="${esc(item)}" aria-label="${esc("Browse " + item + " cards")}">${esc(item)}</button>`).join("")}</div>` : "";
+  const emptyArtists = kind === "illustrator" && browseReady && !(browseIndex && browseIndex.artistList.length);
+  root.innerHTML = `<div class="modes" role="tablist" aria-label="Browse">${browseModeButtons(kind)}</div><label class="sr-only" for="browseFind">${esc(label)}</label><input class="search" id="browseFind" type="search" role="combobox" aria-expanded="${options.length ? "true" : "false"}" aria-controls="browseList" aria-autocomplete="list" placeholder="${esc(placeholder)}" enterkeyhint="search" autocomplete="off" value="${esc(query)}">${suggestions}<p class="browse-note" id="browseNote">${esc(note)}</p>${picks}${emptyArtists ? `<p class="empty-state">No illustrator names are saved yet. ${toad()}</p>` : ""}`;
+  bindBrowseModes(root);
+  root.querySelectorAll("[data-browse]").forEach(btn => btn.onclick = () => openBrowse(kind, btn.dataset.browse));
+  const find = document.getElementById("browseFind");
+  if (!find) return;
+  find.oninput = () => renderBrowseDirectory(root, kind);
+  find.onkeydown = event => onBrowseKey(event, kind, options);
+  if (finding) {
+    find.focus();
+    if (caret != null) find.setSelectionRange(caret, caret);
+  }
+}
+function onBrowseKey(event, kind, options){
+  const find = event.currentTarget;
+  const list = document.getElementById("browseList");
+  const buttons = list ? [...list.querySelectorAll("[role='option']")] : [];
+  const activeId = find.getAttribute("aria-activedescendant") || "";
+  const current = buttons.findIndex(btn => btn.id === activeId);
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    if (!buttons.length) return;
+    event.preventDefault();
+    const next = event.key === "ArrowDown" ? (current + 1) % buttons.length : (current <= 0 ? buttons.length - 1 : current - 1);
+    buttons.forEach((btn, i) => btn.classList.toggle("on", i === next));
+    find.setAttribute("aria-activedescendant", buttons[next].id);
+    return;
+  }
+  if (event.key === "Enter") {
+    event.preventDefault();
+    const picked = current >= 0 ? buttons[current].dataset.browse : ((options[0] && keyOfBrowse(options[0]).startsWith(keyOfBrowse(find.value))) ? options[0] : find.value);
+    const clean = cleanBrowseName(kind, picked);
+    if (clean) openBrowse(kind, clean);
+    return;
+  }
+  if (event.key === "Escape") {
+    find.setAttribute("aria-activedescendant", "");
+    buttons.forEach(btn => btn.classList.remove("on"));
+  }
+}
+function keyOfBrowse(value){
+  return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+function renderBrowseShelf(root, kind, name){
+  const B = window.BinderBrowse;
+  const rows = B && browseIndex ? (kind === "illustrator" ? B.cardsForArtist(browseIndex, name) : B.cardsForSpecies(browseIndex, name)) : [];
+  const shown = rows.filter(row => row && priceText(row.price, "USD") !== "—");
+  const countLine = !browseReady ? "Reading saved prices…" : (shown.length ? shown.length + (shown.length === 1 ? " priced card" : " priced cards") : "No priced cards saved");
+  const few = browseReady ? fewBrowseCopy(kind, name, shown.length) : "";
+  const backLabel = kind === "illustrator" ? "All illustrators" : "All Pokémon";
+  root.innerHTML = `<div class="modes" role="tablist" aria-label="Browse">${browseModeButtons(kind)}</div><div class="browse-head"><button class="chip" id="browseBack" type="button" aria-label="${esc(backLabel)}">←</button><div class="setname"><h2 id="browseTitle">${esc(name)}</h2><p class="fine" id="browseCount">${esc(countLine)}</p></div></div><div class="browse-actions"><button class="chip go" id="browseSwipe" type="button">${esc("Swipe " + name)}</button>${browseReady && shown.length <= 6 ? `<button class="chip" id="browseWiden" type="button">Widen the hunt</button>` : ""}</div>${few ? `<p class="browse-note" role="status">${esc(few)}</p>` : ""}<div class="price-grid" id="browseGrid"></div>${browseReady && !shown.length ? `<p class="empty-state">Nothing priced to show for ${esc(name)}. ${toad()}</p>` : ""}`;
+  bindBrowseModes(root);
+  document.getElementById("browseBack").onclick = () => { browseMode = { kind }; renderSets(); };
+  document.getElementById("browseSwipe").onclick = () => swipeBrowse(kind, name);
+  const widen = document.getElementById("browseWiden");
+  if (widen) widen.onclick = () => widenBrowse();
+  const grid = document.getElementById("browseGrid");
+  shown.forEach(row => {
+    const price = priceText(row.price, "USD");
+    const setLabel = setName(row.setId) || row.setId || "";
+    const metaLine = [setLabel, row.number ? "#" + row.number : ""].filter(Boolean).join(" · ");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "price-tile";
+    btn.setAttribute("aria-label", [row.name, metaLine, price].filter(Boolean).join(", "));
+    btn.innerHTML = `<span class="tile-price">${esc(price)}</span><span class="art"></span><b class="tile-name">${esc(row.name || "Card")}</b><span class="fine">${esc(metaLine)}</span>`;
+    const card = cardFromBrowse(row);
+    if (card) paintArt(btn.querySelector(".art"), card, { lazy:true, priority:"low" });
+    btn.onclick = () => openCachedCard(row);
+    grid.append(btn);
+  });
+}
+function openCachedCard(row){
+  const partial = cardFromBrowse(row);
+  if (!partial) return;
+  openProfile(partial);
+  hydrate({ id:row.id, name:row.name, image:row.image || "" }).then(full => {
+    if (!full || full.id !== row.id) return;
+    if (!usdOf(full) && partial.variants) full.variants = partial.variants.slice();
+    if (!full.artist && partial.artist) full.artist = partial.artist;
+    rememberIllustrator(full);
+    if (profilePinned && profileCard && profileCard.id === full.id) renderProfile(full);
+  }).catch(() => {});
+}
+
 function renderSets(){
   const root = document.getElementById("setsScroll");
+  if (browseMode) {
+    root.classList.remove("fitting");
+    renderBrowse(root);
+    paintContext();
+    return;
+  }
   root.classList.toggle("fitting", !!setView);
   if (setView) { renderSetPage(root); return; }
   const q = (root.querySelector("#setFind") || {}).value || "";
@@ -3936,7 +4326,7 @@ function renderSets(){
     if (!groups.has(era)) groups.set(era, []);
     groups.get(era).push(s);
   });
-  const html = [`<input class="search" id="setFind" type="search" placeholder="Search sets" aria-label="Search sets" enterkeyhint="search" autocomplete="off" value="${esc(q)}">`,`<p class="fine setlead">Grouped by era. Open a set to flip through it, or swipe just that set.</p>`,`<div class="modes"><button class="chip gem-toggle${filters.gem ? " on" : ""}" id="openGemfinder" type="button" aria-pressed="${filters.gem ? "true" : "false"}">Gemfinder</button></div>`];
+  const html = [`<input class="search" id="setFind" type="search" placeholder="Search sets" aria-label="Search sets" enterkeyhint="search" autocomplete="off" value="${esc(q)}">`,`<p class="fine setlead">Grouped by era. Open a set to flip through it, or swipe just that set.</p>`,`<div class="modes" role="tablist" aria-label="Browse">${browseModeButtons("sets")}<button class="chip gem-toggle${filters.gem ? " on" : ""}" id="openGemfinder" type="button" aria-pressed="${filters.gem ? "true" : "false"}">Gemfinder</button></div>`];
   ERA_ORDER.forEach(era => {
     const list = groups.get(era);
     if (!list || !list.length) return;
@@ -3967,9 +4357,11 @@ function renderSets(){
   root.querySelectorAll("[data-set]").forEach(btn => btn.onclick = () => openSet(btn.dataset.set));
   const gemBtn = document.getElementById("openGemfinder");
   if (gemBtn) gemBtn.onclick = () => setGemMode(true);
+  bindBrowseModes(root);
   bindSetArt(root);
 }
 async function openSet(id){
+  browseMode = null;
   countEvent("set-mode");
   const known = meta.sets.find(s => s.id === id) || { id, name:id };
   flipPage = 0;
@@ -5815,7 +6207,7 @@ function coreFacts(card){
     fact("Set", card.set),
     fact("Number", card.number),
     fact("Rarity", card.rarity),
-    fact("Artist", card.artist)
+    artistFact(card)
   ].join("");
 }
 function variantToggle(card, variant){
@@ -5920,7 +6312,7 @@ function renderSummary(card){
     <div class="profile-rest">
       <div class="phead">
         <div class="thumb" id="summaryThumb"></div>
-        <div class="phead-copy"><h2 class="pname" id="profileTitle">${esc(card.name || "Card")}</h2></div>
+        <div class="phead-copy">${nameHeading(card)}</div>
       </div>
       <div class="facts">${coreFacts(card)}</div>
       ${variantToggle(card, story.variant)}
@@ -5943,6 +6335,7 @@ function renderSummary(card){
     focusVariant(key);
   });
   bindPriceStory(story, () => { summaryId = ""; renderSummary(card); summaryId = card.id; });
+  bindProfileBrowse(card);
   const full = document.getElementById("openFullProfile");
   if (full) full.onclick = () => openProfile(card);
   if (story.series.pendingFx) ensureFx().then(rate => { if (rate && !profilePinned) { summaryId = ""; paintDeckSummary(currentTop()); } });
@@ -6050,7 +6443,7 @@ function renderProfile(card){
     </div>
     ${story.html}
     <div class="profile-rest">
-      <h2 class="pname" id="profileTitle">${esc(card.name || "Card")}</h2>
+      ${nameHeading(card)}
       ${gemLine}
       <div class="facts">
         ${coreFacts(card)}
@@ -6087,6 +6480,7 @@ function renderProfile(card){
     focusVariant(key);
   });
   bindPriceStory(story, () => renderProfile(cardCache.get(card.id) || card));
+  bindProfileBrowse(card);
   if (story.series.pendingFx) ensureFx().then(rate => { if (rate && profileCard && profileCard.id === card.id) renderProfile(cardCache.get(card.id) || card); });
   document.getElementById("profileOwn").onclick = () => setOwned(card, !ownedIds.has(card.id), "profile");
   document.getElementById("profileWish").onclick = () => {
@@ -6177,7 +6571,13 @@ document.getElementById("shareDiscovery").onclick = () => {
   const b = discoveryBinder();
   if (b && window.BinderShare) BinderShare.openCollection({ kind:"binder", name:b.name, color:b.color, cards:b.cards || [], ownedIds });
 };
-document.getElementById("context").onclick = () => { if (tab === "hunt") openFilter("all", document.getElementById("openFilters")); else if (tab === "sets" && setView) { setView = null; renderSets(); } else if (tab === "binders" && binderView) { binderView = null; renderBinders(); } };
+document.getElementById("context").onclick = () => {
+  if (tab === "hunt") openFilter("all", document.getElementById("openFilters"));
+  else if (tab === "sets" && browseMode && browseMode.name) { browseMode = { kind: browseMode.kind }; renderSets(); }
+  else if (tab === "sets" && browseMode) { browseMode = null; renderSets(); }
+  else if (tab === "sets" && setView) { setView = null; renderSets(); }
+  else if (tab === "binders" && binderView) { binderView = null; renderBinders(); }
+};
 document.getElementById("skip").onclick = () => fly(-1);
 document.getElementById("save").onclick = () => fly(1);
 document.getElementById("undo").onclick = undo;
@@ -6283,7 +6683,7 @@ window.addEventListener("resize", () => {
   clearTimeout(resizeTick);
   resizeTick = setTimeout(() => {
     if (tab === "binders" && binderView) renderBinders();
-    if (tab === "sets" && setView) renderSets();
+    if (tab === "sets" && (setView || browseMode)) renderSets();
   }, 150);
 });
 let gyroFrame = 0;

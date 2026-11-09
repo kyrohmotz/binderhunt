@@ -616,7 +616,7 @@ const report = await ev(`(async () => {
   HUNT_SILENT_MS = 20000;
   const pumpsBefore = huntPumps;
   filters = blankFilters();
-  filters.names = ["Charizard", "Gengar", "Squirtle"];
+  filters.names = ["Missingmon", "Notapoke", "Stillmissing"];
   filters.era = "vintage";
   filters.pricePreset = "mid";
   showTab("hunt");
