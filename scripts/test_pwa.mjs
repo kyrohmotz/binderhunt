@@ -87,7 +87,7 @@ const server = http.createServer((req, res) => {
   };
   if (rel === "sw.js" && swVersion) {
     let text = body.toString("utf8");
-    const marker = 'const VERSION = "bh-10"';
+    const marker = 'const VERSION = "bh-12"';
     if (!text.includes(marker)) {
       res.writeHead(500, { "Content-Type": "text/plain" });
       res.end("sw.js VERSION marker missing");
@@ -172,7 +172,7 @@ async function shot(page, name) {
 }
 
 try {
-  const html = readFileSync(join(root, "index.html"), "utf8");
+  const html = readFileSync(join(root, "index.html"), "utf8") + "\n" + readFileSync(join(root, "js/app.js"), "utf8");
   const sw = readFileSync(join(root, "sw.js"), "utf8");
   for (const key of ["binderhuntWish", "bh.binders.v1", "bh.owned.v1"]) {
     note(html.includes('"' + key + '"') || html.includes("'" + key + "'") || html.includes(key), "storage key still in the app: " + key);

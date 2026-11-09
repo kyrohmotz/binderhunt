@@ -206,7 +206,7 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 #setsScroll .setstats{display:flex;align-items:center;gap:10px}
 #setsScroll .setmeter{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 #setsScroll .setmeter .bar{margin:0}
-#setsScroll .setstats .go{flex:none;background:var(--green,#ABB28D);white-space:nowrap}
+#setsScroll .setstats .go{flex:none;background:var(--green,#ABB28D);color:var(--ink);white-space:nowrap}
 #setsScroll .setflip .paper{background:#1f2026;border:0;border-radius:16px;box-shadow:0 0 0 1px rgba(255,255,255,.04) inset,0 14px 28px -10px rgba(34,26,16,.5);padding:10px}
 #setsScroll .setflip .paper h3{display:none}
 #setsScroll .setflip .pockets{width:min(100cqw,calc(100cqh * 63 / 88 * .985));height:min(100cqh,calc(100cqw * 88 / 63 / .985));gap:6px}

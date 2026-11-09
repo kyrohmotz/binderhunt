@@ -1,0 +1,6708 @@
+try {
+  if (navigator.serviceWorker && navigator.serviceWorker.controller && navigator.onLine === false) navigator.serviceWorker.controller.postMessage("bh-offline");
+} catch (e) {}
+const AFFILIATE = { tcgplayer:{ params:{} }, ebay:{ params:{} }, cardmarket:{ params:{} } };
+const CHASE = ["Special illustration rare","Illustration rare","Hyper rare","Mega Hyper Rare","Secret Rare","Shiny Ultra Rare","Shiny rare VMAX","Holo Rare VMAX","Holo Rare VSTAR","Radiant Rare","Amazing Rare"];
+const VINTAGE_RARITIES = ["Rare Holo","Holo Rare","Rare Holo LV.X","Rare PRIME","LEGEND","Classic Collection","Shiny rare","Ultra Rare"];
+const HUNT_RARITIES = CHASE.concat(VINTAGE_RARITIES);
+const VINTAGE_SET = /^(?:base|gym|neo|ecard|lc|ex|pop|si|np)/;
+const OPENING = [
+  ["sv08","sv04.5","sv07","sv06","sv01","me02","sv02"],
+  ["swsh7","swsh12.5","swsh11","swsh12","swsh8"],
+  ["sv03.5","base1","base4","neo1","sv03"]
+];
+const MUST_SETS = [
+  { id:"me02", name:"Phantasmal Flames", cardCount:{ official:94, total:130 }, logo:"https://assets.tcgdex.net/en/me/me02/logo" },
+  { id:"base4", name:"Base Set 2", cardCount:{ official:130, total:130 }, logo:"https://assets.tcgdex.net/en/base/base4/logo" }
+];
+const CARD_TYPES = ["Colorless","Darkness","Dragon","Fairy","Fighting","Fire","Grass","Lightning","Metal","Psychic","Water"];
+const ERA_ORDER = ["Mega Evolution","Scarlet & Violet","Sword & Shield","Sun & Moon","XY","Black & White","HeartGold & SoulSilver","Diamond & Pearl","EX","WOTC","Other"];
+const ERA_GROUPS = [
+  { id:"vintage", label:"WotC / Vintage", eras:["WOTC"] },
+  { id:"exds", label:"EX / DS", eras:["EX","Diamond & Pearl","HeartGold & SoulSilver"] },
+  { id:"bwxy", label:"BW / XY", eras:["Black & White","XY"] },
+  { id:"sm", label:"Sun & Moon", eras:["Sun & Moon"] },
+  { id:"swsh", label:"Sword & Shield", eras:["Sword & Shield"] },
+  { id:"svmega", label:"SV / Mega", eras:["Scarlet & Violet","Mega Evolution"] }
+];
+const HUNT_PICKS = [
+  { id:"pikachu", label:"Pikachu", names:["Pikachu"] },
+  { id:"charizard", label:"Charizard", names:["Charizard"] },
+  { id:"eevee", label:"Eevee & friends", names:["Eevee","Vaporeon","Jolteon","Flareon","Espeon","Umbreon","Leafeon","Glaceon","Sylveon"] },
+  { id:"gengar", label:"Gengar", names:["Gengar"] },
+  { id:"umbreon", label:"Umbreon", names:["Umbreon"] },
+  { id:"scyther", label:"Scyther", names:["Scyther"] }
+];
+const MON_LIST = ["Bulbasaur","Ivysaur","Venusaur","Charmander","Charmeleon","Charizard","Squirtle","Wartortle","Blastoise","Pikachu","Raichu","Clefairy","Jigglypuff","Meowth","Psyduck","Growlithe","Arcanine","Abra","Alakazam","Machamp","Gengar","Onix","Scyther","Magikarp","Gyarados","Lapras","Ditto","Eevee","Vaporeon","Jolteon","Flareon","Snorlax","Articuno","Zapdos","Moltres","Dragonite","Mewtwo","Mew","Typhlosion","Espeon","Umbreon","Scizor","Heracross","Tyranitar","Lugia","Ho-Oh","Celebi","Blaziken","Gardevoir","Aggron","Absol","Salamence","Metagross","Rayquaza","Jirachi","Torterra","Infernape","Empoleon","Lucario","Garchomp","Glaceon","Leafeon","Dialga","Palkia","Giratina","Darkrai","Arceus","Zoroark","Zekrom","Reshiram","Greninja","Sylveon","Mimikyu","Solgaleo","Lunala","Rillaboom","Cinderace","Inteleon","Dragapult","Zacian","Zamazenta","Eternatus","Meowscarada","Skeledirge","Quaquaval","Tinkaton","Annihilape","Kingambit","Koraidon","Miraidon","Pecharunt","Ogerpon","Ceruledge","Armarouge","Gholdengo"];
+const COLORS = ["#86DEFF","#ABB28D","#E9D5C0","#F3EDC8","#F6C9C9","#E4E7DA"];
+const GRADES = [["PSA","10"],["PSA","9"],["CGC","10"],["BGS","9.5"]];
+const POCKET_SET = /^(?:P-A|[AB]\d+[a-z]*)$/;
+// Sets whose TCGdex payload has no card art (trainer kits, galleries, samples).
+const IMAGELESS_SETS = new Set(["2011bw","2012bw","2014xy","2015xy","2016xy","2017sm","2018sm","2019sm","2021swsh","2022swsh","2023sv","2024sv","30th-c","bog","cel25cc","ex5.5","exu","jumbo","mee","mep","mfb","miscp","rc","sm3.5","sm7.5","sp","sve","swsh10tg","swsh11tg","swsh12.5gg","swsh12tg","swsh4.5sv","swsh9tg","tk-bw-e","tk-bw-z","tk-dp-l","tk-dp-m","tk-ex-latia","tk-ex-latio","tk-ex-m","tk-ex-p","tk-hs-g","tk-hs-r","tk-sm-l","tk-sm-r","tk-xy-b","tk-xy-latia","tk-xy-latio","tk-xy-n","tk-xy-p","tk-xy-su","tk-xy-sy","tk-xy-w","wp","xya"]);
+const POCKET_RARITIES = new Set(["One Diamond","Two Diamond","Three Diamond","Four Diamond","One Star","Two Star","Three Star","One Shiny","Two Shiny","Crown"]);
+const TCGDEX = "https://api.tcgdex.net/v2/en";
+const TAP_SLOP = 6;
+
+const deck = document.getElementById("deck");
+const live = document.getElementById("live");
+const profileEl = document.getElementById("profile");
+const shell = document.getElementById("shell");
+let tab = "hunt";
+/* A set or type string the catalog has not confirmed yet. It is kept in
+   storage but not applied, so a bad value cannot empty the hunt. */
+let rememberedSet = "";
+let rememberedType = "";
+let filters = loadFilters();
+let wish = loadWish();
+let binderState = loadBinders();
+let settings = loadSettings();
+const ownedIds = new Set();
+const ownedSetById = new Map();
+const celebrated = new Set();
+let ownedNeedsSeed = false;
+let ownedInlineMigrated = false;
+/* A shared link is only a picture of someone else's cards. Boot still runs
+   before that sheet opens, and it must not invent a collection or a filter
+   record in a browser that did not have one. */
+let receivedShareAtOpen = false;
+let ownedMissingAtOpen = false;
+let filtersMissingAtOpen = false;
+const pendingCelebrate = [];
+let logState = { v:1, days:[], events:[] };
+let pile = [];
+let briefs = [];
+let seen = new Set();
+let gemCatalog = null;
+let gemCatalogPromise = null;
+let gemFx = null;
+let gemCycle = null;
+let gemNote = "";
+let gemNoteTimer = 0;
+let undoStack = [];
+let generation = 0;
+let loading = false;
+let streamDone = false;
+let searchStarted = 0;
+let lastFound = 0;
+let paused = false;
+let pumpError = "";
+let catalogBusy = false;
+let effort = 0;
+let matched = 0;
+let pageNo = 1;
+let queryDone = false;
+let openingOrder = [];
+let openingCursor = 0;
+let openingDone = false;
+let chasePage = 1;
+let chaseDone = false;
+let spice = false;
+let mixTurn = 0;
+let mixCursor = 0;
+let mixExhausted = false;
+let mixOrder = [];
+let nameOrder = 0;
+const mixBags = new Map();
+const namePages = new Map();
+let bulkCursor = 0;
+let gradedCursor = 0;
+let priceLane = 0;
+let pricePage = 1;
+let priceOrigin = 1;
+let priceWrapped = false;
+let laneOrder = null;
+let laneStates = null;
+let setWalk = null;
+let feedExhausted = false;
+let holdFeed = false;
+let tailCursor = 0;
+let tailDone = false;
+let pullSerial = 0;
+let busyStrike = 0;
+let busyUntil = 0;
+let busyRenderTimer = 0;
+let pumpEpoch = 0;
+let huntPumps = 0;
+let huntWatch = 0;
+let huntProgressAt = 0;
+let huntFetchSeq = 0;
+let huntBatch = [];
+let busyHold = false;
+let setListHoldUntil = 0;
+let confettiTimer = 0;
+let confettiUntil = 0;
+let HUNT_SILENT_MS = 20000;
+let HUNT_FETCH_MS = 12000;
+const SET_LIST_WAIT_MS = 1500;
+const SET_LIST_RETRY_MS = 4000;
+const SET_LIST_RETRY_CAP = 3;
+const huntInflight = new Map();
+const setListFails = new Map();
+const fetchFails = new Map();
+let deferred = [];
+const CARD_FETCH_RETRIES = 3;
+const bulkBags = new Map();
+const imageless = new Set(IMAGELESS_SETS);
+const setPools = new Map();
+const setLists = new Map();
+const cardCache = new Map();
+const meta = { sets:[], types:[], rarities:[], ready:false };
+let metaPromise = null;
+let scrydex = { ready:false, cards:{} };
+let scrydexPromise = null;
+let profileCard = null;
+let profilePinned = false;
+let pinnedTopId = "";
+let summaryId = "";
+let sideKey = "";
+let deckTopId = "";
+let deckTopSeen = false;
+let variantChoice = new Map();
+let chartRange = "90d";
+let historyPicked = false;
+let compareGrade = "";
+let reserved = new Set();
+let pendingSwipes = [];
+let swipeBusy = false;
+let audioCtx = null;
+let setView = null;
+let binderView = null;
+let binderOpenAnim = false;
+let flipPage = 0;
+let pendingSparkle = -1;
+let binderToastTimer = 0;
+let fillBinderId = "";
+let fillSelected = new Set();
+let menuCard = null;
+let restoreFocus = null;
+let profileOpener = null;
+let onboardOpener = null;
+let pricePointer = 0;
+window.addEventListener("pointerdown", () => { pricePointer++; }, true);
+window.addEventListener("pointerup", () => { pricePointer = Math.max(0, pricePointer - 1); }, true);
+window.addEventListener("pointercancel", () => { pricePointer = Math.max(0, pricePointer - 1); }, true);
+
+const COUNT_NS = "binderhunt.kyrohmotz.github.io";
+function doNotTrack(){
+  try {
+    const flag = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+    return flag === "1" || flag === "yes";
+  } catch (e) { return true; }
+}
+function countEvent(name){
+  try {
+    if (doNotTrack()) return;
+    if (!/^[a-z0-9-]{3,32}$/.test(name)) return;
+    if (typeof fetch !== "function") return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    fetch("https://abacus.jasoncameron.dev/hit/" + COUNT_NS + "/" + name, { method:"GET", credentials:"omit", cache:"no-store", keepalive:true }).catch(() => {});
+  } catch (e) {}
+}
+function localDay(){
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function countPage(){
+  countEvent("pageview");
+  let day = "";
+  try { day = localDay(); logVisit(day); } catch (e) {}
+  try {
+    if (!day || localStorage.getItem("bh.visit.day") === day) return;
+    localStorage.setItem("bh.visit.day", day);
+  } catch (e) { return; }
+  countEvent("visit");
+}
+
+function num(v){ return typeof v === "number" && Number.isFinite(v) ? v : null; }
+function pos(v){ const n = typeof v === "number" ? v : (v == null || v === "" ? null : Number(v)); return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : null; }
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, ch => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[ch])); }
+function safeImg(url){
+  if (typeof url !== "string") return "";
+  if (url.startsWith("https://assets.tcgdex.net/") || url.startsWith("https://images.pokemontcg.io/")) return url;
+  return "";
+}
+function knownArt(card){
+  const urls = [];
+  const push = value => {
+    const url = safeImg(value);
+    if (url && !urls.includes(url)) urls.push(url);
+  };
+  if (!card) return urls;
+  push(card.thumb);
+  push(card.img);
+  const base = safeImg(card.image);
+  if (base) push(base + "/low.webp");
+  push(card.backup);
+  return urls;
+}
+function shuffle(list){
+  const a = list.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function money(n, currency){
+  if (typeof n !== "number" || !Number.isFinite(n) || n < 0.01) return null;
+  const text = new Intl.NumberFormat("en-US", { style:"currency", currency: currency || (settings.currency === "EUR" ? "EUR" : "USD") }).format(n);
+  if (/^[^0-9]*0\.00$/.test(text)) return null;
+  return text;
+}
+function priceText(n, currency){ return money(n, currency) || "—"; }
+function groupNum(n){ return typeof n === "number" && Number.isFinite(n) ? new Intl.NumberFormat("en-US").format(n) : "—"; }
+function compactMoney(n, currency){
+  if (typeof n !== "number" || !Number.isFinite(n) || n < 0.01) return "";
+  const sym = currency === "EUR" ? "€" : "$";
+  if (n >= 10000) return sym + Math.round(n / 1000) + "k";
+  if (n >= 100) return sym + Math.round(n).toLocaleString("en-US");
+  return sym + n.toFixed(2);
+}
+function variantLabel(key){ return String(key).replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase()); }
+function wide(){ return matchMedia("(min-width: 1024px)").matches; }
+function ensureLabelFont(){
+  if (wide() || document.getElementById("latoFace")) return;
+  const style = document.createElement("style");
+  style.id = "latoFace";
+  style.textContent = '@font-face{font-family:Lato;src:url("fonts/lato-700-italic.woff2") format("woff2");font-weight:700;font-style:italic;font-display:swap}';
+  document.head.appendChild(style);
+}
+function isPocketId(id){ return POCKET_SET.test(id || ""); }
+function isDigital(card){
+  if (!card) return false;
+  const setId = card.setId || String(card.id || "").split("-")[0];
+  if (isPocketId(setId)) return true;
+  if (card.serieId === "tcgp") return true;
+  if (POCKET_RARITIES.has(card.rarity)) return true;
+  return false;
+}
+function eraOf(id){
+  const s = String(id || "");
+  if (/^me/.test(s)) return "Mega Evolution";
+  if (/^sv/.test(s)) return "Scarlet & Violet";
+  if (/^swsh/.test(s)) return "Sword & Shield";
+  if (/^sm/.test(s)) return "Sun & Moon";
+  if (/^xy/.test(s)) return "XY";
+  if (/^bw/.test(s)) return "Black & White";
+  if (/^(hgss|col)/.test(s)) return "HeartGold & SoulSilver";
+  if (/^(dp|pl)/.test(s)) return "Diamond & Pearl";
+  if (/^ex/.test(s)) return "EX";
+  if (/^(base|gym|neo|ecard|pop|np|si)/.test(s)) return "WOTC";
+  return "Other";
+}
+function numId(v){ const n = parseInt(String(v || "").replace(/\D/g, ""), 10); return Number.isFinite(n) ? n : 0; }
+function announce(text){ live.textContent = ""; setTimeout(() => { live.textContent = text; }, 20); }
+function reduceMotion(){
+  if (settings.reduce === "on") return true;
+  if (settings.reduce === "off") return false;
+  return matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+function applyMotion(){
+  document.documentElement.classList.toggle("reduce", settings.reduce === "on" || (settings.reduce !== "off" && reduceMotion()));
+  document.documentElement.classList.toggle("motion-on", settings.reduce === "off");
+}
+function toad(){ return `<svg class="toad" viewBox="0 0 64 40" aria-hidden="true"><ellipse cx="32" cy="28" rx="22" ry="10" fill="#E9D5C0" stroke="#1F1F1E" stroke-width="2.5"/><circle cx="20" cy="16" r="8" fill="#ABB28D" stroke="#1F1F1E" stroke-width="2.5"/><circle cx="44" cy="16" r="8" fill="#ABB28D" stroke="#1F1F1E" stroke-width="2.5"/><circle cx="20" cy="16" r="1.6" fill="#1F1F1E"/><circle cx="44" cy="16" r="1.6" fill="#1F1F1E"/></svg>`; }
+
+function loadWish(){
+  try { const raw = JSON.parse(localStorage.getItem("binderhuntWish") || "[]"); return Array.isArray(raw) ? raw.filter(c => c && c.id) : []; }
+  catch (e) { return []; }
+}
+function binderStorageKey(){
+  return (window.BinderThemes && BinderThemes.KEYS && BinderThemes.KEYS.binders) || "bh.binders.v1";
+}
+function loadBinders(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(binderStorageKey()) || "null");
+    if (window.BinderThemes) return BinderThemes.normalizeState(raw);
+    if (raw && Array.isArray(raw.binders)) return { discoveryId: raw.discoveryId || "", binders: raw.binders.filter(b => b && b.id && b.name) };
+  } catch (e) {}
+  return { discoveryId:"", binders:[] };
+}
+function blankFilters(){
+  return { set:"", rarities:[], era:"", type:"", names:[], min:null, max:null, pricePreset:"", graded:false, gem:false };
+}
+function knownEra(value){
+  if (typeof value !== "string") return "";
+  const era = value.trim();
+  if (!era) return "";
+  if (ERA_GROUPS.some(g => g.id === era)) return era;
+  if (ERA_ORDER.includes(era)) return era;
+  return "";
+}
+function knownType(value){
+  if (typeof value !== "string") return "";
+  const type = value.trim();
+  if (!type) return "";
+  if (CARD_TYPES.includes(type)) return type;
+  if (meta.types && meta.types.includes(type)) return type;
+  return "";
+}
+function storedNames(value){
+  if (!Array.isArray(value)) return [];
+  const names = [];
+  value.forEach(item => {
+    if (typeof item !== "string" || names.length >= 24) return;
+    const name = item.trim().slice(0, 24);
+    if (name) names.push(name);
+  });
+  return names;
+}
+function storedRarities(value){
+  if (!Array.isArray(value)) return [];
+  const rarities = [];
+  value.forEach(item => {
+    if (typeof item !== "string") return;
+    const rarity = item.trim();
+    if (!rarity || rarity.length > 60 || rarity === "[object Object]" || rarities.includes(rarity)) return;
+    rarities.push(rarity);
+  });
+  return rarities;
+}
+function catalogHasSet(id){
+  if (!id) return false;
+  if (MUST_SETS.some(s => s.id === id)) return true;
+  return !!(meta.sets && meta.sets.some(s => s && s.id === id));
+}
+function loadFilters(){
+  const blank = blankFilters();
+  rememberedSet = "";
+  rememberedType = "";
+  try {
+    const raw = JSON.parse(localStorage.getItem("bh.filters.v3") || "null");
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return blank;
+    const next = blank;
+    if (typeof raw.set === "string") {
+      const id = raw.set.trim();
+      if (id && id.length <= 40) {
+        if (MUST_SETS.some(s => s.id === id)) next.set = id;
+        else rememberedSet = id;
+      }
+    }
+    if (typeof raw.type === "string") {
+      const type = raw.type.trim();
+      if (CARD_TYPES.includes(type)) next.type = type;
+      else if (type && type.length <= 32) rememberedType = type;
+    }
+    next.names = storedNames(raw.names);
+    next.rarities = storedRarities(raw.rarities);
+    next.era = knownEra(raw.era);
+    next.min = pos(raw.min);
+    next.max = pos(raw.max);
+    next.pricePreset = raw.pricePreset === "under10" || raw.pricePreset === "mid" || raw.pricePreset === "high" ? raw.pricePreset : "";
+    next.graded = raw.graded === true;
+    next.gem = raw.gem === true;
+    return next;
+  } catch (e) { return blank; }
+}
+function dropHeldFilters(){
+  rememberedSet = "";
+  rememberedType = "";
+}
+/* Once the catalog is in, keep a held set or type only if it is real.
+   Anything else is dropped. The hunt never searched with it. */
+function settleStoredFilters(){
+  if (!meta.complete) return;
+  const before = JSON.stringify(filters);
+  if (rememberedSet) {
+    const id = rememberedSet;
+    rememberedSet = "";
+    if (!filters.set && catalogHasSet(id)) filters.set = id;
+  }
+  if (filters.set && !catalogHasSet(filters.set)) filters.set = "";
+  if (rememberedType) {
+    const type = rememberedType;
+    rememberedType = "";
+    const known = knownType(type);
+    if (!filters.type && known) filters.type = known;
+  }
+  if (filters.type && !knownType(filters.type)) filters.type = "";
+  const changed = JSON.stringify(filters) !== before;
+  /* The blank filter object is not a choice the person made. Leave the key
+     unset when this visit arrived as a share and nothing was stored. */
+  if (receivedShareAtOpen && filtersMissingAtOpen) {
+    if (changed && tab === "hunt") restart({ skipFilterWrite:true });
+    else paintChips();
+    return;
+  }
+  saveFilters();
+  if (changed && tab === "hunt") restart();
+  else paintChips();
+}
+function loadSettings(){
+  const blank = { sound:false, haptics:true, reduce:"auto", currency:"USD" };
+  try {
+    const raw = JSON.parse(localStorage.getItem("bh.settings.v1") || "null");
+    if (!raw) {
+      if (localStorage.getItem("binderhuntSound") === "1") blank.sound = true;
+      return blank;
+    }
+    return { sound:!!raw.sound, haptics:raw.haptics !== false, reduce:raw.reduce === "on" || raw.reduce === "off" ? raw.reduce : "auto", currency:raw.currency === "EUR" ? "EUR" : "USD" };
+  } catch (e) { return blank; }
+}
+function saveWish(){ try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {} paintContext(); paintCount(); if (tab === "binders") renderBinders(); if (tab === "sets") renderSets(); }
+function saveBinders(){ try { localStorage.setItem(binderStorageKey(), JSON.stringify(binderState)); } catch (e) {} if (tab === "binders") renderBinders(); paintDiscovery(); paintRail(); }
+function saveFilters(){
+  if (filters.set) rememberedSet = "";
+  if (filters.type) rememberedType = "";
+  const payload = {
+    set: filters.set || rememberedSet || "",
+    rarities: filters.rarities || [],
+    era: filters.era || "",
+    type: filters.type || rememberedType || "",
+    names: filters.names || [],
+    min: filters.min,
+    max: filters.max,
+    pricePreset: filters.pricePreset || "",
+    graded: filters.graded === true,
+    gem: filters.gem === true
+  };
+  try { localStorage.setItem("bh.filters.v3", JSON.stringify(payload)); } catch (e) {}
+  paintChips();
+}
+function saveSettings(){ try { localStorage.setItem("bh.settings.v1", JSON.stringify(settings)); } catch (e) {} applyMotion(); }
+
+const OWNED_KEY = "bh.owned.v1";
+const LOG_KEY = "bh.log.v1";
+const LOG_MAX_EVENTS = 200;
+const LOG_MAX_DAYS = 400;
+function cleanId(id){
+  const s = typeof id === "string" ? id.trim() : "";
+  return s && s.length <= 80 ? s : "";
+}
+function asId(v){
+  if (typeof v === "string") return cleanId(v);
+  if (v && typeof v.id === "string") return cleanId(v.id);
+  return "";
+}
+function loadCollectionState(){
+  loadOwned();
+  loadLog();
+  quietSeedBinders();
+}
+function loadOwned(){
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(OWNED_KEY) || "null"); } catch (e) { raw = null; }
+  const ids = extractOwnedIds(raw);
+  if (ids) {
+    ids.forEach(v => { const id = asId(v); if (id) ownedIds.add(id); });
+    if (raw && raw.sets && typeof raw.sets === "object") {
+      Object.keys(raw.sets).forEach(id => {
+        if (!ownedIds.has(id)) return;
+        const sid = cleanId(raw.sets[id]);
+        if (sid) ownedSetById.set(id, sid);
+      });
+    }
+    if (raw && Array.isArray(raw.celebrated)) raw.celebrated.forEach(k => { if (typeof k === "string" && k.length && k.length < 80) celebrated.add(k); });
+    ownedNeedsSeed = !!(raw && raw.seeded === false);
+    if (!raw || raw.v !== 1 || !Array.isArray(raw.ids)) saveOwned();
+    return;
+  }
+  ownedNeedsSeed = true;
+  if (receivedShareAtOpen && ownedMissingAtOpen) {
+    ownedNeedsSeed = false;
+    return;
+  }
+  ownedInlineMigrated = migrateInlineOwned();
+  saveOwned();
+}
+function extractOwnedIds(raw){
+  if (raw == null) return null;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "object") {
+    if (Array.isArray(raw.ids)) return raw.ids;
+    if (Array.isArray(raw.cards)) return raw.cards;
+    return [];
+  }
+  return [];
+}
+function migrateInlineOwned(){
+  let found = false;
+  const take = card => {
+    if (!card || !card.id) return;
+    if (card.owned !== true && card.status !== "owned") return;
+    const id = cleanId(String(card.id));
+    if (!id) return;
+    ownedIds.add(id);
+    if (card.setId) ownedSetById.set(id, cleanId(String(card.setId)) || String(card.setId));
+    delete card.owned;
+    if (card.status === "owned") delete card.status;
+    found = true;
+  };
+  wish.forEach(take);
+  binderState.binders.forEach(b => (b.cards || []).forEach(take));
+  return found;
+}
+function saveOwned(){
+  const sets = {};
+  ownedIds.forEach(id => { const sid = ownedSetById.get(id); if (sid) sets[id] = sid; });
+  const payload = { v:1, ids:[...ownedIds], sets, celebrated:[...celebrated].slice(-500), seeded:!ownedNeedsSeed };
+  try { localStorage.setItem(OWNED_KEY, JSON.stringify(payload)); } catch (e) {}
+  paintRail();
+}
+function blankLog(){ return { v:1, days:[], events:[] }; }
+function loadLog(){
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(LOG_KEY) || "null"); } catch (e) { raw = null; }
+  if (!raw || typeof raw !== "object") {
+    logState = blankLog();
+    try {
+      const day = localStorage.getItem("bh.visit.day");
+      if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) logState.days.push(day);
+    } catch (e) {}
+    if (logState.days.length) saveLog();
+    return;
+  }
+  logState = trimLog({
+    v:1,
+    days:Array.isArray(raw.days) ? raw.days : [],
+    events:Array.isArray(raw.events) ? raw.events : []
+  });
+}
+function trimLog(log){
+  const days = [];
+  (log.days || []).forEach(d => {
+    if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) && !days.includes(d)) days.push(d);
+  });
+  const events = (log.events || []).filter(e => e && (e.k === "save" || e.k === "own" || e.k === "daily") && typeof e.id === "string" && e.id.length <= 80 && /^\d{4}-\d{2}-\d{2}$/.test(e.t)).slice(-LOG_MAX_EVENTS);
+  return { v:1, days:days.slice(-LOG_MAX_DAYS), events };
+}
+function saveLog(){
+  logState = trimLog(logState);
+  try {
+    let payload = JSON.stringify(logState);
+    while (payload.length > 48000 && logState.events.length) {
+      logState.events.shift();
+      payload = JSON.stringify(logState);
+    }
+    localStorage.setItem(LOG_KEY, payload);
+  } catch (e) {}
+}
+function logVisit(day){
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day || "")) return;
+  if (logState.days.includes(day)) return;
+  logState.days.push(day);
+  saveLog();
+}
+function logEvent(kind, id, extra){
+  const clean = cleanId(String(id || ""));
+  if (!clean || (kind !== "save" && kind !== "own" && kind !== "daily")) return;
+  const row = { t:localDay(), k:kind, id:clean };
+  if (kind === "daily" && extra && /^\d{4}-\d{2}-\d{2}$/.test(extra.day || "")) row.t = extra.day;
+  if (extra && typeof extra.on === "boolean") row.on = extra.on;
+  if (kind === "daily" && extra) {
+    if (Number.isFinite(extra.n)) row.n = extra.n;
+    if (Number.isFinite(extra.g)) row.g = extra.g;
+    if (typeof extra.ok === "boolean") row.ok = extra.ok;
+  }
+  logState.events.push(row);
+  saveLog();
+}
+function setIdOf(card){
+  if (!card) return "";
+  const explicit = card.setId ? cleanId(String(card.setId)) : "";
+  if (explicit) return explicit;
+  const id = cleanId(String(card.id || ""));
+  if (!id) return "";
+  const remembered = ownedSetById.get(id);
+  if (remembered) return remembered;
+  if (meta.sets.length) {
+    let best = "";
+    meta.sets.forEach(s => {
+      if ((id === s.id || id.startsWith(s.id + "-")) && s.id.length > best.length) best = s.id;
+    });
+    if (best) return best;
+  }
+  const cut = id.lastIndexOf("-");
+  return cut > 0 ? id.slice(0, cut) : "";
+}
+function ownedCountsBySet(){
+  const counts = new Map();
+  ownedIds.forEach(id => {
+    const sid = ownedSetById.get(id) || setIdOf({ id });
+    if (!sid) return;
+    counts.set(sid, (counts.get(sid) || 0) + 1);
+  });
+  return counts;
+}
+function setCardList(setId){
+  if (setView && setView.id === setId && Array.isArray(setView.cards) && setView.cards.length) return setView.cards;
+  const bag = setLists.get(setId);
+  if (bag && Array.isArray(bag.cards) && bag.cards.length) return bag.cards;
+  return null;
+}
+function countOwnedInSet(setId, cards){
+  const list = (cards && cards.length) ? cards : setCardList(setId);
+  if (list && list.length) {
+    const seen = new Set();
+    let n = 0;
+    list.forEach(c => {
+      const id = c && c.id;
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      if (ownedIds.has(id)) n++;
+    });
+    return n;
+  }
+  let n = 0;
+  ownedIds.forEach(id => { if (ownedSetById.get(id) === setId) n++; });
+  return n;
+}
+function clampedOwned(matched, total){
+  const n = Math.max(0, matched || 0);
+  if (total > 0) return Math.min(n, total);
+  return n;
+}
+function setTotal(set){
+  const c = set && set.cardCount;
+  if (!c || typeof c !== "object") return 0;
+  const total = Number(c.total);
+  const official = Number(c.official);
+  if (Number.isFinite(total) && total > 0) return Math.round(total);
+  if (Number.isFinite(official) && official > 0) return Math.round(official);
+  return 0;
+}
+function setCompletion(set){
+  const total = setTotal(set);
+  const owned = clampedOwned(countOwnedInSet(set && set.id), total);
+  if (!total) return { owned, total:0, pct:null };
+  const pct = Math.round((owned / total) * 100);
+  if (!Number.isFinite(pct)) return { owned, total, pct:null };
+  return { owned, total, pct:Math.max(0, Math.min(100, pct)) };
+}
+function progressLabel(owned, total){
+  const left = Math.max(0, total - owned);
+  if (left === 0) return "Complete";
+  if (left === 1) return "1 to go";
+  return left + " to go";
+}
+function progressOf(list){
+  const cards = list || [];
+  const total = cards.length;
+  const owned = cards.filter(c => c && ownedIds.has(c.id)).length;
+  return { owned, total, label: total ? progressLabel(owned, total) : "Ready for cards" };
+}
+function ringShown(owned, total){
+  const pct = total > 0 ? Math.max(0, Math.min(100, Math.round((owned / total) * 100))) : 0;
+  return total > 0 && Number.isFinite(pct) ? pct + "%" : "–";
+}
+function ringMarkup(owned, total){
+  const pct = total > 0 ? Math.max(0, Math.min(100, Math.round((owned / total) * 100))) : 0;
+  const c = 2 * Math.PI * 15.5;
+  const dash = total > 0 && Number.isFinite(pct) ? (pct / 100) * c : 0;
+  const shown = ringShown(owned, total);
+  const done = total > 0 && owned >= total;
+  return `<svg class="ring${done ? " done" : ""}" viewBox="0 0 42 42" aria-hidden="true"><circle class="ring-track" cx="21" cy="21" r="15.5"></circle><circle class="ring-val" cx="21" cy="21" r="15.5" stroke-dasharray="${dash.toFixed(2)} ${c.toFixed(2)}"></circle><text x="21" y="21" text-anchor="middle" dominant-baseline="central">${esc(shown)}</text></svg>`;
+}
+function friendlySetName(id){
+  const name = setName(id);
+  if (!name || name === id) return "This set";
+  return name;
+}
+function binderFull(binder){
+  const cards = (binder && binder.cards) || [];
+  return cards.length > 0 && cards.every(c => c && ownedIds.has(c.id));
+}
+function noteBinder(binder, beforeOwned){
+  if (!binder || !binderFull(binder)) return "";
+  const total = (binder.cards || []).length;
+  const before = Number.isFinite(beforeOwned) ? beforeOwned : 0;
+  if (!(before < total)) return "";
+  const key = "binder:" + binder.id;
+  if (celebrated.has(key)) return "";
+  celebrated.add(key);
+  return binder.name + " is complete.";
+}
+function noteSet(setId){
+  if (!setId) return "";
+  const list = setCardList(setId);
+  if (!list || !list.length) return "";
+  const set = meta.sets.find(s => s.id === setId);
+  const total = setTotal(set) || list.length;
+  if (!total) return "";
+  const matched = countOwnedInSet(setId, list);
+  const owned = clampedOwned(matched, total);
+  if (owned < total) return "";
+  const key = "set:" + setId;
+  if (celebrated.has(key)) return "";
+  celebrated.add(key);
+  return friendlySetName(setId) + " is complete.";
+}
+const setListInflight = new Map();
+const setListRetryAt = new Map();
+const deferSetConfetti = new Map();
+function publishSetCelebration(setId){
+  if (!setId || ownedNeedsSeed) return "";
+  const msg = noteSet(setId);
+  if (!msg) return "";
+  saveOwned();
+  if (deferSetConfetti.has(setId)) {
+    deferSetConfetti.set(setId, msg);
+    return msg;
+  }
+  showConfetti(msg);
+  return msg;
+}
+function holdConfetti(el, ms){
+  if (!el) return;
+  clearTimeout(confettiTimer);
+  confettiUntil = Date.now() + ms;
+  confettiTimer = setTimeout(() => { if (el.isConnected) el.remove(); }, ms);
+}
+function showSetFollowUp(binderMsgs, setMsg, startedAt){
+  if (!setMsg) return;
+  const live = document.querySelector(".confetti p");
+  if (binderMsgs.length && live && Date.now() - startedAt <= SET_LIST_WAIT_MS) {
+    live.textContent = binderMsgs.concat(setMsg).join(" ");
+    live.append(document.createRange().createContextualFragment(toad()));
+    announce(setMsg);
+    holdConfetti(live.closest(".confetti"), 2500);
+    return;
+  }
+  showConfetti(setMsg);
+}
+function rememberSetList(id, bag){
+  setLists.set(id, bag);
+  if (bag && bag.cards && bag.cards.length) publishSetCelebration(id);
+  return bag;
+}
+function inflightSetList(id, hunt){
+  const entry = setListInflight.get(hunt ? id + ":hunt" : id);
+  if (entry) return entry;
+  if (!hunt) return null;
+  return setListInflight.get(id) || null;
+}
+async function ensureSetList(id, opts){
+  const hunt = !!(opts && opts.hunt);
+  const ready = setCardList(id);
+  if (ready) return ready;
+  if (setLists.has(id)) return (setLists.get(id) || {}).cards || [];
+  const again = setListRetryAt.get(id) || 0;
+  if (again > Date.now()) {
+    const err = new Error("set list retry");
+    err.setListRetry = true;
+    err.retryAt = again;
+    throw err;
+  }
+  const pending = inflightSetList(id, hunt);
+  if (pending) return pending;
+  const key = hunt ? id + ":hunt" : id;
+  const job = (async () => {
+    try {
+      const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id), hunt ? { hunt:true } : undefined);
+      const raw = set && Array.isArray(set.cards) ? set.cards : null;
+      if (!raw || !raw.length) throw new Error("bad set list");
+      const cards = raw.slice().sort((a, b) => numId(a.localId) - numId(b.localId) || String(a.id).localeCompare(String(b.id)));
+      setListRetryAt.delete(id);
+      setListFails.delete(id);
+      rememberSetList(id, { cards, release:set.releaseDate || "", name:set.name || id });
+      return cards;
+    } catch (e) {
+      if (e && !isBusyError(e)) {
+        const n = (setListFails.get(id) || 0) + 1;
+        setListFails.set(id, n);
+        if (n < SET_LIST_RETRY_CAP) {
+          const at = Date.now() + SET_LIST_RETRY_MS;
+          setListRetryAt.set(id, at);
+          e.setListRetry = true;
+          e.retryAt = at;
+        } else {
+          e.setListGaveUp = true;
+        }
+      }
+      throw e;
+    } finally {
+      setListInflight.delete(key);
+    }
+  })();
+  setListInflight.set(key, job);
+  return job;
+}
+function ownedResult(card, on, msgs){
+  if (msgs.length) showConfetti(msgs.join(" "));
+  else {
+    if (settings.sound && !reduceMotion()) playTone(on ? 540 : 300);
+    announce(on ? (card.name || "Card") + " is marked got it." : (card.name || "Card") + " is wanted again.");
+  }
+}
+function collectNewCompletions(card, prior){
+  const msgs = [];
+  if (!card) return msgs;
+  binderState.binders.forEach(b => {
+    if ((b.cards || []).some(c => c && c.id === card.id)) {
+      const before = prior && typeof prior.get === "function" ? prior.get(b.id) : 0;
+      const msg = noteBinder(b, before);
+      if (msg && !msgs.includes(msg)) msgs.push(msg);
+    }
+  });
+  const setMsg = noteSet(setIdOf(card));
+  if (setMsg && !msgs.includes(setMsg)) msgs.push(setMsg);
+  return msgs;
+}
+function quietSeedBinders(){
+  if (!ownedNeedsSeed) return;
+  binderState.binders.forEach(b => { if (binderFull(b)) celebrated.add("binder:" + b.id); });
+  saveOwned();
+}
+function backfillOwnedSets(){
+  let changed = false;
+  ownedIds.forEach(id => {
+    if (ownedSetById.get(id)) return;
+    const sid = setIdOf({ id });
+    if (!sid) return;
+    ownedSetById.set(id, sid);
+    changed = true;
+  });
+  if (changed) saveOwned();
+}
+function pendingCard(item){ return item && item.card ? item.card : item; }
+function quietSeedSets(){
+  if (!ownedNeedsSeed) return;
+  backfillOwnedSets();
+  const skip = new Set();
+  pendingCelebrate.forEach(item => { const id = setIdOf(pendingCard(item)); if (id) skip.add(id); });
+  meta.sets.forEach(s => {
+    if (skip.has(s.id)) return;
+    const list = setCardList(s.id);
+    if (!list || !list.length) return;
+    const total = setTotal(s) || list.length;
+    if (total && countOwnedInSet(s.id, list) >= total) celebrated.add("set:" + s.id);
+  });
+  const queued = pendingCelebrate.splice(0);
+  ownedNeedsSeed = false;
+  const msgs = [];
+  queued.forEach(item => collectNewCompletions(pendingCard(item), item && item.prior).forEach(m => { if (!msgs.includes(m)) msgs.push(m); }));
+  saveOwned();
+  if (msgs.length) showConfetti(msgs.join(" "));
+}
+function refreshOwnedViews(id){
+  if (tab === "binders") renderBinders();
+  if (tab === "sets") renderSets();
+  if (profileCard && profileCard.id === id && !profileEl.hidden) renderProfile(cardCache.get(id) || profileCard);
+  paintRail();
+  if (wide() && !profilePinned && tab !== "hunt") { sideKey = ""; paintSide(); }
+}
+function focusOwnedControl(id, origin){
+  if (origin === "profile") {
+    const btn = document.getElementById("profileOwn");
+    if (btn) btn.focus();
+    return;
+  }
+  if (origin === "pocket" || origin === "menu") {
+    const btn = document.querySelector('.gotbtn[data-for="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]');
+    if (btn) btn.focus();
+  }
+}
+function binderOwnedNow(binder){
+  return ((binder && binder.cards) || []).filter(c => c && ownedIds.has(c.id)).length;
+}
+function priorsFor(cardId){
+  const prior = new Map();
+  binderState.binders.forEach(b => {
+    if ((b.cards || []).some(c => c && c.id === cardId)) prior.set(b.id, binderOwnedNow(b));
+  });
+  return prior;
+}
+function setOwned(card, on, origin){
+  if (!card || !card.id) return false;
+  const id = cleanId(String(card.id));
+  if (!id) return false;
+  const has = ownedIds.has(id);
+  if (!!on === has) return false;
+  const prior = on ? priorsFor(id) : null;
+  if (on) {
+    ownedIds.add(id);
+    const sid = setIdOf(card);
+    if (sid) ownedSetById.set(id, sid);
+  } else {
+    ownedIds.delete(id);
+    ownedSetById.delete(id);
+  }
+  logEvent("own", id, { on:!!on });
+  let msgs = [];
+  if (on && ownedNeedsSeed) pendingCelebrate.push({ card, prior });
+  else if (on) msgs = collectNewCompletions(card, prior);
+  saveOwned();
+  if (settings.haptics) haptic(on ? 12 : 6);
+  refreshOwnedViews(id);
+  focusOwnedControl(id, origin);
+  const sid = on ? setIdOf(card) : "";
+  const setTotalNow = sid ? setTotal(meta.sets.find(s => s.id === sid)) : 0;
+  const pendingSet = sid && !ownedNeedsSeed && !setCardList(sid) && !celebrated.has("set:" + sid) && setTotalNow && countOwnedInSet(sid) >= setTotalNow ? sid : "";
+  if (pendingSet) {
+    const binderMsgs = msgs.slice();
+    if (binderMsgs.length) ownedResult(card, on, binderMsgs);
+    deferSetConfetti.set(pendingSet, "");
+    const startedAt = Date.now();
+    ensureSetList(pendingSet).then(() => {
+      let setMsg = deferSetConfetti.get(pendingSet) || "";
+      deferSetConfetti.delete(pendingSet);
+      if (!setMsg) {
+        const late = noteSet(pendingSet);
+        if (late) { saveOwned(); setMsg = late; }
+      }
+      if (setMsg) showSetFollowUp(binderMsgs, setMsg, startedAt);
+      else if (!binderMsgs.length) ownedResult(card, on, []);
+      if (tab === "sets") renderSets();
+    }).catch(() => {
+      deferSetConfetti.delete(pendingSet);
+      if (!binderMsgs.length) ownedResult(card, on, []);
+    });
+    return true;
+  }
+  ownedResult(card, on, msgs);
+  return true;
+}
+function snapshot(card){
+  return {
+    id:card.id, name:card.name || "", set:card.set || "", setId:card.setId || "", number:card.number || "",
+    rarity:card.rarity || "", img:card.img || "", thumb:card.thumb || "", types:card.types || [],
+    variants:card.variants || [], price:pos(card.price), source:card.source || "", stampedFirst:!!card.stampedFirst, holo:card.holo === true,
+    artist:card.artist || "", hp:card.hp, flavor:card.flavor || "", legal:card.legal || null, cm:card.cm || null, printings:card.printings || []
+  };
+}
+function discoveryBinder(){ return binderState.binders.find(b => b.id === binderState.discoveryId) || null; }
+function themeOf(b){ return window.BinderThemes ? BinderThemes.themeOf(b) : ((b && b.theme) || { kind:"none" }); }
+function speciesHit(cardName, species){
+  if (window.BinderThemes) return BinderThemes.speciesHit(cardName, species);
+  const n = String(cardName || "").toLowerCase();
+  const s = String(species || "").toLowerCase().trim();
+  if (!s) return false;
+  if (n === s) return true;
+  if (n.startsWith(s + " ") || n.startsWith(s + "-")) return true;
+  if (n.endsWith(" " + s)) return true;
+  if (n.includes(" " + s + " ")) return true;
+  return false;
+}
+function nameHit(card){
+  return (filters.names || []).some(species => speciesHit(card && card.name, species));
+}
+function eraMatches(setId, era){
+  if (!era) return true;
+  const group = ERA_GROUPS.find(g => g.id === era);
+  const got = eraOf(setId);
+  if (group) return group.eras.includes(got);
+  return got === era;
+}
+function eraLabel(era){
+  const group = ERA_GROUPS.find(g => g.id === era);
+  return group ? group.label : (era || "Era");
+}
+function namesLabel(){
+  const names = filters.names || [];
+  if (!names.length) return "Pokémon";
+  const covered = HUNT_PICKS.filter(p => p.names.every(n => names.some(x => x.toLowerCase() === n.toLowerCase())));
+  const explicit = covered.filter(p => !covered.some(other => other.id !== p.id && other.names.length > p.names.length && p.names.every(n => other.names.some(x => x.toLowerCase() === n.toLowerCase()))));
+  const onlyPresets = explicit.length && names.every(n => explicit.some(p => p.names.some(x => x.toLowerCase() === n.toLowerCase())));
+  if (onlyPresets && explicit.length === 1) return explicit[0].label;
+  if (onlyPresets && explicit.length === 2) return explicit[0].label + ", " + explicit[1].label;
+  if (onlyPresets) return explicit[0].label + " +" + (explicit.length - 1);
+  if (names.length === 1) return names[0];
+  return names[0] + " +" + (names.length - 1);
+}
+function priceLabel(){
+  if (filters.pricePreset === "under10") return "Under $10";
+  if (filters.pricePreset === "mid") return "$10–50";
+  if (filters.pricePreset === "high") return "$50+";
+  const lo = filters.min != null ? money(filters.min) : null;
+  const hi = filters.max != null ? money(filters.max) : null;
+  if (!lo && !hi) return "Price";
+  if (!lo) return "Under " + hi;
+  if (!hi) return lo + "+";
+  return lo + "–" + hi;
+}
+function priceOk(price){
+  if (filters.pricePreset === "under10") return price != null && price < 10;
+  if (filters.pricePreset === "mid") return price != null && price >= 10 && price <= 50;
+  if (filters.pricePreset === "high") return price != null && price >= 50;
+  if (filters.min != null && (price == null || price < filters.min)) return false;
+  if (filters.max != null && (price == null || price > filters.max)) return false;
+  return true;
+}
+function matchesTheme(card, theme){
+  if (window.BinderThemes) return BinderThemes.matchesTheme(card, theme);
+  if (!theme || !theme.kind || theme.kind === "none") return true;
+  if (theme.kind === "set") return !!theme.setId && card && card.setId === theme.setId;
+  if (theme.kind === "type") return !!theme.type && card && (card.types || []).includes(theme.type);
+  if (theme.kind === "pokemon") return !!theme.name && speciesHit(card && card.name, theme.name);
+  return true;
+}
+function themePatch(binder){
+  const theme = themeOf(binder);
+  if (window.BinderThemes) return BinderThemes.huntFilters(theme);
+  if (theme.kind === "set" && theme.setId) return { set:theme.setId, type:"", names:[] };
+  if (theme.kind === "type" && theme.type) return { set:"", type:theme.type, names:[] };
+  if (theme.kind === "pokemon" && theme.name) return { set:"", type:"", names:[theme.name] };
+  return { set:"", type:"", names:[] };
+}
+function themeLabel(theme){
+  if (!theme || theme.kind === "none" || !theme.kind) return "Any card";
+  if (theme.kind === "set") return "Set · " + (setName(theme.setId) || theme.setId);
+  if (theme.kind === "type") return "Type · " + theme.type;
+  if (theme.kind === "pokemon") return theme.name ? theme.name + " cards" : "Pokémon cards";
+  return "Any card";
+}
+function setName(id){ const s = meta.sets.find(x => x.id === id); return s ? s.name : id; }
+function usdOf(card){
+  const markets = (card.variants || []).map(v => pos(v.market)).filter(Boolean);
+  if (markets.length) return Math.min(...markets);
+  return pos(card.price);
+}
+function shownMoney(card){
+  if (settings.currency === "EUR") {
+    const printing = (card.printings || []).find(p => pos(p.avg)) || null;
+    const avg = printing ? pos(printing.avg) : pos(card.cm && card.cm.avg);
+    return avg ? { amount:avg, currency:"EUR" } : null;
+  }
+  const amount = usdOf(card);
+  return amount ? { amount, currency:"USD" } : null;
+}
+function printingMoney(card, variant){
+  if (settings.currency === "EUR") return shownMoney(card);
+  const v = variant === undefined ? selectedVariant(card) : variant;
+  if (v && pos(v.market)) return { amount:v.market, currency:"USD" };
+  return shownMoney(card);
+}
+function valueOf(list){
+  const nums = list.map(usdOf).filter(Boolean);
+  if (!nums.length) return null;
+  return nums.reduce((a, b) => a + b, 0);
+}
+
+function editionFlags(name){
+  const s = String(name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return { raw:s, first:/firstedition|1stedition/.test(s), shadowless:s.includes("shadowless"), reverse:s.includes("reverse"), unlimited:s.includes("unlimited"), fourth:s.includes("fourth"), jumbo:s.includes("jumbo"), metal:s.includes("metal") };
+}
+function samePrinting(label, tcgKey){
+  const a = editionFlags(label), b = editionFlags(tcgKey);
+  if (a.jumbo || a.metal || a.fourth) return false;
+  if (a.first || a.shadowless || a.reverse || b.first || b.shadowless || b.reverse) return a.first === b.first && a.shadowless === b.shadowless && a.reverse === b.reverse;
+  if (a.unlimited || a.raw === "holofoil" || a.raw === "holo" || a.raw === "normal" || a.raw.includes("holo")) return true;
+  return a.raw === b.raw;
+}
+function chosenVariant(names, tcgKey){
+  const matches = names.filter(name => samePrinting(name, tcgKey));
+  if (!matches.length) return "";
+  const key = editionFlags(tcgKey).raw;
+  const exact = matches.find(name => editionFlags(name).raw === key);
+  if (exact) return exact;
+  const unlimited = matches.find(name => { const f = editionFlags(name); return f.unlimited && f.raw.includes("holo"); });
+  return unlimited || matches[0];
+}
+function selectedVariant(card){
+  const list = (card.variants || []).filter(v => pos(v.market) || pos(v.mid) || pos(v.low));
+  if (!list.length) return null;
+  const want = variantChoice.get(card.id);
+  return list.find(v => v.key === want) || list.slice().sort((a, b) => (pos(a.market) || 1e12) - (pos(b.market) || 1e12))[0];
+}
+function printingName(variant){
+  if (!variant) return "";
+  if (variant.key === "holofoil" || editionFlags(variant.key).raw.includes("holo")) return "Unlimited Holofoil";
+  return variant.label || "Unlimited";
+}
+function scanBanner(card){
+  const v = selectedVariant(card);
+  if (!card || !card.stampedFirst || !v) return "";
+  if (editionFlags(v.key + " " + v.label).first) return "";
+  return "The catalog scan shows a 1st Edition stamp. Prices are " + printingName(v) + ".";
+}
+function marketCaption(card, variant){
+  if (settings.currency === "EUR") return "Cardmarket average";
+  if (card && card.stampedFirst && variant && !editionFlags(variant.key + " " + variant.label).first) return printingName(variant);
+  return "Market (raw NM)";
+}
+
+function withAffiliate(url, vendor){
+  const extra = (AFFILIATE[vendor] && AFFILIATE[vendor].params) || {};
+  const u = new URL(url);
+  Object.entries(extra).forEach(([k, v]) => { if (v != null && v !== "") u.searchParams.set(k, String(v)); });
+  return u.toString();
+}
+function buyLinks(card){
+  const q = [card.name, card.set, card.number].filter(Boolean).join(" ");
+  const v = selectedVariant(card);
+  const productId = (v && v.productId) || (card.variants || []).map(x => x.productId).find(Boolean);
+  const tcg = productId ? "https://www.tcgplayer.com/product/" + productId : "https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&view=grid&q=" + encodeURIComponent(q);
+  const ebay = new URL("https://www.ebay.com/sch/i.html");
+  ebay.searchParams.set("_nkw", q + " pokemon card");
+  ebay.searchParams.set("LH_Sold", "1");
+  ebay.searchParams.set("LH_Complete", "1");
+  const links = [
+    { label:"View on TCGplayer", href:withAffiliate(tcg, "tcgplayer") },
+    { label:"eBay sold", href:withAffiliate(ebay.toString(), "ebay") }
+  ];
+  if (card.cm && card.cm.idProduct) links.push({ label:"Cardmarket", href:withAffiliate("https://www.cardmarket.com/en/Pokemon/Products?idProduct=" + card.cm.idProduct, "cardmarket") });
+  return links;
+}
+
+function isBusyError(e){
+  const name = e && e.name || "";
+  const msg = String(e && e.message || e || "");
+  if (/HTTP 429/.test(msg) || /^HTTP 5/.test(msg)) return true;
+  if (name === "AbortError" || name === "TimeoutError") return true;
+  return /Failed to fetch|NetworkError|Load failed|ECONN|timeout/i.test(msg);
+}
+function busyBlock(){ return catalogBusy || Date.now() < busyUntil; }
+function touchBusy(){
+  catalogBusy = true;
+  busyUntil = Date.now() + 10000;
+}
+function noteBusy(){
+  touchBusy();
+  busyStrike = Math.min(6, busyStrike + 1);
+}
+function busyDelay(){ return Math.min(8000, 400 * (2 ** Math.min(busyStrike, 5))); }
+function abortError(signal){
+  if (signal && signal.reason) return signal.reason;
+  return new DOMException("The operation was aborted.", "AbortError");
+}
+function whenAborted(signal){
+  if (!signal) return new Promise(() => {});
+  if (signal.aborted) return Promise.reject(abortError(signal));
+  return new Promise((_, reject) => {
+    signal.addEventListener("abort", () => reject(abortError(signal)), { once:true });
+  });
+}
+function combineSignals(timeoutMs, ctrl){
+  const timeout = AbortSignal.timeout(timeoutMs);
+  if (!ctrl) return timeout;
+  if (typeof AbortSignal.any === "function") return AbortSignal.any([timeout, ctrl.signal]);
+  const merged = new AbortController();
+  const link = sig => {
+    if (sig.aborted) { if (!merged.signal.aborted) merged.abort(sig.reason); return; }
+    sig.addEventListener("abort", () => { if (!merged.signal.aborted) merged.abort(sig.reason); }, { once:true });
+  };
+  link(timeout);
+  link(ctrl.signal);
+  return merged.signal;
+}
+function noteHuntProgress(){
+  huntProgressAt = Date.now();
+  if (!streamDone) armHuntWatch(generation);
+}
+function abortStaleHuntFetches(){
+  const now = Date.now();
+  huntInflight.forEach(job => {
+    if (now - job.started >= HUNT_FETCH_MS) job.ctrl.abort();
+  });
+}
+async function readJson(res, signal){
+  const body = res.json();
+  if (!signal) return body;
+  return Promise.race([body, whenAborted(signal)]);
+}
+async function getJson(url, opts){
+  const hunt = !!(opts && opts.hunt);
+  pullSerial++;
+  const warmMap = window.__bhWarm;
+  if (warmMap && Object.prototype.hasOwnProperty.call(warmMap, url)) {
+    const warm = warmMap[url];
+    delete warmMap[url];
+    try {
+      const body = await warm;
+      catalogBusy = false;
+      busyStrike = 0;
+      if (Array.isArray(body)) {
+        try { Object.defineProperty(body, "bhWarm", { value:true }); } catch (e) {}
+      }
+      return body;
+    } catch (e) {}
+  }
+  let last;
+  const startedGen = generation;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const ctrl = hunt ? new AbortController() : null;
+    const huntId = ctrl ? ++huntFetchSeq : 0;
+    if (ctrl) huntInflight.set(huntId, { started:Date.now(), ctrl });
+    const signal = combineSignals(hunt ? HUNT_FETCH_MS : 12000, ctrl);
+    let finished = false;
+    const finish = () => {
+      if (finished || !huntId) return;
+      finished = true;
+      huntInflight.delete(huntId);
+      if (startedGen === generation) noteHuntProgress();
+    };
+    if (signal.aborted) { finish(); throw abortError(signal); }
+    try {
+      const init = { signal };
+      if (opts && opts.priority) init.priority = opts.priority;
+      const res = await fetch(url, init);
+      if (res.status === 429 || res.status >= 500) {
+        last = new Error("HTTP " + res.status);
+        touchBusy();
+        finish();
+        await Promise.race([new Promise(r => setTimeout(r, 280 * (attempt + 1))), whenAborted(signal)]);
+        continue;
+      }
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      catalogBusy = false;
+      busyStrike = 0;
+      const body = await readJson(res, signal);
+      finish();
+      return body;
+    } catch (e) {
+      last = e;
+      finish();
+      if (signal.aborted) throw e;
+      const http = String(e && e.message || "");
+      const retry = http.startsWith("HTTP ") ? /^HTTP (429|5)/.test(http) : true;
+      if (isBusyError(e)) touchBusy();
+      if (attempt === 2 || !retry) break;
+      await new Promise(r => setTimeout(r, 280 * (attempt + 1)));
+    }
+  }
+  if (isBusyError(last)) touchBusy();
+  throw last;
+}
+function usdVariants(tp){
+  if (!tp || typeof tp !== "object") return [];
+  const out = [];
+  for (const [key, val] of Object.entries(tp)) {
+    if (!val || typeof val !== "object" || key === "unit" || key === "updated") continue;
+    const market = pos(val.marketPrice), mid = pos(val.midPrice), low = pos(val.lowPrice), high = pos(val.highPrice);
+    if (market == null && mid == null && low == null && high == null) continue;
+    out.push({ key, label:variantLabel(key), low, mid, high, market, productId:val.productId || null });
+  }
+  return out;
+}
+/* TCGdex sometimes leaves pricing.tcgplayer empty and stores the same table
+   on a printing. Hisuian Zoroark (swsh11-076) is that shape: the card record
+   has no top-level market, and the holofoil market lives under
+   variants_detailed. A card with no market on either level still has no USD price. */
+function dexUsdVariants(card){
+  const top = usdVariants(card && card.pricing && card.pricing.tcgplayer);
+  if (top.length) return top;
+  const out = [];
+  const seen = new Set();
+  const rows = card && Array.isArray(card.variants_detailed) ? card.variants_detailed : [];
+  rows.forEach(row => {
+    usdVariants(row && row.pricing && row.pricing.tcgplayer).forEach(variant => {
+      if (!variant || seen.has(variant.key)) return;
+      seen.add(variant.key);
+      out.push(variant);
+    });
+  });
+  return out;
+}
+function avgPoints(a, b, c){
+  return [["30-day avg", pos(a)], ["7-day avg", pos(b)], ["1-day avg", pos(c)]].filter(([, v]) => v != null).map(([label, value]) => ({ label, value }));
+}
+function normalizeDex(c){
+  const cm = (c.pricing && c.pricing.cardmarket) || {};
+  const printings = [];
+  const seenP = new Set();
+  for (const v of c.variants_detailed || []) {
+    const pcm = v.pricing && v.pricing.cardmarket;
+    if (!pcm) continue;
+    const label = [v.type, v.subtype].filter(Boolean).join(" ") || "printing";
+    const sig = label + "|" + pcm.avg;
+    if (seenP.has(sig)) continue;
+    seenP.add(sig);
+    const pts = avgPoints(pcm.avg30, pcm.avg7, pcm.avg1);
+    if (!pts.length && pos(pcm.avg) == null && pos(pcm.trend) == null) continue;
+    printings.push({ label, avg:pos(pcm.avg), low:pos(pcm.low), trend:pos(pcm.trend), points:pts, updated:pcm.updated || "" });
+  }
+  const dexPrint = c.variants && typeof c.variants === "object" ? c.variants : {};
+  const holo = dexPrint.holo === true || (Array.isArray(c.variants_detailed) && c.variants_detailed.some(v => String(v && v.type || "").toLowerCase() === "holo"));
+  return {
+    source:"tcgdex", id:c.id, name:c.name, holo,
+    img:c.image ? safeImg(c.image + "/high.webp") : "", thumb:c.image ? safeImg(c.image + "/low.webp") : "",
+    set:(c.set && c.set.name) || "", setId:(c.set && c.set.id) || "", number:c.localId || "",
+    rarity:c.rarity || "—", artist:c.illustrator || "", hp:pos(Number(c.hp)) || (Number(c.hp) > 0 ? Number(c.hp) : null),
+    types:c.types || [], flavor:c.description || "", legal:c.legal || null,
+    variants:dexUsdVariants(c),
+    stampedFirst:(c.variants_detailed || []).some(v => Array.isArray(v.stamp) && v.stamp.some(s => String(s).toLowerCase().includes("1st"))),
+    cm:{ avg:pos(cm.avg), low:pos(cm.low), trend:pos(cm.trend), idProduct:cm.idProduct || null, points:avgPoints(cm.avg30, cm.avg7, cm.avg1) },
+    printings
+  };
+}
+function normalizePtcg(c){
+  const prices = (c.tcgplayer && c.tcgplayer.prices) || {};
+  const cm = (c.cardmarket && c.cardmarket.prices) || {};
+  const variants = [];
+  for (const [key, val] of Object.entries(prices)) {
+    if (!val || typeof val !== "object") continue;
+    const market = pos(val.market), mid = pos(val.mid), low = pos(val.low), high = pos(val.high);
+    if (market == null && mid == null && low == null && high == null) continue;
+    variants.push({ key, label:variantLabel(key), low, mid, high, market, productId:null });
+  }
+  const holo = /holo|illustration|hyper|secret|shiny|radiant|amazing/i.test(c.rarity || "") || Object.keys(prices).some(k => /holo/i.test(k) && !/reverse/i.test(k));
+  return {
+    source:"pokemontcg.io", id:c.id, name:c.name, holo,
+    img:safeImg(c.images && c.images.large), thumb:safeImg(c.images && c.images.small),
+    set:(c.set && c.set.name) || "", setId:(c.set && c.set.id) || "", number:c.number || "",
+    rarity:c.rarity || "—", artist:c.artist || "", types:c.types || [],
+    hp:c.hp == null || c.hp === "" ? null : pos(Number(c.hp)),
+    flavor:c.flavorText || "", legal:c.legalities ? { standard:c.legalities.standard === "Legal", expanded:c.legalities.expanded === "Legal" } : null,
+    variants, stampedFirst:false,
+    cm:{ avg:pos(cm.averageSellPrice), low:pos(cm.lowPrice), trend:pos(cm.trendPrice), idProduct:null, points:avgPoints(cm.avg30, cm.avg7, cm.avg1) },
+    printings:[
+      { label:"Holofoil", avg:pos(cm.averageSellPrice), low:pos(cm.lowPrice), trend:pos(cm.trendPrice), points:avgPoints(cm.avg30, cm.avg7, cm.avg1), updated:(c.cardmarket && c.cardmarket.updatedAt) || "" },
+      { label:"Reverse Holofoil", avg:pos(cm.reverseHoloSell), low:pos(cm.reverseHoloLow), trend:pos(cm.reverseHoloTrend), points:avgPoints(cm.reverseHoloAvg30, cm.reverseHoloAvg7, cm.reverseHoloAvg1), updated:(c.cardmarket && c.cardmarket.updatedAt) || "" }
+    ].filter(p => p.avg || p.points.length)
+  };
+}
+async function hydrate(brief, opts){
+  if (cardCache.has(brief.id)) return cardCache.get(brief.id);
+  let card;
+  try { card = normalizeDex(await getJson(TCGDEX + "/cards/" + encodeURIComponent(brief.id), opts)); }
+  catch (e) {
+    if (isBusyError(e)) throw e;
+    const raw = await getJson("https://api.pokemontcg.io/v2/cards/" + encodeURIComponent(brief.id), opts);
+    card = normalizePtcg(raw.data || raw);
+  }
+  if (!card.img && brief.image) {
+    card.img = safeImg(brief.image + "/high.webp");
+    card.thumb = safeImg(brief.image + "/low.webp");
+  }
+  if (!card.setId) card.setId = String(brief.id).split("-")[0];
+  card.digital = isDigital(card);
+  cardCache.set(brief.id, card);
+  return card;
+}
+function loadMeta(){
+  if (meta.ready) return Promise.resolve();
+  if (metaPromise) return metaPromise;
+  metaPromise = (async () => {
+    const [sets, types, rarities] = await Promise.all([
+      getJson(TCGDEX + "/sets", { priority:"low" }), getJson(TCGDEX + "/types", { priority:"low" }), getJson(TCGDEX + "/rarities", { priority:"low" })
+    ]);
+    const byId = new Map();
+    (sets || []).forEach(s => { if (s && s.id && !isPocketId(s.id)) byId.set(s.id, s); });
+    MUST_SETS.forEach(s => { if (!byId.has(s.id)) byId.set(s.id, s); });
+    meta.sets = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+    meta.types = (types || []).filter(t => typeof t === "string");
+    meta.rarities = (rarities || []).filter(r => !POCKET_RARITIES.has(r)).sort((a, b) => a.localeCompare(b));
+    meta.complete = true;
+    meta.ready = true;
+  })().catch(() => {
+    meta.sets = MUST_SETS.slice();
+    meta.types = CARD_TYPES.slice();
+    meta.rarities = [];
+    meta.ready = true;
+  });
+  return metaPromise;
+}
+function binderBusy(){
+  const showcase = document.getElementById("showcase");
+  const book = document.querySelector(".book");
+  return pricePointer > 0 || !!document.querySelector(".leaf.hot") || !!(book && book.dataset.curling) || !!(showcase && !showcase.hidden);
+}
+function applyScrydex(){
+  const busy = binderBusy();
+  paintDeckDrops();
+  if (!busy && profilePinned && profileCard && !profileEl.hidden) {
+    renderProfile(cardCache.get(profileCard.id) || profileCard);
+    queuePrice(profileCard.id);
+  } else if (!profilePinned) { summaryId = ""; paintDeckSummary(currentTop()); }
+  if (busy) { setTimeout(applyScrydex, 160); return; }
+  if (tab === "binders") renderBinders();
+  else paintRail();
+}
+/* The price cache is about 26MB. Parsing it on the page thread freezes swipes,
+   and downloading it with the first card blows the load. A worker parses it
+   and hands cards over in small batches after the top card is on screen. */
+function loadScrydex(){
+  if (scrydexPromise) return scrydexPromise;
+  const finishEmpty = () => { scrydex = { ready:true, cards:{} }; applyScrydex(); };
+  scrydexPromise = new Promise(resolve => {
+    const finish = () => { scrydex.ready = true; applyScrydex(); resolve(); };
+    const fail = () => { finishEmpty(); resolve(); };
+    const absorb = (cards) => {
+      scrydex = { ready:false, cards:{} };
+      const ids = Object.keys(cards || {});
+      let i = 0;
+      const step = () => {
+        const end = Math.min(ids.length, i + 24);
+        for (; i < end; i++) scrydex.cards[ids[i]] = cards[ids[i]];
+        if (i < ids.length) { setTimeout(step, 0); return; }
+        finish();
+      };
+      step();
+    };
+    let worker = null;
+    try {
+      const src = [
+        "self.onmessage = async (event) => {",
+        "  try {",
+        "    const res = await fetch(event.data, { cache: 'no-cache' });",
+        "    if (!res.ok) throw new Error('status');",
+        "    const data = await res.json();",
+        "    const cards = (data && data.cards) || {};",
+        "    const ids = Object.keys(cards);",
+        "    const size = 2;",
+        "    for (let i = 0; i < ids.length; i += size) {",
+        "      const batch = {};",
+        "      const slice = ids.slice(i, i + size);",
+        "      for (let j = 0; j < slice.length; j++) batch[slice[j]] = cards[slice[j]];",
+        "      self.postMessage({ batch: batch, last: i + size >= ids.length });",
+        "    }",
+        "    if (!ids.length) self.postMessage({ batch: {}, last: true });",
+        "  } catch (e) { self.postMessage({ error: true }); }",
+        "};"
+      ].join("\n");
+      worker = new Worker(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+    } catch (e) { worker = null; }
+    if (!worker) {
+      fetch("data/scrydex.json", { cache:"no-cache" }).then(r => r.ok ? r.json() : null).then(j => {
+        absorb((j && j.cards) || {});
+      }).catch(fail);
+      return;
+    }
+    scrydex = { ready:false, cards:{} };
+    const queue = [];
+    let pumping = false;
+    const pumpQueue = () => {
+      pumping = false;
+      if (pricePointer > 0) {
+        pumping = true;
+        setTimeout(pumpQueue, 40);
+        return;
+      }
+      const start = performance.now();
+      while (queue.length && performance.now() - start < 8) {
+        const msg = queue.shift();
+        if (!msg) continue;
+        if (msg.error) { try { worker.terminate(); } catch (e) {} fail(); return; }
+        const batch = msg.batch || {};
+        const ids = Object.keys(batch);
+        for (let i = 0; i < ids.length; i++) scrydex.cards[ids[i]] = batch[ids[i]];
+        if (msg.last) { try { worker.terminate(); } catch (e) {} finish(); return; }
+      }
+      if (!queue.length) return;
+      pumping = true;
+      if (window.requestIdleCallback) requestIdleCallback(pumpQueue, { timeout: 60 });
+      else setTimeout(pumpQueue, 16);
+    };
+    worker.onmessage = (event) => {
+      queue.push(event.data || {});
+      if (pumping) return;
+      pumping = true;
+      if (window.requestIdleCallback) requestIdleCallback(pumpQueue, { timeout: 60 });
+      else setTimeout(pumpQueue, 16);
+    };
+    worker.onerror = () => { try { worker.terminate(); } catch (e) {} fail(); };
+    worker.postMessage(new URL("data/scrydex.json", location.href).href);
+  });
+  return scrydexPromise;
+}
+function scheduleScrydex(){
+  if (scrydexPromise) return scrydexPromise;
+  if (filters.graded) return loadScrydex();
+  let armed = false;
+  let timer = 0;
+  let waitId = 0;
+  const notBefore = Date.now() + 4500;
+  const start = () => {
+    if (armed) return;
+    if (Date.now() < notBefore) return;
+    armed = true;
+    clearInterval(timer);
+    clearTimeout(waitId);
+    loadScrydex();
+  };
+  const sharpReady = () => {
+    const img = deck && deck.querySelector(".card:last-child img");
+    if (!img) return false;
+    const src = img.currentSrc || img.src || "";
+    if (!/\/high\.(webp|png)(\?|$)/.test(src) && !/images\.pokemontcg\.io\//.test(src)) return false;
+    return img.complete && img.naturalWidth > 40;
+  };
+  timer = setInterval(() => { if (sharpReady()) start(); }, 150);
+  waitId = setTimeout(start, 7000);
+  return null;
+}
+const DEMAND_KEY = "bh.priceDemand.v1";
+const priceAsked = new Set();
+function priceProxyUrl(){
+  const meta = document.querySelector('meta[name="binderhunt-price-proxy"]');
+  return meta && meta.content ? meta.content.trim() : "";
+}
+function readDemand(){
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DEMAND_KEY) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (e) { return {}; }
+}
+function noteDemand(id){
+  if (!id) return;
+  const all = readDemand();
+  const row = all[id] && typeof all[id] === "object" ? all[id] : { n:0 };
+  row.n = (Number(row.n) || 0) + 1;
+  row.t = Date.now();
+  all[id] = row;
+  const ids = Object.keys(all);
+  if (ids.length > 400) {
+    ids.sort((a, b) => (all[a].n - all[b].n) || ((all[a].t || 0) - (all[b].t || 0)));
+    ids.slice(0, ids.length - 400).forEach(key => { delete all[key]; });
+  }
+  try { localStorage.setItem(DEMAND_KEY, JSON.stringify(all)); } catch (e) {}
+}
+function needsPriceFetch(id){
+  if (!id || !scrydex.ready) return false;
+  if (!Object.prototype.hasOwnProperty.call(scrydex.cards, id)) return true;
+  const rec = scrydex.cards[id];
+  if (!rec || rec.missing) return true;
+  return !(Array.isArray(rec.graded) && rec.graded.length) && !(Array.isArray(rec.history) && rec.history.length);
+}
+function queuePrice(id){
+  const url = priceProxyUrl();
+  if (!url || !needsPriceFetch(id) || priceAsked.has(id)) return;
+  priceAsked.add(id);
+  fetch(url.replace(/\/$/, "") + "/demand?id=" + encodeURIComponent(id), {
+    method:"POST",
+    headers:{ "content-type":"application/json" },
+    body:JSON.stringify({ id })
+  }).catch(() => {});
+}
+function scryRecord(card){
+  if (!card || !scrydex.ready) return undefined;
+  return Object.prototype.hasOwnProperty.call(scrydex.cards, card.id) ? scrydex.cards[card.id] : null;
+}
+
+function filtersActive(){
+  return !!(filters.gem || filters.set || filters.type || (filters.names || []).length || filters.rarities.length || filters.era || filters.graded || filters.min != null || filters.max != null || filters.pricePreset);
+}
+function raritiesForSet(id){
+  const list = HUNT_RARITIES.slice();
+  if (VINTAGE_SET.test(id || "")) list.push("Rare");
+  return list;
+}
+function gemTypeOk(card){
+  const gemCard = !!(card && (card.gemHint || card.gemReady));
+  if (gemCard && window.BinderGems && typeof BinderGems.typeMatches === "function") return BinderGems.typeMatches(card, filters.type);
+  return (card && card.types || []).includes(filters.type);
+}
+function keep(card){
+  if (!card || isDigital(card) || !knownArt(card).length) return false;
+  if (discoveryBinder() && savedIds().has(card.id)) return false;
+  const surprise = !!(card.spice && !discoveryBinder());
+  if (!surprise) {
+    if (filters.set && card.setId !== filters.set) return false;
+    if ((filters.names || []).length && !nameHit(card)) return false;
+    if (filters.type && !gemTypeOk(card)) return false;
+  }
+  if (filters.era && !eraMatches(card.setId, filters.era)) return false;
+  if (filters.rarities.length && !filters.rarities.includes(card.rarity)) return false;
+  if (!priceOk(usdOf(card))) return false;
+  if (filters.graded) {
+    const rec = scrydex.cards[card.id];
+    if (!rec || rec.missing || !(rec.graded || []).length) return false;
+  }
+  const b = discoveryBinder();
+  if (b && !matchesTheme(card, themeOf(b))) return false;
+  return true;
+}
+function enforceTheme(){
+  const b = discoveryBinder();
+  if (!b) return;
+  const patch = themePatch(b);
+  if (patch.set) filters.set = patch.set;
+  if (patch.type) filters.type = patch.type;
+  if (patch.names.length) filters.names = patch.names.slice();
+}
+async function pullSet(id){
+  if (!setLists.has(id)) {
+    try {
+      await ensureSetList(id, { hunt:true });
+    } catch (e) {
+      if (isBusyError(e)) throw e;
+      if (e && e.setListGaveUp) {
+        feedExhausted = true;
+        catalogBusy = false;
+        busyHold = false;
+        busyUntil = 0;
+        return 0;
+      }
+      if (e && e.setListRetry) { setListHoldUntil = e.retryAt || (Date.now() + SET_LIST_RETRY_MS); return 0; }
+      return 0;
+    }
+  }
+  const bag = setLists.get(id);
+  if (!bag || !Array.isArray(bag.cards)) return 0;
+  let fresh = bag.cards.filter(c => c && c.id && c.image && !seen.has(c.id));
+  if (discoveryBinder()) {
+    const saved = savedIds();
+    fresh.forEach(c => { if (saved.has(c.id)) seen.add(c.id); });
+    fresh = shuffle(fresh.filter(c => !saved.has(c.id)));
+  }
+  const take = fresh.slice(0, 8);
+  take.forEach(c => { seen.add(c.id); briefs.push({ id:c.id, name:c.name, image:c.image, localId:c.localId }); });
+  return take.length;
+}
+async function pullQuery(){
+  if (queryDone) return 0;
+  let guard = 0;
+  while (guard++ < 6 && !queryDone) {
+    const parts = [];
+    if (filters.set) parts.push("set=eq:" + encodeURIComponent(filters.set));
+    if (filters.type) parts.push("types=eq:" + encodeURIComponent(filters.type));
+    if (filters.rarities.length) parts.push("rarity=eq:" + encodeURIComponent(filters.rarities.join("|")));
+    parts.push("pagination:page=" + pageNo, "pagination:itemsPerPage=24");
+    const list = await getJson(TCGDEX + "/cards?" + parts.join("&"), { hunt:true });
+    pageNo += 1;
+    if (!Array.isArray(list) || !list.length) { queryDone = true; return 0; }
+    if (list.length < 24) queryDone = true;
+    let rows = list.filter(c => c && c.id && c.image && !seen.has(c.id) && !isPocketId(String(c.id).split("-")[0]));
+    if (filters.era) rows = rows.filter(c => eraMatches(String(c.id).split("-")[0], filters.era));
+    if (discoveryBinder()) {
+      const saved = savedIds();
+      rows.forEach(c => { if (saved.has(c.id)) seen.add(c.id); });
+      rows = shuffle(rows.filter(c => !saved.has(c.id)));
+    }
+    rows.forEach(c => { seen.add(c.id); briefs.push({ id:c.id, name:c.name, image:c.image, localId:c.localId }); });
+    if (rows.length) return rows.length;
+  }
+  return 0;
+}
+function openingPageUrl(id, page){
+  return TCGDEX + "/cards?set=eq:" + encodeURIComponent(id) + "&rarity=eq:" + encodeURIComponent(raritiesForSet(id).join("|")) + "&pagination:page=" + page + "&pagination:itemsPerPage=24";
+}
+async function takeOpening(id){
+  let bag = setPools.get(id);
+  if (!bag) { bag = { cards:[], page:1, done:false }; setPools.set(id, bag); }
+  const saved = discoveryBinder() ? savedIds() : null;
+  let guard = 0;
+  while (guard++ < 6) {
+    const fresh = bag.cards.filter(c => c && c.id && c.image && !seen.has(c.id) && !isPocketId(String(c.id).split("-")[0]) && !(saved && saved.has(c.id)));
+    if (fresh.length) {
+      const take = fresh.slice(0, 4);
+      take.forEach(c => { seen.add(c.id); briefs.push({ id:c.id, name:c.name, image:c.image, localId:c.localId }); });
+      return take.length;
+    }
+    if (saved) bag.cards.forEach(c => { if (c && saved.has(c.id)) seen.add(c.id); });
+    if (bag.done) return 0;
+    const list = await getJson(openingPageUrl(id, bag.page), { hunt:true });
+    bag.page += 1;
+    const ordered = list && list.bhWarm ? list : shuffle(Array.isArray(list) ? list : []);
+    const rows = ordered.filter(c => c && c.id && c.image && !isPocketId(String(c.id).split("-")[0]));
+    rows.forEach(c => { if (!bag.cards.some(x => x.id === c.id)) bag.cards.push(c); });
+    if (!Array.isArray(list) || list.length < 24 || !rows.length) bag.done = true;
+  }
+  return 0;
+}
+async function pullOpening(){
+  if (openingDone) return 0;
+  if (!openingOrder.length) {
+    const have = new Set(meta.sets.map(s => s.id));
+    const eras = OPENING.map(ids => shuffle(ids.filter(id => !have.size || have.has(id))));
+    const max = Math.max(0, ...eras.map(b => b.length));
+    const order = [];
+    for (let i = 0; i < max; i++) eras.forEach(b => { if (b[i]) order.push(b[i]); });
+    const warmUrl = openingPageUrl("sv08", 1);
+    openingOrder = window.__bhWarm && window.__bhWarm[warmUrl] && order.includes("sv08") ? ["sv08"].concat(order.filter(id => id !== "sv08")) : order;
+  }
+  if (!openingOrder.length) { openingDone = true; return 0; }
+  let hops = 0;
+  while (hops < openingOrder.length) {
+    const id = openingOrder[openingCursor % openingOrder.length];
+    openingCursor++;
+    hops++;
+    const took = await takeOpening(id);
+    if (took) return took;
+  }
+  openingDone = openingOrder.every(id => {
+    const bag = setPools.get(id);
+    return bag && bag.done;
+  });
+  return 0;
+}
+async function pullChaseAll(){
+  if (chaseDone) return 0;
+  let guard = 0;
+  while (guard++ < 5 && !chaseDone) {
+    const list = await getJson(TCGDEX + "/cards?rarity=eq:" + encodeURIComponent(HUNT_RARITIES.join("|")) + "&pagination:page=" + chasePage + "&pagination:itemsPerPage=24", { hunt:true });
+    chasePage += 1;
+    if (!Array.isArray(list) || !list.length) { chaseDone = true; return 0; }
+    if (list.length < 24) chaseDone = true;
+    const saved = discoveryBinder() ? savedIds() : null;
+    let n = 0;
+    shuffle(list).forEach(c => {
+      if (!c || !c.id || !c.image || seen.has(c.id) || isPocketId(String(c.id).split("-")[0])) return;
+      if (saved && saved.has(c.id)) { seen.add(c.id); return; }
+      seen.add(c.id);
+      briefs.push({ id:c.id, name:c.name, image:c.image, localId:c.localId });
+      n++;
+    });
+    if (n) return n;
+  }
+  return 0;
+}
+function huntSetIds(){
+  if (setWalk) return setWalk;
+  setWalk = shuffle(meta.sets.map(s => s.id).filter(id => !imageless.has(id) && (!filters.era || eraMatches(id, filters.era)) && (!filters.set || id === filters.set)));
+  return setWalk;
+}
+async function pullBulk(){
+  const ids = huntSetIds();
+  const takeN = priceHunt() ? 16 : 10;
+  while (bulkCursor < ids.length) {
+    const id = ids[bulkCursor];
+    if (!bulkBags.has(id)) {
+      try {
+        const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id), { hunt:true });
+        const all = set.cards || [];
+        if (!all.some(c => c && safeImg(c.image))) imageless.add(id);
+        bulkBags.set(id, shuffle(all.filter(c => c && c.id && safeImg(c.image) && !isDigital({ id:c.id }))));
+      } catch (e) {
+        if (isBusyError(e)) throw e;
+        bulkBags.set(id, []);
+      }
+    }
+    let cards = bulkBags.get(id).filter(c => !seen.has(c.id));
+    if (discoveryBinder()) {
+      const saved = savedIds();
+      cards.forEach(c => { if (saved.has(c.id)) seen.add(c.id); });
+      cards = cards.filter(c => !saved.has(c.id));
+    }
+    const take = cards.slice(0, takeN);
+    if (!take.length) { bulkCursor++; continue; }
+    if (cards.length <= takeN) bulkCursor++;
+    take.forEach(c => pushBrief(c));
+    return take.length;
+  }
+  return 0;
+}
+async function pullGraded(){
+  const ids = Object.keys(scrydex.cards).filter(id => {
+    const rec = scrydex.cards[id];
+    return rec && !rec.missing && (rec.graded || []).length && !seen.has(id) && !isPocketId(id.split("-")[0]);
+  });
+  const slice = ids.slice(gradedCursor, gradedCursor + 6);
+  gradedCursor += slice.length;
+  slice.forEach(id => { seen.add(id); briefs.push({ id }); });
+  return slice.length;
+}
+function pushBrief(c, extra){
+  const brief = { id:c.id, name:c.name, image:c.image, localId:c.localId };
+  if (extra) Object.assign(brief, extra);
+  seen.add(c.id);
+  briefs.push(brief);
+}
+async function pullNames(names){
+  const pending = names.filter(n => namePages.get(n) !== 0);
+  if (!pending.length) return 0;
+  const species = pending[nameOrder % pending.length];
+  nameOrder++;
+  const page = namePages.get(species) || 1;
+  let list = [];
+  try {
+    list = await getJson(TCGDEX + "/cards?name=" + encodeURIComponent("like:" + species) + "&pagination:page=" + page + "&pagination:itemsPerPage=100", { hunt:true });
+  } catch (e) {
+    if (isBusyError(e)) throw e;
+    namePages.set(species, 0);
+    return 0;
+  }
+  if (!Array.isArray(list) || !list.length) { namePages.set(species, 0); return 0; }
+  namePages.set(species, list.length < 100 ? 0 : page + 1);
+  let n = 0;
+  shuffle(list).forEach(c => {
+    if (!c || !c.id || !safeImg(c.image) || seen.has(c.id) || isDigital({ id:c.id })) return;
+    if (discoveryBinder() && savedIds().has(c.id)) { seen.add(c.id); return; }
+    pushBrief(c);
+    n++;
+  });
+  return n;
+}
+async function pullMix(){
+  if (mixExhausted) return 0;
+  if (!meta.sets.length) { mixExhausted = true; return 0; }
+  if (!mixOrder.length) mixOrder = shuffle(meta.sets.map(s => s.id).filter(id => !isPocketId(id) && !imageless.has(id)));
+  if (!mixOrder.length) { mixExhausted = true; return 0; }
+  let spins = 0;
+  while (spins < mixOrder.length) {
+    const id = mixOrder[mixCursor % mixOrder.length];
+    mixCursor++;
+    spins++;
+    if (!mixBags.has(id)) {
+      try {
+        const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id), { hunt:true });
+        mixBags.set(id, (set.cards || []).filter(c => c && c.id && safeImg(c.image) && !isDigital({ id:c.id })));
+      } catch (e) {
+        if (isBusyError(e)) throw e;
+        mixBags.set(id, []);
+      }
+    }
+    const fresh = shuffle(mixBags.get(id).filter(c => !seen.has(c.id)));
+    if (!fresh.length) continue;
+    fresh.slice(0, 8).forEach(c => pushBrief(c));
+    return Math.min(8, fresh.length);
+  }
+  mixExhausted = true;
+  return 0;
+}
+async function pullUnscoped(){
+  mixTurn++;
+  if (mixTurn % 3 === 0) {
+    const mixed = await pullMix();
+    if (mixed) return mixed;
+  }
+  const opened = await pullOpening();
+  if (opened) return opened;
+  if (!openingDone) return 0;
+  const chase = await pullChaseAll();
+  if (chase) return chase;
+  return pullMix();
+}
+function priceHunt(){
+  return filters.min != null || filters.max != null || !!filters.pricePreset;
+}
+function priceyBand(){
+  if (filters.pricePreset === "mid" || filters.pricePreset === "high") return true;
+  if (filters.pricePreset === "under10") return false;
+  if (filters.min != null && filters.min >= 10) return true;
+  if (filters.max != null && filters.max <= 10 && (filters.min == null || filters.min < 10)) return false;
+  return priceHunt();
+}
+function priceLanes(){
+  if (laneOrder) return laneOrder;
+  const holos = shuffle(["Rare Holo","Holo Rare","Rare Holo LV.X","Rare PRIME","LEGEND","Classic Collection","Shiny rare","Shiny rare VMAX","Holo Rare VMAX","Holo Rare VSTAR"]);
+  const ultra = ["Ultra Rare"];
+  const high = filters.pricePreset === "high" || (filters.min != null && filters.min >= 50 && (filters.max == null || filters.max >= 50));
+  const chase = shuffle(high
+    ? ["Secret Rare","Special illustration rare","Hyper rare","Illustration rare","Mega Hyper Rare","Shiny Ultra Rare","Amazing Rare","Radiant Rare"]
+    : ["Illustration rare","Special illustration rare","Secret Rare","Ultra Rare","Hyper rare","Shiny Ultra Rare","Amazing Rare","Radiant Rare"]);
+  laneOrder = high ? chase.concat(holos, ultra) : chase.concat(holos);
+  return laneOrder;
+}
+function spreadRows(rows){
+  const buckets = new Map();
+  shuffle(rows).forEach(c => {
+    const id = String(c.id).split("-")[0];
+    if (!buckets.has(id)) buckets.set(id, []);
+    buckets.get(id).push(c);
+  });
+  const keys = shuffle([...buckets.keys()]);
+  const out = [];
+  let hop = true;
+  while (hop) {
+    hop = false;
+    keys.forEach(id => {
+      const bag = buckets.get(id);
+      if (bag.length) { out.push(bag.shift()); hop = true; }
+    });
+  }
+  return out;
+}
+function ensureLaneStates(){
+  const lanes = priceLanes();
+  if (!laneStates || laneStates.length !== lanes.length) {
+    laneStates = lanes.map(() => {
+      const origin = 1 + Math.floor(Math.random() * 6);
+      return { page: origin, origin, wrapped: false, done: false };
+    });
+  }
+  return laneStates;
+}
+function advanceLane(state, list){
+  const short = !Array.isArray(list) || list.length < 24;
+  if (!short) { state.page++; return; }
+  if (!state.wrapped && state.origin > 1) { state.wrapped = true; state.page = 1; return; }
+  state.done = true;
+}
+function laneFits(rarity){
+  if (!filters.era) return true;
+  const modern = {
+    "Special illustration rare":["Scarlet & Violet","Mega Evolution"],
+    "Illustration rare":["Scarlet & Violet","Mega Evolution"],
+    "Mega Hyper Rare":["Mega Evolution"],
+    "Hyper rare":["Scarlet & Violet","Mega Evolution"],
+    "Shiny rare VMAX":["Sword & Shield"],
+    "Holo Rare VMAX":["Sword & Shield"],
+    "Holo Rare VSTAR":["Sword & Shield"],
+    "Radiant Rare":["Sword & Shield"],
+    "Amazing Rare":["Sword & Shield"],
+    "Shiny Ultra Rare":["Sun & Moon","Sword & Shield"],
+    "Shiny rare":["Sun & Moon","Sword & Shield"]
+  };
+  const allowed = modern[rarity];
+  if (!allowed) return true;
+  const group = ERA_GROUPS.find(g => g.id === filters.era);
+  const eras = group ? group.eras : [filters.era];
+  return allowed.some(era => eras.includes(era));
+}
+function acceptBrief(c){
+  if (!c || !c.id || !safeImg(c.image) || seen.has(c.id) || isDigital({ id:c.id })) return false;
+  if (imageless.has(String(c.id).split("-")[0])) return false;
+  if (filters.era && !eraMatches(String(c.id).split("-")[0], filters.era)) return false;
+  if (filters.set && String(c.id).split("-")[0] !== filters.set) return false;
+  if ((filters.names || []).length && !(filters.names || []).some(n => speciesHit(c.name, n))) return false;
+  if (discoveryBinder() && savedIds().has(c.id)) { seen.add(c.id); return false; }
+  return true;
+}
+async function pullTails(){
+  const ids = huntSetIds();
+  while (tailCursor < ids.length) {
+    const id = ids[tailCursor++];
+    try {
+      const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id), { hunt:true });
+      const all = set.cards || [];
+      if (!all.some(c => c && safeImg(c.image))) { imageless.add(id); continue; }
+      const tail = all.filter(acceptBrief).slice(-12);
+      if (!tail.length) continue;
+      tail.forEach(c => pushBrief(c));
+      return tail.length;
+    } catch (e) {
+      if (isBusyError(e)) throw e;
+    }
+  }
+  tailDone = true;
+  feedExhausted = true;
+  return 0;
+}
+async function pullPrice(){
+  // The list endpoint hangs on pricing.* filters, so page chase rarities (then set tails) instead.
+  // Each pull samples a few lanes so one visit is not twenty cards from a single set.
+  const lanes = priceLanes();
+  const states = ensureLaneStates();
+  const staged = [];
+  const stagedSets = new Set();
+  let hops = 0;
+  let cursor = priceLane;
+  while (hops++ < 6 && !feedExhausted && stagedSets.size < 3) {
+    let pick = -1;
+    for (let n = 0; n < lanes.length; n++) {
+      const i = (cursor + n) % lanes.length;
+      if (states[i].done || !laneFits(lanes[i])) { states[i].done = states[i].done || !laneFits(lanes[i]); continue; }
+      pick = i;
+      break;
+    }
+    if (pick < 0) break;
+    cursor = pick + 1;
+    const state = states[pick];
+    let list;
+    try {
+      list = await getJson(TCGDEX + "/cards?rarity=eq:" + encodeURIComponent(lanes[pick]) + "&pagination:page=" + state.page + "&pagination:itemsPerPage=24", { hunt:true });
+    } catch (e) {
+      if (isBusyError(e)) throw e;
+      state.done = true;
+      continue;
+    }
+    advanceLane(state, list);
+    (Array.isArray(list) ? list : []).filter(acceptBrief).forEach(c => {
+      staged.push(c);
+      stagedSets.add(String(c.id).split("-")[0]);
+    });
+  }
+  priceLane = cursor;
+  if (!staged.length) {
+    if (states.every(s => s.done)) return pullTails();
+    return 0;
+  }
+  spreadRows(staged).forEach(c => pushBrief(c));
+  return staged.length;
+}
+function namesExhausted(){
+  const names = filters.names || [];
+  return names.length > 0 && names.every(n => namePages.get(n) === 0);
+}
+function setDrained(id){
+  if (!setLists.has(id)) return false;
+  const bag = setLists.get(id);
+  return !(bag.cards || []).some(c => c && c.id && c.image && !seen.has(c.id));
+}
+async function pullMore(){
+  holdFeed = false;
+  await loadMeta();
+  if ((filters.names || []).length) {
+    const n = await pullNames(filters.names);
+    if (!n && namesExhausted()) feedExhausted = true;
+    return n;
+  }
+  if (filters.graded && !filters.set && !filters.type && !filters.rarities.length) {
+    const n = await pullGraded();
+    if (n) return n;
+  }
+  if (filters.set && !priceyBand()) {
+    const n = await pullSet(filters.set);
+    if (!n && setDrained(filters.set)) feedExhausted = true;
+    return n;
+  }
+  if ((filters.type || filters.rarities.length) && !priceyBand()) {
+    const n = await pullQuery();
+    if (!n && queryDone) feedExhausted = true;
+    return n;
+  }
+  if (priceyBand() && !feedExhausted) {
+    const before = pullSerial;
+    const n = await pullPrice();
+    if (n) return n;
+    if (!feedExhausted && pullSerial !== before) { holdFeed = true; return 0; }
+    feedExhausted = true;
+  }
+  if (filters.era || priceHunt() || filters.graded) {
+    const n = await pullBulk();
+    if (!n) feedExhausted = true;
+    return n;
+  }
+  return pullUnscoped();
+}
+function parkThrottled(brief){
+  const fails = (fetchFails.get(brief.id) || 0) + 1;
+  fetchFails.set(brief.id, fails);
+  if (brief.finalTry) return "drop";
+  if (fails <= CARD_FETCH_RETRIES) { briefs.push(brief); return "requeue"; }
+  if (!deferred.some(d => d.id === brief.id)) deferred.push(brief);
+  return "defer";
+}
+function reclaimDeferred(){
+  if (!deferred.length) return false;
+  const pending = deferred;
+  deferred = [];
+  pending.forEach(b => { b.finalTry = true; briefs.push(b); });
+  return true;
+}
+function showSkeleton(){
+  if (deck.querySelector(".card")) return;
+  if (busyHold && !pile.length) return;
+  deck.dataset.status = "loading";
+  delete deck.dataset.huntEnd;
+  deck.setAttribute("aria-busy", "true");
+  deck.setAttribute("aria-label", "Card deck, loading");
+  deck.innerHTML = `<div class="skel"></div>`;
+  const row = document.getElementById("deckCaption");
+  if (row) row.hidden = true;
+  paintDeckSummary(null);
+}
+function paintGemChrome(){
+  const lead = document.getElementById("gemLead");
+  if (lead) {
+    lead.hidden = !filters.gem;
+    lead.textContent = gemNote || (window.BinderGems && BinderGems.EXPLAIN) || "Hand-picked eras and rarities that fly under the radar.";
+  }
+}
+function noteGemLap(){
+  gemNote = (window.BinderGems && BinderGems.WRAP_MESSAGE) || "That's the pocket. These gems are shuffled back in.";
+  announce(gemNote);
+  clearTimeout(gemNoteTimer);
+  gemNoteTimer = setTimeout(() => {
+    gemNote = "";
+    paintCount();
+  }, 4200);
+  paintCount();
+}
+function gemsForHunt(){
+  const G = window.BinderGems;
+  const heat = G ? G.saveHeat(logState && logState.events) : {};
+  const limit = G ? G.GEM_HEAT : 3;
+  return (gemCatalog || []).filter(card => {
+    if (!card || !card.id) return false;
+    if ((heat[card.id] || 0) >= limit) return false;
+    try { return keep(card); } catch (e) { return false; }
+  });
+}
+async function loadGemCatalog(){
+  if (gemCatalog) return gemCatalog;
+  if (gemCatalogPromise) return gemCatalogPromise;
+  const G = window.BinderGems;
+  if (!G) {
+    gemCatalog = [];
+    return gemCatalog;
+  }
+  gemCatalogPromise = (async () => {
+    const fxFile = await fetch("data/fx.json", { cache:"no-cache" }).then(res => res.ok ? res.json() : null).catch(() => null);
+    gemFx = fxFile && Number(fxFile.eurUsd);
+    const seedText = await fetch("data/scrydex-seed.txt", { cache:"no-cache" }).then(res => res.ok ? res.text() : "").catch(() => "");
+    let dailyPool = [];
+    try {
+      const daily = await fetch("data/daily.json", { cache:"no-cache" }).then(res => res.ok ? res.json() : null);
+      if (daily && Array.isArray(daily.pool)) dailyPool = daily.pool;
+    } catch (e) {}
+    const names = {};
+    dailyPool.forEach(card => { if (card && card.setId && card.set) names[card.setId] = card.set; });
+    await loadMeta();
+    (meta.sets || []).forEach(set => { if (set && set.id && set.name) names[set.id] = set.name; });
+    gemCatalog = G.buildCatalog({
+      seedText: seedText,
+      dailyPool: dailyPool,
+      names: names,
+      fx: gemFx,
+      heat: G.saveHeat(logState && logState.events),
+      opening: OPENING.reduce((all, row) => all.concat(row), [])
+    });
+    gemCatalog.forEach(card => {
+      if (card && !card.set) card.set = setName(card.setId) || "";
+    });
+    return gemCatalog;
+  })().catch(() => {
+    gemCatalog = [];
+    return gemCatalog;
+  });
+  return gemCatalogPromise;
+}
+async function pumpGems(my){
+  if (loading || my !== generation) return;
+  const epoch = ++pumpEpoch;
+  loading = true;
+  pumpError = "";
+  try {
+    await loadGemCatalog();
+    if (my !== generation || epoch !== pumpEpoch) return;
+    const G = window.BinderGems;
+    if (!G) throw new Error("gems");
+    if (!gemCycle) {
+      const cards = G.dealGems(gemsForHunt());
+      gemCycle = { cards: cards, cursor: 0, lap: 0 };
+    }
+    const holding = new Set(pile.map(card => card && card.id).filter(Boolean));
+    const pull = G.takeGemCycle(gemCycle, Math.max(0, 5 - pile.length), holding);
+    if (pull.wrapped) noteGemLap();
+    pull.cards.forEach(card => {
+      if (!card || pile.some(item => item.id === card.id)) return;
+      pile.push(card);
+      matched++;
+      lastFound = Date.now();
+    });
+    if (!gemCycle.cards.length) streamDone = true;
+    else streamDone = false;
+  } catch (e) {
+    if (my !== generation || epoch !== pumpEpoch) return;
+    pumpError = "Gemfinder couldn't read the saved card list.";
+    paused = true;
+  } finally {
+    if (my === generation && epoch === pumpEpoch) loading = false;
+  }
+  if (my !== generation || epoch !== pumpEpoch) return;
+  renderDeck();
+  paintCount();
+}
+function paintCount(){
+  const el = document.getElementById("matchCount");
+  if (!el) return;
+  paintGemChrome();
+  if (filters.gem) {
+    const pocket = gemCycle && gemCycle.cards ? gemCycle.cards.length : (gemCatalog ? gemsForHunt().length : 0);
+    let text = pocket ? ("Gemfinder · " + pocket + (pocket === 1 ? " card" : " cards")) : (loading ? "Gemfinder · looking…" : "Gemfinder");
+    if (gemNote) text = gemNote;
+    else if (filters.set) text = setWishLine(filters.set) + " · " + text;
+    el.textContent = text;
+    paintFilterSummary();
+    return;
+  }
+  let text = streamDone ? (matched + (matched === 1 ? " card" : " cards")) : (matched ? matched + (matched === 1 ? " card" : " cards") + " found so far" : "Looking…");
+  if (filters.set) text = setWishLine(filters.set) + " · " + text;
+  el.textContent = text;
+  paintFilterSummary();
+}
+function clearHuntWatch(){
+  clearTimeout(huntWatch);
+  huntWatch = 0;
+}
+function requeueHuntBatch(){
+  const batch = huntBatch || [];
+  huntBatch = [];
+  batch.forEach(b => {
+    if (!b || !b.id) return;
+    if (!briefs.some(x => x.id === b.id) && !deferred.some(x => x.id === b.id)) briefs.unshift(b);
+  });
+}
+function youngHuntFetch(){
+  const now = Date.now();
+  for (const job of huntInflight.values()) {
+    if (now - job.started < HUNT_FETCH_MS) return true;
+  }
+  return false;
+}
+function armHuntWatch(my){
+  clearHuntWatch();
+  const elapsed = Date.now() - huntProgressAt;
+  const wait = Math.max(250, HUNT_SILENT_MS - elapsed);
+  huntWatch = setTimeout(() => huntWatchdog(my), wait);
+}
+function huntWatchdog(my){
+  huntWatch = 0;
+  if (my !== generation) return;
+  const haveCard = pile.length || !!deck.querySelector(".card");
+  if (haveCard || streamDone || paused) {
+    if (!streamDone) armHuntWatch(my);
+    return;
+  }
+  const quiet = Date.now() - huntProgressAt;
+  if (quiet < HUNT_SILENT_MS || youngHuntFetch()) {
+    armHuntWatch(my);
+    return;
+  }
+  abortStaleHuntFetches();
+  if (!busyHold) noteBusy();
+  busyHold = true;
+  if (deck.dataset.status !== "busy") renderDeck();
+  armHuntWatch(my);
+}
+function pumpStale(epoch, my){
+  if (epoch === pumpEpoch && my === generation) return false;
+  if (my === generation) requeueHuntBatch();
+  return true;
+}
+async function pump(my){
+  if (loading || my !== generation) return;
+  if (filters.gem) return pumpGems(my);
+  if (navigator.onLine === false) {
+    loading = true;
+    serveOfflineDeck();
+    loading = false;
+    renderDeck();
+    paintCount();
+    syncOfflineNote();
+    return;
+  }
+  const epoch = ++pumpEpoch;
+  huntPumps++;
+  loading = true;
+  pumpError = "";
+  const serialAtStart = pullSerial;
+  const pileAtStart = pile.length;
+  try {
+    let steps = 0;
+    const capped = filtersActive() || !!discoveryBinder();
+    const priced = priceHunt();
+    const ceiling = !capped ? Infinity : ((filters.names || []).length ? 800 : (priced ? Infinity : 80));
+    while (pile.length < 5 && my === generation && epoch === pumpEpoch && steps < 8 && effort < ceiling) {
+      if (!pile.length && matched === 0 && !briefs.length && !busyBlock() && lastFound && Date.now() - lastFound >= 10000) {
+        if (reclaimDeferred()) { steps++; continue; }
+        streamDone = true; break;
+      }
+      if (briefs.length < 4) {
+        const mark = pullSerial;
+        const added = await pullMore();
+        if (pumpStale(epoch, my)) return;
+        const requested = pullSerial !== mark;
+        if (!added && !briefs.length) {
+          const broad = !filters.set && !(filters.names || []).length && !filters.type && !filters.rarities.length && !filters.era && !priceHunt() && !filters.graded;
+          const broadOpen = broad && (!openingDone || !chaseDone || !mixExhausted);
+          if (setListHoldUntil > Date.now()) break;
+          if (broadOpen && requested) { steps++; continue; }
+          if (holdFeed) break;
+          if (!feedExhausted && requested) { steps++; continue; }
+          if (reclaimDeferred()) { steps++; continue; }
+          streamDone = true; break;
+        }
+      }
+      const batch = briefs.splice(0, 4);
+      if (!batch.length) {
+        if (setListHoldUntil > Date.now()) break;
+        if (reclaimDeferred()) { steps++; continue; }
+        streamDone = true; break;
+      }
+      steps++;
+      huntBatch = batch;
+      const placed = new Set();
+      const outcomes = await Promise.all(batch.map(async b => {
+        try {
+          const card = await hydrate(b, { hunt:true });
+          if (pumpStale(epoch, my)) return { brief:b, stale:true };
+          fetchFails.delete(b.id);
+          const earlyNode = window.__bhEarlyArt;
+          const earlyId = earlyNode && earlyNode.isConnected ? earlyNode.getAttribute("data-card-id") : "";
+          const earlyStillOut = !!(earlyId && b.id !== earlyId && !placed.has(earlyId) && batch.some(item => item && item.id === earlyId));
+          if (card && !pile.length && !placed.size && !(b && b.spice) && keep(card) && !earlyStillOut) {
+            placed.add(card.id);
+            pile.push(card);
+            matched++;
+            rememberRecent(card);
+            lastFound = Date.now();
+            armHuntWatch(my);
+            renderDeck();
+          }
+          return { brief:b, card };
+        } catch (err) {
+          if (pumpStale(epoch, my)) return { brief:b, stale:true };
+          if (isBusyError(err)) return { brief:b, throttled:true, card:null };
+          return { brief:b, card:null };
+        }
+      }));
+      if (pumpStale(epoch, my)) return;
+      huntBatch = [];
+      let throttled = false;
+      outcomes.forEach(o => {
+        if (o.stale) return;
+        if (o.throttled) { throttled = true; parkThrottled(o.brief); return; }
+        effort++;
+        const card = o.card;
+        if (!card || placed.has(card.id)) return;
+        const surprise = !!(o.brief && o.brief.spice);
+        if (surprise) card.spice = true;
+        if (!keep(card)) return;
+        if (!surprise) card.spice = false;
+        pile.push(card);
+        matched++;
+        rememberRecent(card);
+        lastFound = Date.now();
+        armHuntWatch(my);
+      });
+      renderDeck();
+      paintCount();
+      if (throttled) { noteBusy(); break; }
+    }
+  } catch (e) {
+    if (pumpStale(epoch, my)) return;
+    if (isBusyError(e)) noteBusy();
+    else if (navigator.onLine === false) serveOfflineDeck();
+    else { pumpError = "The card catalog didn't respond. Check your connection and try again."; paused = true; }
+  } finally {
+    if (!pumpStale(epoch, my)) loading = false;
+  }
+  if (pumpStale(epoch, my)) return;
+  const capped = filtersActive() || !!discoveryBinder();
+  const priced = priceHunt();
+  const ceiling = (filters.names || []).length ? 800 : 80;
+  const quiet = lastFound && Date.now() - lastFound >= 10000;
+  if (!streamDone && !busyBlock() && !pile.length && !briefs.length && matched === 0 && quiet) {
+    if (!reclaimDeferred()) streamDone = true;
+  } else if (!streamDone && !busyBlock() && !briefs.length && !priced && capped && effort >= ceiling && matched === 0) {
+    if (!reclaimDeferred()) streamDone = true;
+  } else if (!streamDone && !busyBlock() && !briefs.length && !priced && capped && effort >= ceiling && pile.length < 3 && matched > 0) {
+    if (!reclaimDeferred()) paused = true;
+  }
+  if (!streamDone && !paused && !holdFeed && !briefs.length && pile.length < 4 && pile.length === pileAtStart && pullSerial === serialAtStart && !(setListHoldUntil > Date.now())) {
+    if (!reclaimDeferred()) streamDone = true;
+  }
+  renderDeck();
+  paintCount();
+  if (setListHoldUntil > Date.now() && !streamDone && my === generation) {
+    const wait = Math.max(40, setListHoldUntil - Date.now() + 30);
+    setTimeout(() => { if (my === generation) { setListHoldUntil = 0; pump(my); } }, wait);
+    return;
+  }
+  if (catalogBusy && !streamDone && my === generation) { setTimeout(() => { if (my === generation) pump(my); }, busyDelay()); return; }
+  if (streamDone && busyBlock()) {
+    clearTimeout(busyRenderTimer);
+    const wait = Math.max(40, busyUntil - Date.now() + 30);
+    busyRenderTimer = setTimeout(() => { if (my === generation) { renderDeck(); paintCount(); } }, wait);
+  }
+  if (!paused && !streamDone && pile.length < 4 && (holdFeed || briefs.length || priced || effort < ceiling || !capped)) setTimeout(() => pump(my), 30);
+}
+let keepOpeningArt = true;
+function restart(opts){
+  spice = !!(opts && opts.keepSpice);
+  generation++;
+  enforceTheme();
+  if (!(opts && opts.skipFilterWrite)) saveFilters();
+  pile = []; briefs = []; seen = new Set(); matched = 0; pageNo = 1; queryDone = false;
+  openingOrder = []; openingCursor = 0; openingDone = false; chasePage = 1; chaseDone = false; bulkCursor = 0; gradedCursor = 0;
+  mixTurn = 0; mixCursor = 0; mixExhausted = false; mixOrder = []; nameOrder = 0;
+  mixBags.clear(); namePages.clear(); setPools.clear(); bulkBags.clear();
+  priceLane = 0; priceOrigin = 1; pricePage = 1; priceWrapped = false; laneOrder = null; laneStates = null; setWalk = null;
+  feedExhausted = false; holdFeed = false; tailCursor = 0; tailDone = false;
+  streamDone = false; paused = false; pumpError = ""; catalogBusy = false; busyStrike = 0; busyUntil = 0; clearTimeout(busyRenderTimer); effort = 0; loading = false; searchStarted = Date.now(); lastFound = Date.now();
+  gemCycle = null;
+  gemNote = "";
+  clearTimeout(gemNoteTimer);
+  fetchFails.clear(); deferred = [];
+  pendingSwipes = []; reserved = new Set(); swipeBusy = false;
+  busyHold = false;
+  setListHoldUntil = 0;
+  huntBatch = [];
+  const keepArt = keepOpeningArt;
+  keepOpeningArt = false;
+  [...deck.childNodes].forEach(node => {
+    if (keepArt && node.nodeType === 1 && node.classList && node.classList.contains("card") && node.hasAttribute("data-bh-early")) return;
+    node.remove();
+  });
+  delete deck.dataset.huntEnd;
+  showSkeleton();
+  paintChips(); paintContext(); paintDiscovery(); paintCount();
+  abortStaleHuntFetches();
+  huntInflight.forEach(job => job.ctrl.abort());
+  huntInflight.clear();
+  pumpEpoch++;
+  huntProgressAt = Date.now();
+  clearHuntWatch();
+  armHuntWatch(generation);
+  pump(generation);
+}
+function altText(card){ return (card.name || "Card") + " – " + (card.set || "Set") + (card.number ? " #" + card.number : ""); }
+function placeholder(card){
+  const d = document.createElement("div");
+  d.className = "cardback";
+  d.innerHTML = `<div class="cardback-inner">${toad()}<b>${esc((card && card.name) || "Card")}</b></div>`;
+  return d;
+}
+/* Every art URL we know for a card, sharpest first when large is set. */
+function artUrls(card, large){
+  const urls = knownArt(card);
+  if (!large || !card) return urls;
+  const out = [];
+  const push = value => {
+    const url = safeImg(value);
+    if (url && !out.includes(url)) out.push(url);
+  };
+  push(card.img);
+  const base = safeImg(card.image);
+  if (base) push(base + "/high.webp");
+  push(card.backup);
+  urls.forEach(push);
+  return out;
+}
+/* Card art never asks for CORS: neither CDN promises the headers, and an
+   <img> does not need them. If one URL fails, try the next before giving up
+   on the placeholder.
+   With large set, the small preview shows at once (swiping stays instant)
+   and the full-size file replaces it as soon as it has loaded and decoded. */
+const sharpLoaded = new Set();
+function earlyImgFor(img, card, url){
+  if (!img || !card) return false;
+  const id = img.getAttribute("data-card-id");
+  if (id && id === card.id) return true;
+  const src = img.getAttribute("src") || "";
+  return !!url && src === url;
+}
+/* The head script paints the first low.webp before app.js. Reuse that node.
+   Assigning src again, or swapping in a sharp file, would move LCP. */
+function adoptArt(img, card, urls, opts){
+  img.alt = altText(card || {});
+  img.draggable = false;
+  if (!img.getAttribute("width")) img.width = 245;
+  if (!img.getAttribute("height")) img.height = 342;
+  if (!img.decoding) img.decoding = "async";
+  try {
+    const want = (opts && opts.priority) || "high";
+    if (img.fetchPriority !== want) img.fetchPriority = want;
+  } catch (e) {}
+  if (!img.dataset.wired) {
+    img.dataset.wired = "1";
+    img.addEventListener("dragstart", e => e.preventDefault());
+  }
+  let at = 0;
+  img.onerror = () => {
+    at++;
+    if (at < urls.length) { img.src = urls[at]; return; }
+    img.replaceWith(opts && opts.missing ? opts.missing(card) : placeholder(card));
+  };
+  const src = img.getAttribute("src") || "";
+  if (!src) img.src = urls[0];
+  else if (opts && opts.deck && urls[0] && !/\/low\.webp(\?|$)/.test(src)) img.src = urls[0];
+  img.removeAttribute("data-bh-early");
+}
+function paintArt(host, card, opts){
+  const large = !!(opts && opts.large);
+  const deckMode = !!(opts && opts.deck);
+  const quick = knownArt(card);
+  const sharp = large ? artUrls(card, true).filter(u => !/\/low\.webp$/.test(u) && !/images\.pokemontcg\.io\/[^/]+\/[^/_]+\.png$/.test(u)) : [];
+  const missing = () => (opts && opts.missing ? opts.missing(card) : placeholder(card));
+  /* The swipe deck stays on low.webp. A later sharp swap would move LCP. */
+  const ready = !deckMode && sharp.find(u => sharpLoaded.has(u));
+  let urls = ready ? [ready].concat(quick.filter(u => u !== ready)) : quick.length ? quick : sharp;
+  if (deckMode) {
+    const low = urls.filter(u => /\/low\.webp$/.test(u));
+    if (low.length) urls = low;
+  }
+  if (!urls.length) { host.replaceChildren(); host.append(missing()); return; }
+  const prior = host.querySelector(":scope > img");
+  if (prior && deckMode && earlyImgFor(prior, card, urls[0])) {
+    adoptArt(prior, card, urls, opts);
+    return;
+  }
+  const parked = window.__bhEarlyArt;
+  if (deckMode && parked && earlyImgFor(parked, card, urls[0]) && !host.contains(parked)) {
+    adoptArt(parked, card, urls, opts);
+    host.replaceChildren(parked);
+    return;
+  }
+  host.replaceChildren();
+  const img = document.createElement("img");
+  img.alt = altText(card || {});
+  img.width = 245;
+  img.height = 342;
+  img.draggable = false;
+  img.decoding = opts && opts.priority === "high" ? "auto" : "async";
+  try { img.fetchPriority = (opts && opts.priority) || "auto"; } catch (e) {}
+  if ((opts && opts.lazy) || (deckMode && opts && opts.priority !== "high")) img.loading = "lazy";
+  img.addEventListener("dragstart", e => e.preventDefault());
+  let at = 0;
+  img.onerror = () => {
+    at++;
+    if (at < urls.length) { img.src = urls[at]; return; }
+    img.replaceWith(missing());
+  };
+  img.src = urls[0];
+  host.append(img);
+  if (!large || ready || deckMode) return;
+  let i = 0;
+  const next = () => {
+    const url = sharp[i++];
+    if (!url || !img.isConnected && i > 1) return;
+    const hi = new Image();
+    hi.decoding = "async";
+    try { hi.fetchPriority = (opts && opts.priority) || "low"; } catch (e) {}
+    hi.onload = () => {
+      sharpLoaded.add(url);
+      if (sharpLoaded.size > 2000) sharpLoaded.clear();
+      const swap = () => { if (img.isConnected || img.parentNode) { img.onerror = null; img.src = url; } };
+      /* decode() can stall in a background tab; never wait on it long. */
+      let swapped = false;
+      const once = () => { if (!swapped) { swapped = true; swap(); } };
+      if (hi.decode) hi.decode().then(once, once);
+      setTimeout(once, 250);
+    };
+    hi.onerror = next;
+    hi.src = url;
+  };
+  next();
+}
+/* The sharpest scan we can find for one card, for the zoomable 3D view.
+   pokemontcg.io keeps lossless 733x1024 scans; TCGdex tops out at 600x825.
+   The two catalogs name sets differently, so the guessed pokemontcg.io card
+   only counts when its name matches ours. Otherwise the TCGdex PNG. */
+const hdCache = new Map();
+function ptcgIdFor(card){
+  if (!card || !card.id) return "";
+  if (card.source === "pokemontcg.io") return card.id;
+  const m = /^([a-z]+)0*(\d+)(\.5)?$/i.exec(card.setId || String(card.id).replace(/-[^-]+$/, ""));
+  const num = String(card.number || String(card.id).split("-").pop() || "").replace(/^0+(?=\d)/, "");
+  if (!m || !num) return "";
+  return m[1].toLowerCase() + Number(m[2]) + (m[3] ? "pt5" : "") + "-" + num;
+}
+function sameCardName(a, b){
+  const norm = x => String(x || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "");
+  return !!a && norm(a) === norm(b);
+}
+function hdArt(card){
+  if (!card || !card.id) return Promise.resolve("");
+  if (hdCache.has(card.id)) return hdCache.get(card.id);
+  const fallback = () => {
+    const base = safeImg(card.image) || (safeImg(card.img) || "").replace(/\/(high|low)\.(webp|png|jpg)$/, "");
+    return base && base.startsWith("https://assets.tcgdex.net/") ? base + "/high.png" : "";
+  };
+  let busy = false;
+  const job = (async () => {
+    if (/_hires\.png$/.test(card.img || "")) return safeImg(card.img);
+    const id = ptcgIdFor(card);
+    if (id) {
+      busy = true;
+      try {
+        const res = await fetch("https://api.pokemontcg.io/v2/cards/" + encodeURIComponent(id) + "?select=name,images", { signal: AbortSignal.timeout(4000) });
+        if (res.ok) {
+          const data = (await res.json()).data || {};
+          const url = safeImg(data.images && data.images.large);
+          busy = false;
+          if (url && sameCardName(data.name, card.name)) return url;
+        } else if (res.status === 404) busy = false;
+      } catch (e) {}
+    }
+    return fallback();
+  })();
+  /* pokemontcg.io turns busy clients away; ask again next time. */
+  job.then(() => { if (busy) hdCache.delete(card.id); });
+  hdCache.set(card.id, job);
+  if (hdCache.size > 400) hdCache.delete(hdCache.keys().next().value);
+  return job;
+}
+/* Inside the binder a missing image is a dark blank card, not the toad. */
+function binderMissingArt(card){
+  const d = document.createElement("div");
+  d.className = "art-missing";
+  d.innerHTML = `<b>${esc((card && card.name) || "Card")}</b><span>${esc([card && card.set, card && card.number ? "#" + card.number : ""].filter(Boolean).join(" · "))}</span>`;
+  return d;
+}
+function pocketPrice(card){
+  const shown = printingMoney(card);
+  if (!shown || !(shown.amount > 0)) return "";
+  const n = shown.amount;
+  const sym = shown.currency === "EUR" ? "€" : "$";
+  if (n >= 1000) {
+    const k = n / 1000;
+    const body = k >= 100 ? String(Math.round(k)) : (Math.round(k * 10) / 10).toFixed(1).replace(/\.0$/, "");
+    return sym + body + "K";
+  }
+  return sym + n.toFixed(2);
+}
+function refreshPocketPrice(card){
+  if (!card || !card.id) return;
+  const price = pocketPrice(card);
+  const drop = priceDrop(card);
+  const owned = ownedIds.has(card.id);
+  const dropNote = drop ? ", down " + drop.shown + " percent" : "";
+  document.querySelectorAll("#bindersScroll .sleeve").forEach(sleeve => {
+    const got = sleeve.querySelector(":scope > .gotbtn");
+    if (!got || got.dataset.for !== card.id) return;
+    const hit = sleeve.querySelector(".cardhit");
+    if (!hit) return;
+    let pill = hit.querySelector(".price-pill");
+    if (price) {
+      if (!pill) {
+        pill = document.createElement("span");
+        pill.className = "price-pill";
+        hit.append(pill);
+      }
+      pill.textContent = price;
+    } else if (pill) pill.remove();
+    sleeve.querySelectorAll(":scope > .drop-badge").forEach(node => node.remove());
+    const markup = dropBadgeMarkup(drop);
+    if (markup) hit.insertAdjacentHTML("afterend", markup);
+    hit.setAttribute("aria-label", altText(card) + (owned ? ", owned" : ", wanted") + (price ? ", " + price : "") + dropNote);
+  });
+}
+function topCard(){
+  const cards = deck.querySelectorAll(".card");
+  const top = cards[cards.length - 1] || null;
+  if (top && !top.card && top.hasAttribute("data-bh-early")) return null;
+  return top;
+}
+const deckWarmed = new Set();
+function warmArt(url, priority){
+  if (!url || deckWarmed.has(url)) return;
+  if (deckWarmed.size > 400) deckWarmed.clear();
+  deckWarmed.add(url);
+  const img = new Image();
+  img.decoding = "async";
+  try { img.fetchPriority = priority || "low"; } catch (e) {}
+  img.src = url;
+  if (img.decode) img.decode().catch(() => {});
+}
+/* The stack shows three cards. Warm the ones behind it so the next swipe is already decoded. */
+let deckSharpenArmed = false;
+function sharpenDeck(){
+  deck.querySelectorAll(".card").forEach(el => {
+    const img = el.querySelector("img");
+    if (!img || !el.card) return;
+    if (!/\/low\.webp(\?|$)/.test(img.currentSrc || img.src || "")) return;
+    const sharp = artUrls(el.card, true).find(u => u && !/\/low\.webp$/.test(u));
+    if (sharp) img.src = sharp;
+  });
+}
+function armDeckSharpen(){
+  if (deckSharpenArmed) return;
+  deckSharpenArmed = true;
+  const go = () => sharpenDeck();
+  /* No timer. A sharp swap while the trace is still open becomes the new LCP.
+     The deck stays on low.webp until the person actually touches it. */
+  window.addEventListener("pointerdown", go, { once:true, passive:true });
+  window.addEventListener("keydown", go, { once:true });
+}
+function warmDeck(){
+  pile.slice(1, 4).forEach(card => {
+    const quick = knownArt(card);
+    if (quick[0]) warmArt(quick[0], "low");
+  });
+}
+function layoutStack(){
+  const cards = [...deck.querySelectorAll(".card")];
+  cards.forEach((el, i) => {
+    const depth = cards.length - 1 - i;
+    el.style.zIndex = String(10 + i);
+    const buried = depth > 0 || el.classList.contains("leaving");
+    if (buried) el.setAttribute("aria-hidden", "true");
+    else {
+      el.removeAttribute("aria-hidden");
+      const img = el.querySelector("img");
+      if (img) { try { if (img.fetchPriority !== "high") img.fetchPriority = "high"; } catch (e) {} }
+    }
+    if (el.classList.contains("leaving") || el.classList.contains("dragging")) return;
+    el.style.transform = depth ? `translate3d(0, ${6 + depth * 3}px, 0) scale(${1 - depth * 0.035})` : "";
+  });
+  paintCaption();
+  if (!cards.some(el => el.classList.contains("dragging") || el.classList.contains("leaving"))) alignHuntColumn();
+}
+function alignHuntColumn(){
+  const root = document.getElementById("viewHunt");
+  if (!root) return;
+  if (!wide()) { root.style.removeProperty("--deck-w"); return; }
+  const box = document.getElementById("deck");
+  const w = box ? box.getBoundingClientRect().width : 0;
+  if (w > 40) root.style.setProperty("--deck-w", Math.round(w) + "px");
+}
+function paintCardDrop(el){
+  const frame = el && el.querySelector(".frame");
+  if (!frame) return;
+  const drop = el.card ? priceDrop(el.card) : null;
+  const shown = drop && Number.isFinite(drop.shown) ? String(drop.shown) : "";
+  const cur = frame.querySelector(":scope > .drop-badge");
+  if (cur && cur.dataset.pct === shown) return;
+  if (!shown && !cur) return;
+  if (cur) cur.remove();
+  if (shown) frame.insertAdjacentHTML("beforeend", dropBadgeMarkup(drop));
+}
+function paintDeckDrops(){
+  deck.querySelectorAll(".card").forEach(paintCardDrop);
+}
+function paintCaption(){
+  paintDeckDrops();
+  const row = document.getElementById("deckCaption");
+  if (!row) return;
+  const top = [...deck.querySelectorAll(".card")].reverse().find(el => el.card && !el.classList.contains("leaving"));
+  if (!top) { row.hidden = true; paintDeckSummary(null); return; }
+  const card = top.card;
+  const shown = printingMoney(card);
+  row.hidden = false;
+  document.getElementById("capName").textContent = card.name || "Card";
+  const sub = [card.set, card.number ? "#" + card.number : "", card.rarity].filter(Boolean).join(" · ");
+  document.getElementById("capSub").textContent = sub;
+  const pill = document.getElementById("capPrice");
+  pill.textContent = shown ? priceText(shown.amount, shown.currency) : "—";
+  pill.classList.toggle("missing", !shown);
+  deck.setAttribute("aria-label", [card.name || "Card", sub, shown ? priceText(shown.amount, shown.currency) : "Price unavailable"].filter(Boolean).join(", "));
+  paintDeckSummary(card);
+}
+function syncActs(){
+  const ready = !!topCard() && !blocking();
+  document.getElementById("skip").disabled = !ready;
+  document.getElementById("save").disabled = !ready;
+  document.getElementById("undo").disabled = !undoStack.length || blocking();
+  const b = discoveryBinder();
+  document.getElementById("save").setAttribute("aria-label", b ? "Add to wishlist and " + b.name : "Add to wishlist");
+  if (deck) deck.tabIndex = ready ? 0 : -1;
+  if (ready) armDeckSharpen();
+}
+function earlyCardMatches(el, card){
+  const img = el && el.querySelector("img");
+  if (!img || !card) return false;
+  return earlyImgFor(img, card, knownArt(card).find(u => /\/low\.webp$/.test(u)) || "");
+}
+function dressDeckCard(el, card){
+  let frame = el.querySelector(":scope > .frame");
+  if (!frame) {
+    frame = document.createElement("div");
+    frame.className = "frame";
+    el.append(frame);
+  }
+  if (!frame.querySelector(":scope > .art")) {
+    const art = document.createElement("div");
+    art.className = "art";
+    frame.prepend(art);
+  }
+  if (!frame.querySelector(":scope > .stamp.like")) {
+    const like = document.createElement("span");
+    like.className = "stamp like";
+    like.textContent = discoveryBinder() ? "BINDER!" : "WISH!";
+    frame.append(like);
+  }
+  if (!frame.querySelector(":scope > .stamp.nope")) {
+    const nope = document.createElement("span");
+    nope.className = "stamp nope";
+    nope.textContent = "PASS";
+    frame.append(nope);
+  }
+  if (card && card.spice && !frame.querySelector(":scope > .surprise")) {
+    const surprise = document.createElement("span");
+    surprise.className = "surprise";
+    surprise.textContent = "surprise pick";
+    frame.append(surprise);
+    ensureLabelFont();
+  }
+  if (card && card.gemHint && !frame.querySelector(":scope > .gem-hint")) {
+    const gem = document.createElement("span");
+    gem.className = "gem-hint";
+    gem.textContent = card.gemHint;
+    frame.append(gem);
+    ensureLabelFont();
+  }
+}
+function renderDeck(){
+  delete deck.dataset.huntEnd;
+  if (pile.length) busyHold = false;
+  if (!pile.length && !pumpError && !streamDone && (busyHold || catalogBusy)) {
+    if (deck.querySelector(":scope > .card[data-bh-early]")) {
+      busyHold = true;
+      syncActs();
+      return;
+    }
+    busyHold = true;
+    if (deck.dataset.status !== "busy") {
+      deck.dataset.status = "busy";
+      deck.removeAttribute("aria-busy");
+      deck.innerHTML = `<div class="empty-state"><p>Card source is busy, retrying…</p>${toad()}</div>`;
+    }
+    syncActs();
+    if (!deck.querySelector(".card")) paintDeckSummary(null);
+    return;
+  }
+  if (!pile.length && (loading || (!streamDone && !paused && !pumpError))) { showSkeleton(); syncActs(); return; }
+  deck.querySelectorAll(".skel,.empty-state").forEach(n => n.remove());
+  warmDeck();
+  const have = new Set([...deck.querySelectorAll(".card")].map(el => el.card && el.card.id));
+  const early = deck.querySelector(":scope > .card[data-bh-early]");
+  pile.slice(0, 3).forEach((card, index) => {
+    if (have.has(card.id)) return;
+    if (early && !early.card && index === 0 && earlyCardMatches(early, card)) {
+      early.card = card;
+      early.removeAttribute("data-bh-early");
+      dressDeckCard(early, card);
+      paintArt(early.querySelector(".art"), card, { large:true, deck:true, priority:"high" });
+      bindDrag(early);
+      return;
+    }
+    const el = document.createElement("div");
+    el.className = "card";
+    el.draggable = false;
+    el.card = card;
+    const tag = card.spice ? `<span class="surprise">surprise pick</span>` : "";
+    const gem = card.gemHint ? `<span class="gem-hint">${esc(card.gemHint)}</span>` : "";
+    if (card.spice || card.gemHint) ensureLabelFont();
+    el.innerHTML = `<div class="frame"><div class="art"></div><span class="stamp like">${discoveryBinder() ? "BINDER!" : "WISH!"}</span><span class="stamp nope">PASS</span>${tag}${gem}</div>`;
+    paintArt(el.querySelector(".art"), card, { large:true, deck:true, priority: index === 0 ? "high" : "low" });
+    deck.prepend(el);
+    bindDrag(el);
+  });
+  if (early && early.isConnected && !early.card) early.remove();
+  layoutStack();
+  if (!pile.length && !deck.querySelector(".card")) {
+    const openHunt = !filtersActive() && !discoveryBinder();
+    const exhausted = streamDone && !paused && (matched > 0 || !busyBlock());
+    const noMatch = !pumpError && !openHunt && exhausted;
+    deck.dataset.status = pumpError ? "error" : (paused && !noMatch ? "paused" : "empty");
+    deck.removeAttribute("aria-busy");
+    if (noMatch) {
+      const facts = filterFacts();
+      const drop = widenTarget();
+      const huntEnd = matched > 0 ? "seen" : "none";
+      deck.dataset.huntEnd = huntEnd;
+      const headline = filters.gem && matched === 0 ? "Nothing in this pocket fits." : (matched > 0 ? "You've seen every card that fits." : "Nothing fits these filters.");
+      deck.setAttribute("aria-label", headline);
+      const named = facts.map(f => f.label).join(", ");
+      const detail = matched > 0
+        ? (named ? named + " ran out. Widen the hunt and the pile fills back up." : "Widen the hunt and the pile fills back up.")
+        : (named ? named + " left the pile empty. Loosen one and cards come back." : "Loosen a filter and cards come back.");
+      const actions = [];
+      if (drop) actions.push(`<button class="chip" id="widenDeck" type="button">Drop ${esc(drop.label)}</button>`);
+      if (facts.some(f => !f.locked) && (!drop || facts.filter(f => !f.locked).length > 1)) actions.push(`<button class="chip" id="clearDeck" type="button">Clear filters</button>`);
+      if (!actions.length) actions.push(`<button class="chip" id="editDeck" type="button">Edit filters</button>`);
+      deck.innerHTML = `<div class="empty-state" role="status" data-hunt-end="${huntEnd}"><p><b>${headline}</b></p><p class="fine">${esc(detail)} Nothing stays hidden once the filters are clear.</p>${toad()}<div class="huntpicks">${actions.join("")}</div></div>`;
+      const widen = document.getElementById("widenDeck");
+      const clear = document.getElementById("clearDeck");
+      const edit = document.getElementById("editDeck");
+      if (widen && drop) widen.onclick = () => {
+        clearFilterKey(drop.key);
+        saveFilters();
+        restart();
+        announce(drop.label + " cleared. The hunt is wider now.");
+      };
+      if (clear) clear.onclick = () => clearAllFilters();
+      if (edit) edit.onclick = () => openFilter("all", document.getElementById("openFilters"));
+    } else {
+      const msg = navigator.onLine === false ? "<p>You're offline. Your wishlist and binders are still in this browser.</p>" : pumpError ? `<p class="warn">${esc(pumpError)}</p>` : catalogBusy ? "<p>Card source is busy, retrying…</p>" : paused ? "<p>Still matching cards.</p>" : "<p>The hunt is still shuffling the table.</p>";
+      deck.setAttribute("aria-label", pumpError ? "Card deck, something went wrong" : "Card deck");
+      deck.innerHTML = `<div class="empty-state">${msg}${toad()}<button class="chip" id="retryDeck" type="button">Keep looking</button></div>`;
+      const btn = document.getElementById("retryDeck");
+      if (btn) btn.onclick = () => {
+        paused = false; pumpError = ""; catalogBusy = false; streamDone = false; effort = 0; lastFound = Date.now(); searchStarted = Date.now();
+        if (openHunt) { openingDone = false; chaseDone = false; chasePage = 1; openingCursor = 0; seen = new Set(); setPools.clear(); }
+        showSkeleton(); pump(generation);
+      };
+    }
+  } else {
+    deck.dataset.status = "ready";
+    deck.removeAttribute("aria-busy");
+  }
+  syncActs();
+}
+function bindDrag(el){
+  let sx = 0, sy = 0, dx = 0, dy = 0, pid = null, dragged = false;
+  el.draggable = false;
+  el.addEventListener("dragstart", e => e.preventDefault());
+  const rot = x => Math.max(-12, Math.min(12, x / 18));
+  let frame = 0;
+  const like = el.querySelector(".like");
+  const nope = el.querySelector(".nope");
+  const paintDrag = () => {
+    frame = 0;
+    el.style.transform = `translate3d(${dx}px, ${dy}px, 0) rotate(${rot(dx)}deg)`;
+    if (like) like.style.opacity = String(Math.max(0, dx / 110));
+    if (nope) nope.style.opacity = String(Math.max(0, -dx / 110));
+  };
+  el.addEventListener("pointerdown", e => {
+    if (e.button != null && e.button !== 0) return;
+    if (el !== topCard() || blocking() || el.classList.contains("leaving") || reserved.has(el.card.id)) return;
+    if (e.target.closest("a,button")) return;
+    pid = e.pointerId; dragged = false; dx = dy = 0; sx = e.clientX; sy = e.clientY;
+    el.style.transition = "none";
+    window.addEventListener("pointermove", move, { passive:true });
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  });
+  function move(e){
+    if (e.pointerId !== pid) return;
+    dx = e.clientX - sx; dy = e.clientY - sy;
+    if (!dragged && Math.hypot(dx, dy) > TAP_SLOP) { dragged = true; el.classList.add("dragging"); }
+    if (!dragged) return;
+    if (!frame) frame = requestAnimationFrame(paintDrag);
+  }
+  function up(e){
+    if (e.pointerId !== pid) return;
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+    window.removeEventListener("pointercancel", up);
+    if (frame) { cancelAnimationFrame(frame); frame = 0; if (dragged) paintDrag(); }
+    pid = null;
+    if (!dragged) { openProfile(el.card); return; }
+    el.classList.remove("dragging");
+    if (dy < -80 && Math.abs(dy) > Math.abs(dx)) { openProfile(el.card); el.style.transform = ""; return; }
+    if (Math.abs(dx) > 90 && Math.abs(dx) > Math.abs(dy)) fly(Math.sign(dx), { x:dx, y:dy });
+    else {
+      el.style.transition = reduceMotion() ? "none" : "transform .2s cubic-bezier(.2,1.2,.4,1)";
+      el.style.transform = "";
+      el.querySelectorAll(".stamp").forEach(s => { s.style.opacity = "0"; });
+    }
+  }
+}
+function fly(dir, from){
+  if (blocking()) return;
+  const card = pile.find(c => c && !reserved.has(c.id));
+  if (!card) return;
+  const trigger = document.activeElement;
+  reserved.add(card.id);
+  let addedWish = false, addedBinder = false;
+  const binder = dir > 0 ? discoveryBinder() : null;
+  if (dir > 0) {
+    countEvent("swipe-right");
+    addedWish = addWish(card);
+    if (binder) addedBinder = addToBinder(binder, card);
+    if (settings.haptics) haptic(10);
+    if (settings.sound) playTone(620);
+    announce((addedWish || addedBinder ? "Saved " : "Already had ") + card.name + (binder ? " in " + binder.name + " and your wishlist." : " on your wishlist."));
+  } else {
+    if (settings.haptics) haptic(6);
+    if (settings.sound) playTone(320);
+    announce("Passed " + card.name + ".");
+  }
+  undoStack.push({ card, dir, addedWish, addedBinder, binderId: binder && binder.id });
+  if (undoStack.length > 20) undoStack.shift();
+  const idx = pile.indexOf(card);
+  if (idx >= 0) pile.splice(idx, 1);
+  pendingSwipes.push({ card, dir, from: from || null });
+  syncActs();
+  runSwipe();
+  keepSwipeFocus(trigger);
+  noteSwipeEngagement();
+}
+function runSwipe(){
+  if (swipeBusy) return;
+  const job = pendingSwipes[0];
+  if (!job) return;
+  const el = [...deck.querySelectorAll(".card")].find(n => n.card === job.card);
+  if (!el) { pendingSwipes.shift(); reserved.delete(job.card.id); runSwipe(); return; }
+  if (topCard() !== el) return;
+  pendingSwipes.shift();
+  swipeBusy = true;
+  el.classList.add("leaving");
+  layoutStack();
+  const w = deck.clientWidth || 320;
+  const motion = reduceMotion();
+  const fast = pendingSwipes.length > 0 || motion;
+  let doneOnce = false;
+  const done = () => {
+    if (doneOnce) return;
+    doneOnce = true;
+    reserved.delete(job.card.id);
+    if (el.isConnected) el.remove();
+    swipeBusy = false;
+    renderDeck();
+    runSwipe();
+    if (pile.length < 4 && !loading && !streamDone) pump(generation);
+  };
+  el.style.transition = motion ? "none" : (fast ? "transform .16s ease-out" : "transform .22s cubic-bezier(.2,1.3,.4,1)");
+  el.style.transform = `translate3d(${job.dir * (w + 80)}px, -20px, 0) rotate(${Math.max(-12, Math.min(12, job.dir * 10))}deg)`;
+  if (motion) { done(); return; }
+  const ms = fast ? 170 : 240;
+  const onEnd = (ev) => {
+    if (ev && ev.propertyName && ev.propertyName !== "transform") return;
+    el.removeEventListener("transitionend", onEnd);
+    done();
+  };
+  el.addEventListener("transitionend", onEnd);
+  setTimeout(() => { el.removeEventListener("transitionend", onEnd); done(); }, ms + 50);
+}
+function undo(){
+  if (blocking() || !undoStack.length) return;
+  const last = undoStack.pop();
+  if (!last) return;
+  if (last.addedWish) wish = wish.filter(c => c.id !== last.card.id);
+  if (last.addedBinder) {
+    const b = binderState.binders.find(x => x.id === last.binderId);
+    if (b) b.cards = b.cards.filter(c => c.id !== last.card.id);
+  }
+  saveWish(); saveBinders();
+  pendingSwipes = pendingSwipes.filter(j => j.card.id !== last.card.id);
+  reserved.delete(last.card.id);
+  pile = pile.filter(c => c.id !== last.card.id);
+  pile.unshift(last.card);
+  swipeBusy = false;
+  deck.querySelectorAll(".card").forEach(el => el.remove());
+  announce("Brought " + last.card.name + " back.");
+  renderDeck();
+}
+function addWish(card){
+  if (wish.some(w => w.id === card.id)) return false;
+  wish.push(snapshot(card));
+  noteDemand(card.id);
+  saveWish();
+  logEvent("save", card.id);
+  return true;
+}
+function addToBinder(binder, card){
+  if (!binder || !card) return false;
+  if (!Array.isArray(binder.cards)) binder.cards = [];
+  if (binder.cards.some(c => c && c.id === card.id)) return false;
+  noteDemand(card.id);
+  const stored = snapshot(card);
+  const added = window.BinderThemes ? BinderThemes.addCard(binder, stored) : (binder.cards.push(stored), true);
+  if (!added) return false;
+  if (binder.cards.length % 9 === 0) pendingSparkle = Math.floor((binder.cards.length - 1) / 9);
+  saveBinders();
+  logEvent("save", card.id);
+  return true;
+}
+function removeFromBinder(binder, id){
+  if (!binder) return false;
+  const removed = window.BinderThemes ? BinderThemes.removeCard(binder, id) : (Array.isArray(binder.cards) && binder.cards.some(c => c && c.id === id));
+  if (window.BinderThemes) {
+    if (!removed) return false;
+  } else if (Array.isArray(binder.cards)) {
+    binder.cards = binder.cards.filter(c => c && c.id !== id);
+  }
+  saveBinders();
+  announce("Removed from " + binder.name + ". It is still on your wishlist if you saved it there.");
+  return true;
+}
+function removeFromWish(id){
+  wish = wish.filter(c => c.id !== id);
+  saveWish();
+  announce("Removed from your wishlist. Binders that include it are unchanged.");
+}
+
+function markProfile(dialog){
+  if (!profileEl) return;
+  if (dialog) {
+    profileEl.setAttribute("role", "dialog");
+    profileEl.setAttribute("aria-modal", "true");
+  } else {
+    profileEl.setAttribute("role", "complementary");
+    profileEl.removeAttribute("aria-modal");
+  }
+}
+function outsideModal(){
+  return ["filterSheet","settingsSheet","binderSheet","fillSheet","onboard","dropPrompt","showcase"].some(id => {
+    const el = document.getElementById(id);
+    return el && !el.hidden;
+  });
+}
+function syncInert(){
+  const shell = document.getElementById("shell");
+  if (!shell) return;
+  const profileDialog = !wide() && profilePinned && profileEl && !profileEl.hidden;
+  if (outsideModal()) {
+    shell.inert = true;
+    shell.querySelectorAll(":scope > .stage, :scope > .rail, :scope > .tabs").forEach(el => { el.inert = false; });
+    return;
+  }
+  shell.inert = false;
+  shell.querySelectorAll(":scope > .stage, :scope > .rail, :scope > .tabs").forEach(el => { el.inert = !!profileDialog; });
+}
+function blocking(){
+  const prompt = document.getElementById("dropPrompt");
+  const daily = document.getElementById("viewDaily");
+  const showcase = document.getElementById("showcase");
+  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (prompt && !prompt.hidden) || (showcase && !showcase.hidden) || (daily && !daily.hidden) || (!profileEl.hidden && !wide());
+}
+function keepSwipeFocus(trigger){
+  const box = document.getElementById("hapticSwitch");
+  const button = trigger && trigger.closest ? trigger.closest("#skip, #save") : null;
+  if (button && document.body.contains(button)) { button.focus(); return; }
+  const active = document.activeElement;
+  if (active && active !== box && active !== document.body && active !== document.documentElement) return;
+  deck.focus();
+}
+function haptic(pattern){
+  if (!settings.haptics) return;
+  try { if (typeof navigator.vibrate === "function") { navigator.vibrate(pattern); return; } } catch (e) {}
+  const box = document.getElementById("hapticSwitch");
+  if (!box) return;
+  const back = document.activeElement;
+  box.click();
+  keepSwipeFocus(back);
+}
+function popBtn(btn){
+  if (!btn) return;
+  haptic(8);
+  btn.classList.remove("pop");
+  void btn.offsetWidth;
+  btn.classList.add("pop");
+}
+function playTone(freq){
+  if (!settings.sound) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = "sine"; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.05, audioCtx.currentTime + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
+  o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.14);
+}
+function themeLock(){
+  const theme = themeOf(discoveryBinder());
+  return { set:theme.kind === "set", type:theme.kind === "type", names:theme.kind === "pokemon" };
+}
+function filterFacts(){
+  const lock = themeLock();
+  const facts = [];
+  if (filters.set) facts.push({ key:"set", label:setName(filters.set) || "Set", locked:lock.set });
+  if ((filters.names || []).length) facts.push({ key:"names", label:namesLabel(), locked:lock.names });
+  if (filters.type) facts.push({ key:"type", label:filters.type, locked:lock.type });
+  if (filters.rarities.length) facts.push({ key:"rarities", label:filters.rarities.length === 1 ? filters.rarities[0] : filters.rarities.length + " rarities", locked:false });
+  if (filters.era) facts.push({ key:"era", label:eraLabel(filters.era), locked:false });
+  if (filters.pricePreset || filters.min != null || filters.max != null) facts.push({ key:"price", label:priceLabel(), locked:false });
+  if (filters.graded) facts.push({ key:"graded", label:"Graded only", locked:false });
+  return facts;
+}
+function widenTarget(){
+  const facts = filterFacts();
+  const order = ["graded", "rarities", "price", "type", "names", "set", "era"];
+  return order.map(key => facts.find(f => f.key === key && !f.locked)).find(Boolean) || null;
+}
+function clearFilterKey(key){
+  const lock = themeLock();
+  if (key === "graded") filters.graded = false;
+  else if (key === "rarities") filters.rarities = [];
+  else if (key === "price") { filters.pricePreset = ""; filters.min = null; filters.max = null; }
+  else if (key === "type" && !lock.type) { filters.type = ""; rememberedType = ""; }
+  else if (key === "names" && !lock.names) filters.names = [];
+  else if (key === "set" && !lock.set) { filters.set = ""; rememberedSet = ""; }
+  else if (key === "era") filters.era = "";
+}
+function clearAllFilters(){
+  const b = discoveryBinder();
+  dropHeldFilters();
+  filters = blankFilters();
+  if (b) {
+    const patch = themePatch(b);
+    if (patch.set) filters.set = patch.set;
+    if (patch.type) filters.type = patch.type;
+    if (patch.names.length) filters.names = patch.names.slice();
+  }
+  saveFilters();
+  restart();
+  if (!document.getElementById("filterSheet").hidden) openFilter("all", document.getElementById("openFilters"));
+  announce(filtersActive() ? "Cleared everything the binder hunt does not keep." : "Filters cleared. Every physical card can show up.");
+}
+function wishInSet(setId){
+  if (!setId) return 0;
+  let n = 0;
+  wish.forEach(c => {
+    if (!c) return;
+    const sid = c.setId || String(c.id || "").split("-")[0];
+    if (sid === setId) n++;
+  });
+  return n;
+}
+function setYear(set){
+  const raw = set && (set.releaseDate || set.year) || "";
+  const match = String(raw).match(/\d{4}/);
+  return match ? match[0] : "";
+}
+function setWishLine(setId){
+  const set = (meta.sets || []).find(s => s.id === setId);
+  const saved = wishInSet(setId);
+  const total = setTotal(set);
+  if (total) return saved + " of " + total + " saved";
+  return saved + " saved";
+}
+function wishBit(set){
+  const saved = wishInSet(set && set.id);
+  const total = setTotal(set);
+  const pct = total ? Math.max(0, Math.min(100, Math.round((saved / total) * 100))) : 0;
+  const full = total ? saved + " of " + total + " on your wishlist" : saved + " on your wishlist";
+  return { saved, total, pct, short:saved + " saved", full };
+}
+function setArtUrl(set){
+  if (!set) return "";
+  const raw = set.logo || set.symbol || "";
+  if (!raw || typeof raw !== "string") return "";
+  if (/\.(png|webp|jpe?g)(\?.*)?$/i.test(raw)) return raw;
+  return raw + ".webp";
+}
+function paintFilterSummary(){
+  const live = document.getElementById("filterLive");
+  const sheet = document.getElementById("filterSheet");
+  if (!live || !sheet || sheet.hidden) return;
+  const n = filterFacts().length;
+  const count = document.getElementById("matchCount");
+  const tail = count && count.textContent && count.textContent !== "Looking…" ? " · " + count.textContent : "";
+  const base = filters.gem
+    ? "Gemfinder is on. Hand-picked eras and rarities that fly under the radar."
+    : (n ? n + (n === 1 ? " filter on." : " filters on.") : "No filters. Every physical card can show up.");
+  live.textContent = base + (filters.gem ? "" : tail);
+}
+function syncChipFade(){
+  const el = document.getElementById("activeChips");
+  const bar = document.getElementById("chipbar");
+  if (!el || !bar) return;
+  const more = el.scrollWidth > el.clientWidth + 2 && el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+  bar.classList.toggle("more", more);
+  bar.classList.toggle("before", el.scrollLeft > 2);
+}
+function setGemMode(on){
+  const next = !!on;
+  if (filters.gem === next) {
+    if (next && tab !== "hunt") showTab("hunt");
+    return;
+  }
+  filters.gem = next;
+  gemNote = "";
+  clearTimeout(gemNoteTimer);
+  saveFilters();
+  if (tab !== "hunt") showTab("hunt");
+  restart();
+  announce(next ? "Gemfinder. Hand-picked eras and rarities that fly under the radar." : "Gemfinder is off.");
+  if (!document.getElementById("filterSheet").hidden) syncFilterControls();
+}
+function paintChips(){
+  const host = document.getElementById("activeChips");
+  const open = document.getElementById("openFilters");
+  const reset = document.getElementById("resetFilters");
+  const facts = filterFacts();
+  const n = facts.length;
+  if (open) open.setAttribute("aria-label", n ? "Filters, " + n + " active" : "Filters, none active. All physical cards.");
+  const badge = document.getElementById("filterCount");
+  if (badge) {
+    badge.hidden = !n;
+    badge.textContent = n > 9 ? "9+" : String(n);
+  }
+  if (reset) reset.hidden = !n;
+  if (host) {
+    const gemBtn = `<button type="button" class="chip gem-toggle${filters.gem ? " on" : ""}" id="gemMode" aria-pressed="${filters.gem ? "true" : "false"}" title="Hand-picked eras and rarities that fly under the radar." aria-label="Gemfinder. Hand-picked eras and rarities that fly under the radar.">Gemfinder</button>`;
+    if (!n) host.innerHTML = gemBtn + `<span class="filter-hint">${filters.gem ? "Overlooked holos" : "All physical cards"}</span>`;
+    else {
+      host.innerHTML = gemBtn + facts.map(f => {
+        if (f.locked) return `<span class="chip on" title="Kept by the binder you are filling">${esc(f.label)}</span>`;
+        return `<button type="button" class="chip on" data-clear="${esc(f.key)}" aria-label="Clear ${esc(f.label)} filter"><span class="chiplabel">${esc(f.label)}</span><span class="xmark" aria-hidden="true">×</span></button>`;
+      }).join("");
+      host.querySelectorAll("[data-clear]").forEach(btn => btn.onclick = () => {
+        const fact = filterFacts().find(f => f.key === btn.dataset.clear);
+        clearFilterKey(btn.dataset.clear);
+        saveFilters();
+        restart();
+        announce((fact ? fact.label : "Filter") + " cleared.");
+        const next = document.querySelector("#activeChips [data-clear]") || document.getElementById("gemMode") || document.getElementById("openFilters");
+        if (next) next.focus();
+      });
+    }
+    const gem = document.getElementById("gemMode");
+    if (gem) gem.onclick = () => setGemMode(!filters.gem);
+  }
+  const find = document.getElementById("cardFind");
+  if (find && document.activeElement !== find) find.value = (filters.names || []).length === 1 ? filters.names[0] : "";
+  const sheet = document.getElementById("filterSheet");
+  const opener = document.getElementById("openFilters");
+  if (opener && sheet) opener.setAttribute("aria-expanded", sheet.hidden ? "false" : "true");
+  paintGemChrome();
+  syncChipFade();
+}
+function paintContext(){
+  const b = discoveryBinder();
+  let label = "All cards";
+  if (tab === "sets") label = setView ? (setView.name || "Set") : "Sets";
+  else if (tab === "binders") label = binderView ? (binderView.kind === "wish" ? "Wishlist" : (binderState.binders.find(x => x.id === binderView.id) || {}).name || "Binders") : "Binders";
+  else if (tab === "daily") label = "Today's Drop";
+  else if (b) label = b.name;
+  else if (filters.gem && filters.set) label = "Gemfinder · " + (setName(filters.set) || "Set");
+  else if (filters.gem) label = "Gemfinder";
+  else if (filters.set) label = setName(filters.set);
+  else if ((filters.names || []).length) label = namesLabel();
+  else if (filters.type) label = filters.type;
+  else if (filters.rarities.length === 1) label = filters.rarities[0];
+  else if (filters.rarities.length) label = filters.rarities.length + " rarities";
+  else if (filters.era) label = eraLabel(filters.era);
+  else if (filters.pricePreset || filters.min != null || filters.max != null) label = priceLabel();
+  else if (filters.graded) label = "Graded only";
+  const context = document.getElementById("context");
+  context.textContent = label;
+  if (tab === "hunt") context.setAttribute("aria-label", "Open filters. Showing " + label);
+  else if (tab === "sets" && setView) context.setAttribute("aria-label", "Back to all sets");
+  else if (tab === "binders" && binderView) context.setAttribute("aria-label", "Back to binders");
+  else context.setAttribute("aria-label", label);
+  paintRail();
+  paintSide();
+}
+/* On a desktop, an open binder takes the side panel's room too. The panel
+   comes back as soon as a card's details are opened. */
+function syncReadingWide(){
+  shell.classList.toggle("reading-wide", wide() && tab === "binders" && !!binderView && !profilePinned);
+}
+function paintSide(){
+  syncReadingWide();
+  if (!wide() || profilePinned) return;
+  if (tab === "sets") renderSetSide();
+  else if (tab === "binders") renderBinderSide();
+  else if (tab === "daily") renderDailySide();
+  else paintDeckSummary(currentTop());
+}
+function setSideStats(){
+  if (!setView) return null;
+  const metaSet = (meta.sets || []).find(s => s.id === setView.id) || null;
+  const saved = wishInSet(setView.id);
+  const loaded = (setView.cards || []).length;
+  const total = (metaSet ? setTotal(metaSet) : 0) || loaded;
+  const owned = clampedOwned(countOwnedInSet(setView.id, setView.cards), total);
+  const pct = total ? Math.max(0, Math.min(100, Math.round((saved / total) * 100))) : null;
+  return { name:setView.name || "Set", saved, owned, total, pct, release:setView.release || "" };
+}
+function renderSetSide(){
+  const stats = setSideStats();
+  const key = stats ? "set:" + setView.id + ":" + stats.saved + ":" + stats.owned + ":" + stats.total : "sets:" + ((meta.sets || []).length) + ":" + wish.length;
+  if (key === sideKey && profileEl.querySelector("[data-side='sets']")) return;
+  sideKey = key;
+  summaryId = "";
+  profileEl.hidden = false;
+  shell.classList.remove("no-profile");
+  markProfile(false);
+  if (!stats) {
+    const n = (meta.sets || []).length;
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="sets"><p class="eyebrow">Sets</p><h2 class="pname" id="profileTitle">Browse sets</h2><p class="fine">${n ? n + " sets, grouped by era." : "The catalog is still loading."}</p><p class="fine">Open a set to swipe it, or flip through its pages. Saved cards from that set show up here.</p></div>`;
+    return;
+  }
+  const count = stats.total ? stats.saved + " / " + stats.total : String(stats.saved);
+  const fine = (stats.total ? "On your wishlist" : "On your wishlist so far") + (stats.owned ? " · " + stats.owned + " owned" : "");
+  profileEl.innerHTML = `<div class="profile-scroll" data-side="sets"><p class="eyebrow">Set</p><h2 class="pname" id="profileTitle">${esc(stats.name)}</h2><div class="side-progress">${ringMarkup(stats.saved, stats.total)}<div><p class="market-price">${esc(count)}</p><p class="fine">${esc(fine)}</p></div></div>${stats.release ? `<p class="fine">${esc(stats.release)}</p>` : ""}</div>`;
+}
+function binderSideKey(){
+  if (!binderView) return "shelf:" + wish.length + ":" + binderState.binders.length + ":" + ownedIds.size;
+  if (binderView.kind === "wish") return "wish:" + wish.length + ":" + ownedIds.size;
+  const b = binderState.binders.find(x => x.id === binderView.id);
+  const theme = b ? themeOf(b) : null;
+  return "binder:" + binderView.id + ":" + ((b && b.cards) || []).length + ":" + ownedIds.size + ":" + (b ? b.name : "") + ":" + (b ? b.color : "") + ":" + (theme ? theme.kind + theme.setId + theme.type + theme.name : "") + ":" + (b && binderState.discoveryId === b.id ? "1" : "0");
+}
+function binderSideMeter(list){
+  const p = progressOf(list);
+  const val = valueOf(list || []);
+  const money = val == null ? "" : priceText(val, "USD");
+  return `<div class="side-progress">${ringMarkup(p.owned, p.total)}<div><p class="market-price">${esc(p.total ? p.owned + " / " + p.total : "0")}</p><p class="fine">${esc(p.label)}${money ? " · " + esc(money) : ""}</p></div></div>`;
+}
+function binderSideRow(name, list, color){
+  const p = progressOf(list);
+  const val = valueOf(list || []);
+  const money = val == null ? "" : priceText(val, "USD");
+  const dropped = name === "Wishlist" ? droppedCount(list) : 0;
+  const tint = coverColor(color, true);
+  return `<div class="rail-binder"${tint ? ` style="--cover:${tint}"` : ""}><span class="rail-binder-copy"><b>${esc(name)}</b><span class="fine">${esc(p.label)}${money ? " · " + esc(money) : ""}${dropped ? " · " + dropped + " dropped" : ""}</span></span>${ringMarkup(p.owned, p.total)}</div>`;
+}
+function renderBinderSide(){
+  const key = binderSideKey();
+  if (key === sideKey && profileEl.querySelector("[data-side='binders']")) return;
+  sideKey = key;
+  summaryId = "";
+  profileEl.hidden = false;
+  shell.classList.remove("no-profile");
+  markProfile(false);
+  if (!binderView) {
+    /* The shelf already lists the binders, so the side panel answers what
+       a collector checks next: what got cheaper and what is worth most. */
+    const mini = (card, extra) => {
+      const art = artUrls(card, false)[0];
+      return `<button type="button" class="side-card" data-side-card="${esc(card.id)}">${art ? `<img alt="" src="${esc(art)}" loading="lazy" onerror="this.remove()">` : `<span class="side-art"></span>`}<span class="side-copy"><b>${esc(card.name || "Card")}</b><span class="fine">${esc([card.set, card.number ? "#" + card.number : ""].filter(Boolean).join(" · "))}</span></span><span class="side-val">${extra}</span></button>`;
+    };
+    const drops = wish.map(c => ({ c, d: priceDrop(c) })).filter(x => x.d).sort((x, y) => y.d.pct - x.d.pct).slice(0, 4);
+    const top = wish.map(c => ({ c, v: usdOf(c) })).filter(x => x.v > 0).sort((x, y) => y.v - x.v).slice(0, 3);
+    const val = valueOf(wish);
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Your hunt</p><h2 class="pname" id="profileTitle">${wish.length ? wish.length === 1 ? "1 card saved" : wish.length + " cards saved" : "Nothing saved yet"}</h2>${val ? `<p class="market-price">${esc(priceText(val, "USD"))}</p><p class="fine">What your wishlist costs at today's raw prices.</p>` : `<p class="fine">Swipe right on a card in Hunt and it lands on your wishlist.</p>`}
+      ${drops.length ? `<h3 class="side-h">Cheaper than ${DROP_WINDOW_DAYS} days ago</h3><div class="side-cards">${drops.map(x => mini(x.c, `<span class="drop-badge">↓${esc(String(x.d.shown))}%</span>`)).join("")}</div>` : ""}
+      ${top.length ? `<h3 class="side-h">Biggest hunts</h3><div class="side-cards">${top.map(x => mini(x.c, esc(priceText(x.v, "USD")))).join("")}</div>` : ""}
+    </div>`;
+    profileEl.querySelectorAll("[data-side-card]").forEach(btn => btn.onclick = () => {
+      const card = wish.find(c => c.id === btn.dataset.sideCard);
+      if (card) openProfile(card);
+    });
+    return;
+  }
+  if (binderView.kind === "wish") {
+    const dropped = droppedCount(wish);
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Wishlist</p><h2 class="pname" id="profileTitle">Saved cards</h2>${binderSideMeter(wish)}<p class="fine">${wish.length === 1 ? "1 card saved." : wish.length + " cards saved."}${dropped ? " " + dropped + " dropped." : ""}</p></div>`;
+    return;
+  }
+  const binder = binderState.binders.find(x => x.id === binderView.id);
+  if (!binder) {
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Binders</p><h2 class="pname" id="profileTitle">Binder</h2><p class="fine">This binder is gone.</p></div>`;
+    return;
+  }
+  const pages = Math.max(1, Math.ceil(((binder.cards || []).length || 1) / 9));
+  const theme = themeOf(binder);
+  const themeBit = theme.kind !== "none" ? themeLabel(theme) : "Any card";
+  const huntBit = binderState.discoveryId === binder.id ? "Hunt saves into this binder and your wishlist." : "Swipe to discover saves into this binder and your wishlist.";
+  profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Binder</p><h2 class="pname" id="profileTitle">${esc(binder.name)}</h2>${binderSideMeter(binder.cards)}<p class="fine">${esc(themeBit)} · ${(binder.cards || []).length} cards · ${pages} ${pages === 1 ? "page" : "pages"}</p><p class="fine">${esc(huntBit)}</p></div>`;
+}
+function renderDailySide(){
+  const model = typeof window.dailySideModel === "function" ? window.dailySideModel() : null;
+  const n = model && model.n ? model.n : 0;
+  const streak = model ? model.streak : 0;
+  const best = model ? model.best : 0;
+  const countdown = model && model.countdown ? model.countdown : "Next drop is in";
+  const done = !!(model && model.done);
+  const solved = !!(model && model.solved);
+  const guesses = model && model.guesses ? model.guesses : 0;
+  const key = ["daily", n, streak, best, done ? 1 : 0, solved ? 1 : 0, guesses, model && model.ready ? 1 : 0, model && model.empty ? 1 : 0].join(":");
+  if (key === sideKey && profileEl.querySelector("[data-side='daily']")) {
+    const count = document.getElementById("dailySideCount");
+    if (count && count.textContent !== countdown) count.textContent = countdown;
+    return;
+  }
+  sideKey = key;
+  summaryId = "";
+  profileEl.hidden = false;
+  shell.classList.remove("no-profile");
+  markProfile(false);
+  let result = `<p class="fine">Opening today's drop…</p>`;
+  if (model && model.ready && model.empty) result = `<p class="fine">No priced card for today.</p>`;
+  else if (model && model.ready && done) result = `<p class="market-price">${esc(priceText(model.price, "USD"))}</p><p class="fine">${solved ? "You landed it." : "That's the raw price."} Same number for everyone.</p>`;
+  else if (model && model.ready) result = `<p class="fine">${guesses ? guesses + " of 3 guesses in. " : ""}The price stays sealed until the round ends.</p>`;
+  profileEl.innerHTML = `<div class="profile-scroll" data-side="daily"><p class="eyebrow">Daily</p><h2 class="pname" id="profileTitle">${n ? "Drop #" + esc(String(n)) : "Today's drop"}</h2><div class="daily-side"><div class="stat"><span>Streak</span><b>${esc(String(streak))}</b></div><div class="stat"><span>Best</span><b>${esc(String(best))}</b></div></div><p class="fine" id="dailySideCount">${esc(countdown)}</p>${result}</div>`;
+}
+/* The Binders tab carries the wishlist count, so a right swipe visibly lands
+   somewhere. The count bumps when it grows. */
+let tabWishShown = -1;
+function paintTabCount(){
+  const n = wish.length;
+  const grew = tabWishShown >= 0 && n > tabWishShown;
+  tabWishShown = n;
+  document.querySelectorAll('.tabbtn[data-tab="binders"]').forEach(btn => {
+    let badge = btn.querySelector(".tabcount");
+    if (!badge) {
+      badge = document.createElement("span");
+      badge.className = "tabcount";
+      badge.setAttribute("aria-hidden", "true");
+      btn.append(badge);
+    }
+    badge.textContent = n > 99 ? "99+" : String(n);
+    badge.hidden = !n;
+    if (grew && !reduceMotion()) {
+      badge.classList.remove("bump");
+      void badge.offsetWidth;
+      badge.classList.add("bump");
+    }
+  });
+}
+function paintRail(){
+  paintTabCount();
+  const count = document.getElementById("railWishCount");
+  const host = document.getElementById("railBinders");
+  const wishBtn = document.getElementById("railWish");
+  if (!count || !host || !wishBtn) return;
+  count.textContent = String(wish.length);
+  const dropped = droppedCount(wish);
+  let mark = wishBtn.querySelector(".drop-badge");
+  if (dropped) {
+    if (!mark) {
+      mark = document.createElement("span");
+      mark.className = "drop-badge drop-count";
+      wishBtn.append(mark);
+    }
+    mark.textContent = "Dropped " + dropped;
+    mark.hidden = false;
+  } else if (mark) mark.remove();
+  const wishName = "Wishlist " + wish.length + (wish.length === 1 ? " card" : " cards") + (dropped ? " Dropped " + dropped : "");
+  wishBtn.setAttribute("aria-label", wishName);
+  host.replaceChildren();
+  const binders = (binderState && binderState.binders) || [];
+  if (!binders.length) {
+    const empty = document.createElement("p");
+    empty.className = "fine";
+    empty.textContent = "No binders yet.";
+    host.append(empty);
+    return;
+  }
+  binders.slice(0, 5).forEach(b => {
+    const p = progressOf(b.cards);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "rail-binder";
+    btn.style.setProperty("--cover", coverColor(b.color));
+    const hunting = binderState.discoveryId === b.id;
+    if (hunting) btn.classList.add("is-hunting");
+    const fine = (hunting ? "Hunting · " : "") + p.label;
+    const shown = ringShown(p.owned, p.total);
+    btn.setAttribute("aria-label", [b.name, fine, shown].join(", "));
+    btn.innerHTML = `<span class="rail-binder-copy"><b>${esc(b.name)}</b> <span class="fine">${esc(fine)}</span></span> ${ringMarkup(p.owned, p.total)}`;
+    btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); showTab("binders"); };
+    host.append(btn);
+  });
+  if (binders.length > 5) {
+    const more = document.createElement("p");
+    more.className = "fine";
+    more.textContent = (binders.length - 5) + " more in Binders";
+    host.append(more);
+  }
+}
+function paintDiscovery(){
+  const b = discoveryBinder();
+  const el = document.getElementById("discovery");
+  if (!el) return;
+  el.hidden = !b || tab !== "hunt";
+  if (b) {
+    const name = document.getElementById("discoveryName");
+    const theme = document.getElementById("discoveryTheme");
+    if (name) name.textContent = b.name;
+    const t = themeOf(b);
+    if (theme) theme.textContent = (t.kind !== "none" ? themeLabel(t) + " · " : "") + "Also on your wishlist";
+    const share = document.getElementById("shareDiscovery");
+    if (share) share.setAttribute("aria-label", "Share " + b.name);
+    el.style.setProperty("--cover", coverColor(b.color));
+  }
+  syncActs();
+}
+function stopDiscoveryHunt(){
+  const b = discoveryBinder();
+  if (window.BinderThemes) BinderThemes.switchActive(binderState, "");
+  else binderState.discoveryId = "";
+  saveBinders();
+  if (b) {
+    const patch = themePatch(b);
+    if (patch.set) filters.set = "";
+    if (patch.type) filters.type = "";
+    if (patch.names.length) filters.names = [];
+  }
+  saveFilters();
+  paintDiscovery();
+  restart();
+}
+function showTab(name){
+  closeShowcase();
+  tab = name;
+  document.getElementById("viewHunt").hidden = name !== "hunt";
+  document.getElementById("viewSets").hidden = name !== "sets";
+  document.getElementById("viewBinders").hidden = name !== "binders";
+  const dailyView = document.getElementById("viewDaily");
+  if (dailyView) dailyView.hidden = name !== "daily";
+  document.querySelectorAll("[data-tab]").forEach(btn => btn.setAttribute("aria-current", btn.dataset.tab === name ? "page" : "false"));
+  if (wide()) { profilePinned = false; profileCard = null; pinnedTopId = ""; summaryId = ""; sideKey = ""; }
+  if (name === "sets") renderSets();
+  if (name === "binders") renderBinders();
+  if (name === "daily" && typeof window.renderDaily === "function") window.renderDaily();
+  paintContext(); paintDiscovery();
+  if (typeof window.paintDailyBadge === "function") window.paintDailyBadge();
+  if (name === "hunt") renderDeck();
+}
+
+function openSheet(id, anchor){
+  const sheet = document.getElementById(id);
+  sheet.hidden = false;
+  sheet.classList.toggle("popover", wide() && id === "filterSheet");
+  if (wide() && id === "filterSheet" && anchor) {
+    const r = anchor.getBoundingClientRect();
+    let x = Math.min(r.left, window.innerWidth - 372);
+    sheet.style.setProperty("--pop-x", Math.max(12, x) + "px");
+    sheet.style.setProperty("--pop-y", (r.bottom + 8) + "px");
+  }
+  if (!sheet.contains(document.activeElement)) restoreFocus = document.activeElement;
+  const focus = sheet.querySelector(".sheet-card input, .sheet-card select, .sheet-card button, .sheet-card a");
+  if (focus) focus.focus();
+  if (id === "filterSheet") {
+    const opener = document.getElementById("openFilters");
+    if (opener) opener.setAttribute("aria-expanded", "true");
+  }
+  syncInert();
+  syncActs();
+}
+function closeSheet(id){
+  const sheet = document.getElementById(id);
+  sheet.hidden = true;
+  if (id === "filterSheet") {
+    const opener = document.getElementById("openFilters");
+    if (opener) opener.setAttribute("aria-expanded", "false");
+  }
+  syncInert();
+  if (restoreFocus && restoreFocus.focus) restoreFocus.focus();
+  restoreFocus = null;
+  syncActs();
+}
+function sameName(a, b){ return String(a).toLowerCase() === String(b).toLowerCase(); }
+function cleanMon(value){
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 24);
+}
+function presetOn(pick){
+  return pick.names.every(n => (filters.names || []).some(x => sameName(x, n)));
+}
+function togglePreset(pick){
+  if (!filters.names) filters.names = [];
+  if (presetOn(pick)) {
+    const keep = new Set();
+    HUNT_PICKS.forEach(other => { if (other.id !== pick.id && presetOn(other)) other.names.forEach(n => keep.add(n.toLowerCase())); });
+    filters.names = filters.names.filter(n => !pick.names.some(p => sameName(p, n)) || keep.has(n.toLowerCase()));
+  } else {
+    pick.names.forEach(n => { if (!filters.names.some(x => sameName(x, n))) filters.names.push(n); });
+  }
+}
+function drawPokemonFilter(body){
+  const host = body || document.getElementById("pokeHost");
+  if (!host) return;
+  const lock = themeLock();
+  if (lock.names) {
+    const theme = themeOf(discoveryBinder());
+    host.innerHTML = `<p class="fine">This hunt stays on ${esc(theme.name || "this Pokémon")}, including commons.</p>`;
+    return;
+  }
+  const extras = (filters.names || []).filter(n => !HUNT_PICKS.some(p => presetOn(p) && p.names.some(x => sameName(x, n))));
+  host.innerHTML = `<div class="searchrow"><input id="monFind" type="search" placeholder="e.g. Pikachu" aria-label="Search a Pokémon" enterkeyhint="search" autocomplete="off"></div><div class="suggest" id="monSuggest"></div><div class="huntpicks" id="monPicks">${HUNT_PICKS.map(p => `<button type="button" class="huntpick ${presetOn(p) ? "on" : ""}" aria-pressed="${presetOn(p) ? "true" : "false"}" data-pick="${p.id}">${esc(p.label)}</button>`).join("")}${extras.map(n => `<button type="button" class="huntpick on" aria-pressed="true" data-extra="${esc(n)}">${esc(n)} ×</button>`).join("")}</div><p class="fine">Every print of a picked Pokémon stays in the hunt, including commons.</p>`;
+  const refresh = () => { drawPokemonFilter(host); saveFilters(); restart(); };
+  host.querySelectorAll("[data-pick]").forEach(btn => btn.onclick = () => {
+    popBtn(btn);
+    const pick = HUNT_PICKS.find(p => p.id === btn.dataset.pick);
+    if (pick) togglePreset(pick);
+    refresh();
+  });
+  host.querySelectorAll("[data-extra]").forEach(btn => btn.onclick = () => {
+    popBtn(btn);
+    filters.names = (filters.names || []).filter(n => !sameName(n, btn.dataset.extra));
+    refresh();
+  });
+  const find = document.getElementById("monFind");
+  const suggest = () => {
+    const q = cleanMon(find.value);
+    const box = document.getElementById("monSuggest");
+    if (!box) return;
+    if (!q) { box.innerHTML = ""; return; }
+    const hits = MON_LIST.filter(n => n.toLowerCase().includes(q.toLowerCase())).slice(0, 6);
+    const exact = hits.some(n => sameName(n, q));
+    box.innerHTML = hits.map(n => `<button type="button" class="huntpick" data-add="${esc(n)}">${esc(n)}</button>`).join("") + (exact ? "" : `<button type="button" class="huntpick" data-add="${esc(q)}">Hunt ${esc(q)}</button>`);
+    box.querySelectorAll("[data-add]").forEach(btn => btn.onclick = () => {
+      popBtn(btn);
+      const name = btn.dataset.add;
+      if (name && !(filters.names || []).some(n => sameName(n, name))) filters.names.push(name);
+      refresh();
+    });
+  };
+  find.oninput = suggest;
+  find.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); const name = cleanMon(find.value); if (!name) return; if (!(filters.names || []).some(n => sameName(n, name))) filters.names.push(name); refresh(); } };
+}
+function markPressed(nodes, picked){
+  nodes.forEach(btn => {
+    const on = picked(btn);
+    btn.classList.toggle("on", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+}
+function drawSetChoices(){
+  const box = document.getElementById("setChoices");
+  const find = document.getElementById("setSearch");
+  if (!box || !find) return;
+  const q = find.value.trim().toLowerCase();
+  const lock = themeLock();
+  const theme = themeOf(discoveryBinder());
+  if (!q) {
+    box.innerHTML = filters.set ? "" : `<p class="fine">Search for a set, or browse them grouped by era.</p>`;
+    return;
+  }
+  const hits = meta.sets.filter(s => !imageless.has(s.id) && (s.name.toLowerCase().includes(q) || String(s.id).toLowerCase().includes(q)));
+  if (!hits.length) { box.innerHTML = `<p class="fine">No sets match.</p>`; return; }
+  const groups = new Map();
+  hits.slice(0, 40).forEach(s => {
+    const era = eraOf(s.id);
+    if (!groups.has(era)) groups.set(era, []);
+    groups.get(era).push(s);
+  });
+  const html = [];
+  ERA_ORDER.forEach(era => {
+    const list = groups.get(era);
+    if (!list || !list.length) return;
+    html.push(`<h3 class="era-h">${esc(era)}</h3>`);
+    list.forEach(s => {
+      const on = filters.set === s.id;
+      const art = setArtUrl(s);
+      const saved = wishBit(s);
+      const disabled = lock.set && s.id !== theme.setId;
+      html.push(`<button type="button" class="setpick${on ? " on" : ""}" data-setpick="${esc(s.id)}" aria-pressed="${on ? "true" : "false"}"${disabled ? " disabled" : ""}>${art ? `<img alt="" src="${esc(art)}" data-symbol="${esc(s.symbol || "")}">` : ""}<span><b>${esc(s.name)}</b><span class="fine">${esc(saved.full)}</span></span></button>`);
+    });
+  });
+  box.innerHTML = html.join("");
+  bindSetArt(box);
+  box.querySelectorAll("[data-setpick]").forEach(btn => btn.onclick = () => {
+    if (lock.set && btn.dataset.setpick !== theme.setId) return;
+    const id = filters.set === btn.dataset.setpick ? "" : btn.dataset.setpick;
+    filters.set = id;
+    if (id && filters.era && !eraMatches(id, filters.era)) filters.era = "";
+    saveFilters();
+    restart();
+    syncFilterControls();
+    announce(id ? "Swiping " + setName(id) + "." : "Any set.");
+  });
+}
+function bindSetArt(root){
+  if (!root) return;
+  root.querySelectorAll("img").forEach(img => {
+    img.onerror = () => {
+      const symbol = img.dataset.symbol || "";
+      if (img.dataset.step !== "symbol" && symbol && img.src.indexOf(symbol) === -1) {
+        img.dataset.step = "symbol";
+        img.src = setArtUrl({ symbol });
+        return;
+      }
+      if (!img.dataset.fallback) {
+        img.dataset.fallback = "1";
+        img.src = img.src.replace(/\.webp(\?.*)?$/i, ".png");
+        return;
+      }
+      img.remove();
+    };
+  });
+}
+function syncFilterControls(){
+  const body = document.getElementById("filterBody");
+  if (!body || document.getElementById("filterSheet").hidden) return;
+  const anyPrice = !filters.pricePreset && filters.min == null && filters.max == null;
+  markPressed(body.querySelectorAll("[data-preset]"), btn => btn.dataset.preset ? filters.pricePreset === btn.dataset.preset : anyPrice);
+  markPressed(body.querySelectorAll("[data-era]"), btn => (btn.dataset.era || "") === (filters.era || ""));
+  markPressed(body.querySelectorAll("[data-type]"), btn => (btn.dataset.type || "") === (filters.type || ""));
+  markPressed(body.querySelectorAll("[data-rarity]"), btn => filters.rarities.includes(btn.dataset.rarity));
+  const graded = document.getElementById("gradedToggle");
+  if (graded) {
+    graded.classList.toggle("on", filters.graded);
+    graded.setAttribute("aria-pressed", filters.graded ? "true" : "false");
+  }
+  const gemToggle = document.getElementById("gemSheetToggle");
+  if (gemToggle) {
+    gemToggle.classList.toggle("on", filters.gem);
+    gemToggle.setAttribute("aria-pressed", filters.gem ? "true" : "false");
+  }
+  const min = document.getElementById("pMin");
+  const max = document.getElementById("pMax");
+  if (min && document.activeElement !== min) min.value = filters.pricePreset || filters.min == null ? "" : String(filters.min);
+  if (max && document.activeElement !== max) max.value = filters.pricePreset || filters.max == null ? "" : String(filters.max);
+  drawSetChoices();
+  paintSelectedSet();
+  paintFilterSummary();
+}
+function paintSelectedSet(){
+  const section = document.getElementById("filter-set");
+  const search = document.getElementById("setSearch");
+  if (!section || !search) return;
+  let chip = document.getElementById("clearSetPick");
+  const lock = themeLock();
+  if (!filters.set) { if (chip) chip.remove(); return; }
+  if (!chip) {
+    chip = document.createElement("button");
+    chip.type = "button";
+    chip.id = "clearSetPick";
+    section.insertBefore(chip, search);
+  }
+  chip.className = "setpick on";
+  chip.disabled = !!lock.set;
+  chip.innerHTML = `<span><b>${esc(setName(filters.set))}</b><span class="fine">${lock.set ? "Kept by the binder you are filling" : "Tap to swipe every set again"}</span></span>`;
+  chip.onclick = () => {
+    if (themeLock().set) return;
+    filters.set = "";
+    saveFilters();
+    restart();
+    syncFilterControls();
+    announce("Any set.");
+  };
+}
+function applyCustomPrice(){
+  const minEl = document.getElementById("pMin");
+  const maxEl = document.getElementById("pMax");
+  if (!minEl || !maxEl) return;
+  const rawMin = minEl.value.trim();
+  const rawMax = maxEl.value.trim();
+  const minN = rawMin === "" ? null : Number(rawMin);
+  const maxN = rawMax === "" ? null : Number(rawMax);
+  const warn = document.getElementById("pWarn");
+  if (minN != null && maxN != null && Number.isFinite(minN) && Number.isFinite(maxN) && minN > maxN) {
+    if (warn) warn.hidden = false;
+    return;
+  }
+  if (warn) warn.hidden = true;
+  filters.pricePreset = "";
+  filters.min = rawMin === "" ? null : pos(minN);
+  filters.max = rawMax === "" ? null : pos(maxN);
+  saveFilters();
+  restart();
+  syncFilterControls();
+}
+function openFilter(kind, anchor){
+  document.getElementById("filterTitle").textContent = "Filters";
+  const body = document.getElementById("filterBody");
+  const b = discoveryBinder();
+  const theme = themeOf(b);
+  const lock = themeLock();
+  const presets = [["", "Any price"], ["under10", "Under $10"], ["mid", "$10–50"], ["high", "$50+"]];
+  const featured = ["Common", "Uncommon", "Rare", "Rare Holo", "Holo Rare", "Illustration rare", "Special illustration rare", "Ultra Rare", "Hyper rare", "Secret Rare"];
+  const known = meta.rarities.length ? meta.rarities : featured;
+  const featuredHave = featured.filter(r => known.includes(r));
+  const rest = known.filter(r => !featuredHave.includes(r));
+  const moreOpen = rest.some(r => filters.rarities.includes(r));
+  const priceButtons = presets.map(([id, label]) => `<button type="button" class="huntpick" data-preset="${id}">${label}</button>`).join("");
+  const eraButtons = [{ id:"", label:"All eras" }].concat(ERA_GROUPS).map(g => `<button type="button" class="huntpick" data-era="${esc(g.id)}">${esc(g.label)}</button>`).join("");
+  const seriesButtons = ERA_ORDER.map(era => `<button type="button" class="huntpick" data-era="${esc(era)}">${esc(era)}</button>`).join("");
+  const seriesOpen = ERA_ORDER.includes(filters.era);
+  const typeButtons = [`<button type="button" class="huntpick" data-type=""${lock.type ? " disabled" : ""}>Any type</button>`].concat(meta.types.map(t => `<button type="button" class="huntpick" data-type="${esc(t)}"${lock.type && t !== theme.type ? " disabled" : ""}>${esc(t)}</button>`)).join("");
+  const rarityButtons = featuredHave.map(r => `<button type="button" class="huntpick" data-rarity="${esc(r)}">${esc(r)}</button>`).join("");
+  const moreButtons = rest.map(r => `<button type="button" class="huntpick" data-rarity="${esc(r)}">${esc(r)}</button>`).join("");
+  const note = b && (lock.set || lock.type || lock.names) ? `<p class="fine">Some choices stay on because you are filling ${esc(b.name)}.</p>` : "";
+  body.innerHTML = `${note}
+    <section class="filter-sec" id="filter-gem"><h3>Gemfinder</h3><div class="huntpicks"><button type="button" class="huntpick${filters.gem ? " on" : ""}" id="gemSheetToggle" aria-pressed="${filters.gem ? "true" : "false"}">Gemfinder</button></div><p class="fine">Hand-picked eras and rarities that fly under the radar. Expedition, Aquapolis, and Skyridge holos, plus older EX, DP, HGSS, and Call of Legends holos, LV.X, Prime, and LEGEND, in a buyable price band from the cards already saved here. Not a grade-population report.</p></section>
+    <section class="filter-sec" id="filter-price"><h3>Price</h3><div class="huntpicks">${priceButtons}</div><div class="row2"><label class="field">Min USD<input id="pMin" inputmode="decimal" aria-label="Minimum price in US dollars"></label><label class="field">Max USD<input id="pMax" inputmode="decimal" aria-label="Maximum price in US dollars"></label></div><p class="warn" id="pWarn" hidden>Min price is higher than max price. These prices were not applied.</p><p class="fine">Any price keeps cards under $10 in the hunt.</p></section>
+    <section class="filter-sec" id="filter-set"><h3>Set</h3>${filters.set ? `<button type="button" class="setpick on" id="clearSetPick"><span><b>${esc(setName(filters.set))}</b><span class="fine">Tap to swipe every set again</span></span></button>` : ""}<input class="search" id="setSearch" type="search" placeholder="Search sets" aria-label="Search sets" enterkeyhint="search" autocomplete="off"><div id="setChoices"></div><button class="chip" type="button" id="browseSets">Browse sets by era</button></section>
+    <section class="filter-sec" id="filter-era"><h3>Era</h3><div class="huntpicks">${eraButtons}</div><button class="chip" type="button" id="moreEras" aria-expanded="${seriesOpen ? "true" : "false"}">${seriesOpen ? "Fewer series" : "One series"}</button><div class="huntpicks" id="moreEraBox"${seriesOpen ? "" : " hidden"}>${seriesButtons}</div></section>
+    <section class="filter-sec" id="filter-rarity"><h3>Rarity</h3><div class="huntpicks">${rarityButtons || `<p class="fine">Rarity list is still loading.</p>`}</div>${moreButtons ? `<button class="chip" type="button" id="moreRarities" aria-expanded="${moreOpen ? "true" : "false"}">${moreOpen ? "Fewer rarities" : "More rarities"}</button><div class="huntpicks" id="moreRarityBox"${moreOpen ? "" : " hidden"}>${moreButtons}</div>` : ""}</section>
+    <section class="filter-sec" id="filter-type"><h3>Type</h3><div class="huntpicks">${typeButtons}</div></section>
+    <section class="filter-sec" id="filter-pokemon"><h3>Pokémon</h3><div id="pokeHost"></div></section>
+    <section class="filter-sec" id="filter-graded"><h3>Graded</h3><button type="button" class="huntpick" id="gradedToggle">Graded prices only</button><p class="fine">Uses cached graded prices. Leave this off and every raw card stays in the hunt.</p></section>
+    <button class="chip" type="button" id="sheetClear">Clear all filters</button>`;
+  const gemSheet = document.getElementById("gemSheetToggle");
+  if (gemSheet) gemSheet.onclick = () => { popBtn(gemSheet); setGemMode(!filters.gem); };
+  body.querySelectorAll("[data-preset]").forEach(btn => btn.onclick = () => {
+    popBtn(btn);
+    filters.pricePreset = btn.dataset.preset || "";
+    filters.min = null;
+    filters.max = null;
+    saveFilters();
+    restart();
+    syncFilterControls();
+  });
+  body.querySelectorAll("[data-era]").forEach(btn => btn.onclick = () => {
+    popBtn(btn);
+    const era = btn.dataset.era || "";
+    if (lock.set && filters.set && era && !eraMatches(filters.set, era)) {
+      announce(setName(filters.set) + " stays, because this binder hunt is that set.");
+      return;
+    }
+    filters.era = era;
+    if (era && filters.set && !eraMatches(filters.set, era)) filters.set = "";
+    saveFilters();
+    restart();
+    syncFilterControls();
+  });
+  body.querySelectorAll("[data-type]").forEach(btn => btn.onclick = () => {
+    if (btn.disabled) return;
+    popBtn(btn);
+    filters.type = btn.dataset.type || "";
+    saveFilters();
+    restart();
+    syncFilterControls();
+  });
+  const toggleRarity = btn => {
+    popBtn(btn);
+    const rarity = btn.dataset.rarity;
+    if (filters.rarities.includes(rarity)) filters.rarities = filters.rarities.filter(r => r !== rarity);
+    else filters.rarities.push(rarity);
+    saveFilters();
+    restart();
+    syncFilterControls();
+  };
+  body.querySelectorAll("[data-rarity]").forEach(btn => btn.onclick = () => toggleRarity(btn));
+  const moreEras = document.getElementById("moreEras");
+  if (moreEras) moreEras.onclick = () => {
+    const box = document.getElementById("moreEraBox");
+    const open = box.hidden;
+    box.hidden = !open;
+    moreEras.setAttribute("aria-expanded", open ? "true" : "false");
+    moreEras.textContent = open ? "Fewer series" : "One series";
+  };
+  const more = document.getElementById("moreRarities");
+  if (more) more.onclick = () => {
+    const box = document.getElementById("moreRarityBox");
+    const open = box.hidden;
+    box.hidden = !open;
+    more.setAttribute("aria-expanded", open ? "true" : "false");
+    more.textContent = open ? "Fewer rarities" : "More rarities";
+  };
+  const graded = document.getElementById("gradedToggle");
+  if (graded) graded.onclick = () => {
+    popBtn(graded);
+    filters.graded = !filters.graded;
+    saveFilters();
+    restart();
+    syncFilterControls();
+  };
+  document.getElementById("pMin").oninput = applyCustomPrice;
+  document.getElementById("pMax").oninput = applyCustomPrice;
+  document.getElementById("setSearch").oninput = drawSetChoices;
+  document.getElementById("browseSets").onclick = () => {
+    closeSheet("filterSheet");
+    showTab("sets");
+    announce("Sets, grouped by era.");
+  };
+  document.getElementById("sheetClear").onclick = () => clearAllFilters();
+  drawPokemonFilter(document.getElementById("pokeHost"));
+  drawSetChoices();
+  openSheet("filterSheet", anchor || document.getElementById("openFilters"));
+  syncFilterControls();
+  const focusId = { price:"filter-price", era:"filter-era", set:"filter-set", rarity:"filter-rarity", type:"filter-type", pokemon:"filter-pokemon" }[kind];
+  const section = focusId ? document.getElementById(focusId) : null;
+  const focus = (section && section.querySelector("button, input")) || body.querySelector("[data-preset]");
+  if (focus) focus.focus();
+  if (section && kind && kind !== "all") section.scrollIntoView({ block:"start" });
+  if (!meta.ready) loadMeta().then(() => { if (!document.getElementById("filterSheet").hidden) openFilter(kind || "all", anchor); });
+}
+
+function renderSets(){
+  const root = document.getElementById("setsScroll");
+  root.classList.toggle("fitting", !!setView);
+  if (setView) { renderSetPage(root); return; }
+  const q = (root.querySelector("#setFind") || {}).value || "";
+  const groups = new Map();
+  meta.sets.forEach(s => {
+    if (imageless.has(s.id)) return;
+    const year = setYear(s);
+    if (year) s.year = year;
+    const query = q.trim().toLowerCase();
+    const eraHit = query.length >= 3 && eraOf(s.id).toLowerCase().includes(query);
+    if (query && !s.name.toLowerCase().includes(query) && !String(s.id).toLowerCase().includes(query) && !eraHit) return;
+    const era = eraOf(s.id);
+    if (!groups.has(era)) groups.set(era, []);
+    groups.get(era).push(s);
+  });
+  const html = [`<input class="search" id="setFind" type="search" placeholder="Search sets" aria-label="Search sets" enterkeyhint="search" autocomplete="off" value="${esc(q)}">`,`<p class="fine setlead">Grouped by era. Open a set to flip through it, or swipe just that set.</p>`,`<div class="modes"><button class="chip gem-toggle${filters.gem ? " on" : ""}" id="openGemfinder" type="button" aria-pressed="${filters.gem ? "true" : "false"}">Gemfinder</button></div>`];
+  ERA_ORDER.forEach(era => {
+    const list = groups.get(era);
+    if (!list || !list.length) return;
+    html.push(`<h2 class="era-h">${esc(era)} <span class="fine">${list.length}</span></h2><div class="set-grid">`);
+    list.forEach(s => {
+      const count = setTotal(s);
+      const wish = wishBit(s);
+      const year = setYear(s);
+      const owned = countOwnedInSet(s.id);
+      const metaLine = [count ? count + " cards" : era, year].filter(Boolean).join(" · ");
+      const ownedLine = owned ? owned + " owned" : "";
+      const aria = [s.name, era, count ? count + " cards" : "", wish.full, ownedLine].filter(Boolean).join(", ");
+      const art = setArtUrl(s);
+      html.push(`<button class="set-tile" type="button" data-set="${esc(s.id)}" aria-label="${esc(aria)}">${art ? `<img alt="" src="${esc(art)}" data-symbol="${esc(s.symbol || "")}">` : ""}<b>${esc(s.name)}</b><span class="fine">${esc(metaLine)}${ownedLine ? " · " + esc(ownedLine) : ""}</span><span class="setpct${wish.saved ? "" : " zero"}"><span class="bar" aria-hidden="true"><span style="width:${wish.pct}%"></span></span><span class="pct"><span class="wishheart" aria-hidden="true">${wish.saved ? "♥" : "♡"}</span> ${esc(wish.short)}</span></span></button>`);
+    });
+    html.push(`</div>`);
+  });
+  if (!meta.ready && !meta.sets.length) html.push(`<p class="fine">The catalog is still loading.</p>`);
+  else if (html.length === 3) html.push(`<p class="empty-state">No sets match. ${toad()}</p>`);
+  const focused = document.activeElement && document.activeElement.id === "setFind";
+  const caret = focused ? document.activeElement.selectionStart : null;
+  root.innerHTML = html.join("");
+  const find = document.getElementById("setFind");
+  if (find) {
+    find.oninput = () => renderSets();
+    if (focused) { find.focus(); if (caret != null) find.setSelectionRange(caret, caret); }
+  }
+  root.querySelectorAll("[data-set]").forEach(btn => btn.onclick = () => openSet(btn.dataset.set));
+  const gemBtn = document.getElementById("openGemfinder");
+  if (gemBtn) gemBtn.onclick = () => setGemMode(true);
+  bindSetArt(root);
+}
+async function openSet(id){
+  countEvent("set-mode");
+  const known = meta.sets.find(s => s.id === id) || { id, name:id };
+  flipPage = 0;
+  setView = { id, name:known.name, cards:[], release:"", loading:true };
+  renderSets();
+  try {
+    const set = await getJson(TCGDEX + "/sets/" + encodeURIComponent(id));
+    const cards = (set.cards || []).slice().sort((a, b) => numId(a.localId) - numId(b.localId));
+    if (!cards.some(c => safeImg(c && c.image))) imageless.add(id);
+    rememberSetList(id, { cards, release:set.releaseDate || "", name:set.name || known.name || id });
+    setView = { id, name:set.name || known.name, release:(set.releaseDate || "").slice(0, 4), cards, mode:"flip", loading:false };
+    const tile = meta.sets.find(s => s.id === id);
+    if (tile) tile.year = setView.release;
+  } catch (e) { setView.loading = false; setView.error = true; }
+  if (tab === "sets") renderSets();
+}
+function savedIds(){
+  const ids = new Set(wish.map(c => c.id));
+  binderState.binders.forEach(b => b.cards.forEach(c => ids.add(c.id)));
+  return ids;
+}
+function renderSetPage(root){
+  const s = setView;
+  const knownSet = meta.sets.find(x => x.id === s.id);
+  const total = setTotal(knownSet) || s.cards.length || 0;
+  const saved = wishInSet(s.id);
+  const owned = clampedOwned(countOwnedInSet(s.id, s.cards), total);
+  const pct = total ? Math.max(0, Math.min(100, Math.round(saved / total * 100))) : 0;
+  const progressLine = (total ? saved + " of " + total : String(saved)) + " on your wishlist" + (owned ? " · " + owned + " owned" : "");
+  if (s.mode !== "flip" && s.mode !== "about") s.mode = "flip";
+  const art = setArtUrl(knownSet);
+  const logo = art ? `<img class="setlogo" alt="" src="${esc(art)}" data-symbol="${esc((knownSet && knownSet.symbol) || "")}">` : "";
+  root.innerHTML = `<div class="setpage"><div class="sethead"><button class="chip" id="backSets" type="button" aria-label="All sets">←</button>
+    ${logo}<div class="setname"><h2>${esc(s.name)}</h2><p class="fine">${esc([s.release, eraOf(s.id), total ? total + " cards" : ""].filter(Boolean).join(" · "))}</p></div></div>
+    <div class="setstats">
+      <div class="setmeter"><p class="fine" id="setProgress">${esc(progressLine)}</p><div class="bar" aria-hidden="true"><span style="width:${total ? pct : 0}%"></span></div></div>
+      <button class="chip go" id="swipeSet" type="button">Swipe this set</button>
+    </div>
+    <div class="setflip" id="setBody"></div></div>`;
+  bindSetArt(root);
+  document.getElementById("backSets").onclick = () => { setView = null; renderSets(); paintContext(); };
+  document.getElementById("swipeSet").onclick = () => {
+    binderState.discoveryId = "";
+    saveBinders();
+    dropHeldFilters();
+    filters = blankFilters();
+    filters.set = s.id;
+    saveFilters();
+    showTab("hunt");
+    restart();
+    announce("Swiping " + s.name + ". Right-swipes join your wishlist.");
+  };
+  const body = document.getElementById("setBody");
+  if (s.loading) { body.innerHTML = `<p>Shuffling ${esc(s.name)}…</p>`; return; }
+  if (s.error) { body.innerHTML = `<p class="warn">This set didn't load.</p>`; return; }
+  if (!s.cards.some(c => safeImg(c && c.image))) {
+    body.innerHTML = `<p class="empty-state">No card images for this set yet. ${toad()}</p>`;
+    paintContext();
+    return;
+  }
+  const pages = Math.max(1, Math.ceil(s.cards.length / 9));
+  if (flipPage >= pages) flipPage = 0;
+  const slice = s.cards.slice(flipPage * 9, flipPage * 9 + 9);
+  body.innerHTML = `<div class="spread"><div class="paper" id="setPaper"><h3>Page ${flipPage + 1}</h3><div class="pockets" id="setPockets"></div></div>
+    <div class="pager"><button class="chip" id="setPrev" type="button" aria-label="Previous page">←</button><span class="pagefoot">${flipPage + 1} / ${pages}</span><button class="chip" id="setNext" type="button" aria-label="Next page">→</button></div></div>`;
+  const host = document.getElementById("setPockets");
+  slice.forEach(c => {
+    const pocket = document.createElement("article");
+    const ownedCard = ownedIds.has(c.id);
+    pocket.className = "pocket" + (ownedCard ? " owned" : "");
+    const on = wish.some(w => w.id === c.id);
+    pocket.innerHTML = `<button type="button" class="open" aria-label="${esc(c.name)} – ${esc(s.name)} #${esc(c.localId || "")}${ownedCard ? ", owned" : ", wanted"}"><img alt="" draggable="false" decoding="async" loading="lazy"></button><b class="sr-only">${esc(c.name)}</b><button class="iconish heart${on ? " on" : ""}" type="button" aria-pressed="${on ? "true" : "false"}" aria-label="${on ? esc(c.name) + " is on your wishlist" : "Add " + esc(c.name) + " to wishlist"}">${on ? "♥" : "♡"}</button>${ownedCard ? `<span class="owned-mark" aria-hidden="true"></span>` : ""}`;
+    const img = pocket.querySelector("img");
+    img.alt = c.name + " – " + s.name + " #" + (c.localId || "");
+    img.draggable = false;
+    img.addEventListener("dragstart", e => e.preventDefault());
+    const base = safeImg(c.image);
+    if (!base) img.replaceWith(binderMissingArt({ name:c.name, set:s.name, number:c.localId }));
+    else {
+      let tried = false;
+      img.onerror = () => { if (!tried) { tried = true; img.src = base + "/low.webp"; return; } img.replaceWith(binderMissingArt({ name:c.name, set:s.name, number:c.localId })); };
+      img.src = base + "/high.webp";
+    }
+    pocket.querySelector(".open").onclick = () => openProfile({ id:c.id, name:c.name, image:c.image, localId:c.localId });
+    pocket.querySelector(".heart").onclick = async () => {
+      let card = cardCache.get(c.id);
+      try { card = card || await hydrate({ id:c.id, image:c.image, localId:c.localId }); } catch (e) { card = { id:c.id, name:c.name, set:s.name, setId:s.id, number:c.localId, img:c.image ? c.image + "/high.webp" : "", thumb:c.image ? c.image + "/low.webp" : "" }; }
+      addWish(card);
+      const binder = discoveryBinder();
+      if (binder) addToBinder(binder, card);
+      announce("Saved " + c.name + " to your wishlist" + (binder ? " and " + binder.name : "") + ".");
+      renderSets();
+    };
+    host.append(pocket);
+  });
+  while (host.children.length < 9) {
+    const empty = document.createElement("div");
+    empty.className = "pocket empty";
+    empty.setAttribute("aria-hidden", "true");
+    host.append(empty);
+  }
+  const turn = (delta) => {
+    const paper = document.getElementById("setPaper");
+    const next = Math.min(pages - 1, Math.max(0, flipPage + delta));
+    if (next === flipPage) return;
+    const go = () => { flipPage = next; renderSets(); };
+    if (reduceMotion() || !paper) go();
+    else { paper.classList.add("turning"); setTimeout(go, 450); if (settings.sound) playTone(180); }
+  };
+  /* Swipe the page sideways to turn it, like the binder. */
+  const paperEl = document.getElementById("setPaper");
+  if (paperEl) {
+    let sx = 0, sy = 0, pid = null;
+    paperEl.addEventListener("pointerdown", e => { if (e.button) return; pid = e.pointerId; sx = e.clientX; sy = e.clientY; });
+    paperEl.addEventListener("pointerup", e => {
+      if (e.pointerId !== pid) return;
+      pid = null;
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.4) turn(dx < 0 ? 1 : -1);
+    });
+    paperEl.addEventListener("pointercancel", () => { pid = null; });
+  }
+  document.getElementById("setPrev").onclick = () => turn(-1);
+  document.getElementById("setNext").onclick = () => turn(1);
+  paintContext();
+}
+
+function coverColor(value, optional){
+  const raw = String(value || "");
+  if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw;
+  return optional ? "" : "#E9D5C0";
+}
+/* Up to three cards fanned out, so a binder shows what is inside it. */
+function peekMarkup(list, cls){
+  const art = (list || []).map(c => artUrls(c, false)[0]).filter(Boolean).slice(0, 3);
+  if (!art.length) return `<span class="${cls} empty" aria-hidden="true"><i></i><i></i><i></i></span>`;
+  return `<span class="${cls}" aria-hidden="true">${art.map(u => `<img alt="" src="${esc(u)}" loading="lazy" decoding="async" onerror="this.remove()">`).join("")}</span>`;
+}
+function renderBinders(){
+  const root = document.getElementById("bindersScroll");
+  if (binderView) { renderCollection(root); return; }
+  root.classList.remove("reading");
+  const total = valueOf(wish);
+  const ownedN = wish.filter(c => ownedIds.has(c.id)).length;
+  const wantedN = Math.max(0, wish.length - ownedN);
+  const dropped = droppedCount(wish);
+  const cardsWord = n => n + (n === 1 ? " card" : " cards");
+  const wishMeta = wish.length ? cardsWord(wish.length) + (total ? " · " + priceText(total, "USD") : "") : "Nothing saved yet";
+  const wishSub = wish.length ? (wantedN ? wantedN + " still to find" : "You have every card") + (ownedN ? " · " + ownedN + " got" : "") : "Swipe right on a card and it lands here.";
+  root.innerHTML = `<div class="wish-slot"><button class="wish-row" id="openWish" type="button">${peekMarkup(wish, "wish-peek")}<span class="wish-copy"><span class="eyebrow">All saved cards</span><b>Wishlist</b><span class="wish-meta">${esc(wishMeta)}</span><span class="fine">${esc(wishSub)}</span></span>${droppedCountMarkup(dropped)}<span class="wish-go" aria-hidden="true">Open →</span></button><button class="chip wish-share" id="shareWish" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button></div>
+    <div class="shelf-head"><h2 class="shelf-title">Your binders</h2><p class="fine">Right-swipe always lands on your wishlist. A themed binder is another home for the same card.</p></div>
+    <div class="shelf-scene"><div class="shelf" id="shelf"></div></div>`;
+  const shelf = document.getElementById("shelf");
+  binderState.binders.forEach(b => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "cover";
+    const cloth = coverColor(b.color);
+    btn.style.setProperty("--cover", cloth);
+    const p = progressOf(b.cards);
+    if (p.total && p.owned >= p.total) btn.classList.add("complete");
+    const hunting = binderState.discoveryId === b.id;
+    if (hunting) btn.classList.add("is-hunting");
+    const theme = themeOf(b);
+    const countBits = [];
+    if (hunting) countBits.push("Hunting");
+    countBits.push(b.cards.length ? cardsWord(b.cards.length) : "Empty");
+    if (theme.kind !== "none") countBits.push(themeLabel(theme));
+    const charm = b.charm === "toad" ? `<span class="cover-charm">${toad()}</span>` : b.charm === "sticker" ? `<span class="cover-charm star" aria-hidden="true">★</span>` : "";
+    btn.dataset.progress = p.owned + "/" + p.total;
+    const countLine = countBits.join(" · ");
+    const pct = b.cards.length ? ringShown(p.owned, p.total) : "";
+    const coverBits = [b.name];
+    if (pct) coverBits.push(pct);
+    coverBits.push(countLine);
+    if (b.charm === "sticker") coverBits.push("★");
+    const coverName = coverBits.join(", ");
+    btn.setAttribute("aria-label", coverName);
+    btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board">${peekMarkup(b.cards, "cover-peek")}<b class="binder-name">${esc(b.name)}</b> ${b.cards.length ? ringMarkup(p.owned, p.total) + " " : ""}<span class="binder-count">${esc(countLine)}</span></span><span class="binder-fore"></span></span>${charm ? " " + charm : ""}`;
+    btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); renderBinders(); };
+    const slot = document.createElement("div");
+    slot.className = "cover-slot";
+    const share = document.createElement("button");
+    share.type = "button";
+    share.className = "cover-share";
+    share.setAttribute("aria-haspopup", "dialog");
+    share.setAttribute("aria-label", "Share " + b.name);
+    share.textContent = "Share";
+    share.onclick = () => {
+      if (window.BinderShare) BinderShare.openCollection({ kind:"binder", name:b.name, color:b.color, cards:b.cards, ownedIds });
+    };
+    slot.append(btn, share);
+    shelf.append(slot);
+  });
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "cover add";
+  add.style.setProperty("--cover", "#F1F1E4");
+  add.innerHTML = `<span class="binder-book"><span class="binder-spine" aria-hidden="true"></span><span class="binder-board"><span class="cover-add-label">+ New binder<small>${binderState.binders.length ? "Another set, Pokémon or theme" : "One for a set, a Pokémon, or anything you collect"}</small></span></span><span class="binder-fore" aria-hidden="true"></span></span>`;
+  add.onclick = openBinderForm;
+  const addSlot = document.createElement("div");
+  addSlot.className = "cover-slot";
+  const spacer = document.createElement("span");
+  spacer.className = "cover-share-spacer";
+  spacer.setAttribute("aria-hidden", "true");
+  addSlot.append(add, spacer);
+  shelf.append(addSlot);
+  document.getElementById("openWish").onclick = () => { binderView = { kind:"wish" }; flipPage = 0; renderBinders(); };
+  document.getElementById("shareWish").onclick = () => {
+    if (window.BinderShare) BinderShare.openCollection({ kind:"wish", name:"Wishlist", color:"#E4E7DA", cards:wish, ownedIds });
+  };
+  paintContext();
+}
+function pagesOf(list){ return Math.max(1, Math.ceil(list.length / 9) || 1); }
+function isHolo(card){
+  if (!card) return false;
+  if (card.holo === true) return true;
+  if (/holo|illustration|hyper|secret|shiny|radiant|amazing/i.test(card.rarity || "")) return true;
+  const vars = card.variants;
+  if (vars && typeof vars === "object" && !Array.isArray(vars) && vars.holo === true) return true;
+  return Array.isArray(vars) && vars.some(v => {
+    const key = String(v && v.key || "");
+    return /holo/i.test(key) && !/reverse/i.test(key);
+  });
+}
+function playPaper(){
+  if (!settings.sound || reduceMotion()) return;
+  playTone(150);
+  setTimeout(() => { if (settings.sound) playTone(96); }, 70);
+}
+function showToast(text, undo){
+  let toast = document.getElementById("binderToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "binderToast";
+    toast.className = "toast";
+    toast.innerHTML = `<span></span><button type="button">Undo</button>`;
+    document.body.append(toast);
+  }
+  toast.hidden = false;
+  toast.querySelector("span").textContent = text;
+  toast.querySelector("button").onclick = () => { toast.hidden = true; undo(); };
+  clearTimeout(binderToastTimer);
+  binderToastTimer = setTimeout(() => { toast.hidden = true; }, 5200);
+}
+function sparkBits(){
+  const s = document.createElement("div");
+  s.className = "spark";
+  s.setAttribute("aria-hidden", "true");
+  for (let i = 0; i < 8; i++) {
+    const dot = document.createElement("i");
+    dot.style.left = (12 + (i % 4) * 24) + "%";
+    dot.style.top = (18 + Math.floor(i / 4) * 46) + "%";
+    dot.style.background = ["#86DEFF","#F6C9C9","#F3EDC8","#ABB28D"][i % 4];
+    s.append(dot);
+  }
+  return s;
+}
+function showConfetti(message){
+  const text = message || "Complete.";
+  announce(text);
+  if (settings.sound && !reduceMotion()) {
+    playTone(523);
+    setTimeout(() => { if (settings.sound && !reduceMotion()) playTone(659); }, 110);
+  }
+  document.querySelectorAll(".confetti").forEach(n => n.remove());
+  const el = document.createElement("div");
+  el.className = "confetti" + (reduceMotion() ? " still" : "");
+  el.setAttribute("aria-hidden", "true");
+  const p = document.createElement("p");
+  p.textContent = text;
+  p.append(document.createRange().createContextualFragment(toad()));
+  el.append(p);
+  if (!reduceMotion()) {
+    for (let i = 0; i < 16; i++) {
+      const b = document.createElement("b");
+      b.style.left = (4 + (i * 6) % 92) + "%";
+      b.style.top = (8 + (i % 4) * 8) + "%";
+      b.style.background = ["#86DEFF","#F6C9C9","#ABB28D","#F3EDC8","#E9D5C0"][i % 5];
+      el.append(b);
+    }
+  }
+  document.body.append(el);
+  holdConfetti(el, reduceMotion() ? 2400 : 1600);
+}
+function coverPad(binder, list){
+  const pad = document.createElement("div");
+  const p = progressOf(list);
+  pad.className = "pad" + (p.total && p.owned >= p.total ? " complete" : "");
+  pad.style.setProperty("--cover", coverColor(binder.color));
+  const charm = binder.charm === "toad" ? `<div class="charm">${toad()}</div>` : binder.charm === "sticker" ? `<div class="charm sticker" aria-hidden="true">★</div>` : "";
+  pad.innerHTML = `<h2>${esc(binder.name)}</h2><div class="pad-ring">${ringMarkup(p.owned, p.total)}</div>${list.length ? "" : `<p class="fine">A fresh binder. These pockets are waiting.</p>`}${charm}`;
+  return pad;
+}
+function endPaper(text){
+  const wrap = document.createElement("div");
+  wrap.className = "pad";
+  wrap.style.setProperty("--cover", "#F3EDC8");
+  wrap.innerHTML = `<p class="count">${esc(text)}</p>${toad()}`;
+  return wrap;
+}
+let suppressGotClickUntil = 0;
+function gotPressIgnored(press, now, x, y){
+  if (now < suppressGotClickUntil) return true;
+  if (!press || !press.t) return false;
+  if (press.suppress) return true;
+  const dt = now - press.t;
+  const dist = Math.max(press.d || 0, Math.hypot((x || 0) - (press.x || 0), (y || 0) - (press.y || 0)));
+  return dt > 450 || dist > 8;
+}
+function sleeveSlot(card, index, ctx){
+  const slot = document.createElement("div");
+  slot.className = "slot";
+  const owned = ownedIds.has(card.id);
+  const sleeve = document.createElement("div");
+  sleeve.className = "sleeve " + (owned ? "owned" : "wanted") + (isHolo(card) ? " holo" : "");
+  sleeve.dataset.index = String(index);
+  const drop = priceDrop(card);
+  const dropNote = drop ? ", down " + drop.shown + " percent" : "";
+  const price = pocketPrice(card);
+  sleeve.innerHTML = `<button type="button" class="cardhit" aria-label="${esc(altText(card) + (owned ? ", owned" : ", wanted") + (price ? ", " + price : "") + dropNote)}"></button>${dropBadgeMarkup(drop)}`;
+  const hit = sleeve.querySelector(".cardhit");
+  paintArt(hit, card, { large:true, missing:binderMissingArt });
+  const glare = document.createElement("span");
+  glare.className = "glare";
+  glare.setAttribute("aria-hidden", "true");
+  const shine = document.createElement("span");
+  shine.className = "shine";
+  shine.setAttribute("aria-hidden", "true");
+  hit.append(glare, shine);
+  if (price) {
+    const pill = document.createElement("span");
+    pill.className = "price-pill";
+    pill.textContent = price;
+    hit.append(pill);
+  }
+  const got = document.createElement("button");
+  got.type = "button";
+  got.className = "gotbtn";
+  got.dataset.for = card.id;
+  got.innerHTML = `<span class="mark" aria-hidden="true"><i></i></span>`;
+  got.setAttribute("aria-pressed", owned ? "true" : "false");
+  got.setAttribute("aria-label", owned ? "Undo got it for " + (card.name || "this card") : "Got it! Mark " + (card.name || "this card") + " as owned");
+  got.addEventListener("pointerdown", e => {
+    if (e.button) return;
+    got._press = { t:Date.now(), x:e.clientX, y:e.clientY, d:0, suppress:false };
+  });
+  got.addEventListener("pointermove", e => {
+    const p = got._press;
+    if (!p) return;
+    p.d = Math.max(p.d || 0, Math.hypot(e.clientX - p.x, e.clientY - p.y));
+  });
+  got.onclick = e => {
+    e.stopPropagation();
+    e.preventDefault();
+    const press = got._press;
+    got._press = null;
+    if (gotPressIgnored(press, Date.now(), e.clientX, e.clientY)) return;
+    setOwned(card, !ownedIds.has(card.id), "pocket");
+  };
+  const more = document.createElement("button");
+  more.type = "button";
+  more.className = "iconish more";
+  more.setAttribute("aria-label", "Card menu");
+  more.textContent = "⋯";
+  more.onclick = e => { e.stopPropagation(); openMenu(more, card, ctx.binder); };
+  sleeve.append(got, more);
+  slot.append(sleeve);
+  return slot;
+}
+function emptySlot(insertAt){
+  const slot = document.createElement("div");
+  slot.className = "slot";
+  const sleeve = document.createElement("div");
+  sleeve.className = "sleeve empty";
+  if (insertAt != null) sleeve.dataset.insert = String(insertAt);
+  sleeve.innerHTML = `<span class="sleeve-weld" aria-hidden="true"></span><span class="gloss" aria-hidden="true"></span><span class="glare" aria-hidden="true"></span>`;
+  slot.append(sleeve);
+  return slot;
+}
+function buildFace(sheet, ctx, spark){
+  const face = document.createElement("div");
+  face.className = "face";
+  const page = ctx.withCover && sheet > 0 ? sheet - 1 : sheet;
+  const past = sheet < 0 || (ctx.withCover ? sheet === 0 ? false : page < 0 : false) || sheet >= ctx.total;
+  if (ctx.withCover && sheet === 0) {
+    face.classList.add("cover-face");
+    face.append(coverPad(ctx.binder, ctx.list));
+    return face;
+  }
+  if (!past && !ctx.list.length && page === 0) {
+    const note = document.createElement("p");
+    note.className = "sr-only";
+    note.textContent = ctx.withCover ? "Empty pockets. Swipe to discover, or fill from your wishlist." : "Nothing saved yet. Right-swipe a card and it lands here.";
+    face.append(note);
+  }
+  const grid = document.createElement("div");
+  grid.className = "sleeves";
+  const slice = past ? [] : ctx.list.slice(page * 9, page * 9 + 9);
+  for (let i = 0; i < 9; i++) {
+    const card = slice[i];
+    grid.append(card ? sleeveSlot(card, page * 9 + i, ctx) : emptySlot(past ? null : Math.min(ctx.list.length, page * 9 + i)));
+  }
+  face.append(grid);
+  const num = document.createElement("span");
+  num.className = "page-num";
+  num.textContent = String((past ? sheet : page) + 1);
+  face.append(num);
+  if (spark && !past && pendingSparkle === page) {
+    face.append(sparkBits());
+    pendingSparkle = -1;
+  }
+  return face;
+}
+function binderSpread(root){
+  if (!matchMedia("(min-width: 1024px)").matches) return false;
+  if (!root) return true;
+  const w = root.clientWidth;
+  if (!w) return true;
+  return w >= 640;
+}
+function renderCollection(root){
+  const wishMode = binderView.kind === "wish";
+  const binder = wishMode ? null : binderState.binders.find(b => b.id === binderView.id);
+  if (!wishMode && !binder) { binderView = null; renderBinders(); return; }
+  root.classList.add("reading");
+  const list = wishMode ? wish : binder.cards;
+  const withCover = false;
+  const cardPages = Math.max(1, Math.ceil(list.length / 9) || 1);
+  const total = withCover ? cardPages + 1 : cardPages;
+  if (flipPage < 0) flipPage = 0;
+  if (flipPage >= total) flipPage = total - 1;
+  const twoPage = binderSpread(root);
+  if (twoPage && flipPage % 2 === 1) flipPage -= 1;
+  const ctx = { list, binder, withCover, total };
+  const val = valueOf(list);
+  root.innerHTML = "";
+  const tools = document.createElement("div");
+  tools.className = "booktools";
+  tools.innerHTML = `<button class="chip" id="backBinders" type="button">All binders</button>` +
+    (wishMode ? `<button class="chip" id="copyList" type="button">Copy list</button><button class="chip" id="shareCollection" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button>`
+      : `<button class="chip" id="fillFrom" type="button">Fill from wishlist</button><button class="chip" id="discover" type="button">Swipe to discover</button><button class="chip" id="switchBinder" type="button">Switch</button><button class="chip" id="renameBinder" type="button">Rename</button><button class="chip" id="recolorBinder" type="button">Cover</button><button class="chip danger" id="deleteBinder" type="button">Delete</button><button class="chip" id="copyList" type="button">Copy list</button><button class="chip" id="shareCollection" type="button" aria-haspopup="dialog">Share</button>`);
+  const stage = document.createElement("div");
+  stage.className = "bookstage";
+  const book = document.createElement("div");
+  book.className = "book " + (twoPage ? "spread" : "solo") + (wishMode ? " folio" : " leather");
+  book.dataset.layout = twoPage ? "spread" : "solo";
+  book.dataset.flip = String(flipPage);
+  book.style.setProperty("--cover", wishMode ? "#E4E7DA" : coverColor(binder.color));
+  if (binderOpenAnim && !wishMode) {
+    binderOpenAnim = false;
+    if (!reduceMotion()) {
+      book.classList.add("opening");
+      book.addEventListener("animationend", e => { if (e.target === book) book.classList.remove("opening"); });
+    }
+  } else binderOpenAnim = false;
+  book.setAttribute("aria-label", wishMode ? "Wishlist pages" : binder.name);
+  const spread = document.createElement("div");
+  spread.className = "book-spread";
+  const underL = document.createElement("div");
+  underL.className = "under left";
+  const underR = document.createElement("div");
+  underR.className = "under right";
+  const rings = document.createElement("div");
+  rings.className = "rings";
+  rings.setAttribute("aria-hidden", "true");
+  rings.innerHTML = "<i></i><i></i><i></i><i></i><i></i><i></i>";
+  const spine = document.createElement("div");
+  spine.className = "spine";
+  spine.setAttribute("aria-hidden", "true");
+  spine.innerHTML = "<i></i><i></i><i></i><i></i><i></i>";
+  const leafL = document.createElement("section");
+  leafL.className = "leaf left turn-prev";
+  const leafR = document.createElement("section");
+  leafR.className = "leaf right turn-next";
+  /* After a turn lands, the pages it uncovered are already built and their
+     images decoded, so the new spread takes them over instead of rebuilding. */
+  const faceKey = (wishMode ? "wish" : binder.id) + ":" + list.length + ":" + total + ":" + (twoPage ? 2 : 1);
+  const handed = reuseFaces && reuseFaces.key === faceKey ? reuseFaces.faces : null;
+  reuseFaces = null;
+  const adoptFace = sheet => {
+    const face = handed && handed[sheet];
+    if (!face) return null;
+    delete handed[sheet];
+    face.classList.remove("back", "front", "page-left", "page-right", "blank");
+    face.style.removeProperty("transform");
+    face.inert = false;
+    face.removeAttribute("aria-hidden");
+    return face;
+  };
+  const put = (leaf, sheet, side, spark) => {
+    const face = adoptFace(sheet) || buildFace(sheet, ctx, spark);
+    face.classList.add("front", "page-" + side);
+    const back = document.createElement("div");
+    back.className = "face back";
+    leaf.append(face, back);
+  };
+  if (twoPage) put(leafL, flipPage, "left", true);
+  put(leafR, twoPage ? Math.min(total, flipPage + 1) : flipPage, "right", true);
+  if (twoPage && flipPage + 1 >= total) {
+    leafR.replaceChildren();
+    const face = buildFace(total, ctx, false);
+    face.classList.add("front", "page-right");
+    const back = document.createElement("div");
+    back.className = "face back";
+    leafR.append(face, back);
+  }
+  spread.append(leafL, leafR, underL, underR, spine, rings);
+  const prevEar = document.createElement("button");
+  prevEar.type = "button";
+  prevEar.className = "dogear prev";
+  prevEar.id = "pagePrev";
+  prevEar.setAttribute("aria-label", "Previous page");
+  const nextEar = document.createElement("button");
+  nextEar.type = "button";
+  nextEar.className = "dogear next";
+  nextEar.id = "pageCorner";
+  nextEar.setAttribute("aria-label", "Drag to turn the page");
+  book.append(spread, prevEar, nextEar);
+  const nav = document.createElement("div");
+  nav.className = "booknav";
+  const prevBtn = document.createElement("button");
+  prevBtn.type = "button";
+  prevBtn.className = "iconish";
+  prevBtn.id = "pagePrevBtn";
+  prevBtn.setAttribute("aria-label", "Previous page");
+  prevBtn.textContent = "←";
+  const dots = document.createElement("div");
+  dots.className = "dots";
+  dots.setAttribute("role", "tablist");
+  dots.setAttribute("aria-label", "Pages");
+  const jump = document.createElement("label");
+  jump.className = "jump";
+  jump.textContent = "Jump to page";
+  const select = document.createElement("select");
+  select.id = "jumpPage";
+  select.setAttribute("aria-label", "Jump to page");
+  const sheetLabel = (index, spread) => {
+    if (!spread) return withCover && index === 0 ? "Cover" : "Page " + (withCover ? index : index + 1);
+    const left = withCover ? index : index + 1;
+    const right = left + 1;
+    if (withCover && index === 0) return "Cover–Page " + right;
+    return "Page " + left + "–" + right;
+  };
+  const starts = [];
+  if (twoPage) { for (let i = 0; i < total; i += 2) starts.push(i); }
+  else { for (let i = 0; i < total; i++) starts.push(i); }
+  starts.forEach(i => {
+    const label = sheetLabel(i, twoPage);
+    const dot = document.createElement("button");
+    dot.type = "button";
+    dot.dataset.sheet = String(i);
+    dot.title = label;
+    dot.setAttribute("aria-label", label);
+    dot.setAttribute("aria-current", i === flipPage ? "true" : "false");
+    dots.append(dot);
+    const opt = document.createElement("option");
+    opt.value = String(i);
+    opt.textContent = label;
+    if (i === flipPage) opt.selected = true;
+    select.append(opt);
+  });
+  const nextBtn = document.createElement("button");
+  nextBtn.type = "button";
+  nextBtn.className = "iconish";
+  nextBtn.id = "pageNext";
+  nextBtn.setAttribute("aria-label", "Next page");
+  nextBtn.textContent = "→";
+  jump.append(select);
+  nav.append(prevBtn, dots, jump, nextBtn);
+  const foot = document.createElement("p");
+  foot.className = "pagefoot";
+  const ownedHere = list.filter(c => ownedIds.has(c.id)).length;
+  const ownBit = list.length ? " · " + ownedHere + " owned · " + (list.length - ownedHere) + " wanted" : "";
+  const droppedN = wishMode ? droppedCount(list) : 0;
+  const dropBit = droppedN ? " · " + droppedN + " dropped" : "";
+  foot.textContent = (wishMode ? "Wishlist · " : "") + sheetLabel(flipPage, twoPage) + " · " + list.length + (list.length === 1 ? " card" : " cards") + ownBit + dropBit + " · " + (val ? priceText(val, "USD") : "—");
+  /* One control bar under the binder on a desktop; on a phone the bar
+     dissolves and the tools sit above the binder (see css/binder.css). */
+  const bar = document.createElement("div");
+  bar.className = "bookbar";
+  bar.append(tools, foot, nav);
+  stage.append(book, bar);
+  root.append(stage);
+
+  const step = twoPage ? 2 : 1;
+  const landed = dir => {
+    const dest = Math.max(0, Math.min(total - 1, flipPage + dir * step));
+    return twoPage ? dest - (dest % 2) : dest;
+  };
+  const canTurn = dir => landed(dir) !== flipPage;
+  const kindFor = dir => twoPage ? (dir > 0 ? "forward" : "backward") : (dir > 0 ? "solo-forward" : "solo-backward");
+  const leafFor = dir => book.querySelector(twoPage ? (dir > 0 ? ".leaf.right" : ".leaf.left") : ".leaf.right");
+  /* Pages built ahead of a turn sit hidden under or behind the visible ones;
+     they stay out of the tab order and away from screen readers. */
+  const sideFace = (sheet, side, extra) => {
+    const face = buildFace(sheet, ctx, false);
+    face.classList.add("page-" + side);
+    if (extra) face.classList.add(extra);
+    face.inert = true;
+    face.setAttribute("aria-hidden", "true");
+    return face;
+  };
+  const blankBack = side => {
+    const face = document.createElement("div");
+    face.className = "face back blank page-" + side;
+    face.setAttribute("aria-hidden", "true");
+    return face;
+  };
+  const setUnder = (side, face, sheet) => {
+    const under = book.querySelector(".under." + side);
+    if (!under) return;
+    under.replaceChildren(face);
+    under.dataset.sheet = String(sheet);
+  };
+  /* Lay out what the turning sheet carries on its back and what it uncovers,
+     the way a real binder sheet holds a page on each side. */
+  const prepareTurn = (kind, leaf) => {
+    const saved = {};
+    const back = leaf.querySelector(":scope > .face.back");
+    if (kind === "forward") {
+      if (back) back.replaceWith(sideFace(flipPage + 2, "left", "back"));
+      setUnder("right", sideFace(flipPage + 3, "right"), flipPage + 3);
+    } else if (kind === "backward") {
+      if (back) back.replaceWith(sideFace(flipPage - 1, "right", "back"));
+      setUnder("left", sideFace(flipPage - 2, "left"), flipPage - 2);
+    } else if (kind === "solo-forward") {
+      if (back) back.replaceWith(blankBack("left"));
+      setUnder("right", sideFace(flipPage + 1, "right"), flipPage + 1);
+    } else {
+      /* One page on screen: the previous page swings in from the spine and
+         lands on top of the current one. */
+      const front = leaf.querySelector(":scope > .face.front");
+      saved.front = front;
+      setUnder("right", sideFace(flipPage, "right"), flipPage);
+      const incoming = sideFace(flipPage - 1, "right", "front");
+      if (front) front.replaceWith(incoming);
+      else leaf.prepend(incoming);
+      if (back) back.replaceWith(blankBack("left"));
+    }
+    return saved;
+  };
+  let turn = null;
+  let prepared = {};
+  const endTurn = (t, restore) => {
+    if (!t) return;
+    t.ctl.destroy();
+    t.leaf.classList.remove("hot");
+    if (restore && t.saved.front) {
+      const shown = t.leaf.querySelector(":scope > .face.front");
+      if (shown) shown.replaceWith(t.saved.front);
+    }
+    if (t.timer) clearTimeout(t.timer);
+    if (turn === t) {
+      turn = null;
+      delete book.dataset.curling;
+    }
+    if (restore) {
+      prepared = {};
+      prebuild();
+    }
+  };
+  /* Build the hidden pages a turn will need while the binder sits idle, so
+     grabbing a sheet costs nothing. */
+  const prebuild = () => {
+    const run = () => {
+      if (turn || !book.isConnected) return;
+      const kinds = twoPage ? [1, -1] : [1];
+      kinds.forEach(dir => {
+        const kind = kindFor(dir);
+        if (prepared[kind] || !canTurn(dir)) return;
+        const leaf = leafFor(dir);
+        if (leaf) prepared[kind] = prepareTurn(kind, leaf);
+      });
+    };
+    if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 900 });
+    else setTimeout(run, 200);
+  };
+  const startTurn = dir => {
+    if (!canTurn(dir) || !window.BinderTurn) return null;
+    if (turn) {
+      if (turn.dir === dir) return turn;
+      return null;
+    }
+    const leaf = leafFor(dir);
+    if (!leaf) return null;
+    const kind = kindFor(dir);
+    const saved = prepared[kind] || prepareTurn(kind, leaf);
+    prepared = {};
+    leaf.classList.add("hot");
+    book.dataset.curling = "1";
+    book.querySelectorAll(".sleeve.tilting").forEach(node => node.classList.remove("tilting"));
+    const ctl = BinderTurn.arm({ spread, leaf, kind, reduce: reduceMotion() });
+    turn = { ctl, dir, leaf, saved, kind, timer: 0 };
+    return turn;
+  };
+  const noteFlip = () => { if (!wishMode) countEvent("page-flip"); };
+  const commitTurn = t => {
+    const dest = landed(t.dir);
+    const faces = {};
+    const take = (node, sheet) => { if (node && node.classList.contains("face")) faces[sheet] = node; };
+    const back = t.leaf.querySelector(":scope > .face.back");
+    const underFace = side => { const u = book.querySelector(".under." + side); return u ? u.querySelector(":scope > .face") : null; };
+    if (t.kind === "forward") { take(back, flipPage + 2); take(underFace("right"), flipPage + 3); }
+    else if (t.kind === "backward") { take(back, flipPage - 1); take(underFace("left"), flipPage - 2); }
+    else if (t.kind === "solo-forward") take(underFace("right"), flipPage + 1);
+    else take(t.leaf.querySelector(":scope > .face.front"), flipPage - 1);
+    endTurn(t, false);
+    Object.values(faces).forEach(face => face.remove());
+    reuseFaces = { key: faceKey, faces };
+    flipPage = dest;
+    renderBinders();
+  };
+  const settleTurn = (t, to, speed) => {
+    if (t.timer) clearTimeout(t.timer);
+    const going = to >= 90;
+    if (going) {
+      noteFlip();
+      playPaper();
+      if (settings.haptics) haptic(8);
+    }
+    /* A hidden tab pauses animation frames; never leave a sheet mid-air. */
+    t.timer = setTimeout(() => {
+      if (turn !== t) return;
+      if (going) commitTurn(t);
+      else endTurn(t, true);
+    }, 2400);
+    t.ctl.settle(going ? 180 : 0, speed).then(done => {
+      if (done === null || turn !== t) return;
+      if (done) commitTurn(t);
+      else endTurn(t, true);
+    });
+  };
+  const goSheet = dest => {
+    const next = twoPage ? Math.max(0, dest - (dest % 2)) : dest;
+    if (next === flipPage || next < 0 || next >= total) return;
+    if (turn) endTurn(turn, true);
+    noteFlip();
+    flipPage = next;
+    renderBinders();
+  };
+  const finishFlip = dir => {
+    const dest = landed(dir);
+    if (dest === flipPage) return;
+    if (reduceMotion()) {
+      if (turn) endTurn(turn, true);
+      noteFlip();
+      playPaper();
+      flipPage = dest;
+      renderBinders();
+      return;
+    }
+    const t = startTurn(dir);
+    if (!t) {
+      if (turn) return;
+      noteFlip();
+      flipPage = dest;
+      renderBinders();
+      return;
+    }
+    settleTurn(t, 180, 520);
+  };
+  /* Dragging a sheet: the grabbed point of the page stays under the finger,
+     and the sheet's weight shows as a little lag behind it. */
+  let drag = null;
+  const beginDrag = (dir, x) => {
+    const t = startTurn(dir);
+    if (!t) return false;
+    const r = t.leaf.getBoundingClientRect();
+    let reach;
+    if (!twoPage) reach = r.width * 0.95;
+    else {
+      const hinge = dir > 0 ? r.left : r.right;
+      reach = 2 * Math.max(r.width * 0.35, Math.min(r.width, Math.abs(x - hinge)));
+    }
+    drag = { t, reach, base: BinderTurn.travelFor(t.ctl.theta, reach), sx: x, samples: [] };
+    return true;
+  };
+  const dragTo = x => {
+    if (!drag) return;
+    const raw = x - drag.sx;
+    const travel = drag.base + (drag.t.dir > 0 ? -raw : raw);
+    const th = BinderTurn.dragAngle(travel, drag.reach);
+    drag.t.ctl.follow(th);
+    const now = performance.now();
+    drag.samples.push({ at: now, th });
+    while (drag.samples.length > 2 && now - drag.samples[0].at > 110) drag.samples.shift();
+  };
+  const releaseDrag = (cancelled, tap) => {
+    const d = drag;
+    drag = null;
+    if (!d || turn !== d.t) return;
+    /* Speed comes from the last ~100ms of real movement; a lone jump of the
+       pointer is not a flick. */
+    let speed = 0;
+    const s = d.samples;
+    const now = performance.now();
+    if (s.length > 2) {
+      const a = s[0], b = s[s.length - 1];
+      if (now - b.at < 90 && b.at - a.at >= 24) speed = (b.th - a.th) / (b.at - a.at) * 1000;
+    }
+    /* A flick carries the sheet: judge where it would coast to. */
+    const coast = d.t.ctl.target + speed * 0.16;
+    const go = !cancelled && canTurn(d.t.dir) && (tap || coast > 90);
+    settleTurn(d.t, go ? 180 : 0, speed);
+  };
+  prevBtn.onclick = () => finishFlip(-1);
+  nextBtn.onclick = () => finishFlip(1);
+  dots.querySelectorAll("button").forEach(btn => btn.onclick = () => {
+    const n = Number(btn.dataset.sheet);
+    const dest = twoPage ? n - (n % 2) : n;
+    if (dest === flipPage) return;
+    if (Math.abs(dest - flipPage) === step) finishFlip(dest > flipPage ? 1 : -1);
+    else goSheet(dest);
+  });
+  select.onchange = () => {
+    const n = Number(select.value);
+    const dest = twoPage ? n - (n % 2) : n;
+    if (Math.abs(dest - flipPage) === step) finishFlip(dest > flipPage ? 1 : -1);
+    else goSheet(dest);
+  };
+  let mode = "", pid = null, sx = 0, sy = 0, timer = 0, ghost = null, dragIndex = -1, fromPointer = false, pressBtn = null, peak = 0;
+  const clearTimer = () => { if (timer) { clearTimeout(timer); timer = 0; } };
+  const endGhost = () => { if (ghost) { ghost.remove(); ghost = null; } book.querySelectorAll(".sleeve").forEach(s => { s.style.opacity = ""; }); };
+  const onMove = e => {
+    if (e.pointerId !== pid) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    peak = Math.max(peak, Math.hypot(dx, dy));
+    if (pressBtn && pressBtn._press) pressBtn._press.d = Math.max(pressBtn._press.d || 0, Math.hypot(dx, dy));
+    if (mode === "curl") {
+      dragTo(e.clientX);
+      return;
+    }
+    if (mode === "card") {
+      if (ghost) { ghost.style.left = e.clientX + "px"; ghost.style.top = e.clientY + "px"; }
+      const box = book.getBoundingClientRect();
+      book.classList.toggle("out", e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom);
+      return;
+    }
+    if (!mode && Math.hypot(dx, dy) > 10) {
+      clearTimer();
+      book.querySelectorAll(".sleeve.sunk").forEach(s => s.classList.remove("sunk"));
+      if (Math.abs(dx) > Math.abs(dy) && !pressBtn) {
+        const dir = dx < 0 ? 1 : -1;
+        if (canTurn(dir) && beginDrag(dir, sx)) {
+          mode = "curl";
+          dragTo(e.clientX);
+          return;
+        }
+      }
+      if (Math.abs(dx) > Math.abs(dy)) mode = dx < 0 ? "swipe-next" : "swipe-prev";
+      else mode = "scroll";
+    }
+  };
+  const onUp = e => {
+    if (e.pointerId !== pid) return;
+    const cancelled = e.type === "pointercancel";
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onUp);
+    clearTimer();
+    const dx = cancelled ? 0 : e.clientX - sx, dy = cancelled ? 0 : e.clientY - sy;
+    if (mode === "curl") {
+      fromPointer = true;
+      releaseDrag(cancelled, peak < 8);
+    } else if (mode === "card") {
+      if (pressBtn) suppressGotClickUntil = Date.now() + 500;
+      endGhost();
+      book.classList.remove("out");
+      if (!cancelled) {
+        const box = book.getBoundingClientRect();
+        const outside = e.clientX < box.left - 8 || e.clientX > box.right + 8 || e.clientY < box.top - 8 || e.clientY > box.bottom + 24;
+        if (outside) removeAt(dragIndex);
+        else {
+          const hit = document.elementFromPoint(e.clientX, e.clientY);
+          const sleeve = hit && hit.closest(".sleeve[data-index]");
+          const blank = hit && hit.closest(".sleeve[data-insert]");
+          const dot = hit && hit.closest(".dots button[data-sheet]");
+          if (sleeve) moveIndex(dragIndex, Number(sleeve.dataset.index));
+          else if (blank) moveIndex(dragIndex, Number(blank.dataset.insert));
+          else if (dot) {
+            const sheet = Number(dot.dataset.sheet);
+            const page = withCover ? Math.max(0, sheet - 1) : sheet;
+            if (!(withCover && sheet === 0)) moveIndex(dragIndex, Math.min(list.length - 1, page * 9));
+          }
+        }
+      }
+    } else if (!cancelled && mode === "swipe-next" && dx < -48) finishFlip(1);
+    else if (!cancelled && mode === "swipe-prev" && dx > 48) finishFlip(-1);
+    else if (!cancelled && !mode && Math.hypot(dx, dy) < 8 && !turn) {
+      const origin = e.target instanceof Element ? e.target : document.elementFromPoint(e.clientX, e.clientY);
+      if (origin) {
+        const hit = origin.closest(".sleeve[data-index] .cardhit, .sleeve[data-index]");
+        const sleeve = hit && hit.closest(".sleeve[data-index]");
+        if (sleeve && !origin.closest(".iconish, .gotbtn")) liftCard(list[Number(sleeve.dataset.index)]);
+      }
+    }
+    book.querySelectorAll(".sleeve.sunk").forEach(s => s.classList.remove("sunk"));
+    mode = ""; pid = null; pressBtn = null;
+  };
+  function liftCard(card){
+    if (!card) return;
+    const sleeve = book.querySelector('.sleeve[data-index="' + list.indexOf(card) + '"]');
+    openShowcase(card, sleeve ? sleeve.querySelector(".cardhit") : null);
+  }
+  function commit(){ if (binder) saveBinders(); else saveWish(); }
+  function removeAt(index){
+    const card = list[index];
+    if (!card) return;
+    list.splice(index, 1);
+    const kept = card;
+    showToast("Removed " + (card.name || "card") + ".", () => {
+      list.splice(Math.min(index, list.length), 0, kept);
+      commit();
+    });
+    commit();
+  }
+  function moveIndex(from, to){
+    if (from === to || from < 0 || to < 0 || from >= list.length) return;
+    const [card] = list.splice(from, 1);
+    const dest = Math.max(0, Math.min(to, list.length));
+    list.splice(dest, 0, card);
+    const page = Math.floor(dest / 9);
+    if (list.slice(page * 9, page * 9 + 9).length === 9) pendingSparkle = page;
+    commit();
+  }
+  book.addEventListener("keydown", e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const hit = e.target.closest(".cardhit");
+    if (!hit) return;
+    const sleeve = hit.closest(".sleeve[data-index]");
+    if (!sleeve) return;
+    e.preventDefault();
+    liftCard(list[Number(sleeve.dataset.index)]);
+  });
+  book.addEventListener("pointerdown", e => {
+    if (e.button) return;
+    if (e.target.closest(".iconish")) return;
+    const onGot = e.target.closest(".gotbtn");
+    pressBtn = onGot || null;
+    pid = e.pointerId; sx = e.clientX; sy = e.clientY; mode = ""; peak = 0;
+    const dog = e.target.closest(".dogear");
+    const sleeveHit = e.target.closest(".sleeve");
+    if ((dog || sleeveHit) && !onGot && e.cancelable) e.preventDefault();
+    if (dog) {
+      const dir = dog.classList.contains("prev") ? -1 : 1;
+      if (!canTurn(dir)) return;
+      if (!beginDrag(dir, e.clientX)) return;
+      mode = "curl";
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
+      return;
+    }
+    const sleeve = e.target.closest(".sleeve[data-index]");
+    if (sleeve) {
+      if (!onGot) sleeve.classList.add("sunk");
+      dragIndex = Number(sleeve.dataset.index);
+      timer = setTimeout(() => {
+        mode = "card";
+        if (pressBtn && pressBtn._press) pressBtn._press.suppress = true;
+        if (settings.haptics) haptic(6);
+        const img = sleeve.querySelector("img");
+        ghost = document.createElement("img");
+        ghost.className = "ghost";
+        ghost.alt = "";
+        ghost.src = img ? img.src : "";
+        ghost.style.left = sx + "px";
+        ghost.style.top = sy + "px";
+        document.body.append(ghost);
+        sleeve.style.opacity = ".35";
+      }, 420);
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  });
+  prevEar.addEventListener("click", () => { if (fromPointer) { fromPointer = false; return; } finishFlip(-1); });
+  nextEar.addEventListener("click", () => { if (fromPointer) { fromPointer = false; return; } finishFlip(1); });
+  book.addEventListener("pointermove", e => {
+    if (mode || turn) return;
+    const sleeve = e.target.closest(".sleeve:not(.empty)");
+    book.querySelectorAll(".sleeve.tilting").forEach(node => { if (node !== sleeve) node.classList.remove("tilting"); });
+    if (!sleeve || reduceMotion() || e.pointerType === "touch") return;
+    const r = sleeve.getBoundingClientRect();
+    const px = (e.clientX - r.left) / Math.max(1, r.width);
+    const py = (e.clientY - r.top) / Math.max(1, r.height);
+    sleeve.classList.add("tilting");
+    sleeve.style.setProperty("--sx", (px * 100).toFixed(0) + "%");
+    sleeve.style.setProperty("--sy", (py * 100).toFixed(0) + "%");
+    sleeve.style.setProperty("--tx", ((px - 0.5) * 22).toFixed(2) + "deg");
+    sleeve.style.setProperty("--ty", ((0.5 - py) * 16).toFixed(2) + "deg");
+  });
+  book.addEventListener("pointerleave", () => {
+    book.querySelectorAll(".sleeve.tilting").forEach(node => node.classList.remove("tilting"));
+  });
+  document.getElementById("backBinders").onclick = () => { binderView = null; renderBinders(); };
+  document.getElementById("copyList").onclick = async () => {
+    const text = (wishMode ? "Wishlist" : binder.name) + "\n" + list.map(c => [c.name, c.set, c.number ? "#" + c.number : "", ownedIds.has(c.id) ? "owned" : "wanted", priceText(usdOf(c), "USD")].filter(Boolean).join(" — ")).join("\n");
+    try { await navigator.clipboard.writeText(text); announce("List copied."); }
+    catch (err) { announce("List ready. Clipboard was blocked."); }
+  };
+  const shareCollection = document.getElementById("shareCollection");
+  if (shareCollection && window.BinderShare) {
+    if (!wishMode) shareCollection.setAttribute("aria-label", "Share " + binder.name);
+    shareCollection.onclick = () => BinderShare.openCollection(wishMode
+      ? { kind:"wish", name:"Wishlist", color:"#E4E7DA", cards:wish, ownedIds }
+      : { kind:"binder", name:binder.name, color:binder.color, cards:binder.cards, ownedIds });
+  }
+  if (!wishMode) {
+    document.getElementById("fillFrom").onclick = () => openFill(binder.id);
+    document.getElementById("discover").onclick = () => startDiscovery(binder.id);
+    document.getElementById("renameBinder").onclick = () => {
+      document.getElementById("binderSheetTitle").textContent = "Rename binder";
+      document.getElementById("binderSheetBody").innerHTML = `<label class="field">Name<input id="renameInput" value="${esc(binder.name)}" maxlength="40"></label><button class="chip" id="saveRename" type="button">Save</button>`;
+      openSheet("binderSheet");
+      document.getElementById("saveRename").onclick = () => {
+        const next = document.getElementById("renameInput").value.trim();
+        if (!next) return;
+        if (window.BinderThemes) {
+          if (!BinderThemes.renameBinder(binderState, binder.id, next)) return;
+        } else binder.name = next;
+        saveBinders();
+        closeSheet("binderSheet");
+        renderBinders();
+      };
+    };
+    document.getElementById("recolorBinder").onclick = () => {
+      const current = coverColor(binder.color);
+      document.getElementById("binderSheetTitle").textContent = "Cover color";
+      document.getElementById("binderSheetBody").innerHTML = `<p class="fine">Pick a cloth. The cards in this binder stay where they are.</p><div class="swatches" id="swatches">${COLORS.map((c, i) => `<button type="button" class="swatch" data-color="${c}" style="background:${c}" aria-label="Cover ${i + 1}" aria-pressed="${current.toLowerCase() === c.toLowerCase() ? "true" : "false"}"></button>`).join("")}</div>`;
+      openSheet("binderSheet");
+      document.querySelectorAll("#binderSheet .swatch").forEach(btn => btn.onclick = () => {
+        if (window.BinderThemes) BinderThemes.recolorBinder(binderState, binder.id, btn.dataset.color);
+        else binder.color = btn.dataset.color;
+        closeSheet("binderSheet");
+        saveBinders();
+        if (settings.haptics) haptic(8);
+      });
+    };
+    const deleteBtn = document.getElementById("deleteBinder");
+    deleteBtn.setAttribute("aria-label", "Delete " + binder.name + ". Cards stay on your wishlist.");
+    deleteBtn.onclick = () => openDeleteBinder(binder);
+    document.getElementById("switchBinder").onclick = () => openBinderSwitch("view");
+  }
+  warmPages(list, flipPage, step, total);
+  prebuild();
+  paintContext();
+}
+let reuseFaces = null;
+/* Fetch the art for the pages on either side, so a turn uncovers cards that
+   are already loaded. */
+const warmedArt = new Set();
+function warmPages(list, at, step, total){
+  const run = () => {
+    const sheets = [at + step, at + step + 1, at - 1, at - 2, at + step * 2, at + step * 2 + 1];
+    sheets.forEach(sheet => {
+      if (sheet < 0 || sheet >= total) return;
+      list.slice(sheet * 9, sheet * 9 + 9).forEach(card => {
+        const url = artUrls(card, true)[0];
+        if (!url || warmedArt.has(url)) return;
+        if (warmedArt.size > 600) warmedArt.clear();
+        warmedArt.add(url);
+        const img = new Image();
+        img.decoding = "async";
+        img.src = url;
+      });
+    });
+  };
+  if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 1200 });
+  else setTimeout(run, 250);
+}
+
+let showcaseCardRef = null;
+/* The back of an inspected card: the facts a collector checks, in plain words. */
+function inspectBack(card, sealed){
+  const price = pocketPrice(card);
+  const owned = ownedIds.has(card.id);
+  const rows = [
+    ["Set", card.set],
+    ["Number", card.number ? "#" + card.number : ""],
+    ["Rarity", card.rarity && card.rarity !== "—" ? card.rarity : ""],
+    ["Artist", card.artist],
+    ["Market", sealed ? "" : price],
+    ["Status", sealed ? "" : owned ? "Got it" : "Still hunting"]
+  ].filter(row => row[1]);
+  return `<div class="iback"><p class="iback-kicker">BinderHunt</p><h3 class="iback-name">${esc(card.name || "Card")}</h3><dl class="iback-rows">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>${sealed ? `<p class="iback-foot">The price stays sealed until you guess.</p>` : `<p class="iback-foot">Details has the price history.</p>`}</div>`;
+}
+/* Lift a card out of its pocket into the 3D inspect view. */
+function openShowcase(card, from, opts){
+  const sealed = !!(opts && opts.sealed);
+  if (!card) return;
+  if (!window.CardInspect) { openProfile(card); return; }
+  const shown = from && from.querySelector("img");
+  const quick = shown && shown.complete && shown.naturalWidth ? (shown.currentSrc || shown.src) : "";
+  const ok = CardInspect.open({
+    from: from || null,
+    urls: artUrls(card, true),
+    upgrade: sealed ? null : hdArt(card),
+    quick,
+    alt: altText(card),
+    title: card.name || "Card",
+    holo: isHolo(card),
+    reduce: reduceMotion(),
+    missing: () => binderMissingArt(card),
+    backHtml: inspectBack(card, sealed),
+    onDetails: sealed ? null : () => openProfile(card),
+    onClose: () => { if (showcaseCardRef === card) showcaseCardRef = null; syncInert(); }
+  });
+  if (!ok) { openProfile(card); return; }
+  showcaseCardRef = card;
+  syncInert();
+  if (settings.haptics) haptic(8);
+}
+function closeShowcase(){
+  if (window.CardInspect && CardInspect.isOpen()) CardInspect.close("return");
+}
+/* Inspect input lives in js/card-inspect.js. */
+function bindShowcase(){}
+let menuOpener = null;
+function closeMenu(){
+  const menu = document.getElementById("menu");
+  if (!menu || menu.hidden) return;
+  menu.hidden = true;
+  const back = menuOpener;
+  menuOpener = null;
+  if (back && back.isConnected && typeof back.focus === "function") back.focus();
+}
+function openMenu(anchor, card, binder){
+  menuCard = { card, binder };
+  const menu = document.getElementById("menu");
+  menuOpener = anchor && anchor.focus ? anchor : document.activeElement;
+  const r = anchor.getBoundingClientRect();
+  menu.hidden = false;
+  menu.setAttribute("aria-label", (card && card.name) ? card.name + " actions" : "Card actions");
+  menu.style.left = Math.min(r.left, window.innerWidth - 200) + "px";
+  menu.style.top = Math.min(r.bottom + 4, window.innerHeight - 230) + "px";
+  const owned = ownedIds.has(card.id);
+  const ownText = owned ? "Undo got it" : "Got it!";
+  menu.innerHTML = `<button type="button" role="menuitem" id="menuOwn">${ownText}</button>` + (binder
+    ? `<button type="button" role="menuitem" id="menuRemove">Remove from ${esc(binder.name)}</button>`
+    : `<button type="button" role="menuitem" id="menuRemove">Remove from wishlist</button>`) +
+    `<button type="button" role="menuitem" id="menuBinders">In binders</button>`;
+  const ownBtn = document.getElementById("menuOwn");
+  ownBtn.setAttribute("aria-label", ownText + (owned ? " for " + (card.name || "this card") : ". Mark " + (card.name || "this card") + " as owned"));
+  ownBtn.onclick = () => {
+    closeMenu();
+    setOwned(card, !ownedIds.has(card.id), "menu");
+  };
+  document.getElementById("menuRemove").onclick = () => {
+    if (binder) removeFromBinder(binder, card.id);
+    else removeFromWish(card.id);
+    closeMenu();
+    renderBinders();
+  };
+  document.getElementById("menuBinders").onclick = () => {
+    closeMenu();
+    openMembership(card);
+  };
+  menu.querySelector("button").focus();
+}
+const THEME_PRESETS = {
+  jungle: { name:"Jungle", color:"#ABB28D", kind:"set", setId:"base2", setLabel:"Jungle" },
+  water: { name:"Water", color:"#86DEFF", kind:"type", type:"Water" },
+  iono: { name:"Iono", color:"#F6C9C9", kind:"pokemon", mon:"Iono" }
+};
+function binderChoiceMarkup(activeId){
+  return binderState.binders.map(b => {
+    const on = b.id === activeId;
+    const theme = themeOf(b);
+    const sub = theme.kind !== "none" ? themeLabel(theme) : (b.cards.length === 1 ? "1 card" : b.cards.length + " cards");
+    return `<button type="button" class="binder-choice${on ? " on" : ""}" data-id="${esc(b.id)}" aria-pressed="${on ? "true" : "false"}"><i style="background:${coverColor(b.color)}"></i><span><b>${esc(b.name)}</b><small>${esc(sub)}</small></span></button>`;
+  }).join("");
+}
+function openBinderSwitch(mode){
+  const hunting = mode === "hunt";
+  document.getElementById("binderSheetTitle").textContent = hunting ? "Hunt into a binder" : "Switch binder";
+  const active = hunting ? binderState.discoveryId : (binderView && binderView.kind === "binder" ? binderView.id : "");
+  const choices = binderState.binders.length ? `<div class="binder-choices">${binderChoiceMarkup(active)}</div>` : `<p class="fine">No themed binders yet.</p>`;
+  const extra = hunting
+    ? `<button class="chip" id="huntWishlistOnly" type="button">Wishlist only</button>`
+    : `<button type="button" class="binder-choice" data-kind="wish"><i style="background:#E4E7DA"></i><span><b>Wishlist</b><small>Every saved card</small></span></button>`;
+  document.getElementById("binderSheetBody").innerHTML = `<p class="fine">${hunting ? "Right-swipes still join your wishlist, and also this binder." : "Opening another binder leaves your wishlist where it is."}</p>${extra}${choices}`;
+  document.querySelectorAll("#binderSheetBody .binder-choice").forEach(btn => btn.onclick = () => {
+    if (btn.dataset.kind === "wish") {
+      closeSheet("binderSheet");
+      binderView = { kind:"wish" };
+      flipPage = 0;
+      showTab("binders");
+      return;
+    }
+    const id = btn.dataset.id;
+    if (!id) return;
+    closeSheet("binderSheet");
+    if (hunting) {
+      if (id !== binderState.discoveryId) startDiscovery(id);
+      return;
+    }
+    binderView = { kind:"binder", id };
+    flipPage = 0;
+    binderOpenAnim = true;
+    showTab("binders");
+  });
+  const only = document.getElementById("huntWishlistOnly");
+  if (only) only.onclick = () => { closeSheet("binderSheet"); stopDiscoveryHunt(); };
+  openSheet("binderSheet");
+}
+function openDeleteBinder(binder){
+  if (!binder) return;
+  document.getElementById("binderSheetTitle").textContent = "Delete " + binder.name + "?";
+  document.getElementById("binderSheetBody").innerHTML = `<p class="fine">This removes the ${esc(binder.name)} binder only. Every card stays on your wishlist, and any other binder that has it keeps it.</p><button class="chip" id="cancelDelete" type="button">Keep it</button><button class="chip danger" id="confirmDelete" type="button">Delete binder</button>`;
+  document.getElementById("cancelDelete").onclick = () => closeSheet("binderSheet");
+  document.getElementById("confirmDelete").onclick = () => {
+    const wasHunt = binderState.discoveryId === binder.id;
+    if (window.BinderThemes) BinderThemes.deleteBinder(binderState, binder.id);
+    else {
+      binderState.binders = binderState.binders.filter(b => b.id !== binder.id);
+      if (wasHunt) binderState.discoveryId = "";
+    }
+    if (binderView && binderView.kind === "binder" && binderView.id === binder.id) binderView = null;
+    if (wasHunt) {
+      const patch = themePatch(binder);
+      if (patch.set) filters.set = "";
+      if (patch.type) filters.type = "";
+      if (patch.names.length) filters.names = [];
+      saveFilters();
+    }
+    closeSheet("binderSheet");
+    saveBinders();
+    if (wasHunt && tab === "hunt") restart();
+    announce(binder.name + " was deleted. Your wishlist still has every card.");
+  };
+  openSheet("binderSheet");
+}
+function openMembership(card){
+  if (!card) return;
+  document.getElementById("binderSheetTitle").textContent = card.name ? card.name : "Binders";
+  const rows = binderState.binders.map(b => {
+    const on = (b.cards || []).some(c => c && c.id === card.id);
+    return `<label class="choice binder-member"><input type="checkbox" data-binder="${esc(b.id)}" ${on ? "checked" : ""}><i class="swatch-dot" style="background:${coverColor(b.color)}"></i><span>${esc(b.name)}</span></label>`;
+  }).join("");
+  const empty = binderState.binders.length ? "" : `<p class="fine">No themed binders yet.</p><button class="chip" id="membershipCreate" type="button">New binder</button>`;
+  document.getElementById("binderSheetBody").innerHTML = `<p class="fine">A card can sit in more than one binder. Taking it out of a binder leaves it on your wishlist.</p>${rows}${empty}<button class="chip" id="membershipDone" type="button">Done</button>`;
+  document.querySelectorAll("#binderSheetBody input[data-binder]").forEach(input => {
+    input.onchange = () => {
+      const target = binderState.binders.find(b => b.id === input.dataset.binder);
+      if (!target) return;
+      if (input.checked) addToBinder(target, card);
+      else removeFromBinder(target, card.id);
+    };
+  });
+  const create = document.getElementById("membershipCreate");
+  if (create) create.onclick = () => { closeSheet("binderSheet"); openBinderForm(); };
+  document.getElementById("membershipDone").onclick = () => closeSheet("binderSheet");
+  openSheet("binderSheet");
+}
+async function openBinderForm(){
+  await loadMeta();
+  document.getElementById("binderSheetTitle").textContent = "New binder";
+  const setList = Array.isArray(meta.sets) ? meta.sets : [];
+  const typeList = (Array.isArray(meta.types) && meta.types.length ? meta.types : CARD_TYPES).filter(t => typeof t === "string");
+  const sets = setList.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join("");
+  const types = typeList.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
+  document.getElementById("binderSheetBody").innerHTML = `<p class="fine">Name a theme and a pastel cover. Jungle can be a set, Water a type, Iono a card name. Right-swipes still land on your wishlist.</p>
+    <div class="preset-row" id="binderPresets"><button type="button" class="chip" data-preset="jungle">Jungle</button><button type="button" class="chip" data-preset="water">Water</button><button type="button" class="chip" data-preset="iono">Iono</button></div>
+    <label class="field">Name<input id="bName" maxlength="40" placeholder="Jungle"></label>
+    <fieldset><legend>Theme</legend>
+      <label class="choice"><input type="radio" name="theme" value="none" checked> Any card</label>
+      <label class="choice"><input type="radio" name="theme" value="set"> A set</label>
+      <label class="choice"><input type="radio" name="theme" value="type"> A type</label>
+      <label class="choice"><input type="radio" name="theme" value="pokemon"> A name</label>
+    </fieldset>
+    <label class="field" id="setField" hidden>Set<select id="bSet">${sets}</select></label>
+    <label class="field" id="typeField" hidden>Type<select id="bType">${types}</select></label>
+    <label class="field" id="monField" hidden>Card name<input id="bMon" maxlength="24" placeholder="Iono"></label>
+    <p class="fine">Cover</p>
+    <div class="swatches" id="swatches">${COLORS.map((c, i) => `<button type="button" class="swatch" data-color="${c}" style="background:${c}" aria-label="Cover ${i + 1}" aria-pressed="${i === 0 ? "true" : "false"}"></button>`).join("")}</div>
+    <fieldset><legend>Charm</legend>
+      <label class="choice"><input type="radio" name="charm" value="none" checked> Plain cover</label>
+      <label class="choice"><input type="radio" name="charm" value="toad"> Toad charm</label>
+      <label class="choice"><input type="radio" name="charm" value="sticker"> Star sticker</label>
+    </fieldset>
+    <button class="chip" id="createBinder" type="button">Create binder</button>`;
+  let color = COLORS[0];
+  const syncThemeFields = () => {
+    const kind = (document.querySelector("#binderSheet input[name=theme]:checked") || {}).value || "none";
+    document.getElementById("setField").hidden = kind !== "set";
+    document.getElementById("typeField").hidden = kind !== "type";
+    document.getElementById("monField").hidden = kind !== "pokemon";
+  };
+  document.querySelectorAll("input[name=theme]").forEach(input => input.onchange = syncThemeFields);
+  const paintSwatch = () => {
+    document.querySelectorAll("#binderSheet .swatch").forEach(s => s.setAttribute("aria-pressed", s.dataset.color === color ? "true" : "false"));
+  };
+  document.querySelectorAll("#binderSheet .swatch").forEach(btn => btn.onclick = () => { color = btn.dataset.color; paintSwatch(); });
+  document.querySelectorAll("#binderPresets [data-preset]").forEach(btn => btn.onclick = () => {
+    const preset = THEME_PRESETS[btn.dataset.preset];
+    if (!preset) return;
+    document.getElementById("bName").value = preset.name;
+    color = preset.color;
+    paintSwatch();
+    const radio = document.querySelector(`#binderSheet input[name=theme][value="${preset.kind}"]`);
+    if (radio) radio.checked = true;
+    syncThemeFields();
+    if (preset.kind === "set") {
+      const sel = document.getElementById("bSet");
+      if (![...sel.options].some(o => o.value === preset.setId)) {
+        const opt = document.createElement("option");
+        opt.value = preset.setId;
+        opt.textContent = preset.setLabel || preset.setId;
+        sel.append(opt);
+      }
+      sel.value = preset.setId;
+    }
+    if (preset.kind === "type") {
+      const sel = document.getElementById("bType");
+      if (![...sel.options].some(o => o.value === preset.type)) {
+        const opt = document.createElement("option");
+        opt.value = preset.type;
+        opt.textContent = preset.type;
+        sel.append(opt);
+      }
+      sel.value = preset.type;
+    }
+    if (preset.kind === "pokemon") document.getElementById("bMon").value = preset.mon || "";
+  });
+  document.getElementById("createBinder").onclick = () => {
+    const name = document.getElementById("bName").value.trim();
+    if (!name) { announce("Name the binder first."); return; }
+    const kind = (document.querySelector("#binderSheet input[name=theme]:checked") || {}).value || "none";
+    const setId = kind === "set" ? document.getElementById("bSet").value : "";
+    const type = kind === "type" ? document.getElementById("bType").value : "";
+    const mon = kind === "pokemon" ? cleanMon(document.getElementById("bMon").value) : "";
+    if (kind === "set" && !setId) { announce("Pick a set for this theme."); return; }
+    if (kind === "type" && !type) { announce("Pick a type for this theme."); return; }
+    if (kind === "pokemon" && !mon) { announce("Name the card for this theme."); return; }
+    const theme = { kind, setId, type, name: mon };
+    const charm = (document.querySelector("#binderSheet input[name=charm]:checked") || {}).value || "none";
+    const binder = window.BinderThemes
+      ? BinderThemes.createBinder(binderState, { name, color, theme, charm })
+      : { id:"b" + Date.now().toString(36), name, color, theme, cards:[], charm };
+    if (!binder) { announce("Name the binder first."); return; }
+    if (!window.BinderThemes) binderState.binders.push(binder);
+    saveBinders();
+    countEvent("binder-created");
+    noteBinderEngagement();
+    closeSheet("binderSheet");
+    binderView = { kind:"binder", id:binder.id };
+    flipPage = 0;
+    binderOpenAnim = true;
+    if (settings.haptics) haptic(10);
+    renderBinders();
+    announce(name + " is ready.");
+  };
+  openSheet("binderSheet");
+}
+function openFill(id){
+  fillBinderId = id;
+  fillSelected = new Set();
+  const binder = binderState.binders.find(b => b.id === id);
+  if (!binder) return;
+  document.getElementById("fillTitle").textContent = "Fill " + binder.name;
+  drawFill();
+  openSheet("fillSheet");
+}
+function drawFill(){
+  const binder = binderState.binders.find(b => b.id === fillBinderId);
+  const body = document.getElementById("fillBody");
+  if (!binder) return;
+  const theme = themeOf(binder);
+  const cards = wish.filter(c => matchesTheme(c, theme));
+  if (!cards.length) {
+    body.innerHTML = `<p class="empty-state">No wishlist cards match this theme yet. Swipe to discover some. ${toad()}</p><button class="chip" id="fillDiscover" type="button">Swipe to discover</button>`;
+    document.getElementById("fillDiscover").onclick = () => { closeSheet("fillSheet"); startDiscovery(binder.id); };
+    return;
+  }
+  body.innerHTML = `<p class="fine">${theme.kind && theme.kind !== "none" ? "Showing wishlist cards that match " + themeLabel(theme) + "." : "Every wishlist card."} Select any you want in this binder.</p><div class="pick-grid" id="pickGrid"></div><button class="chip" id="addSelected" type="button">Add selected</button>`;
+  const grid = document.getElementById("pickGrid");
+  cards.forEach(card => {
+    const already = binder.cards.some(c => c.id === card.id);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "pick";
+    btn.setAttribute("aria-pressed", already ? "true" : "false");
+    btn.disabled = already;
+    btn.innerHTML = `<span class="art"></span><b>${esc(card.name)}</b><span class="fine">${ownedIds.has(card.id) ? "Owned" : "Wanted"}</span>`;
+    const art = document.createElement("div");
+    paintArt(art, card);
+    btn.querySelector(".art").replaceWith(art);
+    btn.onclick = () => {
+      if (fillSelected.has(card.id)) fillSelected.delete(card.id); else fillSelected.add(card.id);
+      btn.setAttribute("aria-pressed", fillSelected.has(card.id) ? "true" : "false");
+    };
+    grid.append(btn);
+  });
+  document.getElementById("addSelected").onclick = () => {
+    let n = 0;
+    cards.forEach(card => { if (fillSelected.has(card.id) && addToBinder(binder, card)) n++; });
+    closeSheet("fillSheet");
+    renderBinders();
+    announce(n ? "Added " + n + " to " + binder.name + "." : "Those cards are already in " + binder.name + ".");
+  };
+}
+function startDiscovery(id){
+  const binder = binderState.binders.find(b => b.id === id);
+  if (!binder) return;
+  if (window.BinderThemes) {
+    if (!BinderThemes.switchActive(binderState, id)) return;
+  } else binderState.discoveryId = id;
+  saveBinders();
+  const patch = themePatch(binder);
+  dropHeldFilters();
+  filters = blankFilters();
+  filters.set = patch.set;
+  filters.type = patch.type;
+  filters.names = patch.names.slice();
+  saveFilters();
+  binderView = null;
+  showTab("hunt");
+  restart();
+  const theme = themeOf(binder);
+  const extra = theme.kind !== "none" ? " Hunting " + themeLabel(theme) + "." : "";
+  announce("Adding to " + binder.name + ". Right-swipes also join your wishlist." + extra);
+}
+
+function parseDay(s){
+  const m = String(s || "").match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  if (!m) return null;
+  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+function scryHistory(card){
+  const rec = scryRecord(card);
+  const variant = selectedVariant(card);
+  if (!rec || rec.missing || !variant) return [];
+  const names = [...new Set((rec.history || []).map(row => row && row.v).filter(Boolean))];
+  const name = chosenVariant(names, variant.key);
+  if (!name) return [];
+  return (rec.history || []).filter(row => row && row.v === name && pos(row.m)).map(row => ({ t:parseDay(row.d), label:String(row.d).slice(0, 10), value:pos(row.m) })).filter(p => p.t && p.value).sort((a, b) => a.t - b.t);
+}
+// Price-drop badge. Uses only the cached Scrydex raw near-mint USD history
+// already stored for the card (data/scrydex.json keeps about 90 days). This
+// does not call Scrydex.
+// Window: newest cached day for the printing on screen, compared with the
+// newest point on or before 30 days earlier. That baseline has to fall
+// between 30 and 45 days before the newest day, so a short series, or a lone
+// older point, does not pretend to be a 30-day move. The window is measured
+// from the newest cached day, not from today's calendar date.
+// Threshold: the newest market is at least 10% below that baseline. Both
+// prices have to be finite and greater than zero. Missing history, no
+// matching printing, or a non-finite percent shows no badge.
+const DROP_MIN_PCT = 10;
+const DROP_WINDOW_DAYS = 30;
+const DROP_MAX_LAG_DAYS = 45;
+function priceDrop(card){
+  if (!card || !card.id) return null;
+  const points = scryHistory(card);
+  if (!points || points.length < 2) return null;
+  const last = points[points.length - 1];
+  if (!last || !(last.value > 0) || !(last.t > 0)) return null;
+  const target = last.t - DROP_WINDOW_DAYS * 86400000;
+  let prev = null;
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i];
+    if (point && point.t <= target && point.value > 0) prev = point;
+  }
+  if (!prev || !(prev.t > 0) || !(prev.value > 0)) return null;
+  const lag = (last.t - prev.t) / 86400000;
+  if (!(lag >= DROP_WINDOW_DAYS && lag <= DROP_MAX_LAG_DAYS)) return null;
+  const pct = (prev.value - last.value) / prev.value * 100;
+  if (!Number.isFinite(pct) || pct < DROP_MIN_PCT) return null;
+  const shown = Math.round(pct);
+  if (!Number.isFinite(shown) || shown < DROP_MIN_PCT) return null;
+  const days = Math.round(lag);
+  if (!Number.isFinite(days) || days < DROP_WINDOW_DAYS) return null;
+  return { pct, shown, days };
+}
+function dropBadgeMarkup(drop){
+  if (!drop || !Number.isFinite(drop.shown) || drop.shown < DROP_MIN_PCT) return "";
+  const quiet = "Down " + drop.shown + "% versus about " + drop.days + " days ago";
+  return `<span class="drop-badge" data-pct="${drop.shown}"><span aria-hidden="true">↓${drop.shown}%</span><span class="sr-only">${esc(quiet)}</span></span>`;
+}
+function droppedCount(list){
+  let n = 0;
+  (list || []).forEach(card => { if (priceDrop(card)) n++; });
+  return n;
+}
+function droppedCountMarkup(n){
+  if (!Number.isFinite(n) || n < 1) return "";
+  const label = n === 1 ? "1 wishlisted card dropped" : n + " wishlisted cards dropped";
+  return `<span class="drop-badge drop-count"><span aria-hidden="true">Dropped ${n}</span><span class="sr-only">${esc(label)}</span></span>`;
+}
+function marketBlock(card, variant, shown){
+  const badge = dropBadgeMarkup(priceDrop(card));
+  const price = shown ? priceText(shown.amount, shown.currency) : "—";
+  const caption = settings.currency === "EUR" ? "Cardmarket average" : "Raw · ungraded";
+  const printing = marketCaption(card, variant);
+  const detail = settings.currency === "EUR"
+    ? (variant && variant.label ? variant.label : "European average")
+    : (printing && printing !== "Market (raw NM)" ? printing + " · near mint" : "Near mint · TCGplayer");
+  return `<div class="market"><div class="market-copy"><p class="eyebrow">${esc(caption)}</p><div class="price-row"><p class="market-price">${esc(price)}</p>${badge}</div>${detail ? `<p class="fine">${esc(detail)}</p>` : ""}</div></div>`;
+}
+function trendHistory(card){
+  const variant = selectedVariant(card);
+  const list = (card.printings || []).filter(p => p && ((p.points && p.points.length) || pos(p.avg)));
+  const printing = variant ? list.find(p => samePrinting(p.label, variant.key)) : null;
+  const source = printing || null;
+  const pts = (source && source.points && source.points.length) ? source.points : ((card.cm && card.cm.points) || []);
+  const avg = source ? pos(source.avg) : pos(card.cm && card.cm.avg);
+  if (!pts.length && avg == null) return [];
+  const anchor = parseDay(source && source.updated) || Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate());
+  const day = 86400000;
+  const back = { "30-day avg":30, "7-day avg":7, "1-day avg":1 };
+  const points = pts.filter(p => p && p.value).map(p => ({ t:anchor - (back[p.label] || 0) * day, label:p.label, value:p.value }));
+  if (avg) points.push({ t:anchor, label:"Latest average", value:avg });
+  const seen = new Set();
+  return points.filter(p => p.t && p.value && !seen.has(p.t) && seen.add(p.t)).sort((a, b) => a.t - b.t);
+}
+const FX_KEY = "bh.fx.v1";
+const FX_FALLBACK = 1.1253;
+let fxRate = FX_FALLBACK;
+let fxPending = null;
+function readFx(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(FX_KEY) || "null");
+    if (raw && raw.date === localDay() && raw.eurUsd > 0.2 && raw.eurUsd < 5) return raw.eurUsd;
+  } catch (e) {}
+  return null;
+}
+function useFx(rate){
+  if (!(rate > 0.2 && rate < 5)) return fxRate;
+  const changed = rate !== fxRate;
+  fxRate = rate;
+  if (changed && profilePinned && profileCard && !profileEl.hidden) renderProfile(cardCache.get(profileCard.id) || profileCard);
+  if (changed) { summaryId = ""; paintDeckSummary(currentTop()); }
+  return fxRate;
+}
+function ensureFx(){
+  if (fxPending) return fxPending;
+  fxPending = (async () => {
+    try {
+      const res = await fetch("data/fx.json", { cache:"no-cache", signal:AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const file = await res.json();
+        const filed = file && pos(file.eurUsd);
+        if (filed) return useFx(filed);
+      }
+    } catch (e) {}
+    const cached = readFx();
+    if (cached) return useFx(cached);
+    if (navigator.onLine === false) return useFx(fxRate);
+    try {
+      const res = await fetch("https://api.frankfurter.dev/v1/latest?from=EUR&to=USD", { signal:AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const live = await res.json();
+        const rate = live && live.rates ? pos(live.rates.USD) : null;
+        if (rate) {
+          try { localStorage.setItem(FX_KEY, JSON.stringify({ date:localDay(), eurUsd:rate })); } catch (e) {}
+          return useFx(rate);
+        }
+      }
+    } catch (e) {}
+    return useFx(FX_FALLBACK);
+  })().catch(() => useFx(FX_FALLBACK)).finally(() => { fxPending = null; });
+  return fxPending;
+}
+function priceSeries(card){
+  const sales = scryHistory(card);
+  if (sales.length >= 2) return { points:sales, source:"sales", currency:"USD", note:"Drag the line, or focus it and use the arrow keys, for a day." };
+  const trend = trendHistory(card);
+  if (trend.length >= 2) {
+    if (settings.currency === "EUR") return { points:trend, source:"trend", currency:"EUR", note:"Cardmarket 30-day, 7-day, and 1-day averages, in euros. Not a daily sales history." };
+    const rate = fxRate || FX_FALLBACK;
+    const points = trend.map(p => ({ t:p.t, label:p.label, value:Math.round(p.value * rate * 100) / 100 }));
+    return { points, source:"trend", currency:"USD", note:"approx. USD from Cardmarket. 30-day, 7-day, and 1-day averages, not a daily sales history." };
+  }
+  return { points:[], source:"", currency:"USD", note:"" };
+}
+function trendIsThin(points){
+  const vals = points.map(p => p.value).filter(v => typeof v === "number" && v > 0);
+  if (vals.length < 2) return true;
+  const min = Math.min(...vals), max = Math.max(...vals);
+  if (max < 1) return true;
+  if (max - min < 0.05) return true;
+  if (min > 0 && (max - min) / min < 0.005) return true;
+  return false;
+}
+function ranged(points){
+  if (!points.length) return [];
+  const last = points[points.length - 1].t;
+  const days = chartRange === "1M" ? 30 : chartRange === "3M" ? 90 : chartRange === "1Y" ? 365 : 100000;
+  return points.filter(p => last - p.t <= days * 86400000);
+}
+function change30(points){
+  if (points.length < 2) return null;
+  const last = points[points.length - 1];
+  const target = last.t - 30 * 86400000;
+  let prev = null;
+  points.forEach(p => { if (p.t <= target) prev = p; });
+  if (!prev || prev.value <= 0 || last.value <= 0) return null;
+  const pct = (last.value - prev.value) / prev.value * 100;
+  return Number.isFinite(pct) ? pct : null;
+}
+function seriesWindow(points, days){
+  if (!points || !points.length) return [];
+  const last = points[points.length - 1].t;
+  if (!(last > 0)) return [];
+  const span = days * 86400000;
+  return points.filter(p => p && p.t > 0 && p.value > 0 && last - p.t <= span);
+}
+function covered(points, minSpan){
+  if (!points || points.length < 2) return false;
+  const span = (points[points.length - 1].t - points[0].t) / 86400000;
+  return Number.isFinite(span) && span + 1e-6 >= minSpan;
+}
+// 30-day and 90-day moves use the cached series only. The baseline is the
+// newest point on or before the window, and it has to sit close to that
+// window so a short series is not labelled as a 90-day change.
+function windowMove(points, days, minLag, maxLag){
+  if (!points || points.length < 2) return null;
+  const last = points[points.length - 1];
+  if (!last || !(last.value > 0) || !(last.t > 0)) return null;
+  const target = last.t - days * 86400000;
+  let prev = null;
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i];
+    if (point && point.t <= target && point.value > 0) prev = point;
+  }
+  if (!prev && points[0] && points[0].value > 0) {
+    const lag0 = (last.t - points[0].t) / 86400000;
+    if (lag0 >= minLag && lag0 <= maxLag) prev = points[0];
+  }
+  if (!prev || !(prev.t > 0) || !(prev.value > 0)) return null;
+  const lag = (last.t - prev.t) / 86400000;
+  if (!(lag >= minLag && lag <= maxLag)) return null;
+  const pct = (last.value - prev.value) / prev.value * 100;
+  if (!Number.isFinite(pct)) return null;
+  const dir = pct >= 0.05 ? "up" : pct <= -0.05 ? "down" : "flat";
+  const shown = dir === "flat" ? 0 : Math.round(Math.abs(pct) * 10) / 10;
+  if (!Number.isFinite(shown) || (dir !== "flat" && shown <= 0)) return null;
+  return { pct, shown, dir, days:Math.round(lag) };
+}
+function historyView(points){
+  const pack = days => {
+    const windowed = seriesWindow(points, days);
+    const minSpan = days === 90 ? 75 : 30;
+    return { days, points:windowed, ok:covered(windowed, minSpan) };
+  };
+  const choice = chartRange === "30d" || chartRange === "1M" ? 30 : 90;
+  if (historyPicked) return pack(choice);
+  const quarter = pack(90);
+  if (quarter.ok) return quarter;
+  const month = pack(30);
+  if (month.ok) return month;
+  return quarter;
+}
+function moveWord(move){
+  const word = move.dir === "down" ? "down" : move.dir === "up" ? "up" : "unchanged";
+  return word + " " + move.shown.toFixed(1) + " percent";
+}
+function lineStroke(move){
+  if (!move || move.dir === "flat") return "#146f96";
+  return move.dir === "down" ? "#8d4a4a" : "#737863";
+}
+function historyAria(view, currency, move30, move90){
+  const pts = view.points || [];
+  const bits = ["Raw price history"];
+  if (pts.length >= 2) {
+    const from = priceText(pts[0].value, currency);
+    const to = priceText(pts[pts.length - 1].value, currency);
+    if (from !== "—" && to !== "—") bits.push("from " + from + " to " + to);
+  }
+  if (move30) bits.push("30 day " + moveWord(move30));
+  if (move90) bits.push("90 day " + moveWord(move90));
+  return bits.join(", ");
+}
+function historyCaption(view){
+  const pts = view.points || [];
+  if (pts.length < 2 || !/^\d{4}/.test(String(pts[0].label || ""))) return "";
+  const day = label => String(label || "").slice(5).replace("-", "/");
+  const span = Math.round((pts[pts.length - 1].t - pts[0].t) / 86400000);
+  const length = Number.isFinite(span) && span > 0 ? span + " days · " : "";
+  return length + day(pts[0].label) + " – " + day(pts[pts.length - 1].label);
+}
+function rangeButton(days, move, pressed){
+  const id = days + "d";
+  const arrow = !move ? "" : move.dir === "down" ? "▼" : move.dir === "up" ? "▲" : "–";
+  const face = move ? id + " " + arrow + " " + move.shown.toFixed(1) + "%" : id;
+  const spoken = (move ? days + " day change, " + moveWord(move) : days + " day change unavailable");
+  const name = face + ". " + spoken;
+  const tone = move ? "move " + move.dir : "";
+  return `<button type="button" class="${tone}" data-range="${id}" aria-pressed="${pressed ? "true" : "false"}" aria-label="${esc(name)}">${esc(face)}</button>`;
+}
+function gradeRank(grade){
+  const n = Number(grade);
+  return Number.isFinite(n) ? n : -1;
+}
+function rowsForCompany(facts, company){
+  return (facts.prices || []).filter(p => {
+    if (!p || p.company !== company) return false;
+    const market = pos(p.market);
+    if (!market) return false;
+    try { return !!money(market, p.currency || "USD"); }
+    catch (e) { return !!money(market, "USD"); }
+  });
+}
+function pickGrade(rows, grade){
+  return rows.find(p => String(p.grade) === String(grade)) || null;
+}
+function highestGrade(rows){
+  if (!rows.length) return null;
+  return rows.slice().sort((a, b) => gradeRank(b.grade) - gradeRank(a.grade) || String(a.grade).localeCompare(String(b.grade)))[0];
+}
+function gradeSlot(facts, row){
+  if (!row) return null;
+  const market = pos(row.market);
+  if (!market) return null;
+  let text = null;
+  try { text = money(market, row.currency || "USD"); }
+  catch (e) { text = money(market, "USD"); }
+  if (!text) return null;
+  const popReport = (facts.pops || []).find(p => p.company === row.company);
+  const pop = popReport && (popReport.grades || []).find(g => String(g.grade) === String(row.grade));
+  const count = pop && typeof pop.count === "number" && Number.isFinite(pop.count) && pop.count >= 0 ? pop.count : null;
+  return { company:row.company, grade:String(row.grade), text, count };
+}
+function headlineGrades(facts){
+  const out = [];
+  const push = row => {
+    const slot = gradeSlot(facts, row);
+    if (!slot) return;
+    if (out.some(s => s.company === slot.company && s.grade === slot.grade)) return;
+    out.push(slot);
+  };
+  const psa = rowsForCompany(facts, "PSA");
+  const psa10 = pickGrade(psa, "10");
+  const psa9 = pickGrade(psa, "9");
+  if (psa10) push(psa10);
+  if (psa9) push(psa9);
+  if (!psa10 && !psa9) push(highestGrade(psa));
+  ["BGS", "CGC"].forEach(company => {
+    const rows = rowsForCompany(facts, company);
+    push(pickGrade(rows, "10") || pickGrade(rows, "9.5") || pickGrade(rows, "9") || highestGrade(rows));
+  });
+  return out;
+}
+function gradedSection(facts, queued){
+  const head = `<section class="price-block" aria-label="Graded prices"><p class="eyebrow">Graded</p>`;
+  if (!scrydex.ready) return head + `<p class="fine">Checking graded prices…</p></section>`;
+  const slots = headlineGrades(facts);
+  if (!slots.length) {
+    return head + `<p class="quiet">No graded sales yet</p>${queued ? `<p class="fine">Queued for the next price batch.</p>` : ""}</section>`;
+  }
+  const cells = slots.map(slot => {
+    const pop = slot.count == null ? "" : `<small class="fine">Pop ${esc(groupNum(slot.count))}</small>`;
+    return `<li class="grade"><span>${esc(slot.company + " " + slot.grade)}</span><b>${esc(slot.text)}</b>${pop}</li>`;
+  }).join("");
+  return head + `<ul class="grade-grid">${cells}</ul></section>`;
+}
+function historySection(view, series, move30, move90, svg, scrubId){
+  const quiet = series.pendingFx ? "Checking the dollar rate…" : "Not enough price history";
+  const head = `<section class="price-block" aria-label="Price history"><p class="eyebrow">Price history</p>`;
+  if (!series.points || series.points.length < 2) return head + `<p class="quiet">${esc(quiet)}</p></section>`;
+  const buttons = `<div class="rangebar"><div class="ranges" role="group" aria-label="30 day and 90 day change">${rangeButton(30, move30, view.days === 30)}${rangeButton(90, move90, view.days === 90)}</div></div>`;
+  if (!view.ok || !svg) return head + buttons + `<p class="quiet">${esc(quiet)}</p></section>`;
+  const caption = [series.note, historyCaption(view)].filter(Boolean).join(" ");
+  return head + buttons + `<div class="chart-wrap">${svg}<p class="scrub" id="${scrubId}" aria-live="polite">${esc(caption)}</p></div></section>`;
+}
+function priceStory(card, opts){
+  const queued = !!(opts && opts.queued);
+  const summary = !!(opts && opts.summary);
+  const variant = selectedVariant(card);
+  const shown = printingMoney(card, variant);
+  const rawSeries = priceSeries(card);
+  const thinTrend = rawSeries.source === "trend" && !rawSeries.pendingFx && trendIsThin(rawSeries.points);
+  const series = thinTrend ? { points:[], source:"", currency:rawSeries.currency || "USD", note:"", pendingFx:!!rawSeries.pendingFx } : rawSeries;
+  const move30 = windowMove(series.points, 30, 30, 45);
+  const move90 = windowMove(series.points, 90, 75, 100);
+  const view = historyView(series.points);
+  const stroke = lineStroke(view.days === 30 ? move30 : move90);
+  const aria = historyAria(view, series.currency || "USD", move30, move90);
+  const svg = view.ok ? chartSvg(view.points, null, series.currency, aria, stroke) : "";
+  const facts = gradeFacts(card);
+  const banner = scanBanner(card);
+  const scrubId = summary ? "summaryScrub" : "scrub";
+  const thumbId = opts && opts.thumbId;
+  const thumb = thumbId ? `<button class="thumb" id="${thumbId}" type="button" aria-label="Look at ${esc(card.name || "this card")} up close"></button>` : "";
+  const html = `<section class="price-hero" aria-label="Raw ungraded market price"><div class="phead hero-row">${marketBlock(card, variant, shown)}${thumb}</div></section>${banner ? `<p class="note">${esc(banner)}</p>` : ""}${gradedSection(facts, queued)}${historySection(view, series, move30, move90, svg, scrubId)}`;
+  return { html, series, windowed:view.ok ? view.points : [], scrubId, variant };
+}
+function bindChart(svgEl, points, currency, scrub){
+  if (!svgEl || !points || points.length < 2) return;
+  const show = index => {
+    if (!scrub) return;
+    const i = Math.max(0, Math.min(points.length - 1, index));
+    const point = points[i];
+    if (!point || !(point.value > 0)) return;
+    const text = priceText(point.value, currency);
+    if (!text || text === "—") return;
+    scrub.textContent = (point.label || "") + " · " + text;
+    svgEl.dataset.index = String(i);
+  };
+  svgEl.addEventListener("pointermove", e => {
+    const rect = svgEl.getBoundingClientRect();
+    if (!(rect.width > 0)) return;
+    const x = (e.clientX - rect.left) / rect.width;
+    show(Math.round(x * (points.length - 1)));
+  });
+  svgEl.addEventListener("keydown", e => {
+    const current = Number(svgEl.dataset.index || points.length - 1);
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "Home" && e.key !== "End") return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === "ArrowRight") show((Number.isFinite(current) ? current : points.length - 1) + 1);
+    if (e.key === "ArrowLeft") show((Number.isFinite(current) ? current : points.length - 1) - 1);
+    if (e.key === "Home") show(0);
+    if (e.key === "End") show(points.length - 1);
+  });
+}
+function bindPriceStory(story, rerender){
+  profileEl.querySelectorAll("[data-range]").forEach(btn => btn.onclick = () => {
+    historyPicked = true;
+    chartRange = btn.dataset.range;
+    rerender();
+    const again = profileEl.querySelector('[data-range="' + chartRange + '"]');
+    if (again) again.focus();
+  });
+  const svgEl = profileEl.querySelector(".chart");
+  const scrub = document.getElementById(story.scrubId);
+  if (svgEl) bindChart(svgEl, story.windowed, story.series.currency, scrub);
+  const ranges = profileEl.querySelector(".ranges");
+  if (ranges) {
+    const fade = () => {
+      const wrap = ranges.parentElement;
+      if (!wrap) return;
+      wrap.classList.toggle("more", ranges.scrollWidth > ranges.clientWidth + 2 && ranges.scrollLeft + ranges.clientWidth < ranges.scrollWidth - 2);
+    };
+    ranges.addEventListener("scroll", fade, { passive:true });
+    requestAnimationFrame(fade);
+  }
+}
+function coreFacts(card){
+  return [
+    fact("Set", card.set),
+    fact("Number", card.number),
+    fact("Rarity", card.rarity),
+    fact("Artist", card.artist)
+  ].join("");
+}
+function variantToggle(card, variant){
+  const variants = (card.variants || []).filter(v => pos(v.market));
+  if (variants.length < 2) return "";
+  return `<div class="vtoggle" role="group" aria-label="Printings">${variants.map(v => `<button type="button" data-variant="${esc(v.key)}" aria-pressed="${variant && variant.key === v.key ? "true" : "false"}">${esc(v.label)}</button>`).join("")}</div>`;
+}
+function focusVariant(key){
+  const again = [...profileEl.querySelectorAll("[data-variant]")].find(btn => btn.dataset.variant === key);
+  if (again) again.focus();
+}
+function gradeFacts(card){
+  const rec = scryRecord(card);
+  const variant = selectedVariant(card);
+  if (!rec || rec.missing || !variant) return { prices:[], pops:[] };
+  const names = [...new Set((rec.graded || []).map(p => p.variant).concat((rec.pop || []).map(p => p.variant)).filter(Boolean))];
+  const name = chosenVariant(names, variant.key);
+  return {
+    name,
+    prices: name ? (rec.graded || []).filter(p => p.variant === name) : [],
+    pops: name ? (rec.pop || []).filter(p => p.variant === name) : []
+  };
+}
+function chartSvg(points, guide, currency, label, stroke){
+  if (!points || points.length < 2) return "";
+  const vals = points.map(p => p.value);
+  if (!vals.every(v => typeof v === "number" && Number.isFinite(v) && v > 0)) return "";
+  let min = Math.min(...vals), max = Math.max(...vals);
+  if (guide && typeof guide.value === "number" && Number.isFinite(guide.value) && guide.value > 0) {
+    min = Math.min(min, guide.value);
+    max = Math.max(max, guide.value);
+  }
+  if (!(max > 0) || !Number.isFinite(min) || !Number.isFinite(max)) return "";
+  if (min === max) { min *= 0.9; max *= 1.1; }
+  if (!(max > min)) return "";
+  const w = 360, h = 124, padL = 56, padR = 10, padT = 16, padB = 24;
+  const xOf = i => padL + i * (w - padL - padR) / (points.length - 1);
+  const yOf = v => padT + (1 - (v - min) / (max - min)) * (h - padT - padB);
+  const d = points.map((p, i) => `${i ? "L" : "M"}${xOf(i).toFixed(1)},${yOf(p.value).toFixed(1)}`).join(" ");
+  const ticks = [0, Math.round((points.length - 1) / 2), points.length - 1];
+  const axis = [...new Set(ticks)].map(i => {
+    const anchor = i === 0 ? "start" : i === points.length - 1 ? "end" : "middle";
+    const raw = points[i].label || "";
+    const text = /^\d{4}/.test(raw) ? raw.slice(5).replace("-", "/") : raw.replace(" average", "").replace("-day avg", "d");
+    return `<text x="${i === 0 ? padL : i === points.length - 1 ? w - padR : xOf(i)}" y="${h - 6}" text-anchor="${anchor}" fill="#404241" font-size="11">${esc(text)}</text>`;
+  }).join("");
+  const guideLine = guide && guide.value > 0 ? `<line x1="${padL}" x2="${w - padR}" y1="${yOf(guide.value).toFixed(1)}" y2="${yOf(guide.value).toFixed(1)}" stroke="#737863" stroke-dasharray="5 4" stroke-width="2"/>` : "";
+  const moneyCur = currency || "USD";
+  const hi = compactMoney(max, moneyCur);
+  const lo = compactMoney(min, moneyCur);
+  const line = stroke || "#146f96";
+  const lastX = xOf(points.length - 1).toFixed(1);
+  const lastY = yOf(points[points.length - 1].value).toFixed(1);
+  const aria = label || "Price history";
+  return `<svg class="chart" tabindex="0" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(aria)}"><path d="${d}" fill="none" stroke="${line}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${lastX}" cy="${lastY}" r="4" fill="${line}"/>${guideLine}${hi ? `<text x="4" y="14" fill="#404241" font-size="11">${esc(hi)}</text>` : ""}${lo ? `<text x="4" y="${h - padB}" fill="#404241" font-size="11">${esc(lo)}</text>` : ""}${axis}</svg>`;
+}
+function currentTop(){
+  const top = [...deck.querySelectorAll(".card")].reverse().find(el => el.card && !el.classList.contains("leaving"));
+  return top ? top.card : null;
+}
+function paintDeckSummary(card){
+  if (!wide()) return;
+  const id = card && card.id ? card.id : "";
+  const changed = deckTopSeen && id !== deckTopId;
+  deckTopId = id;
+  deckTopSeen = true;
+  if (tab !== "hunt") return;
+  if (profilePinned) {
+    if (!pinnedTopId) {
+      if (id) pinnedTopId = id;
+      return;
+    }
+    if (id === pinnedTopId || !changed) return;
+    profilePinned = false;
+    profileCard = null;
+    pinnedTopId = "";
+    summaryId = "";
+  }
+  if (id && id === summaryId && profileEl.querySelector("[data-summary='1']")) return;
+  if (!id && summaryId === "" && profileEl.querySelector("[data-summary-empty]")) return;
+  summaryId = id;
+  sideKey = "";
+  if (!card) paintSummaryEmpty();
+  else renderSummary(card);
+}
+function paintSummaryEmpty(){
+  profileEl.hidden = false;
+  shell.classList.remove("no-profile");
+  markProfile(false);
+  profileEl.innerHTML = `<div class="profile-scroll" data-summary-empty="1"><p class="eyebrow">On the table</p><p class="empty-state">The next card's price lands here. ${toad()}</p></div>`;
+}
+function renderSummary(card){
+  profileEl.hidden = false;
+  shell.classList.remove("no-profile");
+  markProfile(false);
+  const story = priceStory(card, { summary:true });
+  const gemLine = card.gemHint ? `<p class="gem-note"><b>Why it's a gem.</b> ${esc(card.gemWhy || card.gemHint)}</p>` : "";
+  profileEl.innerHTML = `<div class="profile-scroll profile-summary" data-summary="1">
+    <p class="eyebrow">On the table</p>
+    ${gemLine}
+    ${story.html}
+    <div class="profile-rest">
+      <div class="phead">
+        <div class="thumb" id="summaryThumb"></div>
+        <div class="phead-copy"><h2 class="pname" id="profileTitle">${esc(card.name || "Card")}</h2></div>
+      </div>
+      <div class="facts">${coreFacts(card)}</div>
+      ${variantToggle(card, story.variant)}
+      <div class="summary-actions">
+        <button class="chip" id="openFullProfile" type="button">Full profile</button>
+        <p class="fine summary-note">Tap the card, or swipe it up, for links and the rest.</p>
+      </div>
+    </div>
+  </div>`;
+  const thumb = document.getElementById("summaryThumb");
+  if (thumb) paintArt(thumb, card);
+  profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => {
+    const key = btn.dataset.variant;
+    variantChoice.set(card.id, key);
+    summaryId = "";
+    renderSummary(card);
+    summaryId = card.id;
+    paintCaption();
+    refreshPocketPrice(card);
+    focusVariant(key);
+  });
+  bindPriceStory(story, () => { summaryId = ""; renderSummary(card); summaryId = card.id; });
+  const full = document.getElementById("openFullProfile");
+  if (full) full.onclick = () => openProfile(card);
+  if (story.series.pendingFx) ensureFx().then(rate => { if (rate && !profilePinned) { summaryId = ""; paintDeckSummary(currentTop()); } });
+}
+function openProfile(card){
+  ensureLabelFont();
+  const dialog = !wide();
+  const already = dialog && profilePinned && profileEl && !profileEl.hidden;
+  const opener = document.activeElement;
+  if (dialog && !already && opener && opener !== document.body && !profileEl.contains(opener)) profileOpener = opener;
+  if (card && card.id && (!card.variants || card.gemReady)) {
+    const hint = card.gemHint || "";
+    const why = card.gemWhy || "";
+    const repaintGem = full => {
+      if (!(profilePinned && profileCard && profileCard.id === card.id)) return;
+      const closeWasFocused = !!(document.activeElement && document.activeElement.id === "closeProfile");
+      if (full) {
+        if (hint) { full.gemHint = hint; full.gemWhy = why; }
+        renderProfile(full);
+      } else renderProfile(card);
+      if (closeWasFocused && !wide()) {
+        const close = document.getElementById("closeProfile");
+        if (close) close.focus();
+      }
+    };
+    hydrate(card).then(repaintGem).catch(() => repaintGem(null));
+  }
+  profilePinned = true;
+  syncReadingWide();
+  pinnedTopId = (currentTop() && currentTop().id) || "";
+  summaryId = "";
+  profileCard = card;
+  profileEl.hidden = false;
+  shell.classList.toggle("no-profile", false);
+  markProfile(!wide());
+  renderProfile(card);
+  noteDemand(card.id);
+  queuePrice(card.id);
+  profileEl.scrollTop = 0;
+  const scroller = profileEl.querySelector(".profile-scroll");
+  if (scroller) scroller.scrollTop = 0;
+  const close = document.getElementById("closeProfile");
+  if (close && dialog) close.focus();
+  syncInert();
+  syncActs();
+}
+function closeProfile(){
+  const dialog = !wide();
+  const back = profileOpener;
+  profileOpener = null;
+  profilePinned = false;
+  profileCard = null;
+  pinnedTopId = "";
+  summaryId = "";
+  sideKey = "";
+  if (wide()) paintSide();
+  else { profileEl.hidden = true; shell.classList.add("no-profile"); }
+  syncInert();
+  if (dialog) {
+    if (back && back.isConnected && back !== document.body && typeof back.focus === "function") back.focus();
+    else if (deck) deck.focus();
+  }
+  syncActs();
+}
+function paintEmptyProfile(){
+  paintSummaryEmpty();
+}
+function syncProfilePane(){
+  if (wide()) {
+    if (profilePinned && profileCard) {
+      profileEl.hidden = false;
+      shell.classList.remove("no-profile");
+      markProfile(false);
+    } else {
+      summaryId = "";
+      sideKey = "";
+      paintSide();
+    }
+  } else if (!(profilePinned && profileCard)) {
+    profileEl.hidden = true;
+    shell.classList.add("no-profile");
+  } else {
+    profileEl.hidden = false;
+    shell.classList.remove("no-profile");
+    markProfile(true);
+  }
+  syncInert();
+}
+function renderProfile(card){
+  profileCard = card;
+  const priceQueued = scrydex.ready && needsPriceFetch(card.id) && !!priceProxyUrl();
+  const story = priceStory(card, { thumbId:"profileThumb", queued:priceQueued });
+  const onWish = wish.some(w => w.id === card.id);
+  const owned = ownedIds.has(card.id);
+  const ownLabel = owned ? "Got it · undo" : "Got it!";
+  const ownAria = owned ? "Undo got it for " + (card.name || "this card") : "Got it! Mark " + (card.name || "this card") + " as owned";
+  const wishAria = onWish ? "Remove " + (card.name || "this card") + " from the wishlist" : "Save " + (card.name || "this card") + " to the wishlist";
+  const binder = discoveryBinder();
+  const inBinder = binder && binder.cards.some(c => c.id === card.id);
+  const legal = card.legal ? [card.legal.standard ? "Standard" : "", card.legal.expanded ? "Expanded" : ""].filter(Boolean).join(", ") || "Not legal" : "";
+  const gemLine = card.gemHint ? `<p class="gem-note"><b>Why it's a gem.</b> ${esc(card.gemWhy || card.gemHint)}</p>` : "";
+  profileEl.innerHTML = `<div class="profile-scroll">
+    <div class="phead profile-tools">
+      <button class="iconbtn" id="closeProfile" type="button" aria-label="Close profile">✕</button>
+    </div>
+    ${story.html}
+    <div class="profile-rest">
+      <h2 class="pname" id="profileTitle">${esc(card.name || "Card")}</h2>
+      ${gemLine}
+      <div class="facts">
+        ${coreFacts(card)}
+        ${fact("HP", card.hp)}
+        ${fact("Type", (card.types || []).join(", "))}
+        ${fact("Release", card.releaseDate || "…")}
+        ${fact("Legality", legal)}
+      </div>
+      ${variantToggle(card, story.variant)}
+      <div class="ownrow mine">
+        <button class="chip ownchip" id="profileOwn" type="button" aria-pressed="${owned ? "true" : "false"}" aria-label="${esc(ownAria)}">${esc(ownLabel)}</button>
+        <button class="chip wishchip" id="profileWish" type="button" aria-pressed="${onWish ? "true" : "false"}" aria-label="${esc(wishAria)}">${onWish ? "♥ On wishlist" : "♡ Add to wishlist"}</button>
+        ${binder ? `<button class="chip" id="profileBinder" type="button">${inBinder ? "In " + esc(binder.name) : "Add to " + esc(binder.name)}</button>` : ""}
+        <p class="fine">${owned ? "You have it. Every binder shows it as owned." : "Tap Got it! once it's in your hands. Every binder updates."}</p>
+      </div>
+      <div class="shoplinks"><p class="eyebrow">Check prices on</p><div class="links">${buyLinks(card).map(l => `<a class="buy-btn" href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label.replace(/^View on /, ""))} ↗</a>`).join("")}</div></div>
+      ${card.flavor ? `<p class="fine">${esc(card.flavor)}</p>` : ""}
+      <p class="fine">The big price is today's raw TCGplayer market. Graded prices, and the 30-day and 90-day changes, come from the cached Scrydex history for this printing. Prices are estimates, not financial advice. Buy links are not affiliate links yet.</p>
+      <button class="chip" id="copyLink" type="button">Copy link</button>
+    </div>
+  </div>`;
+  const thumb = document.getElementById("profileThumb");
+  if (thumb) {
+    paintArt(thumb, card, { large:true });
+    thumb.onclick = () => openShowcase(card, thumb);
+  }
+  document.getElementById("closeProfile").onclick = closeProfile;
+  profileEl.querySelectorAll("[data-variant]").forEach(btn => btn.onclick = () => {
+    const key = btn.dataset.variant;
+    variantChoice.set(card.id, key);
+    renderProfile(card);
+    paintCaption();
+    refreshPocketPrice(card);
+    focusVariant(key);
+  });
+  bindPriceStory(story, () => renderProfile(cardCache.get(card.id) || card));
+  if (story.series.pendingFx) ensureFx().then(rate => { if (rate && profileCard && profileCard.id === card.id) renderProfile(cardCache.get(card.id) || card); });
+  document.getElementById("profileOwn").onclick = () => setOwned(card, !ownedIds.has(card.id), "profile");
+  document.getElementById("profileWish").onclick = () => {
+    if (onWish) removeFromWish(card.id); else addWish(card);
+    renderProfile(cardCache.get(card.id) || card);
+  };
+  const pb = document.getElementById("profileBinder");
+  if (pb && binder) pb.onclick = () => { if (!inBinder) addToBinder(binder, card); renderProfile(card); };
+  const copy = document.getElementById("copyLink");
+  if (copy) copy.onclick = async () => {
+    const u = new URL(location.href); u.searchParams.set("card", card.id);
+    try { await navigator.clipboard.writeText(u.toString()); announce("Link copied."); }
+    catch (e) { announce("Link ready."); }
+  };
+  if (!card.releaseDate && card.setId) {
+    getJson(TCGDEX + "/sets/" + encodeURIComponent(card.setId)).then(set => {
+      card.releaseDate = set.releaseDate || "—";
+      if (profileCard && profileCard.id === card.id) {
+        const node = [...profileEl.querySelectorAll(".fact")].find(n => (n.querySelector("span") || {}).textContent === "Release");
+        if (node) node.querySelector("b").textContent = card.releaseDate;
+      }
+    }).catch(() => {});
+  }
+}
+function fact(label, value){
+  if (value == null || value === "" || value === "—") return "";
+  return `<div class="fact"><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
+}
+function gradePrice(facts, label){
+  const [company, grade] = label.split(" ");
+  const row = (facts.prices || []).find(p => p.company === company && String(p.grade) === grade && pos(p.market));
+  return row ? { label, value:pos(row.market) } : null;
+}
+function gradesAvailable(facts){
+  return GRADES.some(([company, grade]) => {
+    const price = (facts.prices || []).find(p => p.company === company && String(p.grade) === String(grade));
+    const popReport = (facts.pops || []).find(p => p.company === company);
+    const pop = popReport && (popReport.grades || []).find(g => String(g.grade) === String(grade));
+    return !!(price && pos(price.market)) || !!(pop && typeof pop.count === "number");
+  });
+}
+function gradeCell(facts, company, grade){
+  const price = (facts.prices || []).find(p => p.company === company && String(p.grade) === String(grade));
+  const popReport = (facts.pops || []).find(p => p.company === company);
+  const pop = popReport && (popReport.grades || []).find(g => String(g.grade) === String(grade));
+  const market = price ? pos(price.market) : null;
+  const title = market ? company + " " + grade : "no recent sales";
+  return `<div class="grade" title="${esc(title)}"><span>${esc(company + " " + grade)}</span><b>${esc(market ? priceText(market, price.currency || "USD") : "—")}</b><small class="fine">Pop ${esc(pop && typeof pop.count === "number" ? groupNum(pop.count) : "—")}</small></div>`;
+}
+
+document.querySelectorAll("[data-tab]").forEach(btn => btn.onclick = () => showTab(btn.dataset.tab));
+function openSettingsPanel(){
+  document.getElementById("settingsBody").innerHTML = `
+    <label class="choice"><input type="checkbox" id="setSound" ${settings.sound ? "checked" : ""}> Sound</label>
+    <label class="choice"><input type="checkbox" id="setHaptic" ${settings.haptics ? "checked" : ""}> Haptics</label>
+    <label class="field">Reduce motion<select id="setMotion"><option value="auto">Follow system</option><option value="on">On</option><option value="off">Off</option></select></label>
+    <label class="field">Currency<select id="setCur"><option value="USD">US dollars</option><option value="EUR">Cardmarket euros</option></select></label>
+    <button class="chip" id="retakeOnboard" type="button">Retake the hunt quiz</button>
+    <h2>About</h2>
+    <p class="fine">BinderHunt is not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. There is no account. Wishlists, binders, owned marks, filters, settings, and the daily streak stay in this browser.</p>
+    <p class="fine">A public hit counter records page views, one visit a day, and a few actions, including playing the daily drop. It sets no cookies and sends no identifier, and it stays off when Do Not Track is on.</p>
+    <p class="fine">Card text and images come from TCGdex. US prices come from TCGplayer. European prices come from Cardmarket. Commons and cards under $10 use those catalog prices. Graded prices and population come from a Scrydex cache for chase cards and cards you open or save often, and only for the printing on screen. Prices are estimates, not financial advice. TCGplayer, eBay, and Cardmarket links are not affiliate links yet.</p>
+    <p class="fine"><img src="assets/brand/two-toads-logo.png" width="32" height="32" alt="Two Toads" decoding="async" fetchpriority="low"> BinderHunt · made with 🐸 by Two Toads</p>`;
+  document.getElementById("setMotion").value = settings.reduce;
+  document.getElementById("setCur").value = settings.currency;
+  document.getElementById("setSound").onchange = e => { settings.sound = e.target.checked; saveSettings(); if (settings.sound) playTone(520); };
+  document.getElementById("setHaptic").onchange = e => { settings.haptics = e.target.checked; saveSettings(); };
+  document.getElementById("setMotion").onchange = e => { settings.reduce = e.target.value; saveSettings(); };
+  document.getElementById("setCur").onchange = e => { settings.currency = e.target.value; saveSettings(); summaryId = ""; renderDeck(); if (profilePinned && profileCard && !profileEl.hidden) renderProfile(profileCard); };
+  document.getElementById("retakeOnboard").onclick = () => { closeSheet("settingsSheet"); openOnboard("retake"); };
+  openSheet("settingsSheet");
+  const firstSetting = document.getElementById("setSound");
+  if (firstSetting) firstSetting.focus();
+}
+document.querySelectorAll("[data-gear]").forEach(btn => btn.onclick = openSettingsPanel);
+document.getElementById("railWish").onclick = () => { binderView = { kind:"wish" }; flipPage = 0; showTab("binders"); };
+document.querySelectorAll(".backdrop").forEach(btn => btn.onclick = () => {
+  const sheet = btn.parentElement;
+  if (sheet && sheet.id) closeSheet(sheet.id);
+});
+document.getElementById("openFilters").onclick = () => openFilter("all", document.getElementById("openFilters"));
+document.getElementById("filterDone").onclick = () => closeSheet("filterSheet");
+document.getElementById("settingsDone").onclick = () => closeSheet("settingsSheet");
+document.getElementById("resetFilters").onclick = () => clearAllFilters();
+document.getElementById("stopDiscovery").onclick = () => stopDiscoveryHunt();
+document.getElementById("switchDiscovery").onclick = () => openBinderSwitch("hunt");
+document.getElementById("shareDiscovery").onclick = () => {
+  const b = discoveryBinder();
+  if (b && window.BinderShare) BinderShare.openCollection({ kind:"binder", name:b.name, color:b.color, cards:b.cards || [], ownedIds });
+};
+document.getElementById("context").onclick = () => { if (tab === "hunt") openFilter("all", document.getElementById("openFilters")); else if (tab === "sets" && setView) { setView = null; renderSets(); } else if (tab === "binders" && binderView) { binderView = null; renderBinders(); } };
+document.getElementById("skip").onclick = () => fly(-1);
+document.getElementById("save").onclick = () => fly(1);
+document.getElementById("undo").onclick = undo;
+function typingTarget(el){
+  if (!el || el.nodeType !== 1) return false;
+  if (el.isContentEditable) return true;
+  const tag = el.tagName;
+  if (tag === "TEXTAREA" || tag === "SELECT") return true;
+  if (tag !== "INPUT") return false;
+  const type = String(el.getAttribute("type") || "text").toLowerCase();
+  return type === "text" || type === "search" || type === "number";
+}
+function focusableIn(root){
+  if (!root) return [];
+  return [...root.querySelectorAll("button, a[href], input, select, textarea, [tabindex='0']")].filter(el => {
+    if (el.disabled || el.getAttribute("aria-hidden") === "true" || el.tabIndex < 0) return false;
+    const style = getComputedStyle(el);
+    return style.display !== "none" && style.visibility !== "hidden" && el.getClientRects().length > 0;
+  });
+}
+function trapTab(event, root){
+  if (!root || event.key !== "Tab") return false;
+  const items = focusableIn(root);
+  if (!items.length) { event.preventDefault(); return true; }
+  const first = items[0], last = items[items.length - 1];
+  const active = document.activeElement;
+  const inside = items.includes(active);
+  if (!inside) { event.preventDefault(); (event.shiftKey ? last : first).focus(); }
+  else if (event.shiftKey && active === first) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus(); }
+  return true;
+}
+document.addEventListener("keydown", e => {
+  const menu = document.getElementById("menu");
+  if (menu && !menu.hidden && e.key === "Tab") { trapTab(e, menu); return; }
+  const open = ["fillSheet","binderSheet","settingsSheet","filterSheet","dropPrompt"].map(id => document.getElementById(id)).find(el => el && !el.hidden);
+  const onboardLayer = document.getElementById("onboard");
+  const showcaseLayer = document.getElementById("showcase");
+  const layer = !open && onboardLayer && !onboardLayer.hidden ? onboardLayer : (!open && showcaseLayer && !showcaseLayer.hidden ? showcaseLayer : null);
+  if (layer && e.key === "Tab") { trapTab(e, layer.querySelector(".onboard-card, .inspect-stage") ? layer : layer); return; }
+  if (open && e.key === "Tab") {
+    trapTab(e, open.querySelector(".sheet-card, .drop-card") || open);
+    return;
+  }
+  if (!open && !wide() && profilePinned && profileEl && !profileEl.hidden && e.key === "Tab") { trapTab(e, profileEl); return; }
+  if (e.key === "Escape") {
+    const showcase = document.getElementById("showcase");
+    if (showcase && !showcase.hidden) { closeShowcase(); return; }
+    if (menu && !menu.hidden) { closeMenu(); return; }
+    ["fillSheet","binderSheet","settingsSheet","filterSheet"].forEach(id => { if (!document.getElementById(id).hidden) closeSheet(id); });
+    const prompt = document.getElementById("dropPrompt");
+    if (prompt && !prompt.hidden) {
+      const back = prompt._opener;
+      prompt._opener = null;
+      prompt.hidden = true;
+      const shell = document.getElementById("shell");
+      if (shell) shell.removeAttribute("inert");
+      syncActs();
+      if (back && back.isConnected && typeof back.focus === "function") back.focus();
+      else if (deck) deck.focus();
+    }
+    if (!profileEl.hidden && !wide()) closeProfile();
+    return;
+  }
+  if (typingTarget(e.target) || blocking()) return;
+  if (document.getElementById("showcase") && !document.getElementById("showcase").hidden) return;
+  if ((e.key === "f" || e.key === "F") && tab === "hunt") { e.preventDefault(); openFilter("all", document.getElementById("openFilters")); return; }
+  if (e.key === "z" || e.key === "Z") { if (tab === "hunt") undo(); return; }
+  if (tab === "hunt" && !blocking()) {
+    if (e.key === "ArrowLeft") fly(-1);
+    if (e.key === "ArrowRight") fly(1);
+    if (e.key === "ArrowUp") { const el = topCard(); if (el) openProfile(el.card); }
+  }
+  if ((tab === "binders" && binderView) || (tab === "sets" && setView)) {
+    const root = document.getElementById(tab === "binders" ? "viewBinders" : "viewSets");
+    if (e.key === "ArrowLeft") { const b = root && root.querySelector("#pagePrev, #setPrev"); if (b) b.click(); }
+    if (e.key === "ArrowRight") { const b = root && root.querySelector("#pageNext, #setNext"); if (b) b.click(); }
+  }
+});
+document.addEventListener("pointerdown", e => {
+  const menu = document.getElementById("menu");
+  if (!menu.hidden && !menu.contains(e.target)) closeMenu();
+});
+
+applyMotion();
+bindShowcase();
+syncProfilePane();
+matchMedia("(min-width: 1024px)").addEventListener("change", syncProfilePane);
+document.getElementById("activeChips").addEventListener("scroll", syncChipFade);
+document.getElementById("cardSearch").onsubmit = e => {
+  e.preventDefault();
+  const name = cleanMon(document.getElementById("cardFind").value);
+  filters.names = name ? [name] : [];
+  saveFilters();
+  restart();
+};
+ensureFx();
+deck.addEventListener("dragstart", e => e.preventDefault());
+let resizeTick = 0;
+window.addEventListener("resize", () => {
+  syncChipFade();
+  alignHuntColumn();
+  clearTimeout(resizeTick);
+  resizeTick = setTimeout(() => {
+    if (tab === "binders" && binderView) renderBinders();
+    if (tab === "sets" && setView) renderSets();
+  }, 150);
+});
+let gyroFrame = 0;
+window.addEventListener("deviceorientation", e => {
+  if (reduceMotion() || tab !== "binders" || !binderView) return;
+  const gx = Math.max(-1, Math.min(1, (e.gamma || 0) / 35));
+  const gy = Math.max(-1, Math.min(1, ((e.beta || 40) - 40) / 40));
+  if (gyroFrame) return;
+  gyroFrame = requestAnimationFrame(() => {
+    gyroFrame = 0;
+    document.querySelectorAll("#bindersScroll .sleeve").forEach(el => {
+      el.style.setProperty("--sx", ((gx + 1) * 50).toFixed(0) + "%");
+      el.style.setProperty("--sy", ((gy + 1) * 50).toFixed(0) + "%");
+      if (!el.classList.contains("holo")) return;
+      el.style.setProperty("--tx", (gx * 6).toFixed(2) + "deg");
+      el.style.setProperty("--ty", (gy * -6).toFixed(2) + "deg");
+    });
+  });
+}, { passive:true });
+const ONBOARD_KEY = "bh.onboard.v1";
+let onboardStep = 1;
+let onboardMode = "first";
+let onboardPicks = new Set();
+let onboardCustom = [];
+let onboardEra = "";
+let onboardBudget = "";
+function loadOnboard(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(ONBOARD_KEY) || "null");
+    if (raw && typeof raw === "object") return raw;
+  } catch (e) {}
+  return null;
+}
+function saveOnboard(data){
+  try { localStorage.setItem(ONBOARD_KEY, JSON.stringify(data)); } catch (e) {}
+}
+function namesFromOnboard(){
+  const names = [];
+  onboardPicks.forEach(id => {
+    const pick = HUNT_PICKS.find(p => p.id === id);
+    if (pick) pick.names.forEach(n => { if (!names.some(x => sameName(x, n))) names.push(n); });
+  });
+  onboardCustom.forEach(n => { if (!names.some(x => sameName(x, n))) names.push(n); });
+  return names.slice(0, 24);
+}
+function renderOnboard(){
+  const title = document.getElementById("onboardTitle");
+  const sub = document.getElementById("onboardSub");
+  const step = document.getElementById("onboardStep");
+  const body = document.getElementById("onboardBody");
+  const back = document.getElementById("onboardBack");
+  const next = document.getElementById("onboardNext");
+  back.hidden = onboardStep === 1;
+  if (onboardStep === 1) {
+    step.textContent = "1 of 2";
+    title.textContent = "Who are you hunting for?";
+    sub.textContent = "Pick a few. You can change this anytime.";
+    next.textContent = "Next";
+    body.innerHTML = `<div class="searchrow"><input id="obFind" type="search" placeholder="e.g. Pikachu" aria-label="Search a Pokémon"></div><div class="suggest" id="obSuggest"></div><div class="huntpicks">${HUNT_PICKS.map(p => `<button type="button" class="huntpick ${onboardPicks.has(p.id) ? "on" : ""}" aria-pressed="${onboardPicks.has(p.id) ? "true" : "false"}" data-ob="${p.id}">${esc(p.label)}</button>`).join("")}${onboardCustom.map(n => `<button type="button" class="huntpick on" aria-pressed="true" data-obx="${esc(n)}">${esc(n)}</button>`).join("")}</div>`;
+    body.querySelectorAll("[data-ob]").forEach(btn => btn.onclick = () => {
+      popBtn(btn);
+      const id = btn.dataset.ob;
+      if (onboardPicks.has(id)) onboardPicks.delete(id); else onboardPicks.add(id);
+      const on = onboardPicks.has(id);
+      btn.classList.toggle("on", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    body.querySelectorAll("[data-obx]").forEach(btn => btn.onclick = () => {
+      popBtn(btn);
+      onboardCustom = onboardCustom.filter(n => !sameName(n, btn.dataset.obx));
+      renderOnboard();
+    });
+    const find = document.getElementById("obFind");
+    const addCustom = name => {
+      const preset = HUNT_PICKS.find(p => sameName(p.label, name) || (p.names.length === 1 && sameName(p.names[0], name)));
+      if (preset) onboardPicks.add(preset.id);
+      else if (!onboardCustom.some(n => sameName(n, name))) onboardCustom.push(name);
+      renderOnboard();
+    };
+    find.oninput = () => {
+      const q = cleanMon(find.value);
+      const box = document.getElementById("obSuggest");
+      if (!q) { box.innerHTML = ""; return; }
+      const hits = MON_LIST.filter(n => n.toLowerCase().includes(q.toLowerCase())).slice(0, 6);
+      const exact = hits.some(n => sameName(n, q));
+      box.innerHTML = hits.map(n => `<button type="button" class="huntpick" data-add="${esc(n)}">${esc(n)}</button>`).join("") + (exact ? "" : `<button type="button" class="huntpick" data-add="${esc(q)}">Hunt ${esc(q)}</button>`);
+      box.querySelectorAll("[data-add]").forEach(btn => btn.onclick = () => { popBtn(btn); addCustom(btn.dataset.add); });
+    };
+    find.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); const name = cleanMon(find.value); if (name) addCustom(name); } };
+    find.focus();
+  } else {
+    step.textContent = "2 of 2";
+    title.textContent = "Favorite era?";
+    sub.textContent = "And a budget, if you have one.";
+    next.textContent = "Start hunting";
+    const eras = [{ id:"", label:"All of it" }].concat(ERA_GROUPS);
+    const budgets = [{ id:"", label:"Any" }, { id:"under10", label:"Under $10" }, { id:"mid", label:"$10–50" }, { id:"high", label:"$50+" }];
+    body.innerHTML = `<div class="huntpicks">${eras.map(g => `<button type="button" class="huntpick ${onboardEra === g.id ? "on" : ""}" aria-pressed="${onboardEra === g.id ? "true" : "false"}" data-era="${esc(g.id)}">${esc(g.label)}</button>`).join("")}</div><p class="fine">Budget</p><div class="huntpicks">${budgets.map(g => `<button type="button" class="huntpick ${onboardBudget === g.id ? "on" : ""}" aria-pressed="${onboardBudget === g.id ? "true" : "false"}" data-budget="${esc(g.id)}">${esc(g.label)}</button>`).join("")}</div>`;
+    body.querySelectorAll("[data-era]").forEach(btn => btn.onclick = () => {
+      popBtn(btn);
+      onboardEra = btn.dataset.era || "";
+      body.querySelectorAll("[data-era]").forEach(other => {
+        const on = other === btn;
+        other.classList.toggle("on", on);
+        other.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    });
+    body.querySelectorAll("[data-budget]").forEach(btn => btn.onclick = () => {
+      popBtn(btn);
+      onboardBudget = btn.dataset.budget || "";
+      body.querySelectorAll("[data-budget]").forEach(other => {
+        const on = other === btn;
+        other.classList.toggle("on", on);
+        other.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    });
+  }
+}
+function openOnboard(mode){
+  ensureLabelFont();
+  const saved = loadOnboard() || {};
+  onboardMode = mode || "first";
+  onboardStep = 1;
+  if (onboardMode === "retake") {
+    onboardPicks = new Set(Array.isArray(saved.picks) ? saved.picks : []);
+    onboardCustom = Array.isArray(saved.custom) ? saved.custom.map(cleanMon).filter(Boolean) : [];
+    onboardEra = typeof saved.era === "string" ? saved.era : "";
+    onboardBudget = typeof saved.budget === "string" ? saved.budget : "";
+  } else {
+    onboardPicks = new Set();
+    onboardCustom = [];
+    onboardEra = "";
+    onboardBudget = "";
+  }
+  const opener = document.activeElement;
+  if (opener && opener !== document.body && !document.getElementById("onboard").contains(opener)) onboardOpener = opener;
+  document.getElementById("onboard").hidden = false;
+  renderOnboard();
+  syncInert();
+}
+function closeOnboard(){
+  document.getElementById("onboard").hidden = true;
+  const back = onboardOpener;
+  onboardOpener = null;
+  syncInert();
+  if (back && back.isConnected && typeof back.focus === "function") back.focus();
+  else if (deck) deck.focus();
+  syncActs();
+}
+function skipOnboard(){
+  closeOnboard();
+  if (onboardMode === "retake") return;
+  saveOnboard({ done:true, skipped:true, picks:[], custom:[], era:"", budget:"", at:Date.now() });
+  countEvent("onboard-skip");
+  maybeInstallHint();
+}
+function finishOnboard(){
+  if (onboardStep === 1) { onboardStep = 2; renderOnboard(); return; }
+  const names = namesFromOnboard();
+  dropHeldFilters();
+  filters = blankFilters();
+  filters.names = names;
+  filters.era = onboardEra || "";
+  filters.pricePreset = onboardBudget || "";
+  saveOnboard({ done:true, skipped:!names.length && !filters.era && !filters.pricePreset, picks:[...onboardPicks], custom:onboardCustom.slice(), era:filters.era, budget:filters.pricePreset, at:Date.now() });
+  closeOnboard();
+  if (onboardMode !== "retake") countEvent("onboard-done");
+  restart();
+  const bits = [];
+  if (names.length) bits.push(namesLabel());
+  if (filters.era) bits.push(eraLabel(filters.era));
+  if (filters.pricePreset) bits.push(priceLabel());
+  announce(bits.length ? "Hunting " + bits.join(" · ") + ". The chips up top can change it." : "A mixed hunt. The chips up top can narrow it.");
+  maybeInstallHint();
+}
+document.getElementById("onboardSkip").onclick = skipOnboard;
+document.getElementById("onboardBack").onclick = () => { onboardStep = 1; renderOnboard(); };
+document.getElementById("onboardNext").onclick = finishOnboard;
+receivedShareAtOpen = !!(window.BinderShare && typeof BinderShare.readQuery === "function" && BinderShare.readQuery(location.search));
+try {
+  ownedMissingAtOpen = localStorage.getItem(OWNED_KEY) == null;
+  filtersMissingAtOpen = localStorage.getItem("bh.filters.v3") == null;
+} catch (e) {
+  ownedMissingAtOpen = false;
+  filtersMissingAtOpen = false;
+}
+loadCollectionState();
+if (ownedInlineMigrated) {
+  try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {}
+  try { localStorage.setItem("bh.binders.v1", JSON.stringify(binderState)); } catch (e) {}
+}
+paintChips();
+paintContext();
+paintDiscovery();
+scheduleScrydex();
+loadMeta().then(() => {
+  settleStoredFilters();
+  backfillOwnedSets();
+  quietSeedSets();
+  if (tab === "sets") renderSets();
+  if (tab === "binders") renderBinders();
+  paintChips();
+  paintCount();
+  paintContext();
+}).catch(() => {});
+const RECENT_KEY = "bh.recent.v1";
+const PWA_KEY = "bh.pwa.v1";
+let offlineSeeded = false;
+let deferredInstall = null;
+function recentCards(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+    return Array.isArray(raw) ? raw.filter(c => c && c.id) : [];
+  } catch (e) { return []; }
+}
+function rememberRecent(card){
+  try {
+    if (!card || !card.id || navigator.onLine === false) return;
+    const snap = snapshot(card);
+    delete snap.flavor; delete snap.legal; delete snap.printings; delete snap.cm;
+    const list = recentCards().filter(c => c.id !== snap.id);
+    list.unshift(snap);
+    if (list.length > 18) list.length = 18;
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+  } catch (e) {}
+}
+function serveOfflineDeck(){
+  offlineSeeded = true;
+  pumpError = "";
+  paused = false;
+  if (!pile.length) {
+    const recent = recentCards().filter(c => knownArt(c).length && !isDigital(c));
+    let use = recent.filter(c => { try { return keep(c); } catch (e) { return false; } });
+    if (!use.length) use = recent;
+    use.slice(0, 12).forEach(card => { pile.push(card); matched++; });
+  }
+  streamDone = true;
+  syncOfflineNote();
+}
+function syncOfflineNote(){
+  const note = document.getElementById("offlineNote");
+  if (note) note.hidden = navigator.onLine !== false;
+}
+function loadPwa(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(PWA_KEY) || "null");
+    return raw && typeof raw === "object" ? raw : {};
+  } catch (e) { return {}; }
+}
+function savePwa(data){
+  try { localStorage.setItem(PWA_KEY, JSON.stringify(data)); } catch (e) {}
+}
+function inStandalone(){
+  try { return matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; }
+  catch (e) { return false; }
+}
+function isIos(){
+  const ua = navigator.userAgent || "";
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+function onboardFinished(){
+  const saved = loadOnboard();
+  return !!(saved && saved.done);
+}
+function engagedEnough(data){
+  if ((data.swipes || 0) >= 10) return true;
+  if (data.binder) return true;
+  return !!(binderState && binderState.binders && binderState.binders.length);
+}
+function maybeInstallHint(){
+  const hint = document.getElementById("installHint");
+  if (!hint) return;
+  const onboard = document.getElementById("onboard");
+  const drop = document.getElementById("dropPrompt");
+  const data = loadPwa();
+  const ios = isIos();
+  const blocked = (onboard && !onboard.hidden) || (drop && !drop.hidden);
+  const ready = !inStandalone() && !data.dismissed && onboardFinished() && !blocked && engagedEnough(data) && (ios || deferredInstall);
+  if (!ready) { hint.hidden = true; return; }
+  const text = document.getElementById("installHintText");
+  const go = document.getElementById("installGo");
+  if (ios) {
+    text.textContent = "Add BinderHunt to your home screen. Tap Share, then Add to Home Screen.";
+    if (go) go.hidden = true;
+  } else {
+    text.textContent = "Add BinderHunt to your home screen";
+    if (go) go.hidden = false;
+  }
+  hint.hidden = false;
+}
+function dismissInstall(){
+  const data = loadPwa();
+  data.dismissed = true;
+  savePwa(data);
+  const hint = document.getElementById("installHint");
+  if (hint) hint.hidden = true;
+}
+function noteSwipeEngagement(){
+  const data = loadPwa();
+  data.swipes = (data.swipes || 0) + 1;
+  savePwa(data);
+  maybeInstallHint();
+}
+function noteBinderEngagement(){
+  const data = loadPwa();
+  data.binder = true;
+  savePwa(data);
+  maybeInstallHint();
+}
+/* The bh-2 worker answered some card images with a 107x150 placeholder.
+   When the new worker takes over, ask for those images again so an open
+   page heals without a reload. */
+function healArt(){
+  document.querySelectorAll("img").forEach(img => {
+    const src = img.currentSrc || img.src || "";
+    if (!/^https:\/\/(assets\.tcgdex\.net|images\.pokemontcg\.io)\//.test(src)) return;
+    if (!(img.complete && img.naturalWidth === 107 && img.naturalHeight === 150)) return;
+    img.src = src + (src.includes("?") ? "&" : "?") + "v=3";
+  });
+}
+function showUpdateToast(){
+  const toast = document.getElementById("updateToast");
+  if (!toast || !toast.hidden) return;
+  toast.hidden = false;
+}
+function bootPwa(){
+  const tell = () => {
+    const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (sw) sw.postMessage(navigator.onLine === false ? "bh-offline" : "bh-online");
+  };
+  tell();
+  syncOfflineNote();
+  window.addEventListener("online", () => {
+    tell();
+    syncOfflineNote();
+    if (offlineSeeded && tab === "hunt") { offlineSeeded = false; restart(); }
+  });
+  window.addEventListener("offline", () => {
+    tell();
+    syncOfflineNote();
+    if (tab === "hunt") serveOfflineDeck();
+    renderDeck();
+    paintCount();
+  });
+  const dismiss = document.getElementById("installDismiss");
+  if (dismiss) dismiss.onclick = dismissInstall;
+  const go = document.getElementById("installGo");
+  if (go) go.onclick = async () => {
+    const prompt = deferredInstall;
+    deferredInstall = null;
+    if (!prompt) { dismissInstall(); return; }
+    try {
+      prompt.prompt();
+      await prompt.userChoice;
+    } catch (e) {}
+    dismissInstall();
+  };
+  const refresh = document.getElementById("updateRefresh");
+  if (refresh) refresh.onclick = () => location.reload();
+  window.addEventListener("beforeinstallprompt", event => {
+    event.preventDefault();
+    deferredInstall = event;
+    maybeInstallHint();
+  });
+  window.addEventListener("appinstalled", () => { deferredInstall = null; dismissInstall(); });
+  maybeInstallHint();
+  if (!("serviceWorker" in navigator)) return;
+  // Toast only when a worker replaces one that was already controlling this
+  // page. The first claim, on a fresh visit, has nothing to refresh.
+  let hadController = !!navigator.serviceWorker.controller;
+  const askSkip = worker => {
+    try { if (worker) worker.postMessage("SKIP_WAITING"); } catch (e) {}
+  };
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    tell();
+    healArt();
+    setTimeout(healArt, 1500);
+    if (hadController) showUpdateToast();
+    hadController = true;
+  });
+  navigator.serviceWorker.register("sw.js", { scope: "./", updateViaCache: "none" }).then(reg => {
+    reg.addEventListener("updatefound", () => {
+      const worker = reg.installing;
+      if (!worker) return;
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "installed") askSkip(worker);
+      });
+    });
+    askSkip(reg.waiting);
+    const look = () => { reg.update().catch(() => {}); };
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") look();
+    });
+    setInterval(look, 30 * 60 * 1000);
+  }).catch(() => {});
+}
+restart(receivedShareAtOpen && filtersMissingAtOpen ? { skipFilterWrite:true } : undefined);
+const deepId = new URLSearchParams(location.search).get("card");
+const shareView = window.BinderShare ? BinderShare.readQuery(location.search) : null;
+const returning = wish.length > 0 || binderState.binders.length > 0;
+if (!deepId && !shareView && !returning && !(loadOnboard() || {}).done) openOnboard("first");
+countPage();
+bootPwa();
+if (deepId && !shareView) hydrate({ id:deepId }).then(card => { if (card && !card.digital) openProfile(card); }).catch(() => announce("That card link didn't load."));
+if (shareView && window.BinderShare) BinderShare.present(shareView, { received:true });
+
+window.BHDailyHost = {
+  get filters(){ return filters; },
+  set filters(value){ filters = value; },
+  get binderState(){ return binderState; },
+  get ownedIds(){ return ownedIds; },
+  get wish(){ return wish; },
+  speciesFor(name){
+    if (window.BinderDaily && typeof window.BinderDaily.speciesName === "function") return window.BinderDaily.speciesName(name);
+    const names = MON_LIST.slice().sort((a, b) => b.length - a.length);
+    const found = names.find(n => speciesHit(name, n));
+    if (found) return found;
+    const word = String(name || "").split(/[\s-]/)[0];
+    if (word && word.length > 2 && !/^(the|a|an|team|rocket|dark|light|shiny|mr|ms)$/i.test(word)) return word;
+    return "";
+  }
+};

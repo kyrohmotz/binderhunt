@@ -6,7 +6,7 @@
    index.html, js, or css. Any change to this file is a new worker: it
    calls skipWaiting immediately and takes over, and the page asks before
    it reloads. */
-const VERSION = "bh-10";
+const VERSION = "bh-12";
 const SHELL = "bh-shell-" + VERSION;
 const DATA = "bh-data-" + VERSION;
 const IMG = "bh-img-" + VERSION;
@@ -24,6 +24,7 @@ const SHELL_FILES = [
   "js/gems.js",
   "js/share.js",
   "js/themed-binders.js",
+  "js/app.js",
   "css/themes.css",
   "css/share.css",
   "data/scrydex-seed.txt",
@@ -41,7 +42,6 @@ const SHELL_FILES = [
   "fonts/nunito.woff2",
   "fonts/nunito-bold.woff2",
   "fonts/lato-700-italic.woff2",
-  "fonts/baloo-600.ttf",
   "fonts/fraunces-500.woff2"
 ];
 
@@ -169,6 +169,10 @@ function relPath(url) {
 
 function isData(url) {
   return /^data\/[^/]+\.json$/.test(relPath(url));
+}
+
+function isFont(url) {
+  return /\.(?:woff2|ttf|otf)$/.test(relPath(url));
 }
 
 function isShell(url) {
@@ -306,14 +310,36 @@ async function staleWhileRevalidate(request) {
   return new Response("offline", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
 }
 
-async function imageCache(request) {
+async function fontCache(request) {
+  const hit = await cached(SHELL, request);
+  if (hit) return hit;
+  if (offlineNow()) return new Response("offline", { status: 503, headers: { "Cache-Control": "no-store" } });
+  try {
+    const response = await fetch(request);
+    if (good(response)) {
+      try {
+        const cache = await caches.open(SHELL);
+        await cache.put(request, await materialize(response.clone()));
+      } catch (e) {}
+      return response;
+    }
+    return response;
+  } catch (e) {
+    return new Response("offline", { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
+}
+
+async function imageCache(event, request) {
   const hit = await cached(IMG, request);
   if (hit) {
-    try {
-      const cache = await caches.open(IMG);
-      await cache.delete(request);
-      await cache.put(request, hit.clone());
-    } catch (e) {}
+    const refresh = (async () => {
+      try {
+        const cache = await caches.open(IMG);
+        await cache.delete(request);
+        await cache.put(request, hit.clone());
+      } catch (e) {}
+    })();
+    try { event.waitUntil(refresh); } catch (e) {}
     return hit;
   }
   /* A network error makes the page fall back to its own placeholder, which
@@ -356,12 +382,16 @@ self.addEventListener("fetch", event => {
     event.respondWith(staleWhileRevalidate(request));
     return;
   }
+  if (isFont(url)) {
+    event.respondWith(fontCache(request));
+    return;
+  }
   if (isShell(url)) {
     event.respondWith(networkFirst(SHELL, request, 0, NAV_TIMEOUT).catch(() => cached(SHELL, request).then(hit => hit || new Response("Offline", { status: 503, headers: { "Cache-Control": "no-store" } }))));
     return;
   }
   if (isCardImage(url)) {
-    event.respondWith(imageCache(request));
+    event.respondWith(imageCache(event, request));
     return;
   }
   if (isCatalog(url)) {
