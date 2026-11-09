@@ -3507,7 +3507,7 @@ function paintRail(){
     const fine = (hunting ? "Hunting · " : "") + p.label;
     const shown = ringShown(p.owned, p.total);
     btn.setAttribute("aria-label", [b.name, fine, shown].join(", "));
-    btn.innerHTML = `<span class="rail-binder-copy"><b>${esc(b.name)}</b><span class="fine">${esc(fine)}</span></span>${ringMarkup(p.owned, p.total)}`;
+    btn.innerHTML = `<span class="rail-binder-copy"><b>${esc(b.name)}</b> <span class="fine">${esc(fine)}</span></span> ${ringMarkup(p.owned, p.total)}`;
     btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); showTab("binders"); };
     host.append(btn);
   });
@@ -4148,7 +4148,7 @@ function renderBinders(){
     if (b.charm === "sticker") coverBits.push("★");
     const coverName = coverBits.join(", ");
     btn.setAttribute("aria-label", coverName);
-    btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board">${peekMarkup(b.cards, "cover-peek")}<b class="binder-name">${esc(b.name)}</b>${b.cards.length ? ringMarkup(p.owned, p.total) : ""}<span class="binder-count">${esc(countLine)}</span></span><span class="binder-fore"></span></span>${charm}<span class="sr-only">${esc(coverName)}</span>`;
+    btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board">${peekMarkup(b.cards, "cover-peek")}<b class="binder-name">${esc(b.name)}</b> ${b.cards.length ? ringMarkup(p.owned, p.total) + " " : ""}<span class="binder-count">${esc(countLine)}</span></span><span class="binder-fore"></span></span>${charm ? " " + charm : ""}`;
     btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); renderBinders(); };
     const slot = document.createElement("div");
     slot.className = "cover-slot";
