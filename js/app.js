@@ -3396,7 +3396,7 @@ function paintContext(){
   const context = document.getElementById("context");
   context.textContent = label;
   if (tab === "hunt") context.setAttribute("aria-label", "Open filters. Showing " + label);
-  else if (tab === "sets" && browseMode && browseMode.name) context.setAttribute("aria-label", browseMode.kind === "illustrator" ? "All illustrators" : "All Pokémon");
+  else if (tab === "sets" && browseMode && browseMode.name) context.setAttribute("aria-label", label + ", " + (browseMode.kind === "illustrator" ? "All illustrators" : "All Pokémon"));
   else if (tab === "sets" && browseMode) context.setAttribute("aria-label", "Back to sets");
   else if (tab === "sets" && setView) context.setAttribute("aria-label", "Back to all sets");
   else if (tab === "binders" && binderView) context.setAttribute("aria-label", "Back to binders");
@@ -3924,7 +3924,7 @@ function openFilter(kind, anchor){
     <section class="filter-sec" id="filter-rarity"><h3>Rarity</h3><div class="huntpicks">${rarityButtons || `<p class="fine">Rarity list is still loading.</p>`}</div>${moreButtons ? `<button class="chip" type="button" id="moreRarities" aria-expanded="${moreOpen ? "true" : "false"}">${moreOpen ? "Fewer rarities" : "More rarities"}</button><div class="huntpicks" id="moreRarityBox"${moreOpen ? "" : " hidden"}>${moreButtons}</div>` : ""}</section>
     <section class="filter-sec" id="filter-type"><h3>Type</h3><div class="huntpicks">${typeButtons}</div></section>
     <section class="filter-sec" id="filter-pokemon"><h3>Pokémon</h3><div id="pokeHost"></div><button class="chip" type="button" id="browsePokemon">Browse Pokémon</button></section>
-    <section class="filter-sec" id="filter-illustrator"><h3>Illustrator</h3><p class="fine" id="illustratorFine"></p><button class="chip" type="button" id="browseIllustrators">Browse illustrators</button></section>
+    ${illustratorsListed() ? `<section class="filter-sec" id="filter-illustrator"><h3>Illustrator</h3><p class="fine" id="illustratorFine"></p><button class="chip" type="button" id="browseIllustrators">Browse illustrators</button></section>` : ""}
     <section class="filter-sec" id="filter-graded"><h3>Graded</h3><button type="button" class="huntpick" id="gradedToggle">Graded prices only</button><p class="fine">Uses cached graded prices. Leave this off and every raw card stays in the hunt.</p></section>
     <button class="chip" type="button" id="sheetClear">Clear all filters</button>`;
   const gemSheet = document.getElementById("gemSheetToggle");
@@ -4152,11 +4152,19 @@ function widenBrowse(){
   restart();
   announce("Filters cleared. Every physical card can show up.");
 }
+function illustratorsListed(){
+  if (browseMode && browseMode.kind === "illustrator") return true;
+  if (!browseReady || !browseIndex || !browseIndex.coverage) return true;
+  const total = browseIndex.coverage.cards || 0;
+  if (!total) return false;
+  return (browseIndex.coverage.withIllustrator || 0) / total >= 0.5;
+}
 function browseModeButtons(current){
   const sets = current === "sets";
   const pokemon = current === "pokemon";
   const artist = current === "illustrator";
-  return `<button class="chip${sets ? " on" : ""}" id="modeSets" type="button" role="tab" aria-selected="${sets ? "true" : "false"}">Sets</button><button class="chip${pokemon ? " on" : ""}" id="modePokemon" type="button" role="tab" aria-selected="${pokemon ? "true" : "false"}">Pokémon</button><button class="chip${artist ? " on" : ""}" id="modeArtists" type="button" role="tab" aria-selected="${artist ? "true" : "false"}">Illustrators</button>`;
+  const artists = illustratorsListed() ? `<button class="chip${artist ? " on" : ""}" id="modeArtists" type="button" role="tab" aria-selected="${artist ? "true" : "false"}">Illustrators</button>` : "";
+  return `<button class="chip${sets ? " on" : ""}" id="modeSets" type="button" role="tab" aria-selected="${sets ? "true" : "false"}">Sets</button><button class="chip${pokemon ? " on" : ""}" id="modePokemon" type="button" role="tab" aria-selected="${pokemon ? "true" : "false"}">Pokémon</button>${artists}`;
 }
 function bindBrowseModes(root){
   if (!root) return;
@@ -4268,7 +4276,7 @@ function renderBrowseShelf(root, kind, name){
   const countLine = !browseReady ? "Reading saved prices…" : (shown.length ? shown.length + (shown.length === 1 ? " priced card" : " priced cards") : "No priced cards saved");
   const few = browseReady ? fewBrowseCopy(kind, name, shown.length) : "";
   const backLabel = kind === "illustrator" ? "All illustrators" : "All Pokémon";
-  root.innerHTML = `<div class="modes" role="tablist" aria-label="Browse">${browseModeButtons(kind)}</div><div class="browse-head"><button class="chip" id="browseBack" type="button" aria-label="${esc(backLabel)}">←</button><div class="setname"><h2 id="browseTitle">${esc(name)}</h2><p class="fine" id="browseCount">${esc(countLine)}</p></div></div><div class="browse-actions"><button class="chip go" id="browseSwipe" type="button">${esc("Swipe " + name)}</button>${browseReady && shown.length <= 6 ? `<button class="chip" id="browseWiden" type="button">Widen the hunt</button>` : ""}</div>${few ? `<p class="browse-note" role="status">${esc(few)}</p>` : ""}<div class="price-grid" id="browseGrid"></div>${browseReady && !shown.length ? `<p class="empty-state">Nothing priced to show for ${esc(name)}. ${toad()}</p>` : ""}`;
+  root.innerHTML = `<div class="modes" role="tablist" aria-label="Browse">${browseModeButtons(kind)}</div><div class="browse-head"><button class="chip" id="browseBack" type="button" aria-label="${esc(name + ", " + backLabel)}">←</button><div class="setname"><h2 id="browseTitle">${esc(name)}</h2><p class="fine" id="browseCount">${esc(countLine)}</p></div></div><div class="browse-actions"><button class="chip go" id="browseSwipe" type="button">${esc("Swipe " + name)}</button>${browseReady && shown.length <= 6 ? `<button class="chip" id="browseWiden" type="button">Widen the hunt</button>` : ""}</div>${few ? `<p class="browse-note" role="status">${esc(few)}</p>` : ""}<div class="price-grid" id="browseGrid"></div>${browseReady && !shown.length ? `<p class="empty-state">Nothing priced to show for ${esc(name)}. ${toad()}</p>` : ""}`;
   bindBrowseModes(root);
   document.getElementById("browseBack").onclick = () => { browseMode = { kind }; renderSets(); };
   document.getElementById("browseSwipe").onclick = () => swipeBrowse(kind, name);
@@ -4282,10 +4290,15 @@ function renderBrowseShelf(root, kind, name){
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "price-tile";
-    btn.setAttribute("aria-label", [row.name, metaLine, price].filter(Boolean).join(", "));
-    btn.innerHTML = `<span class="tile-price">${esc(price)}</span><span class="art"></span><b class="tile-name">${esc(row.name || "Card")}</b><span class="fine">${esc(metaLine)}</span>`;
+    const numberLabel = row.number ? "#" + row.number : "";
+    btn.setAttribute("aria-label", [price, row.name || "Card", setLabel, numberLabel].filter(Boolean).join(", "));
+    btn.innerHTML = `<span class="tile-price">${esc(price)}</span> <span class="art"></span> <b class="tile-name">${esc(row.name || "Card")}</b> <span class="fine">${esc(metaLine)}</span>`;
     const card = cardFromBrowse(row);
-    if (card) paintArt(btn.querySelector(".art"), card, { lazy:true, priority:"low" });
+    if (card) {
+      paintArt(btn.querySelector(".art"), card, { lazy:true, priority:"low" });
+      const img = btn.querySelector("img");
+      if (img) img.alt = "";
+    }
     btn.onclick = () => openCachedCard(row);
     grid.append(btn);
   });

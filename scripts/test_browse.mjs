@@ -119,10 +119,10 @@ const boot = `(() => {
 })();`;
 
 const fixture = {
-  "base1-4": { name: "Charizard", history: [{ d: "2026/10/01", v: "holofoil", m: 120 }, { d: "2026/10/28", v: "holofoil", m: 0 }, { d: "2026/10/28", v: "holofoil", m: NaN }, { d: "2026/09/01", v: "1stEditionHolofoil", m: 400 }] },
-  "base1-58": { name: "Pikachu", history: [{ d: "2026/10/20", v: "normal", m: 12.5 }] },
-  "base4-4": { name: "Pikachu", history: [{ d: "2026/10/20", v: "normal", m: 4 }] },
-  "base1-2": { name: "Blastoise", history: [{ d: "2026/10/20", v: "holofoil", m: 80 }] },
+  "base1-4": { name: "Charizard", illustrator: "Mitsuhiro Arita", history: [{ d: "2026/10/01", v: "holofoil", m: 120 }, { d: "2026/10/28", v: "holofoil", m: 0 }, { d: "2026/10/28", v: "holofoil", m: NaN }, { d: "2026/09/01", v: "1stEditionHolofoil", m: 400 }] },
+  "base1-58": { name: "Pikachu", illustrator: "Ken Sugimori", history: [{ d: "2026/10/20", v: "normal", m: 12.5 }] },
+  "base4-4": { name: "Pikachu", illustrator: "Mitsuhiro Arita", history: [{ d: "2026/10/20", v: "normal", m: 4 }] },
+  "base1-2": { name: "Blastoise", illustrator: "Mitsuhiro Arita", history: [{ d: "2026/10/20", v: "holofoil", m: 80 }] },
   "base1-15": { name: "Venusaur", illustrator: "Ken Sugimori", history: [{ d: "2026/10/20", v: "holofoil", m: 70 }] },
   "swsh1-1": { name: "Professor Juniper", history: [{ d: "2026/10/20", v: "normal", m: 3 }] },
   "base1-99": { name: "Pikachu", history: [{ d: "2026/10/20", v: "normal", m: 0 }] }
@@ -349,7 +349,7 @@ note(touched.ok && touched.name === "Pikachu" && touched.undo && touched.gone, "
 await page.locator(".tabs [data-tab='sets']").click();
 await page.locator("#modeArtists").click();
 const coverage = await page.locator("#browseNote").innerText();
-note(/names an illustrator on 1 of 7 cards/.test(coverage), "illustrator directory states coverage", coverage);
+note(/names an illustrator on 5 of 7 cards/.test(coverage), "illustrator directory states coverage", coverage);
 await page.locator("#browseFind").fill("ken");
 await page.locator("#browseList [data-browse='Ken Sugimori']").click();
 await page.waitForSelector(".price-tile");
