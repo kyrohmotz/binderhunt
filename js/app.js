@@ -678,11 +678,15 @@ function progressOf(list){
   const owned = cards.filter(c => c && ownedIds.has(c.id)).length;
   return { owned, total, label: total ? progressLabel(owned, total) : "Ready for cards" };
 }
+function ringShown(owned, total){
+  const pct = total > 0 ? Math.max(0, Math.min(100, Math.round((owned / total) * 100))) : 0;
+  return total > 0 && Number.isFinite(pct) ? pct + "%" : "–";
+}
 function ringMarkup(owned, total){
   const pct = total > 0 ? Math.max(0, Math.min(100, Math.round((owned / total) * 100))) : 0;
   const c = 2 * Math.PI * 15.5;
   const dash = total > 0 && Number.isFinite(pct) ? (pct / 100) * c : 0;
-  const shown = total > 0 && Number.isFinite(pct) ? pct + "%" : "–";
+  const shown = ringShown(owned, total);
   const done = total > 0 && owned >= total;
   return `<svg class="ring${done ? " done" : ""}" viewBox="0 0 42 42" aria-hidden="true"><circle class="ring-track" cx="21" cy="21" r="15.5"></circle><circle class="ring-val" cx="21" cy="21" r="15.5" stroke-dasharray="${dash.toFixed(2)} ${c.toFixed(2)}"></circle><text x="21" y="21" text-anchor="middle" dominant-baseline="central">${esc(shown)}</text></svg>`;
 }
@@ -3500,8 +3504,10 @@ function paintRail(){
     btn.style.setProperty("--cover", coverColor(b.color));
     const hunting = binderState.discoveryId === b.id;
     if (hunting) btn.classList.add("is-hunting");
-    btn.setAttribute("aria-label", b.name + (hunting ? ", hunting into this binder" : "") + ", " + p.label);
-    btn.innerHTML = `<span class="rail-binder-copy"><b>${esc(b.name)}</b><span class="fine">${esc((hunting ? "Hunting · " : "") + p.label)}</span></span>${ringMarkup(p.owned, p.total)}`;
+    const fine = (hunting ? "Hunting · " : "") + p.label;
+    const shown = ringShown(p.owned, p.total);
+    btn.setAttribute("aria-label", [b.name, fine, shown].join(", "));
+    btn.innerHTML = `<span class="rail-binder-copy"><b>${esc(b.name)}</b><span class="fine">${esc(fine)}</span></span>${ringMarkup(p.owned, p.total)}`;
     btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); showTab("binders"); };
     host.append(btn);
   });
@@ -4134,7 +4140,15 @@ function renderBinders(){
     if (theme.kind !== "none") countBits.push(themeLabel(theme));
     const charm = b.charm === "toad" ? `<span class="cover-charm">${toad()}</span>` : b.charm === "sticker" ? `<span class="cover-charm star" aria-hidden="true">★</span>` : "";
     btn.dataset.progress = p.owned + "/" + p.total;
-    btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board">${peekMarkup(b.cards, "cover-peek")}<b class="binder-name">${esc(b.name)}</b>${b.cards.length ? ringMarkup(p.owned, p.total) : ""}<span class="binder-count">${esc(countBits.join(" · "))}</span></span><span class="binder-fore"></span></span>${charm}<span class="sr-only">${esc(b.name + (hunting ? ". Hunting into this binder." : "") + (theme.kind !== "none" ? " " + themeLabel(theme) + "." : "") + " " + (p.total ? p.owned + " of " + p.total + " owned" : "No cards yet"))}</span>`;
+    const countLine = countBits.join(" · ");
+    const pct = b.cards.length ? ringShown(p.owned, p.total) : "";
+    const coverBits = [b.name];
+    if (pct) coverBits.push(pct);
+    coverBits.push(countLine);
+    if (b.charm === "sticker") coverBits.push("★");
+    const coverName = coverBits.join(", ");
+    btn.setAttribute("aria-label", coverName);
+    btn.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board">${peekMarkup(b.cards, "cover-peek")}<b class="binder-name">${esc(b.name)}</b>${b.cards.length ? ringMarkup(p.owned, p.total) : ""}<span class="binder-count">${esc(countLine)}</span></span><span class="binder-fore"></span></span>${charm}<span class="sr-only">${esc(coverName)}</span>`;
     btn.onclick = () => { binderView = { kind:"binder", id:b.id }; flipPage = 0; binderOpenAnim = true; if (settings.haptics) haptic(10); renderBinders(); };
     const slot = document.createElement("div");
     slot.className = "cover-slot";
