@@ -3397,7 +3397,7 @@ function paintContext(){
   context.textContent = label;
   if (tab === "hunt") context.setAttribute("aria-label", "Open filters. Showing " + label);
   else if (tab === "sets" && browseMode && browseMode.name) context.setAttribute("aria-label", label + ", " + (browseMode.kind === "illustrator" ? "All illustrators" : "All Pokémon"));
-  else if (tab === "sets" && browseMode) context.setAttribute("aria-label", "Back to sets");
+  else if (tab === "sets" && browseMode) context.setAttribute("aria-label", label + ", Back to sets");
   else if (tab === "sets" && setView) context.setAttribute("aria-label", "Back to all sets");
   else if (tab === "binders" && binderView) context.setAttribute("aria-label", "Back to binders");
   else context.setAttribute("aria-label", label);
