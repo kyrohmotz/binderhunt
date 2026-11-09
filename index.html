@@ -43,13 +43,17 @@ if (matchMedia("(min-width: 1024px)").matches) {
 <link rel="preconnect" href="https://api.tcgdex.net" crossorigin>
 <link rel="preconnect" href="https://assets.tcgdex.net" crossorigin>
 <script>
-/* Start the catalog and the first opening-set page while the app script is still downloading.
-   The warmed URLs match getJson() exactly. A saved hunt, a shared link, or a card link skips the deck warm. */
+/* Start the catalog and the first opening card while the document is still parsing.
+   The warmed URLs match getJson() exactly. A saved hunt, a shared link, or a card link skips the deck warm.
+   Sets, types, and rarities stay low priority. The first low.webp is painted into #deck from this script,
+   and the app scripts wait until that image has loaded so they do not take its bandwidth. */
 (function () {
   var base = "https://api.tcgdex.net/v2/en";
   var warm = Object.create(null);
-  function go(url) {
-    var job = fetch(url, { credentials: "omit" }).then(function (res) {
+  function go(url, priority) {
+    var init = { credentials: "omit" };
+    if (priority) init.priority = priority;
+    var job = fetch(url, init).then(function (res) {
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
     });
@@ -57,9 +61,85 @@ if (matchMedia("(min-width: 1024px)").matches) {
     warm[url] = job;
     return job;
   }
-  go(base + "/sets");
-  go(base + "/types");
-  go(base + "/rarities");
+  go(base + "/sets", "low");
+  go(base + "/types", "low");
+  go(base + "/rarities", "low");
+  function loadApp() {
+    if (loadApp.started) return;
+    loadApp.started = true;
+    function goScripts() {
+      ["css/binder.css", "css/share.css", "css/themes.css", "css/daily.css"].forEach(function (href) {
+        var link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = href;
+        document.head.appendChild(link);
+      });
+      ["js/binder-turn.js", "js/card-inspect.js", "js/gems.js", "js/share.js", "js/themed-binders.js", "js/app.js", "js/daily-core.js", "js/daily-ui.js"].forEach(function (src) {
+        var s = document.createElement("script");
+        s.src = src;
+        s.async = false;
+        document.head.appendChild(s);
+      });
+    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", goScripts, { once: true });
+    else goScripts();
+  }
+  function placeEarly() {
+    var img = window.__bhEarlyArt;
+    var deck = document.getElementById("deck");
+    if (!img || !deck || (img.closest && img.closest("#deck"))) return;
+    if (deck.querySelector(".card:not([data-bh-early])")) return;
+    var art = document.createElement("div");
+    art.className = "art";
+    var frame = document.createElement("div");
+    frame.className = "frame";
+    var shell = document.createElement("div");
+    shell.className = "card";
+    shell.setAttribute("data-bh-early", "1");
+    var like = document.createElement("span");
+    like.className = "stamp like";
+    like.textContent = "WISH!";
+    var nope = document.createElement("span");
+    nope.className = "stamp nope";
+    nope.textContent = "PASS";
+    art.appendChild(img);
+    frame.appendChild(art);
+    frame.appendChild(like);
+    frame.appendChild(nope);
+    shell.appendChild(frame);
+    deck.appendChild(shell);
+    deck.querySelectorAll(".skel").forEach(function (node) { node.remove(); });
+  }
+  window.__bhPlaceEarly = placeEarly;
+  function mountEarly(card) {
+    var img = window.__bhEarlyArt;
+    if (img) {
+      if (card.name && !img.alt) img.alt = String(card.name);
+      if (img.getAttribute("data-card-id") !== card.id) {
+        img.setAttribute("data-card-id", card.id);
+        var next = card.image + "/low.webp";
+        if (img.getAttribute("src") !== next) img.src = next;
+      }
+      placeEarly();
+      return;
+    }
+    img = document.createElement("img");
+    img.width = 245;
+    img.height = 342;
+    img.alt = card.name ? String(card.name) : "";
+    img.decoding = "async";
+    img.draggable = false;
+    img.setAttribute("fetchpriority", "high");
+    try { img.fetchPriority = "high"; } catch (e) {}
+    img.setAttribute("data-bh-early", "1");
+    img.setAttribute("data-card-id", card.id);
+    img.addEventListener("load", loadApp, { once: true });
+    img.addEventListener("error", loadApp, { once: true });
+    img.src = card.image + "/low.webp";
+    window.__bhEarlyArt = img;
+    if (img.complete) loadApp();
+    placeEarly();
+  }
   var narrowed = false;
   try {
     var filters = JSON.parse(localStorage.getItem("bh.filters.v3") || "null") || {};
@@ -68,36 +148,26 @@ if (matchMedia("(min-width: 1024px)").matches) {
   } catch (e) {}
   if (/[?&](card|share)=/.test(location.search)) narrowed = true;
   if (!narrowed) {
+    /* The filtered Surging Sparks page starts at this card. Paint it now; the page response retargets the same node if the first card differs. */
+    mountEarly({ id: "sv08-192", name: "", image: "https://assets.tcgdex.net/en/sv/sv08/192" });
     var rarity = "Special illustration rare|Illustration rare|Hyper rare|Mega Hyper Rare|Secret Rare|Shiny Ultra Rare|Shiny rare VMAX|Holo Rare VMAX|Holo Rare VSTAR|Radiant Rare|Amazing Rare|Rare Holo|Holo Rare|Rare Holo LV.X|Rare PRIME|LEGEND|Classic Collection|Shiny rare|Ultra Rare";
     var page = base + "/cards?set=eq:" + encodeURIComponent("sv08") + "&rarity=eq:" + encodeURIComponent(rarity) + "&pagination:page=1&pagination:itemsPerPage=24";
-    go(page).then(function (list) {
-      if (!Array.isArray(list)) return;
+    go(page, "high").then(function (list) {
+      if (!Array.isArray(list)) { loadApp(); return; }
       var shown = [];
       for (var i = 0; i < list.length && shown.length < 3; i++) {
         if (list[i] && list[i].id && list[i].image) shown.push(list[i]);
       }
-      if (shown[0]) go(base + "/cards/" + encodeURIComponent(shown[0].id));
-      shown.forEach(function (card, n) {
-        var link = document.createElement("link");
-        link.rel = "preload";
-        link.as = "image";
-        link.href = card.image + "/low.webp";
-        link.setAttribute("fetchpriority", n === 0 ? "high" : "low");
-        document.head.appendChild(link);
-      });
-    }).catch(function () {});
-  }
+      if (shown[0]) {
+        mountEarly(shown[0]);
+        go(base + "/cards/" + encodeURIComponent(shown[0].id), "high");
+      } else loadApp();
+    }).catch(function () { loadApp(); });
+    setTimeout(loadApp, 8000);
+  } else loadApp();
   window.__bhWarm = warm;
 })();
 </script>
-<script src="js/binder-turn.js" defer></script>
-<script src="js/card-inspect.js" defer></script>
-<script src="js/gems.js" defer></script>
-<script src="js/share.js" defer></script>
-<script src="js/themed-binders.js" defer></script>
-<script src="js/app.js" defer fetchpriority="high"></script>
-<script src="js/daily-core.js" defer fetchpriority="low"></script>
-<script src="js/daily-ui.js" defer fetchpriority="low"></script>
 <style>
 /* Sniglet ExtraBold is the closest free match to the Two Toads wordmark (heavy, round, even stroke). Same file serves 600–800 so buttons stay the real cut, not a faux bold. */
 @font-face{font-family:Sniglet;src:url("fonts/sniglet-800.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap}
@@ -154,6 +224,7 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 .view{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column}
 .view[hidden]{display:none !important}
 #deck{position:relative;flex:1;min-height:0;margin:6px auto 0;width:min(100%,420px);touch-action:none;overflow:hidden;background:var(--paper);container-type:size}
+#deck > .card[data-bh-early]{z-index:12}
 .card{position:absolute;left:0;right:0;bottom:18px;margin-inline:auto;width:min(calc(100% - 12px),calc((100cqh - 26px) * 63 / 88));aspect-ratio:63/88;height:auto;max-height:calc(100% - 22px);display:flex;flex-direction:column;user-select:none;touch-action:none;transform-origin:center bottom;contain:layout style}
 .card.dragging,.card.leaving{will-change:transform}
 .frame{flex:1;min-height:0;margin:0 auto;width:100%;height:100%;aspect-ratio:63/88;background:var(--paper-2);border:2.5px solid var(--ink);border-radius:22px;box-shadow:3px 3px 0 var(--ink);overflow:hidden;position:relative;display:grid;place-items:center}
@@ -844,18 +915,12 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 }
 </style>
 <link rel="stylesheet" href="css/polish.css">
+<noscript>
 <link rel="stylesheet" href="css/binder.css">
 <link rel="stylesheet" href="css/share.css">
 <link rel="stylesheet" href="css/themes.css">
-<link rel="stylesheet" href="css/daily.css" media="print" data-async-css="1">
-<script>
-document.querySelectorAll("link[data-async-css]").forEach(function (link) {
-  function apply() { link.media = "all"; link.removeAttribute("data-async-css"); }
-  if (link.sheet) apply();
-  else link.addEventListener("load", apply);
-});
-</script>
-<noscript><link rel="stylesheet" href="css/daily.css"></noscript>
+<link rel="stylesheet" href="css/daily.css">
+</noscript>
 </head>
 <body>
 <div id="live" class="sr-only" aria-live="polite"></div>
@@ -925,6 +990,7 @@ document.querySelectorAll("link[data-async-css]").forEach(function (link) {
       <div class="hunt-cluster">
       <div class="deck-slot">
       <div id="deck" data-status="loading" aria-busy="true" tabindex="-1" role="region" aria-roledescription="swipe deck" aria-label="Card deck, loading" aria-describedby="deckHelp"></div>
+      <script>if (window.__bhPlaceEarly) window.__bhPlaceEarly();</script>
       </div>
       <div id="deckCaption" class="deckcap" hidden>
         <div class="cap"><b id="capName"></b><small id="capSub"></small></div>

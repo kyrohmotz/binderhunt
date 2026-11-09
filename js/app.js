@@ -1216,7 +1216,9 @@ async function getJson(url, opts){
     };
     if (signal.aborted) { finish(); throw abortError(signal); }
     try {
-      const res = await fetch(url, { signal });
+      const init = { signal };
+      if (opts && opts.priority) init.priority = opts.priority;
+      const res = await fetch(url, init);
       if (res.status === 429 || res.status >= 500) {
         last = new Error("HTTP " + res.status);
         touchBusy();
@@ -1355,7 +1357,7 @@ function loadMeta(){
   if (metaPromise) return metaPromise;
   metaPromise = (async () => {
     const [sets, types, rarities] = await Promise.all([
-      getJson(TCGDEX + "/sets"), getJson(TCGDEX + "/types"), getJson(TCGDEX + "/rarities")
+      getJson(TCGDEX + "/sets", { priority:"low" }), getJson(TCGDEX + "/types", { priority:"low" }), getJson(TCGDEX + "/rarities", { priority:"low" })
     ]);
     const byId = new Map();
     (sets || []).forEach(s => { if (s && s.id && !isPocketId(s.id)) byId.set(s.id, s); });
@@ -2281,7 +2283,10 @@ async function pump(my){
           const card = await hydrate(b, { hunt:true });
           if (pumpStale(epoch, my)) return { brief:b, stale:true };
           fetchFails.delete(b.id);
-          if (card && !pile.length && !placed.size && !(b && b.spice) && keep(card)) {
+          const earlyNode = window.__bhEarlyArt;
+          const earlyId = earlyNode && earlyNode.isConnected ? earlyNode.getAttribute("data-card-id") : "";
+          const earlyStillOut = !!(earlyId && b.id !== earlyId && !placed.has(earlyId) && batch.some(item => item && item.id === earlyId));
+          if (card && !pile.length && !placed.size && !(b && b.spice) && keep(card) && !earlyStillOut) {
             placed.add(card.id);
             pile.push(card);
             matched++;
@@ -2358,6 +2363,7 @@ async function pump(my){
   }
   if (!paused && !streamDone && pile.length < 4 && (holdFeed || briefs.length || priced || effort < ceiling || !capped)) setTimeout(() => pump(my), 30);
 }
+let keepOpeningArt = true;
 function restart(opts){
   spice = !!(opts && opts.keepSpice);
   generation++;
@@ -2378,7 +2384,12 @@ function restart(opts){
   busyHold = false;
   setListHoldUntil = 0;
   huntBatch = [];
-  deck.innerHTML = "";
+  const keepArt = keepOpeningArt;
+  keepOpeningArt = false;
+  [...deck.childNodes].forEach(node => {
+    if (keepArt && node.nodeType === 1 && node.classList && node.classList.contains("card") && node.hasAttribute("data-bh-early")) return;
+    node.remove();
+  });
   delete deck.dataset.huntEnd;
   showSkeleton();
   paintChips(); paintContext(); paintDiscovery(); paintCount();
@@ -2420,18 +2431,66 @@ function artUrls(card, large){
    With large set, the small preview shows at once (swiping stays instant)
    and the full-size file replaces it as soon as it has loaded and decoded. */
 const sharpLoaded = new Set();
+function earlyImgFor(img, card, url){
+  if (!img || !card) return false;
+  const id = img.getAttribute("data-card-id");
+  if (id && id === card.id) return true;
+  const src = img.getAttribute("src") || "";
+  return !!url && src === url;
+}
+/* The head script paints the first low.webp before app.js. Reuse that node.
+   Assigning src again, or swapping in a sharp file, would move LCP. */
+function adoptArt(img, card, urls, opts){
+  img.alt = altText(card || {});
+  img.draggable = false;
+  if (!img.getAttribute("width")) img.width = 245;
+  if (!img.getAttribute("height")) img.height = 342;
+  if (!img.decoding) img.decoding = "async";
+  try {
+    const want = (opts && opts.priority) || "high";
+    if (img.fetchPriority !== want) img.fetchPriority = want;
+  } catch (e) {}
+  if (!img.dataset.wired) {
+    img.dataset.wired = "1";
+    img.addEventListener("dragstart", e => e.preventDefault());
+  }
+  let at = 0;
+  img.onerror = () => {
+    at++;
+    if (at < urls.length) { img.src = urls[at]; return; }
+    img.replaceWith(opts && opts.missing ? opts.missing(card) : placeholder(card));
+  };
+  const src = img.getAttribute("src") || "";
+  if (!src) img.src = urls[0];
+  else if (opts && opts.deck && urls[0] && !/\/low\.webp(\?|$)/.test(src)) img.src = urls[0];
+  img.removeAttribute("data-bh-early");
+}
 function paintArt(host, card, opts){
-  host.replaceChildren();
   const large = !!(opts && opts.large);
+  const deckMode = !!(opts && opts.deck);
   const quick = knownArt(card);
   const sharp = large ? artUrls(card, true).filter(u => !/\/low\.webp$/.test(u) && !/images\.pokemontcg\.io\/[^/]+\/[^/_]+\.png$/.test(u)) : [];
   const missing = () => (opts && opts.missing ? opts.missing(card) : placeholder(card));
-  /* Already sharp in this session: skip the preview step. The swipe deck
-     stays on the small scan until the hunt is idle, so the first paint is
-     the preloaded file and a later swap does not move it. */
-  const ready = sharp.find(u => sharpLoaded.has(u));
-  const urls = ready ? [ready].concat(quick.filter(u => u !== ready)) : quick.length ? quick : sharp;
-  if (!urls.length) { host.append(missing()); return; }
+  /* The swipe deck stays on low.webp. A later sharp swap would move LCP. */
+  const ready = !deckMode && sharp.find(u => sharpLoaded.has(u));
+  let urls = ready ? [ready].concat(quick.filter(u => u !== ready)) : quick.length ? quick : sharp;
+  if (deckMode) {
+    const low = urls.filter(u => /\/low\.webp$/.test(u));
+    if (low.length) urls = low;
+  }
+  if (!urls.length) { host.replaceChildren(); host.append(missing()); return; }
+  const prior = host.querySelector(":scope > img");
+  if (prior && deckMode && earlyImgFor(prior, card, urls[0])) {
+    adoptArt(prior, card, urls, opts);
+    return;
+  }
+  const parked = window.__bhEarlyArt;
+  if (deckMode && parked && earlyImgFor(parked, card, urls[0]) && !host.contains(parked)) {
+    adoptArt(parked, card, urls, opts);
+    host.replaceChildren(parked);
+    return;
+  }
+  host.replaceChildren();
   const img = document.createElement("img");
   img.alt = altText(card || {});
   img.width = 245;
@@ -2439,7 +2498,7 @@ function paintArt(host, card, opts){
   img.draggable = false;
   img.decoding = opts && opts.priority === "high" ? "auto" : "async";
   try { img.fetchPriority = (opts && opts.priority) || "auto"; } catch (e) {}
-  if ((opts && opts.lazy) || (opts && opts.deck && opts.priority !== "high")) img.loading = "lazy";
+  if ((opts && opts.lazy) || (deckMode && opts && opts.priority !== "high")) img.loading = "lazy";
   img.addEventListener("dragstart", e => e.preventDefault());
   let at = 0;
   img.onerror = () => {
@@ -2449,7 +2508,7 @@ function paintArt(host, card, opts){
   };
   img.src = urls[0];
   host.append(img);
-  if (!large || ready || (opts && opts.deck)) return;
+  if (!large || ready || deckMode) return;
   let i = 0;
   const next = () => {
     const url = sharp[i++];
@@ -2565,7 +2624,12 @@ function refreshPocketPrice(card){
     hit.setAttribute("aria-label", altText(card) + (owned ? ", owned" : ", wanted") + (price ? ", " + price : "") + dropNote);
   });
 }
-function topCard(){ const cards = deck.querySelectorAll(".card"); return cards[cards.length - 1] || null; }
+function topCard(){
+  const cards = deck.querySelectorAll(".card");
+  const top = cards[cards.length - 1] || null;
+  if (top && !top.card && top.hasAttribute("data-bh-early")) return null;
+  return top;
+}
 const deckWarmed = new Set();
 function warmArt(url, priority){
   if (!url || deckWarmed.has(url)) return;
@@ -2592,9 +2656,10 @@ function armDeckSharpen(){
   if (deckSharpenArmed) return;
   deckSharpenArmed = true;
   const go = () => sharpenDeck();
+  /* No timer. A sharp swap while the trace is still open becomes the new LCP.
+     The deck stays on low.webp until the person actually touches it. */
   window.addEventListener("pointerdown", go, { once:true, passive:true });
   window.addEventListener("keydown", go, { once:true });
-  setTimeout(go, 12000);
 }
 function warmDeck(){
   pile.slice(1, 4).forEach(card => {
@@ -2670,10 +2735,59 @@ function syncActs(){
   if (deck) deck.tabIndex = ready ? 0 : -1;
   if (ready) armDeckSharpen();
 }
+function earlyCardMatches(el, card){
+  const img = el && el.querySelector("img");
+  if (!img || !card) return false;
+  return earlyImgFor(img, card, knownArt(card).find(u => /\/low\.webp$/.test(u)) || "");
+}
+function dressDeckCard(el, card){
+  let frame = el.querySelector(":scope > .frame");
+  if (!frame) {
+    frame = document.createElement("div");
+    frame.className = "frame";
+    el.append(frame);
+  }
+  if (!frame.querySelector(":scope > .art")) {
+    const art = document.createElement("div");
+    art.className = "art";
+    frame.prepend(art);
+  }
+  if (!frame.querySelector(":scope > .stamp.like")) {
+    const like = document.createElement("span");
+    like.className = "stamp like";
+    like.textContent = discoveryBinder() ? "BINDER!" : "WISH!";
+    frame.append(like);
+  }
+  if (!frame.querySelector(":scope > .stamp.nope")) {
+    const nope = document.createElement("span");
+    nope.className = "stamp nope";
+    nope.textContent = "PASS";
+    frame.append(nope);
+  }
+  if (card && card.spice && !frame.querySelector(":scope > .surprise")) {
+    const surprise = document.createElement("span");
+    surprise.className = "surprise";
+    surprise.textContent = "surprise pick";
+    frame.append(surprise);
+    ensureLabelFont();
+  }
+  if (card && card.gemHint && !frame.querySelector(":scope > .gem-hint")) {
+    const gem = document.createElement("span");
+    gem.className = "gem-hint";
+    gem.textContent = card.gemHint;
+    frame.append(gem);
+    ensureLabelFont();
+  }
+}
 function renderDeck(){
   delete deck.dataset.huntEnd;
   if (pile.length) busyHold = false;
   if (!pile.length && !pumpError && !streamDone && (busyHold || catalogBusy)) {
+    if (deck.querySelector(":scope > .card[data-bh-early]")) {
+      busyHold = true;
+      syncActs();
+      return;
+    }
     busyHold = true;
     if (deck.dataset.status !== "busy") {
       deck.dataset.status = "busy";
@@ -2688,8 +2802,17 @@ function renderDeck(){
   deck.querySelectorAll(".skel,.empty-state").forEach(n => n.remove());
   warmDeck();
   const have = new Set([...deck.querySelectorAll(".card")].map(el => el.card && el.card.id));
+  const early = deck.querySelector(":scope > .card[data-bh-early]");
   pile.slice(0, 3).forEach((card, index) => {
     if (have.has(card.id)) return;
+    if (early && !early.card && index === 0 && earlyCardMatches(early, card)) {
+      early.card = card;
+      early.removeAttribute("data-bh-early");
+      dressDeckCard(early, card);
+      paintArt(early.querySelector(".art"), card, { large:true, deck:true, priority:"high" });
+      bindDrag(early);
+      return;
+    }
     const el = document.createElement("div");
     el.className = "card";
     el.draggable = false;
@@ -2702,6 +2825,7 @@ function renderDeck(){
     deck.prepend(el);
     bindDrag(el);
   });
+  if (early && early.isConnected && !early.card) early.remove();
   layoutStack();
   if (!pile.length && !deck.querySelector(".card")) {
     const openHunt = !filtersActive() && !discoveryBinder();
@@ -3987,10 +4111,9 @@ function renderBinders(){
   const wantedN = Math.max(0, wish.length - ownedN);
   const dropped = droppedCount(wish);
   const cardsWord = n => n + (n === 1 ? " card" : " cards");
-  const wishLabel = "Wishlist" + (wish.length ? ", " + cardsWord(wish.length) : ", nothing saved") + (dropped ? ", " + dropped + " dropped" : "");
   const wishMeta = wish.length ? cardsWord(wish.length) + (total ? " · " + priceText(total, "USD") : "") : "Nothing saved yet";
   const wishSub = wish.length ? (wantedN ? wantedN + " still to find" : "You have every card") + (ownedN ? " · " + ownedN + " got" : "") : "Swipe right on a card and it lands here.";
-  root.innerHTML = `<div class="wish-slot"><button class="wish-row" id="openWish" type="button" aria-label="${esc(wishLabel)}">${peekMarkup(wish, "wish-peek")}<span class="wish-copy"><span class="eyebrow">All saved cards</span><b>Wishlist</b><span class="wish-meta">${esc(wishMeta)}</span><span class="fine">${esc(wishSub)}</span></span>${droppedCountMarkup(dropped)}<span class="wish-go" aria-hidden="true">Open →</span></button><button class="chip wish-share" id="shareWish" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button></div>
+  root.innerHTML = `<div class="wish-slot"><button class="wish-row" id="openWish" type="button">${peekMarkup(wish, "wish-peek")}<span class="wish-copy"><span class="eyebrow">All saved cards</span><b>Wishlist</b><span class="wish-meta">${esc(wishMeta)}</span><span class="fine">${esc(wishSub)}</span></span>${droppedCountMarkup(dropped)}<span class="wish-go" aria-hidden="true">Open →</span></button><button class="chip wish-share" id="shareWish" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button></div>
     <div class="shelf-head"><h2 class="shelf-title">Your binders</h2><p class="fine">Right-swipe always lands on your wishlist. A themed binder is another home for the same card.</p></div>
     <div class="shelf-scene"><div class="shelf" id="shelf"></div></div>`;
   const shelf = document.getElementById("shelf");
@@ -4031,7 +4154,7 @@ function renderBinders(){
   add.type = "button";
   add.className = "cover add";
   add.style.setProperty("--cover", "#F1F1E4");
-  add.innerHTML = `<span class="binder-book" aria-hidden="true"><span class="binder-spine"></span><span class="binder-board"><span class="cover-add-label">+ New binder<small>${binderState.binders.length ? "Another set, Pokémon or theme" : "One for a set, a Pokémon, or anything you collect"}</small></span></span><span class="binder-fore"></span></span>`;
+  add.innerHTML = `<span class="binder-book"><span class="binder-spine" aria-hidden="true"></span><span class="binder-board"><span class="cover-add-label">+ New binder<small>${binderState.binders.length ? "Another set, Pokémon or theme" : "One for a set, a Pokémon, or anything you collect"}</small></span></span><span class="binder-fore" aria-hidden="true"></span></span>`;
   add.onclick = openBinderForm;
   const addSlot = document.createElement("div");
   addSlot.className = "cover-slot";
