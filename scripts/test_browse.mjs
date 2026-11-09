@@ -268,6 +268,11 @@ const deckCard = await page.evaluate(() => {
     pile: pile.slice(0, 4).map(card => card.id)
   };
 });
+await page.waitForFunction(() => {
+  const node = [...document.querySelectorAll("#deck .card")].find(el => el.card && el.card.id === "base1-4");
+  const img = node && node.querySelector("img");
+  return img && img.complete && img.naturalWidth > 40;
+}, null, { timeout: 15000 });
 const cachedDeal = await page.evaluate(() => {
   const card = pile.find(item => item && item.id === "base1-4");
   const market = card && card.variants && card.variants[0] && card.variants[0].market;
