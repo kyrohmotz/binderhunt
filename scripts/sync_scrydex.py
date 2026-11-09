@@ -674,6 +674,13 @@ def fetch_card(card_id: str, headers: dict, now: datetime) -> tuple[dict, bool, 
     return record, stop, credits
 
 
+def preserve_illustrator(record: dict, previous) -> dict:
+    """Keep a TCGdex illustrator when a Scrydex refresh replaces the record."""
+    if isinstance(previous, dict) and isinstance(previous.get("illustrator"), str):
+        record["illustrator"] = previous["illustrator"]
+    return record
+
+
 def write_cache(cache: dict, path: Path | None = None) -> None:
     path = CACHE_PATH if path is None else path
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -888,7 +895,7 @@ def sync(now: datetime | None = None) -> int:
             card_credits += credits
             spent_month += credits
             add_usage(usage, month, credits, now)
-            cards[card_id] = record
+            cards[card_id] = preserve_illustrator(record, cards.get(card_id))
             refreshed += 1
             if record.get("missing"):
                 print(f"  {card_id}: not found, credits={credits}")

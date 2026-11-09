@@ -74,7 +74,7 @@ if (matchMedia("(min-width: 1024px)").matches) {
         link.href = href;
         document.head.appendChild(link);
       });
-      ["js/binder-turn.js", "js/card-inspect.js", "js/gems.js", "js/share.js", "js/themed-binders.js", "js/app.js", "js/daily-core.js", "js/daily-ui.js"].forEach(function (src) {
+      ["js/binder-turn.js", "js/card-inspect.js", "js/gems.js", "js/share.js", "js/themed-binders.js", "js/browse.js", "js/app.js", "js/daily-core.js", "js/daily-ui.js"].forEach(function (src) {
         var s = document.createElement("script");
         s.src = src;
         s.async = false;
@@ -144,7 +144,7 @@ if (matchMedia("(min-width: 1024px)").matches) {
   try {
     var filters = JSON.parse(localStorage.getItem("bh.filters.v3") || "null") || {};
     var binders = JSON.parse(localStorage.getItem("bh.binders.v1") || "null") || {};
-    narrowed = !!(filters.set || filters.type || filters.era || filters.gem || filters.graded || filters.pricePreset || filters.min != null || filters.max != null || (filters.names && filters.names.length) || (filters.rarities && filters.rarities.length) || binders.discoveryId);
+    narrowed = !!(filters.set || filters.type || filters.era || filters.artist || filters.gem || filters.graded || filters.pricePreset || filters.min != null || filters.max != null || (filters.names && filters.names.length) || (filters.rarities && filters.rarities.length) || binders.discoveryId);
   } catch (e) {}
   if (/[?&](card|share)=/.test(location.search)) narrowed = true;
   if (!narrowed) {

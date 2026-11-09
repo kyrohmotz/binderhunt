@@ -134,9 +134,13 @@
     const s = String(species || "").toLowerCase().trim();
     if (!s) return false;
     if (n === s) return true;
-    if (n.startsWith(s + " ") || n.startsWith(s + "-")) return true;
-    if (n.endsWith(" " + s)) return true;
-    if (n.includes(" " + s + " ")) return true;
+    const edges = [" ", "-"];
+    for (let i = 0; i < edges.length; i++) {
+      if (n.startsWith(s + edges[i]) || n.endsWith(edges[i] + s)) return true;
+      for (let j = 0; j < edges.length; j++) {
+        if (n.includes(edges[i] + s + edges[j])) return true;
+      }
+    }
     return false;
   }
 

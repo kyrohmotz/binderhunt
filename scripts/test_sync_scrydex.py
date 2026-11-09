@@ -943,6 +943,16 @@ class WorkflowGuardTests(unittest.TestCase):
 
 
 class CacheWriteTests(unittest.TestCase):
+    def test_refresh_keeps_existing_illustrator(self):
+        kept = sync.preserve_illustrator(
+            {"name": "Venusaur", "history": []},
+            {"name": "Venusaur", "illustrator": "Ken Sugimori", "history": []},
+        )
+        self.assertEqual(kept["illustrator"], "Ken Sugimori")
+        self.assertEqual(kept["history"], [])
+        fresh = sync.preserve_illustrator({"name": "New"}, {"name": "Old"})
+        self.assertNotIn("illustrator", fresh)
+
     def test_write_cache_roundtrip(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "scrydex.json"
