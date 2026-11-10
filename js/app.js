@@ -448,7 +448,7 @@ function loadSettings(){
     return { sound:!!raw.sound, haptics:raw.haptics !== false, reduce:raw.reduce === "on" || raw.reduce === "off" ? raw.reduce : "auto", currency:raw.currency === "EUR" ? "EUR" : "USD" };
   } catch (e) { return blank; }
 }
-function saveWish(){ try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {} paintContext(); paintCount(); if (tab === "binders") renderBinders(); if (tab === "sets") renderSets(); }
+function saveWish(){ try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {} paintContext(); paintCount(); if (tab === "binders") renderBinders(); if (tab === "sets") renderSets(); if (tab === "value" && window.BinderValueUI) window.BinderValueUI.refresh(); }
 function saveBinders(){ try { localStorage.setItem(binderStorageKey(), JSON.stringify(binderState)); } catch (e) {} if (tab === "binders") renderBinders(); paintDiscovery(); paintRail(); }
 function saveFilters(){
   if (filters.set) rememberedSet = "";
@@ -548,6 +548,7 @@ function saveOwned(){
   const payload = { v:1, ids:[...ownedIds], sets, celebrated:[...celebrated].slice(-500), seeded:!ownedNeedsSeed };
   try { localStorage.setItem(OWNED_KEY, JSON.stringify(payload)); } catch (e) {}
   paintRail();
+  if (tab === "value" && window.BinderValueUI) window.BinderValueUI.refresh();
 }
 function blankLog(){ return { v:1, days:[], events:[] }; }
 function loadLog(){
@@ -1416,6 +1417,7 @@ function applyScrydex(){
   if (busy) { setTimeout(applyScrydex, 160); return; }
   if (tab === "binders") renderBinders();
   else paintRail();
+  if (tab === "value" && window.BinderValueUI) window.BinderValueUI.refresh();
 }
 /* The price cache is about 26MB. Parsing it on the page thread freezes swipes,
    and downloading it with the first card blows the load. A worker parses it
@@ -3169,8 +3171,9 @@ function syncInert(){
 function blocking(){
   const prompt = document.getElementById("dropPrompt");
   const daily = document.getElementById("viewDaily");
+  const value = document.getElementById("viewValue");
   const showcase = document.getElementById("showcase");
-  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (prompt && !prompt.hidden) || (showcase && !showcase.hidden) || (daily && !daily.hidden) || (!profileEl.hidden && !wide());
+  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (prompt && !prompt.hidden) || (showcase && !showcase.hidden) || (daily && !daily.hidden) || (value && !value.hidden) || (!profileEl.hidden && !wide());
 }
 function keepSwipeFocus(trigger){
   const box = document.getElementById("hapticSwitch");
@@ -3381,6 +3384,7 @@ function paintContext(){
   }
   else if (tab === "binders") label = binderView ? (binderView.kind === "wish" ? "Wishlist" : (binderState.binders.find(x => x.id === binderView.id) || {}).name || "Binders") : "Binders";
   else if (tab === "daily") label = "Today's Drop";
+  else if (tab === "value") label = "Value";
   else if (b) label = b.name;
   else if (filters.gem && filters.set) label = "Gemfinder · " + (setName(filters.set) || "Set");
   else if (filters.gem) label = "Gemfinder";
@@ -3415,6 +3419,7 @@ function paintSide(){
   if (tab === "sets") renderSetSide();
   else if (tab === "binders") renderBinderSide();
   else if (tab === "daily") renderDailySide();
+  else if (tab === "value") renderValueSide();
   else paintDeckSummary(currentTop());
 }
 function setSideStats(){
@@ -3644,6 +3649,39 @@ function stopDiscoveryHunt(){
   paintDiscovery();
   restart();
 }
+function loadScript(src){
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.async = false;
+    s.onload = () => resolve();
+    s.onerror = () => { s.remove(); reject(new Error(src)); };
+    document.head.appendChild(s);
+  });
+}
+let valueAssets = null;
+function ensureValueView(){
+  const host = document.getElementById("valueScroll");
+  if (!host) return;
+  if (window.BinderValueUI) { window.BinderValueUI.open(host); return; }
+  host.innerHTML = `<p class="value-wait" role="status">Adding up cached prices…</p>`;
+  if (!valueAssets) valueAssets = loadScript("js/value.js").then(() => loadScript("js/value-ui.js"));
+  valueAssets.then(() => {
+    if (tab === "value" && window.BinderValueUI) window.BinderValueUI.open(host);
+  }).catch(() => {
+    valueAssets = null;
+    if (tab === "value" && host) host.innerHTML = `<p class="empty-state">The value view didn't load. Try the Value tab again in a moment.</p>`;
+  });
+}
+function renderValueSide(){
+  if (sideKey === "value" && profileEl.querySelector("[data-side='value']")) return;
+  sideKey = "value";
+  summaryId = "";
+  profileEl.hidden = false;
+  shell.classList.remove("no-profile");
+  markProfile(false);
+  profileEl.innerHTML = `<div class="profile-scroll" data-side="value"><p class="eyebrow">Collection value</p><h2 class="pname" id="profileTitle">What you hold</h2><p class="fine">Raw near-mint prices from the saved history. A card with no price is counted, and it stays out of the total.</p><p class="fine">Seven-day and thirty-day changes use that same cached history. Since your last visit stays in this browser.</p></div>`;
+}
 function showTab(name){
   closeShowcase();
   tab = name;
@@ -3652,11 +3690,14 @@ function showTab(name){
   document.getElementById("viewBinders").hidden = name !== "binders";
   const dailyView = document.getElementById("viewDaily");
   if (dailyView) dailyView.hidden = name !== "daily";
+  const valueView = document.getElementById("viewValue");
+  if (valueView) valueView.hidden = name !== "value";
   document.querySelectorAll("[data-tab]").forEach(btn => btn.setAttribute("aria-current", btn.dataset.tab === name ? "page" : "false"));
   if (wide()) { profilePinned = false; profileCard = null; pinnedTopId = ""; summaryId = ""; sideKey = ""; }
   if (name === "sets") renderSets();
   if (name === "binders") renderBinders();
   if (name === "daily" && typeof window.renderDaily === "function") window.renderDaily();
+  if (name === "value") ensureValueView();
   paintContext(); paintDiscovery();
   if (typeof window.paintDailyBadge === "function") window.paintDailyBadge();
   if (name === "hunt") renderDeck();
