@@ -13887,13 +13887,23 @@
     },
     "2026-11-11": {
       "id": "xy1-46",
-      "price": 8.8,
+      "price": 8.73,
       "variant": "holofoil",
       "printing": "Holofoil",
       "alts": 1,
       "source": "tcgplayer",
       "eur": 4.28,
-      "at": "2026-11-09T19:24:34Z"
+      "at": "2026-11-10T16:06:38Z"
+    },
+    "2026-11-12": {
+      "id": "ecard2-10",
+      "price": 59.98,
+      "variant": "normal",
+      "printing": "Normal",
+      "alts": 2,
+      "source": "tcgplayer",
+      "eur": 347.22,
+      "at": "2026-11-10T16:06:38Z"
     }
   }
 }
