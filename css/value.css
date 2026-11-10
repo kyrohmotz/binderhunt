@@ -1,0 +1,33 @@
+/* Collection value. Pastel paper, sage totals, rose for declines. */
+.value-wrap{width:min(100%,760px);margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-bottom:8px}
+.value-title{font-family:var(--display);font-weight:800;font-size:clamp(26px,7vw,34px);line-height:1.1;margin:0}
+.value-pair{display:flex;flex-direction:column;gap:12px}
+.value-card{background:#fff;border:2.5px solid var(--ink);border-radius:22px;padding:14px;box-shadow:3px 3px 0 var(--ink);min-width:0}
+.value-owned{background:linear-gradient(180deg,#fff 40%,#eef2e4)}
+.value-wish{background:linear-gradient(180deg,#fff 40%,#fdeeee)}
+.value-empty{text-align:left;background:var(--butter)}
+.value-empty p{margin:6px 0 0}
+.value-empty .go{margin:12px 0 0}
+.value-h{font-family:var(--display);font-weight:700;font-size:18px;margin:0 0 8px}
+.value-missing{font-size:28px}
+.value-moves{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.value-moves li{display:flex;justify-content:space-between;align-items:baseline;gap:10px;min-width:0}
+.value-moves span{flex:none;font-family:var(--label);font-style:italic;font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:12px;color:var(--ink-2)}
+.value-moves b{font-variant-numeric:tabular-nums;text-align:right;min-width:0}
+.value-moves b.down{color:#8d4a4a}
+.value-gap{margin:0;background:var(--butter);border:2.5px solid var(--ink);border-radius:16px;padding:10px 12px;box-shadow:3px 3px 0 var(--ink);font-family:var(--display);font-weight:700;line-height:1.35}
+.value-wait{margin:8px 0;font-family:var(--display);font-weight:700}
+.value-row{width:100%;text-align:left;display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:8px;align-items:center;background:#fff;border:2.5px solid var(--ink);border-radius:16px;padding:8px;box-shadow:2px 2px 0 var(--ink);min-height:64px;margin-top:8px}
+.value-row img,.value-art{width:36px;height:50px;object-fit:contain;background:#fff;border-radius:6px;border:1.5px solid var(--ink)}
+.value-art{display:block;background:repeating-linear-gradient(135deg,#e4e7da 0 6px,#f8f7ef 6px 12px)}
+.value-copy{min-width:0}
+.value-copy b{display:block;font-family:var(--display);font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.value-delta{font-family:Nunito,sans-serif;font-weight:800;font-variant-numeric:tabular-nums;text-align:right;line-height:1.15}
+.value-delta small{display:block;font-weight:700;color:var(--ink-2)}
+.value-delta.down{color:#8d4a4a}
+.value-spark{width:100%;height:auto;display:block}
+.value-card .chart-wrap{margin-top:0}
+@media (min-width:1024px){
+  .value-pair{display:grid;grid-template-columns:1fr 1fr;align-items:stretch}
+  .value-title{font-size:34px}
+}
