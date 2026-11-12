@@ -172,6 +172,11 @@ let swipeBusy = false;
 let audioCtx = null;
 let setView = null;
 let binderView = null;
+let dealsFrom = "shelf";
+let dealsOpenedAt = 0;
+let dealsToken = 0;
+const visitLocked = new Set();
+const visitPrior = Object.create(null);
 let binderOpenAnim = false;
 let flipPage = 0;
 let pendingSparkle = -1;
@@ -1418,6 +1423,7 @@ function applyScrydex(){
   if (tab === "binders") renderBinders();
   else paintRail();
   if (tab === "value" && window.BinderValueUI) window.BinderValueUI.refresh();
+  ensureTargets().then(() => { if (scrydex.ready) paintDealsBadge(); }).catch(() => {});
 }
 /* The price cache is about 26MB. Parsing it on the page thread freezes swipes,
    and downloading it with the first card blows the load. A worker parses it
@@ -3382,7 +3388,12 @@ function paintContext(){
     else if (browseMode) label = "Pokémon";
     else label = setView ? (setView.name || "Set") : "Sets";
   }
-  else if (tab === "binders") label = binderView ? (binderView.kind === "wish" ? "Wishlist" : (binderState.binders.find(x => x.id === binderView.id) || {}).name || "Binders") : "Binders";
+  else if (tab === "binders") {
+    if (!binderView) label = "Binders";
+    else if (binderView.kind === "wish") label = "Wishlist";
+    else if (binderView.kind === "deals") label = "Deals";
+    else label = (binderState.binders.find(x => x.id === binderView.id) || {}).name || "Binders";
+  }
   else if (tab === "daily") label = "Today's Drop";
   else if (tab === "value") label = "Value";
   else if (b) label = b.name;
@@ -3403,7 +3414,7 @@ function paintContext(){
   else if (tab === "sets" && browseMode && browseMode.name) context.setAttribute("aria-label", label + ", " + (browseMode.kind === "illustrator" ? "All illustrators" : "All Pokémon"));
   else if (tab === "sets" && browseMode) context.setAttribute("aria-label", label + ", Back to sets");
   else if (tab === "sets" && setView) context.setAttribute("aria-label", "Back to all sets");
-  else if (tab === "binders" && binderView) context.setAttribute("aria-label", "Back to binders");
+  else if (tab === "binders" && binderView) context.setAttribute("aria-label", label + ". Back to binders");
   else context.setAttribute("aria-label", label);
   paintRail();
   paintSide();
@@ -3411,7 +3422,8 @@ function paintContext(){
 /* On a desktop, an open binder takes the side panel's room too. The panel
    comes back as soon as a card's details are opened. */
 function syncReadingWide(){
-  shell.classList.toggle("reading-wide", wide() && tab === "binders" && !!binderView && !profilePinned);
+  const bookOpen = binderView && binderView.kind !== "deals";
+  shell.classList.toggle("reading-wide", wide() && tab === "binders" && !!bookOpen && !profilePinned);
 }
 function paintSide(){
   syncReadingWide();
@@ -3498,6 +3510,10 @@ function renderBinderSide(){
       const card = wish.find(c => c.id === btn.dataset.sideCard);
       if (card) openProfile(card);
     });
+    return;
+  }
+  if (binderView.kind === "deals") {
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Deals</p><h2 class="pname" id="profileTitle">Worth a look</h2><p class="fine">Wishlist cards at or below a target, or down at least 10% since you saved that target. Prices come from the cached file.</p><p class="fine">Open a wishlisted card and set Alert me at a price. The suggestion starts about 10% under the cached market.</p></div>`;
     return;
   }
   if (binderView.kind === "wish") {
@@ -3648,6 +3664,17 @@ function stopDiscoveryHunt(){
   saveFilters();
   paintDiscovery();
   restart();
+}
+function loadStyle(href){
+  return new Promise((resolve, reject) => {
+    if (document.querySelector('link[rel="stylesheet"][href="' + href + '"]')) { resolve(); return; }
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    link.onload = () => resolve();
+    link.onerror = () => { link.remove(); reject(new Error(href)); };
+    document.head.appendChild(link);
+  });
 }
 function loadScript(src){
   return new Promise((resolve, reject) => {
@@ -4554,8 +4581,297 @@ function peekMarkup(list, cls){
   if (!art.length) return `<span class="${cls} empty" aria-hidden="true"><i></i><i></i><i></i></span>`;
   return `<span class="${cls}" aria-hidden="true">${art.map(u => `<img alt="" src="${esc(u)}" loading="lazy" decoding="async" onerror="this.remove()">`).join("")}</span>`;
 }
+let targetsAssets = null;
+function ensureTargets(){
+  if (window.BinderTargets) return Promise.resolve(window.BinderTargets);
+  if (targetsAssets) return targetsAssets;
+  targetsAssets = loadStyle("css/targets.css").then(() => loadScript("js/targets.js")).then(() => window.BinderTargets);
+  targetsAssets.catch(() => { targetsAssets = null; });
+  return targetsAssets;
+}
+function targetMarket(card){
+  if (!card || !scrydex.ready || !window.BinderTargets) return null;
+  try {
+    const points = scryHistory(card);
+    if (points && points.length) {
+      const last = points[points.length - 1];
+      const amount = window.BinderTargets.cents(last && last.value);
+      if (amount) return amount;
+    }
+  } catch (e) {}
+  const quote = window.BinderTargets.quoteRecord(scryRecord(card));
+  return quote ? quote.latest : null;
+}
+function noteDealVisits(){
+  const T = window.BinderTargets;
+  if (!T || !scrydex.ready) return visitPrior;
+  if (!dealsOpenedAt) dealsOpenedAt = Date.now();
+  const stored = T.read(localStorage);
+  const quotes = [];
+  wish.forEach(card => {
+    if (!card || !card.id || !stored[card.id] || visitLocked.has(card.id)) return;
+    const market = targetMarket(card);
+    if (!market) return;
+    quotes.push({ id:card.id, market });
+    visitLocked.add(card.id);
+  });
+  if (quotes.length) {
+    const prior = T.rememberVisit(localStorage, quotes, dealsOpenedAt);
+    Object.keys(prior).forEach(id => { visitPrior[id] = prior[id]; });
+  }
+  return visitPrior;
+}
+function currentDeals(){
+  const T = window.BinderTargets;
+  if (!T || !scrydex.ready) return [];
+  const prior = noteDealVisits();
+  const stored = T.read(localStorage);
+  const rows = [];
+  wish.forEach(card => {
+    if (!card || !card.id || !stored[card.id]) return;
+    rows.push({ id:card.id, name:card.name || "Card", market:targetMarket(card), target:stored[card.id], visit:prior[card.id] });
+  });
+  return T.listDeals(rows);
+}
+function paintDealsBadge(){
+  let count = 0;
+  try { count = currentDeals().length; }
+  catch (e) { count = 0; }
+  if (!Number.isFinite(count) || count < 1) count = 0;
+  const label = count === 1 ? "1 deal" : count + " deals";
+  document.querySelectorAll('.tabbtn[data-tab="binders"]').forEach(btn => {
+    let badge = btn.querySelector(":scope > .deals-badge");
+    let note = btn.querySelector(":scope > .deals-note");
+    btn.removeAttribute("aria-label");
+    if (!count) {
+      if (badge) badge.remove();
+      if (note) note.remove();
+      return;
+    }
+    if (!badge) {
+      badge = document.createElement("span");
+      badge.className = "deals-badge";
+      badge.setAttribute("aria-hidden", "true");
+      btn.append(badge);
+    }
+    badge.hidden = false;
+    badge.textContent = count > 99 ? "99+" : String(count);
+    if (!note) {
+      note = document.createElement("span");
+      note.className = "sr-only deals-note";
+      btn.append(note);
+    }
+    note.textContent = ", " + label;
+  });
+  document.querySelectorAll("[data-deals-count]").forEach(badge => {
+    badge.hidden = !count;
+    badge.textContent = count > 99 ? "99+" : String(count);
+  });
+  const chip = document.getElementById("openDeals");
+  if (chip && chip.classList.contains("chip")) {
+    const face = count ? "Deals · " + count : "Deals";
+    chip.textContent = face;
+    if (count) chip.setAttribute("aria-label", face + ", " + label);
+    else chip.removeAttribute("aria-label");
+  }
+  const row = document.querySelector(".deals-row");
+  if (row) {
+    row.removeAttribute("aria-label");
+    const copy = row.querySelector(".deals-copy");
+    let note = row.querySelector(".deals-note");
+    if (copy && count) {
+      if (!note) {
+        note = document.createElement("span");
+        note.className = "sr-only deals-note";
+        copy.append(note);
+      }
+      note.textContent = ", " + label;
+    } else if (note) note.remove();
+  }
+}
+function refreshDeals(){
+  paintDealsBadge();
+  if (tab === "binders" && binderView && binderView.kind === "deals") {
+    const root = document.getElementById("bindersScroll");
+    if (root && root.querySelector("#dealsBody")) fillDeals(root);
+  }
+}
+function openDeals(from){
+  dealsFrom = from === "wish" ? "wish" : "shelf";
+  binderView = { kind:"deals" };
+  if (tab !== "binders") showTab("binders");
+  else renderBinders();
+}
+function closeDeals(){
+  const from = dealsFrom;
+  if (from === "wish") { binderView = { kind:"wish" }; flipPage = 0; }
+  else binderView = null;
+  renderBinders();
+  const next = document.getElementById("openDeals") || document.getElementById("openWish");
+  if (next) next.focus();
+}
+function renderDeals(root){
+  if (!root) return;
+  const token = ++dealsToken;
+  root.classList.remove("reading");
+  const backLabel = dealsFrom === "wish" ? "Wishlist" : "All binders";
+  root.innerHTML = `<div class="deals-wrap"><div class="booktools"><button class="chip" id="backDeals" type="button">${esc(backLabel)}</button></div><h2 class="deals-title" id="dealsTitle">Deals</h2><div id="dealsBody"><p class="deals-lead" role="status">Checking cached prices…</p></div></div>`;
+  const back = document.getElementById("backDeals");
+  if (back) back.onclick = () => closeDeals();
+  paintContext();
+  ensureTargets().then(() => {
+    if (token !== dealsToken) return;
+    if (!(tab === "binders" && binderView && binderView.kind === "deals")) return;
+    fillDeals(root);
+    if (wide() && !profilePinned) paintSide();
+  }).catch(() => {
+    const body = document.getElementById("dealsBody");
+    if (token === dealsToken && body) body.innerHTML = `<p class="empty-state">Deals didn't load. Open the shelf again in a moment.</p>`;
+  });
+}
+function dealEmpty(storedCount){
+  if (!wish.length) {
+    return `<div class="empty-state deals-empty"><h3>No deals yet</h3><p>Swipe right on a card in Hunt. Then open that card and set Alert me at a price. When the cached market hits it, the card shows up here.</p></div>`;
+  }
+  if (!storedCount) {
+    return `<div class="empty-state deals-empty"><h3>No deals yet</h3><p>Set a target on a wishlisted card. A suggestion starts about 10% under the cached market, and you can change it or clear it.</p><ol><li>Open a card on your wishlist.</li><li>Under Price alert, set Alert me at a price.</li><li>Come back here when that price lands, or when the card drops since you saved it.</li></ol></div>`;
+  }
+  const alerts = storedCount === 1 ? "1 alert is set" : storedCount + " alerts are set";
+  return `<div class="empty-state deals-empty"><h3>Nothing at your targets yet</h3><p>${esc(alerts)}. A card shows up here when the cached market hits its target, or drops at least 10% since you saved it. A card with no cached price can't join this shelf.</p></div>`;
+}
+function fillDeals(root){
+  const body = root ? root.querySelector("#dealsBody") : null;
+  const T = window.BinderTargets;
+  if (!body || !T) return;
+  if (!scrydex.ready) {
+    body.innerHTML = `<p class="deals-lead" role="status">Checking cached prices…</p>`;
+    if (typeof loadScrydex === "function") {
+      const pending = loadScrydex();
+      if (pending && pending.then) pending.then(() => { if (binderView && binderView.kind === "deals") fillDeals(root); });
+    }
+    return;
+  }
+  const stored = T.read(localStorage);
+  let storedCount = 0;
+  wish.forEach(card => { if (card && card.id && stored[card.id]) storedCount++; });
+  const deals = currentDeals();
+  if (!deals.length) {
+    body.innerHTML = dealEmpty(storedCount);
+    paintDealsBadge();
+    return;
+  }
+  const status = deals.length === 1 ? "1 deal, best first." : deals.length + " deals, best first.";
+  const rendered = deals.map(deal => {
+    const card = wish.find(c => c && c.id === deal.id) || { id:deal.id, name:deal.name };
+    const now = T.moneyText(deal.market);
+    const goal = T.moneyText(deal.target.price);
+    if (!now || !goal) return "";
+    const lines = T.dealLines(deal).map(line => `<span class="fine">${esc(line)}</span>`).join("");
+    const meta = [card.set, card.number ? "#" + card.number : ""].filter(Boolean).join(" · ");
+    return `<li><button type="button" class="deal-row" data-deal="${esc(deal.id)}"><span class="deal-art" data-art="${esc(deal.id)}"></span><span class="deal-copy"><b>${esc(card.name || deal.name || "Card")}</b>${meta ? `<span class="fine">${esc(meta)}</span>` : ""}<span class="deal-prices"><span>Now ${esc(now)}</span><span>Target ${esc(goal)}</span></span>${lines}<span class="sr-only">Open profile</span></span></button></li>`;
+  }).filter(Boolean);
+  if (!rendered.length) {
+    body.innerHTML = dealEmpty(storedCount);
+    paintDealsBadge();
+    return;
+  }
+  body.innerHTML = `<p class="deals-lead" role="status">${esc(status)} Cached raw prices, in US dollars.</p><ul class="deals-list">${rendered.join("")}</ul>`;
+  body.querySelectorAll(".deal-row").forEach(btn => {
+    const card = wish.find(c => c && c.id === btn.dataset.deal);
+    const art = btn.querySelector(".deal-art");
+    if (art && card) {
+      paintArt(art, card, { priority:"low" });
+      const img = art.querySelector("img");
+      if (img) img.alt = "";
+    }
+    btn.onclick = () => {
+      if (!card) return;
+      popBtn(btn);
+      openProfile(card);
+    };
+  });
+  paintDealsBadge();
+}
+function mountTarget(card){
+  if (!card || !document.getElementById("targetSlot")) return;
+  const paint = () => {
+    if (!profileCard || profileCard.id !== card.id || !document.getElementById("targetSlot")) return;
+    paintTargetSlot(cardCache.get(card.id) || card);
+  };
+  paint();
+  if (window.BinderTargets) return;
+  ensureTargets().then(paint).catch(() => {});
+}
+function paintTargetSlot(card, focusId){
+  const slot = document.getElementById("targetSlot");
+  if (!slot || !card) return;
+  const onWish = wish.some(w => w.id === card.id);
+  if (!onWish) { slot.remove(); return; }
+  const T = window.BinderTargets;
+  if (!T || !scrydex.ready) {
+    slot.innerHTML = `<section class="target-box" aria-labelledby="targetHeading"><h3 id="targetHeading">Price alert</h3><p class="fine" role="status">Checking the cached price…</p></section>`;
+    return;
+  }
+  const market = targetMarket(card);
+  const marketText = T.moneyText(market);
+  if (!marketText) {
+    slot.innerHTML = `<section class="target-box" aria-labelledby="targetHeading"><h3 id="targetHeading">Price alert</h3><p>No cached market price for this card yet, so a target can't be set. Alerts use the saved price file, not a live lookup.</p></section>`;
+    return;
+  }
+  const stored = T.read(localStorage)[card.id] || null;
+  const suggestion = T.suggest(market);
+  const suggestionText = T.moneyText(suggestion);
+  const savedText = stored ? T.moneyText(stored.price) : "";
+  const field = stored ? stored.price.toFixed(2) : (suggestion != null ? suggestion.toFixed(2) : "");
+  const hint = savedText ? "Change the amount, or clear the alert." : (suggestionText ? "Suggested " + suggestionText + ", about 10% under the cached market. You can change it." : "Enter a price above one cent.");
+  slot.innerHTML = `<section class="target-box" id="targetBox" aria-labelledby="targetHeading"><h3 id="targetHeading">Price alert</h3><p class="fine">Cached raw market ${esc(marketText)}. Alerts stay in US dollars.</p>${savedText ? `<p class="fine">Alert set at ${esc(savedText)}.</p>` : ""}<form class="target-form" id="targetForm"><label class="target-label" for="targetPrice">Alert me at $</label><input id="targetPrice" name="price" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" spellcheck="false" maxlength="10" value="${esc(field)}" aria-describedby="targetHint"><div class="target-actions"><button class="chip" type="submit" id="saveTarget">${savedText ? "Update alert" : "Set alert"}</button>${savedText ? `<button class="chip" type="button" id="clearTarget" aria-label="Clear price alert">Clear</button>` : ""}</div></form><p class="fine" id="targetHint">${esc(hint)}</p><p class="target-error" id="targetError" hidden></p></section>`;
+  const form = document.getElementById("targetForm");
+  const showError = (text) => {
+    const err = document.getElementById("targetError");
+    if (!err) return;
+    err.hidden = false;
+    err.textContent = text;
+    announce(text);
+    const input = document.getElementById("targetPrice");
+    if (input) { input.setAttribute("aria-invalid", "true"); input.focus(); }
+  };
+  if (form) form.onsubmit = (event) => {
+    event.preventDefault();
+    const input = document.getElementById("targetPrice");
+    const price = T.parsePrice(input ? input.value : "");
+    const liveMarket = targetMarket(card);
+    if (price == null || !T.moneyText(price)) {
+      showError("Enter a price above one cent. Zero and blank prices are not alerts.");
+      return;
+    }
+    if (!T.moneyText(liveMarket)) {
+      showError("No cached market price for this card yet, so a target can't be set.");
+      return;
+    }
+    const rec = T.setTarget(localStorage, card.id, price, liveMarket, Date.now());
+    if (!rec || !T.moneyText(rec.price)) { announce("The alert didn't save."); return; }
+    const btn = document.getElementById("saveTarget");
+    if (btn) popBtn(btn);
+    announce("Alert set at " + T.moneyText(rec.price) + ".");
+    refreshDeals();
+    paintTargetSlot(cardCache.get(card.id) || card, "saveTarget");
+  };
+  const clear = document.getElementById("clearTarget");
+  if (clear) clear.onclick = () => {
+    popBtn(clear);
+    T.clearTarget(localStorage, card.id);
+    announce("Price alert cleared.");
+    refreshDeals();
+    paintTargetSlot(cardCache.get(card.id) || card, "targetPrice");
+  };
+  if (focusId) {
+    const again = document.getElementById(focusId);
+    if (again) again.focus();
+  }
+}
 function renderBinders(){
   const root = document.getElementById("bindersScroll");
+  if (binderView && binderView.kind === "deals") { renderDeals(root); return; }
   if (binderView) { renderCollection(root); return; }
   root.classList.remove("reading");
   const total = valueOf(wish);
@@ -4566,6 +4882,7 @@ function renderBinders(){
   const wishMeta = wish.length ? cardsWord(wish.length) + (total ? " · " + priceText(total, "USD") : "") : "Nothing saved yet";
   const wishSub = wish.length ? (wantedN ? wantedN + " still to find" : "You have every card") + (ownedN ? " · " + ownedN + " got" : "") : "Swipe right on a card and it lands here.";
   root.innerHTML = `<div class="wish-slot"><button class="wish-row" id="openWish" type="button">${peekMarkup(wish, "wish-peek")}<span class="wish-copy"><span class="eyebrow">All saved cards</span><b>Wishlist</b><span class="wish-meta">${esc(wishMeta)}</span><span class="fine">${esc(wishSub)}</span></span>${droppedCountMarkup(dropped)}<span class="wish-go" aria-hidden="true">Open →</span></button><button class="chip wish-share" id="shareWish" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button></div>
+    <button class="deals-row" id="openDeals" type="button"><span class="deals-copy"><span class="eyebrow">Price alerts</span><b>Deals</b><span class="fine">Cards at your target, or down since you saved one.</span></span><span class="deals-badge" data-deals-count hidden aria-hidden="true"></span></button>
     <div class="shelf-head"><h2 class="shelf-title">Your binders</h2><p class="fine">Right-swipe always lands on your wishlist. A themed binder is another home for the same card.</p></div>
     <div class="shelf-scene"><div class="shelf" id="shelf"></div></div>`;
   const shelf = document.getElementById("shelf");
@@ -4624,10 +4941,12 @@ function renderBinders(){
   addSlot.append(add, spacer);
   shelf.append(addSlot);
   document.getElementById("openWish").onclick = () => { binderView = { kind:"wish" }; flipPage = 0; renderBinders(); };
+  document.getElementById("openDeals").onclick = () => openDeals("shelf");
   document.getElementById("shareWish").onclick = () => {
     if (window.BinderShare) BinderShare.openCollection({ kind:"wish", name:"Wishlist", color:"#E4E7DA", cards:wish, ownedIds });
   };
   paintContext();
+  paintDealsBadge();
 }
 function pagesOf(list){ return Math.max(1, Math.ceil(list.length / 9) || 1); }
 function isHolo(card){
@@ -4856,7 +5175,7 @@ function renderCollection(root){
   const tools = document.createElement("div");
   tools.className = "booktools";
   tools.innerHTML = `<button class="chip" id="backBinders" type="button">All binders</button>` +
-    (wishMode ? `<button class="chip" id="copyList" type="button">Copy list</button><button class="chip" id="shareCollection" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button>`
+    (wishMode ? `<button class="chip" id="openDeals" type="button">Deals</button><button class="chip" id="copyList" type="button">Copy list</button><button class="chip" id="shareCollection" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button>`
       : `<button class="chip" id="fillFrom" type="button">Fill from wishlist</button><button class="chip" id="discover" type="button">Swipe to discover</button><button class="chip" id="switchBinder" type="button">Switch</button><button class="chip" id="renameBinder" type="button">Rename</button><button class="chip" id="recolorBinder" type="button">Cover</button><button class="chip danger" id="deleteBinder" type="button">Delete</button><button class="chip" id="copyList" type="button">Copy list</button><button class="chip" id="shareCollection" type="button" aria-haspopup="dialog">Share</button>`);
   const stage = document.createElement("div");
   stage.className = "bookstage";
@@ -5413,6 +5732,8 @@ function renderCollection(root){
     book.querySelectorAll(".sleeve.tilting").forEach(node => node.classList.remove("tilting"));
   });
   document.getElementById("backBinders").onclick = () => { binderView = null; renderBinders(); };
+  const openDealsBtn = document.getElementById("openDeals");
+  if (openDealsBtn) openDealsBtn.onclick = () => openDeals("wish");
   document.getElementById("copyList").onclick = async () => {
     const text = (wishMode ? "Wishlist" : binder.name) + "\n" + list.map(c => [c.name, c.set, c.number ? "#" + c.number : "", ownedIds.has(c.id) ? "owned" : "wanted", priceText(usdOf(c), "USD")].filter(Boolean).join(" — ")).join("\n");
     try { await navigator.clipboard.writeText(text); announce("List copied."); }
@@ -5464,6 +5785,7 @@ function renderCollection(root){
   warmPages(list, flipPage, step, total);
   prebuild();
   paintContext();
+  if (wishMode) paintDealsBadge();
 }
 let reuseFaces = null;
 /* Fetch the art for the pages on either side, so a turn uncovers cards that
@@ -6486,7 +6808,8 @@ function renderProfile(card){
   const owned = ownedIds.has(card.id);
   const ownLabel = owned ? "Got it · undo" : "Got it!";
   const ownAria = owned ? "Undo got it for " + (card.name || "this card") : "Got it! Mark " + (card.name || "this card") + " as owned";
-  const wishAria = onWish ? "Remove " + (card.name || "this card") + " from the wishlist" : "Save " + (card.name || "this card") + " to the wishlist";
+  const wishFace = onWish ? "♥ On wishlist" : "♡ Add to wishlist";
+  const wishAria = onWish ? wishFace + ". Remove " + (card.name || "this card") + " from the wishlist" : wishFace + ". Save " + (card.name || "this card") + " to the wishlist";
   const binder = discoveryBinder();
   const inBinder = binder && binder.cards.some(c => c.id === card.id);
   const legal = card.legal ? [card.legal.standard ? "Standard" : "", card.legal.expanded ? "Expanded" : ""].filter(Boolean).join(", ") || "Not legal" : "";
@@ -6499,6 +6822,7 @@ function renderProfile(card){
     <div class="profile-rest">
       ${nameHeading(card)}
       ${gemLine}
+      ${onWish ? `<div id="targetSlot"></div>` : ""}
       <div class="facts">
         ${coreFacts(card)}
         ${fact("HP", card.hp)}
@@ -6509,7 +6833,7 @@ function renderProfile(card){
       ${variantToggle(card, story.variant)}
       <div class="ownrow mine">
         <button class="chip ownchip" id="profileOwn" type="button" aria-pressed="${owned ? "true" : "false"}" aria-label="${esc(ownAria)}">${esc(ownLabel)}</button>
-        <button class="chip wishchip" id="profileWish" type="button" aria-pressed="${onWish ? "true" : "false"}" aria-label="${esc(wishAria)}">${onWish ? "♥ On wishlist" : "♡ Add to wishlist"}</button>
+        <button class="chip wishchip" id="profileWish" type="button" aria-pressed="${onWish ? "true" : "false"}" aria-label="${esc(wishAria)}">${esc(wishFace)}</button>
         ${binder ? `<button class="chip" id="profileBinder" type="button">${inBinder ? "In " + esc(binder.name) : "Add to " + esc(binder.name)}</button>` : ""}
         <p class="fine">${owned ? "You have it. Every binder shows it as owned." : "Tap Got it! once it's in your hands. Every binder updates."}</p>
       </div>
@@ -6536,6 +6860,7 @@ function renderProfile(card){
   bindPriceStory(story, () => renderProfile(cardCache.get(card.id) || card));
   bindProfileBrowse(card);
   if (story.series.pendingFx) ensureFx().then(rate => { if (rate && profileCard && profileCard.id === card.id) renderProfile(cardCache.get(card.id) || card); });
+  mountTarget(card);
   document.getElementById("profileOwn").onclick = () => setOwned(card, !ownedIds.has(card.id), "profile");
   document.getElementById("profileWish").onclick = () => {
     if (onWish) removeFromWish(card.id); else addWish(card);
@@ -6594,7 +6919,7 @@ function openSettingsPanel(){
     <label class="field">Currency<select id="setCur"><option value="USD">US dollars</option><option value="EUR">Cardmarket euros</option></select></label>
     <button class="chip" id="retakeOnboard" type="button">Retake the hunt quiz</button>
     <h2>About</h2>
-    <p class="fine">BinderHunt is not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. There is no account. Wishlists, binders, owned marks, filters, settings, and the daily streak stay in this browser.</p>
+    <p class="fine">BinderHunt is not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. There is no account. Wishlists, binders, price alerts, owned marks, filters, settings, and the daily streak stay in this browser.</p>
     <p class="fine">A public hit counter records page views, one visit a day, and a few actions, including playing the daily drop. It sets no cookies and sends no identifier, and it stays off when Do Not Track is on.</p>
     <p class="fine">Card text and images come from TCGdex. US prices come from TCGplayer. European prices come from Cardmarket. Commons and cards under $10 use those catalog prices. Graded prices and population come from a Scrydex cache for chase cards and cards you open or save often, and only for the printing on screen. Prices are estimates, not financial advice. TCGplayer, eBay, and Cardmarket links are not affiliate links yet.</p>
     <p class="fine"><img src="assets/brand/two-toads-logo.png" width="32" height="32" alt="Two Toads" decoding="async" fetchpriority="low"> BinderHunt · made with 🐸 by Two Toads</p>`;
@@ -6693,7 +7018,8 @@ document.addEventListener("keydown", e => {
       if (back && back.isConnected && typeof back.focus === "function") back.focus();
       else if (deck) deck.focus();
     }
-    if (!profileEl.hidden && !wide()) closeProfile();
+    if (!profileEl.hidden && !wide()) { closeProfile(); return; }
+    if (tab === "binders" && binderView && binderView.kind === "deals" && !profilePinned) { closeDeals(); return; }
     return;
   }
   if (typingTarget(e.target) || blocking()) return;
