@@ -69,14 +69,47 @@
     return kept.length ? kept[kept.length - 1] : "";
   }
 
+  // Pokémon SP suffixes and forme words are not species. C, G, and 4 are
+  // the short SP marks; FB, GL, and E4 are the longer ones. LV.X is already
+  // skipped as two tokens by speciesName.
+  const SP_SUFFIX = {
+    fb: 1, gl: 1, c: 1, g: 1, e4: 1, "4": 1,
+    forme: 1, normal: 1
+  };
+
+  function trailingSpecies(name) {
+    const words = String(name || "").match(/[A-Za-z0-9][A-Za-z0-9'.-]*/g) || [];
+    const kept = [];
+    words.forEach(word => {
+      let display = word.replace(/['’]s$/i, "");
+      let token = display.toLowerCase();
+      if (token === "lv.x" || SPECIES_SKIP[token] || SP_SUFFIX[token]) return;
+      let guard = 0;
+      while (guard++ < 4) {
+        const dash = token.lastIndexOf("-");
+        if (dash <= 0) break;
+        const tail = token.slice(dash + 1);
+        if (!SPECIES_SKIP[tail] && !SP_SUFFIX[tail]) break;
+        display = display.slice(0, display.lastIndexOf("-"));
+        token = token.slice(0, dash);
+      }
+      if (SPECIES_SKIP[token] || SP_SUFFIX[token] || token.length <= 1) return;
+      if (!/[a-z]/i.test(token)) return;
+      kept.push(display);
+    });
+    return kept.length ? kept[kept.length - 1] : "";
+  }
+
 function pokemonSpecies(name) {
   const raw = norm(name);
   if (!raw || NOT_POKEMON.test(raw)) return "";
   const species = speciesName(raw);
-  if (species && !NOT_SPECIES[species.toLowerCase()] && speciesHit(raw, species)) return species;
-  // Porygon2 is one word to collectors. The letter-only species trim would
-  // call it Porygon, and a Porygon hunt would not keep it.
-  if (/^[A-Za-z][A-Za-z0-9'.-]{1,40}$/.test(raw) && !NOT_SPECIES[raw.toLowerCase()]) return raw;
+  if (species && !NOT_SPECIES[species.toLowerCase()] && !SP_SUFFIX[species.toLowerCase()] && speciesHit(raw, species)) return species;
+  // Digits stay on the token, so Dark Porygon2 is Porygon2 and not Porygon.
+  // Trailing SP marks (FB, GL, C, G, 4, E4) and "Normal Forme" are dropped.
+  const repaired = trailingSpecies(raw);
+  if (repaired && !NOT_SPECIES[repaired.toLowerCase()] && speciesHit(raw, repaired)) return repaired;
+  if (/^[A-Za-z][A-Za-z0-9'.-]{1,40}$/.test(raw) && !NOT_SPECIES[raw.toLowerCase()] && !SP_SUFFIX[raw.toLowerCase()]) return raw;
   return "";
 }
 

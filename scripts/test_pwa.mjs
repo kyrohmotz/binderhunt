@@ -87,7 +87,7 @@ const server = http.createServer((req, res) => {
   };
   if (rel === "sw.js" && swVersion) {
     let text = body.toString("utf8");
-    const marker = 'const VERSION = "bh-15"';
+    const marker = 'const VERSION = "bh-16"';
     if (!text.includes(marker)) {
       res.writeHead(500, { "Content-Type": "text/plain" });
       res.end("sw.js VERSION marker missing");

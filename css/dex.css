@@ -1,0 +1,61 @@
+/* Pokédex completion. Pastel paper, sage for owned, rose for wishlisted. */
+.dex-wrap{width:min(100%,980px);margin:0 auto;display:flex;flex-direction:column;gap:10px;padding-bottom:18px;min-width:0}
+.dex-title{font-family:var(--display);font-weight:800;font-size:clamp(26px,7vw,34px);line-height:1.1;margin:0}
+.dex-caught{font-family:var(--display);font-weight:800;font-size:clamp(20px,5.4vw,28px);line-height:1.15;margin:0;font-variant-numeric:tabular-nums}
+.dex-lead{margin:0}
+.dex-wrap .bar{margin-top:2px}
+.dex-legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin:0;padding:0;list-style:none}
+.dex-legend li{display:flex;align-items:center;gap:6px;min-height:24px;font-size:13px}
+.dex-swatch{width:18px;height:18px;border-radius:6px;border:2px solid var(--ink);flex:none;background:#fff}
+.dex-swatch.owned{box-shadow:inset 0 0 0 3px #ABB28D}
+.dex-swatch.wish{background:#fff6f6;box-shadow:inset 0 0 0 3px #F6C9C9}
+.dex-swatch.missing{background:#e4e7da}
+.dex-gens{display:flex;flex-wrap:wrap;gap:6px;margin:0}
+.dex-genchip{flex:none;border:2px solid var(--ink);border-radius:999px;background:#fff;padding:4px 8px;font-family:Nunito,sans-serif;font-weight:800;font-size:12px;line-height:1.3;font-variant-numeric:tabular-nums;box-shadow:1px 1px 0 var(--ink)}
+.dex-tools{display:flex;flex-direction:column;gap:8px;min-width:0}
+.dex-filters{display:flex;flex-wrap:wrap;gap:6px}
+.dex-filters .chip{max-width:none}
+.dex-tools .search{margin:0}
+.dex-showing{margin:0}
+.dex-wait{margin:8px 0;font-family:var(--display);font-weight:700}
+.dex-gen{display:flex;flex-direction:column;gap:8px;min-width:0}
+.dex-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;min-width:0}
+.dex-head h3{margin:0;min-width:0;font-size:18px}
+.dex-count{flex:none;margin:0;font-family:Nunito,sans-serif;font-weight:800;font-variant-numeric:tabular-nums}
+.dex-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;min-width:0}
+.dex-cell{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;min-height:44px;padding:8px 4px 6px;border:2.5px solid var(--ink);border-radius:16px;background:#fff;box-shadow:2px 2px 0 var(--ink);text-align:center}
+.dex-cell.owned{box-shadow:2px 2px 0 var(--ink), inset 0 0 0 3px #ABB28D}
+.dex-cell.wish{background:#fff7f6;box-shadow:2px 2px 0 var(--ink), inset 0 0 0 3px #F6C9C9}
+.dex-cell.missing{background:#f4f5f0}
+.dex-art{position:relative;width:64px;height:64px;flex:none;border-radius:14px;overflow:hidden;background:#fff;border:2px solid var(--ink)}
+.dex-cell.missing .dex-art{background:#e4e7da}
+.dex-art img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff}
+.dex-cell.missing .dex-art img{filter:grayscale(1) brightness(.62) contrast(1.05)}
+.dex-cell.wish .dex-art img{filter:saturate(.8)}
+.dex-initials{display:none;position:absolute;inset:0;place-items:center;font-family:var(--display);font-weight:800;font-size:16px;color:var(--ink-2)}
+.dex-art.fallback .dex-initials{display:grid}
+.dex-name{display:block;width:100%;overflow-wrap:anywhere;font-family:var(--display);font-weight:700;font-size:13px;line-height:1.15}
+.dex-num{font-family:Nunito,sans-serif;font-weight:800;font-size:11px;line-height:1.2;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.dex-mark{position:absolute;z-index:2;top:5px;right:5px;width:18px;height:18px;display:grid;place-items:center;border:1.5px solid var(--ink);border-radius:999px;background:#fff;line-height:0}
+.dex-mark svg{display:block}
+.dex-cell.owned .dex-mark{background:#ABB28D}
+.dex-cell.wish .dex-mark{background:#F6C9C9}
+.dex-empty{margin:0}
+@media (hover:hover) and (pointer:fine){
+  .dex-cell:hover{transform:translateY(-2px);box-shadow:3px 4px 0 var(--ink)}
+  .dex-cell.owned:hover{box-shadow:3px 4px 0 var(--ink), inset 0 0 0 3px #ABB28D}
+  .dex-cell.wish:hover{box-shadow:3px 4px 0 var(--ink), inset 0 0 0 3px #F6C9C9}
+}
+.dex-cell:active{transform:translateY(1px) scale(.97)}
+.dex-filters .chip:active{transform:translateY(1px) scale(.97)}
+@media (min-width:720px){
+  .dex-grid{grid-template-columns:repeat(auto-fill,minmax(108px,1fr))}
+}
+@media (min-width:1024px){
+  .dex-grid{gap:10px}
+  .dex-art{width:76px;height:76px}
+  .dex-name{font-size:14px}
+}
+@media (prefers-reduced-motion:reduce){
+  .dex-cell:hover,.dex-cell:active,.dex-filters .chip:active{transform:none}
+}
