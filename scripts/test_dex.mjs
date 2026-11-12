@@ -155,15 +155,85 @@ const catalogModel = Dex.collection(catalog.species, [], []);
 const dexNames = new Set(table.map(entry => Dex.fold(entry.name)));
 const leaked = catalog.unmatched.filter(name => dexNames.has(Dex.fold(name)));
 assert.deepEqual(leaked, []);
-assert.equal(catalog.species.length, 364, "species with a catalog card");
+assert.equal(catalog.species.length, 366, "species with a catalog card");
 assert.ok(catalog.species.every(entry => entry.ids.length >= 1 && entry.dex >= 1 && entry.gen >= 1 && entry.gen <= 9));
 assert.ok(catalog.species.every(entry => !entry.art || /^https:\/\/(?:assets\.tcgdex\.net|images\.pokemontcg\.io)\//.test(entry.art)));
 assert.equal(catalog.species.find(entry => entry.name === "Charizard").dex, 6);
 assert.equal(catalog.species.find(entry => entry.name === "Pikachu").dex, 25);
 assert.equal(catalog.species.find(entry => entry.name === "Mr. Mime").browseName, "Mime");
 assert.equal(catalog.species.find(entry => entry.name === "Raging Bolt").browseName, "Bolt");
-assert.equal(catalogModel.generations.reduce((sum, gen) => sum + gen.total, 0), 364);
+assert.equal(catalog.species.find(entry => entry.name === "Farfetch'd").dex, 83);
+assert.equal(catalog.species.find(entry => entry.name === "Porygon-Z").dex, 474);
+assert.equal(catalog.species.find(entry => entry.name === "Ho-Oh").dex, 250);
+assert.equal(catalogModel.generations.reduce((sum, gen) => sum + gen.total, 0), 366);
+assert.deepEqual(catalogModel.generations.map(gen => [gen.id, gen.total]), [
+  [1, 100], [2, 65], [3, 70], [4, 43], [5, 28], [6, 12], [7, 16], [8, 7], [9, 25]
+]);
 assert.equal(catalogModel.generations.find(gen => gen.id === 1).total, 100);
+
+const fixed = [
+  ["neo4-8", "Dark Porygon2", "Porygon2", 233],
+  ["dp6-1", "Deoxys Normal Forme", "Deoxys", 386],
+  ["pl3-2", "Blaziken FB", "Blaziken", 257],
+  ["pl3-142", "Blaziken FB LV.X", "Blaziken", 257],
+  ["pl3-144", "Electivire FB LV.X", "Electivire", 466],
+  ["pl3-147", "Staraptor FB LV.X", "Staraptor", 398],
+  ["pl2-8", "Lucario GL", "Lucario", 448],
+  ["pl2-104", "Floatzel GL LV.X", "Floatzel", 419],
+  ["pl2-109", "Luxray GL LV.X", "Luxray", 405],
+  ["pl2-110", "Mismagius GL LV.X", "Mismagius", 429]
+];
+fixed.forEach(([id, name, species, dex]) => {
+  assert.equal(Browse.pokemonSpecies(name), species, name);
+  const row = catalog.species.find(entry => entry.ids.includes(id));
+  assert.ok(row, id + " is on the board");
+  assert.equal(row.name, species, id);
+  assert.equal(row.dex, dex, id);
+});
+assert.equal(Browse.pokemonSpecies("Rayquaza C"), "Rayquaza");
+assert.equal(Browse.pokemonSpecies("Rayquaza C LV.X"), "Rayquaza");
+assert.equal(Browse.pokemonSpecies("Absol G"), "Absol");
+assert.equal(Browse.pokemonSpecies("Charizard G LV.X"), "Charizard");
+assert.equal(Browse.pokemonSpecies("Alakazam E4 LV.X"), "Alakazam");
+assert.equal(Browse.pokemonSpecies("Infernape 4"), "Infernape");
+assert.equal(Browse.pokemonSpecies("Mewtwo LV.X"), "Mewtwo");
+assert.equal(Browse.pokemonSpecies("Garchomp LVX"), "Garchomp");
+assert.equal(Browse.pokemonSpecies("Mr. Mime"), "Mime");
+assert.equal(Browse.pokemonSpecies("Farfetch'd"), "Farfetch'd");
+assert.equal(Browse.pokemonSpecies("Raging Bolt ex"), "Bolt");
+assert.equal(Browse.pokemonSpecies("Porygon-Z"), "Porygon-Z");
+assert.equal(Browse.pokemonSpecies("Ho-Oh"), "Ho-Oh");
+assert.equal(Browse.pokemonSpecies("Dark Charizard"), "Charizard");
+assert.equal(Browse.pokemonSpecies("Light Arcanine"), "Arcanine");
+assert.equal(Browse.pokemonSpecies("Team Rocket's Meowth"), "Meowth");
+assert.equal(Browse.pokemonSpecies("Alolan Vulpix"), "Vulpix");
+assert.equal(Browse.pokemonSpecies("Galarian Mr. Mime"), "Mime");
+assert.equal(Browse.pokemonSpecies("Origin Forme Dialga V"), "Dialga");
+assert.equal(Browse.pokemonSpecies("Origin Forme Palkia V"), "Palkia");
+assert.equal(Browse.pokemonSpecies("Porygon2"), "Porygon2");
+assert.equal(Browse.pokemonSpecies("Charizard ex"), "Charizard");
+assert.equal(Browse.pokemonSpecies("Charizard VMAX"), "Charizard");
+assert.equal(Browse.pokemonSpecies("Charizard-GX"), "Charizard");
+
+const browseIndex = Browse.buildIndex(cache.cards);
+fixed.forEach(([id, name, species]) => {
+  assert.ok(Browse.cardsForSpecies(browseIndex, species).some(card => card.id === id), name + " is on the " + species + " shelf");
+});
+
+const unmapped = [];
+Object.keys(cache.cards).forEach(id => {
+  const rec = cache.cards[id];
+  if (!rec || rec.missing || typeof rec.name !== "string") return;
+  const rows = Array.isArray(rec.history) ? rec.history : [];
+  const priced = rows.some(row => row && Number(row.m) > 0 && /\d{4}/.test(String(row.d || "")));
+  if (!priced) return;
+  const name = rec.name.replace(/\s+/g, " ").trim();
+  if (/\b(?:energy|professor|boss'?s orders)\b/i.test(name)) return;
+  const hits = table.filter(entry => Dex.phraseHit(name, entry.name));
+  if (!hits.length) return;
+  if (!catalog.species.some(entry => entry.ids.includes(id))) unmapped.push(id + " " + name);
+});
+assert.deepEqual(unmapped, []);
 assert.equal(catalogModel.overall.owned, 0);
 assert.equal(catalogModel.overall.pct, 0);
 assert.equal(JSON.stringify(catalogModel).includes("NaN"), false);
@@ -331,7 +401,7 @@ const emptyView = await page.evaluate(() => {
   };
 });
 note(emptyView.current === "page", "Dex tab is current");
-note(emptyView.caught === "Caught 0 of 364", "empty board counts catalog species", emptyView.caught);
+note(emptyView.caught === "Caught 0 of 366", "empty board counts catalog species", emptyView.caught);
 note(emptyView.text.includes("Gen 1: 0/100"), "gen 1 progress uses catalog species", emptyView.text);
 note(emptyView.label === "Bulbasaur #001, missing", "first cell is labelled", emptyView.label);
 note(!emptyView.text.includes("NaN") && !emptyView.text.includes("$0"), "no NaN or $0 on the empty board");
@@ -369,7 +439,7 @@ const wideEmpty = await page.evaluate(() => {
     wide: matchMedia("(min-width: 1024px)").matches
   };
 });
-note(wideEmpty.wide && /Caught 0 of 364/.test(wideEmpty.side), "desktop side panel shows the empty total", wideEmpty.side);
+note(wideEmpty.wide && /Caught 0 of 366/.test(wideEmpty.side), "desktop side panel shows the empty total", wideEmpty.side);
 note(!wideEmpty.rail.some(tab => tab.clipped), "rail labels are not clipped", JSON.stringify(wideEmpty.rail));
 note(!wideEmpty.off.length, "nothing is clipped at 1440x900 empty", wideEmpty.off.join(" | "));
 const wideEmptyAxe = await axe(page, "dex-empty-1440");
@@ -390,7 +460,7 @@ await page.evaluate(() => {
 });
 await page.waitForFunction(() => {
   const node = document.querySelector(".dex-caught");
-  return node && node.textContent.includes("Caught 4 of 364");
+  return node && node.textContent.includes("Caught 4 of 366");
 });
 await settleImages(page);
 const seededWide = await page.evaluate(() => {
@@ -411,7 +481,7 @@ note(seededWide.cells[0] && seededWide.cells[0].label === "Bulbasaur #001, missi
 note(seededWide.cells[1] && seededWide.cells[1].label === "Ivysaur #002, wishlisted" && seededWide.cells[1].state === "wish", "Ivysaur is wishlisted", JSON.stringify(seededWide.cells[1]));
 note(seededWide.cells[2] && seededWide.cells[2].label === "Venusaur #003, owned" && seededWide.cells[2].state === "owned", "Venusaur is owned", JSON.stringify(seededWide.cells[2]));
 note(/3 wishlisted/.test(seededWide.text), "wishlisted count is on the board", seededWide.text.slice(0, 180));
-note(/Caught 4 of 364/.test(seededWide.side), "desktop side panel updates after seeding", seededWide.side);
+note(/Caught 4 of 366/.test(seededWide.side), "desktop side panel updates after seeding", seededWide.side);
 note(!seededWide.text.includes("NaN") && !seededWide.text.includes("$0"), "no NaN or $0 after seeding");
 note(!seededWide.off.length, "nothing is clipped at 1440x900 seeded", seededWide.off.join(" | "));
 const seededWideAxe = await axe(page, "dex-seeded-1440");
@@ -455,7 +525,7 @@ const ownedOnly = await page.evaluate(() => ({
   caught: document.querySelector(".dex-caught").textContent.trim()
 }));
 note(ownedOnly.showing.includes("Showing 4") && ownedOnly.names.some(name => name.startsWith("Venusaur")) && !ownedOnly.names.some(name => name.startsWith("Bulbasaur")) && !ownedOnly.names.some(name => name.startsWith("Ivysaur")), "owned filter keeps caught Pokémon", ownedOnly.names.join(", "));
-note(ownedOnly.caught === "Caught 4 of 364", "filter does not change the caught total", ownedOnly.caught);
+note(ownedOnly.caught === "Caught 4 of 366", "filter does not change the caught total", ownedOnly.caught);
 
 await page.locator(".dex-filters [data-dex-filter=wish]").click();
 await page.waitForFunction(() => {

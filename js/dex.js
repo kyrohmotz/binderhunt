@@ -113,6 +113,18 @@
     return { byFold: byFold, bySpecies: bySpecies };
   }
 
+  function soleMatch(name, table) {
+    let found = null;
+    const list = Array.isArray(table) ? table : [];
+    for (let i = 0; i < list.length; i++) {
+      const entry = list[i];
+      if (!entry || !entry.name || !phraseHit(name, entry.name)) continue;
+      if (found) return null;
+      found = entry;
+    }
+    return found;
+  }
+
   function resolveGroup(group, index) {
     const key = fold(group.name);
     const exact = index.byFold.get(key);
@@ -144,15 +156,13 @@
   function buildSpecies(cards, table, speciesOf, artFor) {
     const unmatched = [];
     if (typeof speciesOf !== "function") return { species: [], unmatched: unmatched };
-    const index = indexTable(table, speciesOf);
-    const groups = groupsFrom(cards, speciesOf);
+    const list = Array.isArray(table) ? table : [];
+    const index = indexTable(list, speciesOf);
     const byDex = new Map();
-    groups.forEach(group => {
-      const match = resolveGroup(group, index);
-      if (!match) {
-        unmatched.push(group.name);
-        return;
-      }
+    const claimed = new Set();
+    const bag = cards && typeof cards === "object" ? cards : {};
+
+    function ensure(match) {
       let row = byDex.get(match.dex);
       if (!row) {
         row = {
@@ -160,24 +170,70 @@
           dex: match.dex,
           gen: match.gen,
           genName: match.genName,
-          browseName: group.name,
+          browseName: "",
           ids: [],
           cards: [],
           art: ""
         };
         byDex.set(match.dex, row);
       }
-      const want = fold(speciesOf(match.name) || match.name);
-      if (!row.browseName || fold(group.name) === want) row.browseName = group.name;
-      group.cards.forEach(card => {
-        if (row.ids.indexOf(card.id) < 0) {
-          row.ids.push(card.id);
-          row.cards.push(card);
-        }
-      });
+      return row;
+    }
+
+    function take(row, card) {
+      if (row.ids.indexOf(card.id) >= 0) return;
+      row.ids.push(card.id);
+      row.cards.push(card);
+    }
+
+    function noteBrowse(row, label, match, allowEmpty) {
+      const name = String(label || "").replace(/\s+/g, " ").trim();
+      if (!name) return;
+      let want = "";
+      try { want = fold(speciesOf(match.name) || match.name); } catch (e) { want = fold(match.name); }
+      if (fold(name) === want || (allowEmpty && !row.browseName)) row.browseName = name;
+    }
+
+    // A title that phrase-matches exactly one national entry is that species.
+    // Titles with two or more (Latias & Latios, Porygon-Z) stay on the
+    // last-species path below so an existing mapping does not move.
+    Object.keys(bag).forEach(id => {
+      const rec = bag[id];
+      if (!id || !rec || typeof rec !== "object" || rec.missing) return;
+      const name = typeof rec.name === "string" ? rec.name.replace(/\s+/g, " ").trim() : "";
+      if (!name) return;
+      const hit = soleMatch(name, list);
+      if (!hit) return;
+      const row = ensure(hit);
+      take(row, { id: id, name: name });
+      let label = "";
+      try { label = speciesOf(name) || ""; } catch (e) { label = ""; }
+      noteBrowse(row, label, hit, false);
+      claimed.add(id);
+    });
+
+    const rest = {};
+    Object.keys(bag).forEach(id => {
+      if (!claimed.has(id)) rest[id] = bag[id];
+    });
+    const groups = groupsFrom(rest, speciesOf);
+    groups.forEach(group => {
+      const match = resolveGroup(group, index);
+      if (!match) {
+        unmatched.push(group.name);
+        return;
+      }
+      const row = ensure(match);
+      noteBrowse(row, group.name, match, true);
+      group.cards.forEach(card => take(row, card));
     });
     const species = [...byDex.values()].sort((a, b) => a.dex - b.dex || a.name.localeCompare(b.name));
     species.forEach(row => {
+      if (!row.browseName) {
+        let fallback = "";
+        try { fallback = speciesOf(row.name) || ""; } catch (e) { fallback = ""; }
+        row.browseName = String(fallback || row.name).replace(/\s+/g, " ").trim() || row.name;
+      }
       const ranked = row.cards.slice().sort((a, b) => {
         const diff = rankCard(b, row.name) - rankCard(a, row.name);
         if (diff) return diff;
