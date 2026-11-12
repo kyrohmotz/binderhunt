@@ -453,7 +453,7 @@ function loadSettings(){
     return { sound:!!raw.sound, haptics:raw.haptics !== false, reduce:raw.reduce === "on" || raw.reduce === "off" ? raw.reduce : "auto", currency:raw.currency === "EUR" ? "EUR" : "USD" };
   } catch (e) { return blank; }
 }
-function saveWish(){ try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {} paintContext(); paintCount(); if (tab === "binders") renderBinders(); if (tab === "sets") renderSets(); if (tab === "value" && window.BinderValueUI) window.BinderValueUI.refresh(); }
+function saveWish(){ try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {} paintContext(); paintCount(); if (tab === "binders") renderBinders(); if (tab === "sets") renderSets(); if (tab === "value" && window.BinderValueUI) window.BinderValueUI.refresh(); if (tab === "dex" && window.BinderDexUI) window.BinderDexUI.refresh(); }
 function saveBinders(){ try { localStorage.setItem(binderStorageKey(), JSON.stringify(binderState)); } catch (e) {} if (tab === "binders") renderBinders(); paintDiscovery(); paintRail(); }
 function saveFilters(){
   if (filters.set) rememberedSet = "";
@@ -554,6 +554,7 @@ function saveOwned(){
   try { localStorage.setItem(OWNED_KEY, JSON.stringify(payload)); } catch (e) {}
   paintRail();
   if (tab === "value" && window.BinderValueUI) window.BinderValueUI.refresh();
+  if (tab === "dex" && window.BinderDexUI) window.BinderDexUI.refresh();
 }
 function blankLog(){ return { v:1, days:[], events:[] }; }
 function loadLog(){
@@ -1423,6 +1424,7 @@ function applyScrydex(){
   if (tab === "binders") renderBinders();
   else paintRail();
   if (tab === "value" && window.BinderValueUI) window.BinderValueUI.refresh();
+  if (tab === "dex" && window.BinderDexUI) window.BinderDexUI.refresh();
   ensureTargets().then(() => { if (scrydex.ready) paintDealsBadge(); }).catch(() => {});
 }
 /* The price cache is about 26MB. Parsing it on the page thread freezes swipes,
@@ -3396,6 +3398,7 @@ function paintContext(){
   }
   else if (tab === "daily") label = "Today's Drop";
   else if (tab === "value") label = "Value";
+  else if (tab === "dex") label = "Pokédex";
   else if (b) label = b.name;
   else if (filters.gem && filters.set) label = "Gemfinder · " + (setName(filters.set) || "Set");
   else if (filters.gem) label = "Gemfinder";
@@ -3432,6 +3435,7 @@ function paintSide(){
   else if (tab === "binders") renderBinderSide();
   else if (tab === "daily") renderDailySide();
   else if (tab === "value") renderValueSide();
+  else if (tab === "dex") renderDexSide();
   else paintDeckSummary(currentTop());
 }
 function setSideStats(){
@@ -3687,6 +3691,20 @@ function loadScript(src){
   });
 }
 let valueAssets = null;
+let dexAssets = null;
+function ensureDexView(){
+  const host = document.getElementById("dexScroll");
+  if (!host) return;
+  if (window.BinderDexUI) { window.BinderDexUI.open(host); return; }
+  host.innerHTML = `<p class="dex-wait" role="status">Opening the Pokédex…</p>`;
+  if (!dexAssets) dexAssets = loadScript("js/dex.js").then(() => loadScript("js/dex-ui.js"));
+  dexAssets.then(() => {
+    if (tab === "dex" && window.BinderDexUI) window.BinderDexUI.open(host);
+  }).catch(() => {
+    dexAssets = null;
+    if (tab === "dex" && host) host.innerHTML = `<p class="empty-state">The Pokédex didn't load. Try the Dex tab again in a moment.</p>`;
+  });
+}
 function ensureValueView(){
   const host = document.getElementById("valueScroll");
   if (!host) return;
@@ -3699,6 +3717,17 @@ function ensureValueView(){
     valueAssets = null;
     if (tab === "value" && host) host.innerHTML = `<p class="empty-state">The value view didn't load. Try the Value tab again in a moment.</p>`;
   });
+}
+function renderDexSide(){
+  const summary = window.BinderDexUI && window.BinderDexUI.summaryText ? window.BinderDexUI.summaryText() : "Reading the saved catalog.";
+  const key = "dex:" + summary;
+  if (key === sideKey && profileEl.querySelector("[data-side='dex']")) return;
+  sideKey = key;
+  summaryId = "";
+  profileEl.hidden = false;
+  shell.classList.remove("no-profile");
+  markProfile(false);
+  profileEl.innerHTML = `<div class="profile-scroll" data-side="dex"><p class="eyebrow">Pokédex</p><h2 class="pname" id="profileTitle">Your Pokédex</h2><p class="fine">${esc(summary)}</p><p class="fine">Full color means you own a card. A rose outline means it is only on the wishlist. Grey means it is still out there. Tap a Pokémon to open its cards.</p></div>`;
 }
 function renderValueSide(){
   if (sideKey === "value" && profileEl.querySelector("[data-side='value']")) return;
@@ -3719,12 +3748,15 @@ function showTab(name){
   if (dailyView) dailyView.hidden = name !== "daily";
   const valueView = document.getElementById("viewValue");
   if (valueView) valueView.hidden = name !== "value";
+  const dexView = document.getElementById("viewDex");
+  if (dexView) dexView.hidden = name !== "dex";
   document.querySelectorAll("[data-tab]").forEach(btn => btn.setAttribute("aria-current", btn.dataset.tab === name ? "page" : "false"));
   if (wide()) { profilePinned = false; profileCard = null; pinnedTopId = ""; summaryId = ""; sideKey = ""; }
   if (name === "sets") renderSets();
   if (name === "binders") renderBinders();
   if (name === "daily" && typeof window.renderDaily === "function") window.renderDaily();
   if (name === "value") ensureValueView();
+  if (name === "dex") ensureDexView();
   paintContext(); paintDiscovery();
   if (typeof window.paintDailyBadge === "function") window.paintDailyBadge();
   if (name === "hunt") renderDeck();
