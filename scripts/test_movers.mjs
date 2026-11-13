@@ -18,7 +18,7 @@ const Value = require(resolve(root, "js/value.js"));
 const sw = readFileSync(resolve(root, "sw.js"), "utf8");
 const html = readFileSync(resolve(root, "index.html"), "utf8");
 const app = readFileSync(resolve(root, "js/app.js"), "utf8");
-assert.match(sw, /const VERSION = "bh-17"/);
+assert.match(sw, /const VERSION = "bh-18"/);
 assert.match(sw, /"js\/movers\.js"/);
 assert.match(sw, /"js\/movers-ui\.js"/);
 assert.match(sw, /"css\/movers\.css"/);

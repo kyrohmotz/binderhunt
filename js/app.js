@@ -3200,7 +3200,7 @@ function markProfile(dialog){
   }
 }
 function outsideModal(){
-  return ["filterSheet","settingsSheet","binderSheet","fillSheet","onboard","dropPrompt","showcase"].some(id => {
+  return ["filterSheet","settingsSheet","binderSheet","fillSheet","budgetSheet","onboard","dropPrompt","showcase"].some(id => {
     const el = document.getElementById(id);
     return el && !el.hidden;
   });
@@ -3222,7 +3222,8 @@ function blocking(){
   const daily = document.getElementById("viewDaily");
   const value = document.getElementById("viewValue");
   const showcase = document.getElementById("showcase");
-  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (prompt && !prompt.hidden) || (showcase && !showcase.hidden) || (daily && !daily.hidden) || (value && !value.hidden) || (!profileEl.hidden && !wide());
+  const budget = document.getElementById("budgetSheet");
+  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || (budget && !budget.hidden) || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (prompt && !prompt.hidden) || (showcase && !showcase.hidden) || (daily && !daily.hidden) || (value && !value.hidden) || (!profileEl.hidden && !wide());
 }
 function keepSwipeFocus(trigger){
   const box = document.getElementById("hapticSwitch");
@@ -3436,6 +3437,7 @@ function paintContext(){
     else if (binderView.kind === "wish") label = "Wishlist";
     else if (binderView.kind === "deals") label = "Deals";
     else if (binderView.kind === "movers") label = "Movers";
+    else if (binderView.kind === "plan") label = "Buy plan";
     else label = (binderState.binders.find(x => x.id === binderView.id) || {}).name || "Binders";
   }
   else if (tab === "daily") label = "Today's Drop";
@@ -3468,7 +3470,7 @@ function paintContext(){
 /* On a desktop, an open binder takes the side panel's room too. The panel
    comes back as soon as a card's details are opened. */
 function syncReadingWide(){
-  const bookOpen = binderView && binderView.kind !== "deals" && binderView.kind !== "movers";
+  const bookOpen = binderView && binderView.kind !== "deals" && binderView.kind !== "movers" && binderView.kind !== "plan";
   shell.classList.toggle("reading-wide", wide() && tab === "binders" && !!bookOpen && !profilePinned);
 }
 function paintSide(){
@@ -3514,6 +3516,7 @@ function binderSideKey(){
   if (!binderView) return "shelf:" + wish.length + ":" + binderState.binders.length + ":" + ownedIds.size;
   if (binderView.kind === "wish") return "wish:" + wish.length + ":" + ownedIds.size;
   if (binderView.kind === "movers") return "movers";
+  if (binderView.kind === "plan") return "plan";
   const b = binderState.binders.find(x => x.id === binderView.id);
   const theme = b ? themeOf(b) : null;
   return "binder:" + binderView.id + ":" + ((b && b.cards) || []).length + ":" + ownedIds.size + ":" + (b ? b.name : "") + ":" + (b ? b.color : "") + ":" + (theme ? theme.kind + theme.setId + theme.type + theme.name : "") + ":" + (b && binderState.discoveryId === b.id ? "1" : "0");
@@ -3566,6 +3569,10 @@ function renderBinderSide(){
   }
   if (binderView.kind === "movers") {
     profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Market movers</p><h2 class="pname" id="profileTitle">Check back</h2><p class="fine">Risers and fallers from the cached history. Seven and thirty days both end on each card's latest saved price.</p><p class="fine">Swipe the movers to hunt that list. When it runs out, the usual hunt continues.</p></div>`;
+    return;
+  }
+  if (binderView.kind === "plan") {
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Buy plan</p><h2 class="pname" id="profileTitle">One card at a time</h2><p class="fine">Pick a monthly number and stick with it. Wishlist cards that fit what's left show up with the cached price.</p><p class="fine">I bought it marks the card as yours and moves the ring. A card with no cached price waits on the list.</p></div>`;
     return;
   }
   if (binderView.kind === "wish") {
@@ -5034,10 +5041,73 @@ function paintTargetSlot(card, focusId){
     if (again) again.focus();
   }
 }
+let budgetAssets = null;
+function ensureBudget(){
+  if (window.BinderBudgetUI && window.BinderBudget) return Promise.resolve(window.BinderBudgetUI);
+  if (budgetAssets) return budgetAssets;
+  budgetAssets = loadStyle("css/budget.css").then(() => loadScript("js/budget.js")).then(() => loadScript("js/budget-ui.js")).then(() => window.BinderBudgetUI);
+  budgetAssets.catch(() => { budgetAssets = null; });
+  return budgetAssets;
+}
+function budgetHooks(){
+  return {
+    storage: () => window.localStorage,
+    now: () => new Date(),
+    wish: () => (Array.isArray(wish) ? wish : []),
+    owned: id => ownedIds.has(id),
+    cards: () => (scrydex && scrydex.cards) || {},
+    ready: () => !!(scrydex && scrydex.ready),
+    load: () => (typeof loadScrydex === "function" ? loadScrydex() : Promise.resolve()),
+    targets: () => (window.BinderTargets ? BinderTargets.read(localStorage) : {}),
+    ensureTargets: () => (typeof ensureTargets === "function" ? ensureTargets() : Promise.resolve()),
+    own: (card, on) => setOwned(card, !!on, "plan"),
+    paintArt: (host, card) => paintArt(host, card, { priority:"low", lazy:true }),
+    announce: text => announce(text),
+    goHunt: () => showTab("hunt"),
+    open: card => { if (card) openProfile(card); },
+    openSheet: () => openSheet("budgetSheet"),
+    closeSheet: () => closeSheet("budgetSheet"),
+    pop: btn => popBtn(btn),
+    onBack: () => {
+      binderView = null;
+      renderBinders();
+      const next = document.getElementById("openPlan") || document.getElementById("openWish");
+      if (next) next.focus();
+    }
+  };
+}
+function renderPlan(root){
+  if (!root) return;
+  root.classList.remove("reading");
+  if (window.BinderBudgetUI && window.BinderBudget) {
+    window.BinderBudgetUI.open(root, budgetHooks());
+    paintContext();
+    return;
+  }
+  root.innerHTML = `<div class="plan-wrap"><div class="booktools"><button class="chip" id="planBack" type="button">All binders</button></div><h2 class="plan-title">Buy plan</h2><p class="plan-wait" role="status">Opening your buy plan…</p></div>`;
+  const back = document.getElementById("planBack");
+  if (back) back.onclick = () => { binderView = null; renderBinders(); };
+  paintContext();
+  ensureBudget().then(() => {
+    if (!(tab === "binders" && binderView && binderView.kind === "plan")) return;
+    if (window.BinderBudgetUI) window.BinderBudgetUI.open(root, budgetHooks());
+  }).catch(() => {
+    if (!(tab === "binders" && binderView && binderView.kind === "plan")) return;
+    root.innerHTML = `<div class="plan-wrap"><div class="booktools"><button class="chip" id="planBack" type="button">All binders</button></div><p class="empty-state">The buy plan didn't load. Open it again in a moment.</p></div>`;
+    const again = document.getElementById("planBack");
+    if (again) again.onclick = () => { binderView = null; renderBinders(); };
+  });
+}
+function openPlan(){
+  binderView = { kind:"plan" };
+  if (tab !== "binders") showTab("binders");
+  else renderBinders();
+}
 function renderBinders(){
   const root = document.getElementById("bindersScroll");
   if (binderView && binderView.kind === "deals") { renderDeals(root); return; }
   if (binderView && binderView.kind === "movers") { renderMovers(root); return; }
+  if (binderView && binderView.kind === "plan") { renderPlan(root); return; }
   if (binderView) { renderCollection(root); return; }
   root.classList.remove("reading");
   const total = valueOf(wish);
@@ -5050,6 +5120,7 @@ function renderBinders(){
   root.innerHTML = `<div class="wish-slot"><button class="wish-row" id="openWish" type="button">${peekMarkup(wish, "wish-peek")}<span class="wish-copy"><span class="eyebrow">All saved cards</span><b>Wishlist</b><span class="wish-meta">${esc(wishMeta)}</span><span class="fine">${esc(wishSub)}</span></span>${droppedCountMarkup(dropped)}<span class="wish-go" aria-hidden="true">Open →</span></button><button class="chip wish-share" id="shareWish" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button></div>
     <button class="deals-row" id="openDeals" type="button"><span class="deals-copy"><span class="eyebrow">Price alerts</span><b>Deals</b><span class="fine">Cards at your target, or down since you saved one.</span></span><span class="deals-badge" data-deals-count hidden aria-hidden="true"></span></button>
     <button class="movers-row" id="openMovers" type="button"><span class="deals-copy"><span class="eyebrow">Cached market</span><b>Market movers</b><span class="fine">Risers and fallers over 7 and 30 days.</span></span></button>
+    <button class="plan-shelf" id="openPlan" type="button"><span class="deals-copy"><span class="eyebrow">This month</span><b>Buy plan</b><span class="fine">Wishlist cards that fit the number you picked.</span></span></button>
     <div class="shelf-head"><h2 class="shelf-title">Your binders</h2><p class="fine">Right-swipe always lands on your wishlist. A themed binder is another home for the same card.</p></div>
     <div class="shelf-scene"><div class="shelf" id="shelf"></div></div>`;
   const shelf = document.getElementById("shelf");
@@ -5111,6 +5182,8 @@ function renderBinders(){
   document.getElementById("openDeals").onclick = () => openDeals("shelf");
   const moversBtn = document.getElementById("openMovers");
   if (moversBtn) moversBtn.onclick = () => openMovers();
+  const planBtn = document.getElementById("openPlan");
+  if (planBtn) planBtn.onclick = () => openPlan();
   document.getElementById("shareWish").onclick = () => {
     if (window.BinderShare) BinderShare.openCollection({ kind:"wish", name:"Wishlist", color:"#E4E7DA", cards:wish, ownedIds });
   };
@@ -5141,7 +5214,8 @@ function showToast(text, undo){
     toast.id = "binderToast";
     toast.className = "toast";
     toast.innerHTML = `<span></span><button type="button">Undo</button>`;
-    document.body.append(toast);
+    const home = document.querySelector("main.stage") || document.body;
+    home.append(toast);
   }
   toast.hidden = false;
   toast.querySelector("span").textContent = text;
@@ -7088,7 +7162,7 @@ function openSettingsPanel(){
     <label class="field">Currency<select id="setCur"><option value="USD">US dollars</option><option value="EUR">Cardmarket euros</option></select></label>
     <button class="chip" id="retakeOnboard" type="button">Retake the hunt quiz</button>
     <h2>About</h2>
-    <p class="fine">BinderHunt is not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. There is no account. Wishlists, binders, price alerts, owned marks, filters, settings, and the daily streak stay in this browser.</p>
+    <p class="fine">BinderHunt is not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. There is no account. Wishlists, binders, price alerts, the monthly budget, owned marks, filters, settings, and the daily streak stay in this browser.</p>
     <p class="fine">A public hit counter records page views, one visit a day, and a few actions, including playing the daily drop. It sets no cookies and sends no identifier, and it stays off when Do Not Track is on.</p>
     <p class="fine">Card text and images come from TCGdex. US prices come from TCGplayer. European prices come from Cardmarket. Commons and cards under $10 use those catalog prices. Graded prices and population come from a Scrydex cache for chase cards and cards you open or save often, and only for the printing on screen. Prices are estimates, not financial advice. TCGplayer, eBay, and Cardmarket links are not affiliate links yet.</p>
     <p class="fine"><img src="assets/brand/two-toads-logo.png" width="32" height="32" alt="Two Toads" decoding="async" fetchpriority="low"> BinderHunt · made with 🐸 by Two Toads</p>`;
@@ -7112,6 +7186,8 @@ document.querySelectorAll(".backdrop").forEach(btn => btn.onclick = () => {
 document.getElementById("openFilters").onclick = () => openFilter("all", document.getElementById("openFilters"));
 document.getElementById("filterDone").onclick = () => closeSheet("filterSheet");
 document.getElementById("settingsDone").onclick = () => closeSheet("settingsSheet");
+const budgetDone = document.getElementById("budgetDone");
+if (budgetDone) budgetDone.onclick = () => closeSheet("budgetSheet");
 document.getElementById("resetFilters").onclick = () => clearAllFilters();
 document.getElementById("stopDiscovery").onclick = () => stopDiscoveryHunt();
 document.getElementById("switchDiscovery").onclick = () => openBinderSwitch("hunt");
@@ -7161,7 +7237,7 @@ function trapTab(event, root){
 document.addEventListener("keydown", e => {
   const menu = document.getElementById("menu");
   if (menu && !menu.hidden && e.key === "Tab") { trapTab(e, menu); return; }
-  const open = ["fillSheet","binderSheet","settingsSheet","filterSheet","dropPrompt"].map(id => document.getElementById(id)).find(el => el && !el.hidden);
+  const open = ["fillSheet","binderSheet","settingsSheet","filterSheet","budgetSheet","dropPrompt"].map(id => document.getElementById(id)).find(el => el && !el.hidden);
   const onboardLayer = document.getElementById("onboard");
   const showcaseLayer = document.getElementById("showcase");
   const layer = !open && onboardLayer && !onboardLayer.hidden ? onboardLayer : (!open && showcaseLayer && !showcaseLayer.hidden ? showcaseLayer : null);
@@ -7175,7 +7251,13 @@ document.addEventListener("keydown", e => {
     const showcase = document.getElementById("showcase");
     if (showcase && !showcase.hidden) { closeShowcase(); return; }
     if (menu && !menu.hidden) { closeMenu(); return; }
-    ["fillSheet","binderSheet","settingsSheet","filterSheet"].forEach(id => { if (!document.getElementById(id).hidden) closeSheet(id); });
+    const budgetSheet = document.getElementById("budgetSheet");
+    const budgetWasOpen = budgetSheet && !budgetSheet.hidden;
+    ["fillSheet","binderSheet","settingsSheet","filterSheet","budgetSheet"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && !el.hidden) closeSheet(id);
+    });
+    if (budgetWasOpen) return;
     const prompt = document.getElementById("dropPrompt");
     if (prompt && !prompt.hidden) {
       const back = prompt._opener;
@@ -7188,6 +7270,13 @@ document.addEventListener("keydown", e => {
       else if (deck) deck.focus();
     }
     if (!profileEl.hidden && !wide()) { closeProfile(); return; }
+    if (tab === "binders" && binderView && binderView.kind === "plan" && !profilePinned) {
+      binderView = null;
+      renderBinders();
+      const next = document.getElementById("openPlan") || document.getElementById("openWish");
+      if (next) next.focus();
+      return;
+    }
     if (tab === "binders" && binderView && binderView.kind === "deals" && !profilePinned) { closeDeals(); return; }
     return;
   }

@@ -1,0 +1,245 @@
+/* Monthly budget and the buy plan. Sage for what fits, rose when a month runs past its number. */
+
+.plan-wrap{
+  width:min(100%,720px);
+  margin:0 auto;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  padding-bottom:12px;
+  min-width:0;
+}
+.plan-title{
+  font-family:var(--display);
+  font-weight:800;
+  font-size:clamp(26px,7vw,34px);
+  line-height:1.1;
+  margin:0;
+}
+.plan-lead{margin:0}
+.plan-head{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  background:#fff;
+  border:2.5px solid var(--ink);
+  border-radius:22px;
+  padding:14px;
+  box-shadow:3px 3px 0 var(--ink);
+  min-width:0;
+}
+.plan-head.over{background:linear-gradient(180deg,#fff 18%,#fdeeee)}
+.plan-head.invite{background:linear-gradient(180deg,#fff 30%,#eef2e4)}
+.plan-meter{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+.plan-meter .ring{width:96px;height:96px}
+.plan-meter .ring text{font-size:13px}
+.plan-head .ring-val{stroke:#737863;transition:stroke-dasharray .4s ease}
+.plan-head.over .ring-val{stroke:#e7b4b4}
+.plan-meter-copy{min-width:0;flex:1}
+.plan-left{
+  font-family:Nunito,sans-serif;
+  font-weight:800;
+  font-size:clamp(26px,8vw,36px);
+  line-height:1.05;
+  margin:0;
+  font-variant-numeric:tabular-nums;
+  overflow-wrap:anywhere;
+}
+.plan-bar{
+  height:14px;
+  border:2.5px solid var(--ink);
+  border-radius:999px;
+  background:#fff;
+  overflow:hidden;
+}
+.plan-bar span{
+  display:block;
+  height:100%;
+  width:0;
+  background:#ABB28D;
+  transition:width .4s ease;
+}
+.plan-head.over .plan-bar span{background:#F6C9C9}
+.plan-tools{display:flex;flex-wrap:wrap;gap:8px}
+.plan-body .plan-buy,.plan-body .plan-undo{align-self:flex-start;width:auto;min-width:9.5em;max-width:100%;padding:0 18px}
+.plan-save,.plan-buy,.plan-change,.plan-undo{
+  min-height:44px;
+  border:2.5px solid var(--ink);
+  border-radius:999px;
+  background:#ABB28D;
+  color:var(--ink);
+  padding:0 14px;
+  font-family:var(--display);
+  font-weight:700;
+  box-shadow:2px 2px 0 var(--ink);
+}
+.plan-skip,.plan-later{
+  min-height:44px;
+  border:2.5px solid var(--ink);
+  border-radius:999px;
+  background:#F6C9C9;
+  color:var(--ink);
+  padding:0 14px;
+  font-family:var(--display);
+  font-weight:700;
+  box-shadow:2px 2px 0 var(--ink);
+}
+.plan-change,.plan-undo{background:#fff}
+.plan-save:active,.plan-buy:active,.plan-skip:active,.plan-later:active,.plan-change:active,.plan-undo:active,.plan-open:active{
+  transform:translate(1px,1px);
+  box-shadow:1px 1px 0 var(--ink);
+}
+.plan-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.plan-actions .plan-save{margin-left:auto}
+.plan-section{display:flex;flex-direction:column;gap:8px;min-width:0}
+.plan-h{font-family:var(--display);font-weight:700;font-size:18px;margin:0}
+.plan-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.plan-card{
+  display:grid;
+  grid-template-columns:64px minmax(0,1fr);
+  gap:10px;
+  align-items:start;
+  background:#fff;
+  border:2.5px solid var(--ink);
+  border-radius:18px;
+  padding:10px;
+  box-shadow:2px 2px 0 var(--ink);
+  min-width:0;
+}
+.plan-card.fits{background:linear-gradient(180deg,#fff 55%,#f4f7ee)}
+.plan-card.over-card{background:linear-gradient(180deg,#fff 70%,#fff8f2)}
+.plan-open{
+  width:64px;
+  min-height:84px;
+  padding:0;
+  border:0;
+  background:transparent;
+  border-radius:10px;
+}
+.plan-art{
+  display:grid;
+  place-items:center;
+  width:64px;
+  height:88px;
+  border-radius:10px;
+  overflow:hidden;
+  background:var(--paper-2);
+  border:1.5px solid var(--ink);
+}
+.plan-art img{width:100%;height:100%;object-fit:contain;background:#fff}
+.plan-art .cardback{width:100%;height:100%;border:0;box-shadow:none}
+.plan-body{min-width:0;display:flex;flex-direction:column;gap:4px}
+.plan-top{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:8px;min-width:0}
+.plan-price{
+  margin:0;
+  font-family:Nunito,sans-serif;
+  font-weight:800;
+  font-size:clamp(22px,6.4vw,28px);
+  line-height:1.05;
+  font-variant-numeric:tabular-nums;
+  overflow-wrap:anywhere;
+  min-width:0;
+}
+.plan-price.missing{font-family:var(--display);font-size:18px;font-weight:700}
+.plan-fit{
+  flex:none;
+  border:2px solid var(--ink);
+  border-radius:999px;
+  padding:3px 8px;
+  font-family:var(--display);
+  font-weight:700;
+  font-size:13px;
+  line-height:1.2;
+  background:#ABB28D;
+  box-shadow:1px 1px 0 var(--ink);
+}
+.plan-fit.later{background:#F3EDC8}
+.plan-name{
+  margin:0;
+  font-family:var(--display);
+  font-weight:700;
+  font-size:16px;
+  line-height:1.25;
+  overflow-wrap:anywhere;
+}
+.plan-meta{margin:0}
+.plan-pay{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:flex-end;
+  margin-top:4px;
+}
+.plan-pay label{display:flex;flex-direction:column;gap:4px;font-family:var(--display);font-weight:700;font-size:14px;min-width:0}
+.plan-pay input{
+  width:7.5em;
+  max-width:100%;
+  min-height:44px;
+  border:2.5px solid var(--ink);
+  border-radius:12px;
+  padding:8px 10px;
+  background:var(--paper);
+  font-variant-numeric:tabular-nums;
+}
+.plan-empty{
+  text-align:left;
+  background:var(--butter);
+  border:2.5px solid var(--ink);
+  border-radius:22px;
+  padding:16px;
+  box-shadow:3px 3px 0 var(--ink);
+}
+.plan-empty h3{font-family:var(--display);margin:0 0 6px}
+.plan-empty p{margin:0}
+.plan-empty .plan-save{margin-top:12px}
+.plan-wait,.plan-error{margin:0}
+.plan-error{color:#8d4a4a;font-weight:800}
+.plan-error[hidden]{display:none}
+#budgetSheet .field{font-family:var(--display)}
+#budgetSheet .field input{
+  min-height:44px;
+  border:2.5px solid var(--ink);
+  border-radius:12px;
+  padding:10px;
+  background:#fff;
+  font-variant-numeric:tabular-nums;
+}
+html.reduce .plan-save:active,
+html.reduce .plan-buy:active,
+html.reduce .plan-skip:active,
+html.reduce .plan-later:active,
+html.reduce .plan-change:active,
+html.reduce .plan-undo:active,
+html.reduce .plan-open:active,
+html.reduce .plan-shelf:active{transform:none}
+html.reduce .plan-head .ring-val,
+html.reduce .plan-bar span{transition:none}
+@media (prefers-reduced-motion:reduce){
+  html:not(.motion-on) .plan-save:active,
+  html:not(.motion-on) .plan-buy:active,
+  html:not(.motion-on) .plan-skip:active,
+  html:not(.motion-on) .plan-later:active,
+  html:not(.motion-on) .plan-change:active,
+  html:not(.motion-on) .plan-undo:active,
+  html:not(.motion-on) .plan-open:active,
+  html:not(.motion-on) .plan-shelf:active{transform:none}
+  html:not(.motion-on) .plan-head .ring-val,
+  html:not(.motion-on) .plan-bar span{transition:none}
+}
+@media (min-width:1024px){
+  #budgetSheet .sheet-card{
+    left:50%;
+    right:auto;
+    width:min(440px,calc(100% - 32px));
+    transform:translateX(-50%);
+    bottom:24px;
+    border-bottom:2.5px solid var(--ink);
+    border-radius:22px;
+  }
+  .plan-title{font-size:34px}
+}
