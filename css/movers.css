@@ -1,0 +1,99 @@
+/* Market movers. Loaded with the movers view, after the shelf is opened. */
+.movers-wrap{min-width:0;max-width:960px;margin:0 auto;padding:0 0 28px}
+.movers-title{font-family:var(--display);font-weight:800;font-size:28px;line-height:1.15;margin:4px 0 6px}
+.movers-lead{margin:0 0 12px}
+.movers-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.movers-windows{display:flex;gap:8px;flex:1 1 16em;min-width:0}
+.movers-windows button{
+  flex:1 1 7.5em;
+  min-height:44px;
+  min-width:0;
+  border:2.5px solid var(--ink);
+  border-radius:999px;
+  background:#fff;
+  padding:8px 12px;
+  font-family:var(--display);
+  font-weight:700;
+  box-shadow:2px 2px 0 var(--ink);
+}
+.movers-windows button[aria-checked="true"]{background:var(--sky);box-shadow:2px 2px 0 var(--ink)}
+.movers-swipe{
+  flex:1 1 100%;
+  width:100%;
+  min-height:48px;
+  border:2.5px solid var(--ink);
+  border-radius:999px;
+  background:#ABB28D;
+  color:#1F1F1E;
+  padding:10px 16px;
+  font-family:var(--display);
+  font-weight:700;
+  box-shadow:3px 3px 0 var(--ink);
+}
+.movers-board{display:flex;flex-direction:column;gap:16px;min-width:0}
+.movers-col{min-width:0}
+.movers-h{font-family:var(--display);font-weight:800;font-size:22px;margin:0 0 8px}
+.movers-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.mover-row{
+  width:100%;
+  display:grid;
+  grid-template-columns:56px minmax(0,1fr) minmax(6.5em,9.2em);
+  gap:8px;
+  align-items:center;
+  text-align:left;
+  background:#fff;
+  border:2.5px solid var(--ink);
+  border-radius:16px;
+  padding:8px;
+  box-shadow:3px 3px 0 var(--ink);
+  min-height:44px;
+  min-width:0;
+}
+.mover-row.up{background:linear-gradient(180deg,#fff 55%,#eef2e4)}
+.mover-row.down{background:linear-gradient(180deg,#fff 55%,#fdeeee)}
+.mover-art{
+  width:56px;
+  aspect-ratio:63/88;
+  border-radius:8px;
+  overflow:hidden;
+  background:var(--paper-2);
+  border:2px solid var(--ink);
+  display:block;
+}
+.mover-art img{width:100%;height:100%;object-fit:cover;display:block;background:#fff}
+.mover-copy{min-width:0;display:flex;flex-direction:column;gap:2px}
+.mover-name{font-family:var(--display);font-size:16px;line-height:1.2;overflow-wrap:anywhere}
+.mover-badges{display:flex;flex-wrap:wrap;gap:4px}
+.mover-badge{
+  display:inline-block;
+  border:1.5px solid var(--ink);
+  border-radius:999px;
+  padding:0 6px;
+  background:#fff;
+  color:#1F1F1E;
+  font-family:Nunito,sans-serif;
+  font-weight:800;
+  font-size:11px;
+  line-height:1.45;
+}
+.mover-badge.owned{background:#ABB28D}
+.mover-badge.wish{background:#F6C9C9}
+.mover-spark{width:88px;height:28px;display:block;max-width:100%}
+.mover-change{min-width:0;text-align:right;font-variant-numeric:tabular-nums;line-height:1.15;overflow-wrap:anywhere}
+.mover-change b{display:block;font-family:Nunito,sans-serif;font-weight:800}
+.mover-change .pct{display:block;font-weight:800}
+.mover-change.down b,.mover-change.down .pct{color:#8d4a4a}
+.movers-empty{margin:0}
+.movers-wrap .booktools .chip{min-height:44px}
+html.reduce .movers-row:active,html.reduce .mover-row:active,html.reduce .movers-swipe:active,html.reduce .movers-windows button:active{transform:none}
+@media (prefers-reduced-motion:reduce){
+  html:not(.motion-on) .movers-row:active,html:not(.motion-on) .mover-row:active,html:not(.motion-on) .movers-swipe:active,html:not(.motion-on) .movers-windows button:active{transform:none}
+}
+@media (min-width:1024px){
+  .movers-title{font-size:32px}
+  .movers-tools{flex-wrap:nowrap}
+  .movers-swipe{flex:0 1 auto;width:auto}
+  .movers-board{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+  .mover-row{grid-template-columns:64px minmax(0,1fr) minmax(7em,9.2em)}
+  .mover-art{width:64px}
+}
