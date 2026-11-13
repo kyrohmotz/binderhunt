@@ -13924,6 +13924,16 @@
       "source": "tcgplayer",
       "eur": 9.04,
       "at": "2026-11-12T16:35:43Z"
+    },
+    "2026-11-15": {
+      "id": "me02-102",
+      "price": 3.47,
+      "variant": "holofoil",
+      "printing": "Holofoil",
+      "alts": 1,
+      "source": "tcgplayer",
+      "eur": 2.47,
+      "at": "2026-11-13T15:55:26Z"
     }
   }
 }
