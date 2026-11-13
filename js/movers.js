@@ -19,6 +19,12 @@
   const MIN_PCT = 1;
   const SPARK_CAP = 16;
   const DEFAULT_LIMIT = 12;
+  // A point more than 3x away from the median of its neighbors is a spike
+  // unless the next or previous print agrees. A move past 60% also needs
+  // the latest print confirmed by a neighbor inside this band.
+  const SPIKE_RATIO = 3;
+  const BIG_MOVE = 60;
+  const CONFIRM_RATIO = 1.25;
 
   let cache = null;
 
@@ -172,6 +178,55 @@
     };
   }
 
+  function priceRatio(a, b) {
+    if (!(a > 0) || !(b > 0)) return Infinity;
+    return Math.max(a, b) / Math.min(a, b);
+  }
+
+  function neighborAgrees(points, index) {
+    const point = points && points[index];
+    if (!point || !(point.value > 0)) return false;
+    const agree = other => other && other.value > 0 && priceRatio(other.value, point.value) <= CONFIRM_RATIO;
+    return agree(points[index - 1]) || agree(points[index + 1]);
+  }
+
+  function surroundingMedian(points, index) {
+    const values = [];
+    const start = Math.max(0, index - 6);
+    const end = Math.min(points.length - 1, index + 6);
+    for (let i = start; i <= end; i++) {
+      if (i === index) continue;
+      const point = points[i];
+      if (point && point.value > 0) values.push(point.value);
+    }
+    if (!values.length) return null;
+    values.sort((a, b) => a - b);
+    const mid = Math.floor(values.length / 2);
+    return values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
+  }
+
+  function isolatedEndpoint(points, index) {
+    if (!points || !points[index] || neighborAgrees(points, index)) return false;
+    const med = surroundingMedian(points, index);
+    const point = points[index];
+    if (med == null || !(point.value > 0)) return false;
+    return priceRatio(point.value, med) > SPIKE_RATIO;
+  }
+
+  function outlierReason(points, move) {
+    if (!points || !move || typeof move.from !== "number") return "";
+    const last = points.length - 1;
+    if (isolatedEndpoint(points, move.from)) return "baseline-spike";
+    if (isolatedEndpoint(points, last)) return "latest-spike";
+    if (move.pct > BIG_MOVE && !neighborAgrees(points, last)) return "unconfirmed-latest";
+    return "";
+  }
+
+  function acceptMove(points, move) {
+    if (!move || outlierReason(points, move)) return null;
+    return move;
+  }
+
   function sample(points) {
     if (!points || points.length < 2) return [];
     const cap = SPARK_CAP;
@@ -193,8 +248,8 @@
     const cardId = cleanId(id);
     const series = seriesFor(rec);
     if (!cardId || !series) return null;
-    const move7 = windowMove(series.points, 7, 7, 14);
-    const move30 = windowMove(series.points, 30, 30, 45);
+    const move7 = acceptMove(series.points, windowMove(series.points, 7, 7, 14));
+    const move30 = acceptMove(series.points, windowMove(series.points, 30, 30, 45));
     if (!move7 && !move30) return null;
     const art = artFor(cardId);
     return {
@@ -401,6 +456,7 @@
     cents,
     seriesFor,
     windowMove,
+    outlierReason,
     quoteCard,
     list,
     readDays,

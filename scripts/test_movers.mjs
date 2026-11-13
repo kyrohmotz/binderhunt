@@ -54,7 +54,10 @@ const cards = {
   "base1-999": { name: "Missing", history: [{ d: "2026/10/01", v: "holofoil", m: 0 }, { d: "nope", v: "holofoil", m: NaN }, { d: "2026/10/01", v: "holofoil", m: null }] },
   "zero-1": { name: "Zero", history: history("normal", 0, 0, 40) }
 };
-const wideGap = history("holofoil", 30, 30, 20, Date.UTC(2026, 8, 1)).concat([{ d: "2026/10/01", v: "holofoil", m: 80 }]);
+const wideGap = history("holofoil", 30, 30, 20, Date.UTC(2026, 8, 1)).concat([
+  { d: "2026/10/01", v: "holofoil", m: 80 },
+  { d: "2026/10/02", v: "holofoil", m: 80 }
+]);
 const lagCards = { "lag-1": { name: "Late", history: wideGap } };
 
 const week = Movers.list(cards, { days: 7, wishIds: ["base1-4"], ownedIds: ["base1-2", "base1-2"] });
@@ -77,6 +80,56 @@ assert.equal(week.fallers.some(row => row.id === "base1-15"), false);
 assert.equal(week.risers.concat(week.fallers).some(row => row.id === "base1-25" || row.id === "base1-58" || row.id === "sv1-1" || row.id === "base1-999" || row.id === "zero-1"), false);
 assert.equal(Movers.list(lagCards, { days: 7 }).risers.length, 0);
 assert.equal(Movers.list(lagCards, { days: 30 }).risers[0].id, "lag-1");
+
+function plateau(variant, hold, holdDays, next, nextDays) {
+  const last = Date.UTC(2026, 9, 1);
+  const rows = [];
+  for (let ago = holdDays + nextDays; ago >= 0; ago--) {
+    const t = new Date(last - ago * 86400000);
+    const iso = t.getUTCFullYear() + "/" + String(t.getUTCMonth() + 1).padStart(2, "0") + "/" + String(t.getUTCDate()).padStart(2, "0");
+    rows.push({ d: iso, v: variant, m: ago < nextDays ? next : hold });
+  }
+  return rows;
+}
+function reasonFor(id, rec, days) {
+  const series = Movers.seriesFor(rec);
+  const minLag = days === 30 ? 30 : 7;
+  const maxLag = days === 30 ? 45 : 14;
+  const move = Movers.windowMove(series.points, days, minLag, maxLag);
+  return { move, reason: Movers.outlierReason(series.points, move) };
+}
+const magneton = { name: "Magneton", history: plateau("unlimitedShadowlessHolofoil", 135, 14, 1.29, 1) };
+const deoxys = { name: "Deoxys", history: plateau("holofoil", 500, 14, 850, 2) };
+const onePrint = { name: "Togetic", history: plateau("holofoil", 129.99, 14, 209.89, 1) };
+const heldJump = { name: "Togetic", history: plateau("holofoil", 129.99, 14, 209.89, 2) };
+const heldDrop = { name: "Blastoise", history: plateau("holofoil", 400, 14, 100, 7) };
+const spikeBaseRows = [];
+for (let ago = 20; ago >= 0; ago--) {
+  const t = new Date(Date.UTC(2026, 9, 1) - ago * 86400000);
+  const iso = t.getUTCFullYear() + "/" + String(t.getUTCMonth() + 1).padStart(2, "0") + "/" + String(t.getUTCDate()).padStart(2, "0");
+  spikeBaseRows.push({ d: iso, v: "holofoil", m: ago === 7 ? 400 : 100 });
+}
+const spikeBase = { name: "Spike", history: spikeBaseRows };
+const magnetonGuard = reasonFor("base1-9", magneton, 7);
+assert.equal(magnetonGuard.reason, "latest-spike");
+assert.equal(Movers.list({ "base1-9": magneton }, { days: 7 }).fallers.length, 0);
+const deoxysGuard = reasonFor("col1-SL1", deoxys, 7);
+assert.equal(deoxysGuard.reason, "");
+assert.equal(deoxysGuard.move.baseline, 500);
+assert.equal(deoxysGuard.move.latest, 850);
+assert.equal(Movers.list({ "col1-SL1": deoxys }, { days: 7 }).risers[0].id, "col1-SL1");
+const loneGuard = reasonFor("ex7-14", onePrint, 7);
+assert.equal(loneGuard.reason, "unconfirmed-latest");
+assert.equal(Movers.list({ "ex7-14": onePrint }, { days: 7 }).risers.length, 0);
+const heldGuard = reasonFor("ex7-14", heldJump, 7);
+assert.equal(heldGuard.reason, "");
+assert.equal(Movers.list({ "ex7-14": heldJump }, { days: 7 }).risers[0].pct > 60, true);
+const dropGuard = reasonFor("ecard1-4", heldDrop, 7);
+assert.equal(dropGuard.reason, "");
+assert.equal(Movers.list({ "ecard1-4": heldDrop }, { days: 7 }).fallers[0].dir, "down");
+const baseGuard = reasonFor("spike-1", spikeBase, 7);
+assert.equal(baseGuard.reason, "baseline-spike");
+assert.equal(Movers.list({ "spike-1": spikeBase }, { days: 7 }).fallers.length, 0);
 assert.equal(Movers.moneyText(0), "");
 assert.equal(Movers.moneyText(NaN), "");
 assert.equal(Movers.moneyText(0.004), "");
@@ -168,6 +221,12 @@ function assertRows(model) {
 }
 assertRows(real7);
 assertRows(real30);
+assert.equal(real7.fallers.some(row => row.id === "base1-9"), false, "Magneton's one-day $1.29 print stays off the 7-day list");
+assert.equal(real7.risers[0].id, "col1-SL1");
+assert.equal(real7.risers[0].baseline, 500);
+assert.equal(real7.risers[0].latest, 850);
+assert.equal(real7.risers.some(row => row.id === "ex7-14"), false, "a single unconfirmed print over 60% stays off the list");
+assert.equal(real30.fallers.some(row => row.id === "bw5-111"), false, "Pokémon Catcher's one-day $12 print stays off the 30-day list");
 assert.equal(real7.measuredFrom, "latest-cached-price");
 assert.equal(real30.measuredFrom, "latest-cached-price");
 console.log("movers math ok", {
