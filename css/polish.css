@@ -282,3 +282,9 @@ h2 .name-link{font-family:var(--display);font-weight:800;font-size:26px;line-hei
 .deals-copy b{font-family:var(--display);font-size:20px;line-height:1.1}
 .deals-copy .fine{white-space:normal}
 html.reduce .deals-row:active{transform:none}
+.movers-row{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;margin:0 0 14px;padding:12px 14px;background:#E4E7DA;border:2.5px solid var(--ink);border-radius:18px;box-shadow:3px 3px 0 var(--ink);min-height:72px;min-width:0}
+.movers-row:active{transform:scale(.98)}
+html.reduce .movers-row:active{transform:none}
+@media (prefers-reduced-motion:reduce){
+  html:not(.motion-on) .movers-row:active{transform:none}
+}

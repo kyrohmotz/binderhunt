@@ -75,6 +75,8 @@ let filtersMissingAtOpen = false;
 const pendingCelebrate = [];
 let logState = { v:1, days:[], events:[] };
 let pile = [];
+let moverQueue = [];
+let moverHunt = false;
 let briefs = [];
 let seen = new Set();
 let gemCatalog = null;
@@ -2251,9 +2253,36 @@ async function pumpGems(my){
   renderDeck();
   paintCount();
 }
+function moverCardsLeft(){
+  let n = moverQueue.length;
+  pile.forEach(card => { if (card && card.mover) n++; });
+  return n;
+}
+function takeMoverCards(){
+  while (moverQueue.length && pile.length < 5) {
+    const card = moverQueue.shift();
+    if (!card || !card.id || isDigital(card) || !knownArt(card).length) continue;
+    if (pile.some(item => item && item.id === card.id)) continue;
+    card.mover = true;
+    pile.push(card);
+    matched++;
+    lastFound = Date.now();
+    try { rememberRecent(card); } catch (e) {}
+  }
+}
 function paintCount(){
   const el = document.getElementById("matchCount");
   if (!el) return;
+  if (moverHunt) {
+    const left = moverCardsLeft();
+    if (left > 0) {
+      el.textContent = "Market movers · " + left + (left === 1 ? " card" : " cards") + ", then the usual hunt";
+      paintFilterSummary();
+      return;
+    }
+    moverHunt = false;
+    paintContext();
+  }
   paintGemChrome();
   if (filters.gem) {
     const pocket = gemCycle && gemCycle.cards ? gemCycle.cards.length : (gemCatalog ? gemsForHunt().length : 0);
@@ -2320,6 +2349,14 @@ function pumpStale(epoch, my){
 }
 async function pump(my){
   if (loading || my !== generation) return;
+  if (moverQueue.length && pile.length < 5) {
+    takeMoverCards();
+    if (pile.length) {
+      renderDeck();
+      paintCount();
+    }
+  }
+  if (moverQueue.length && pile.length >= 5) return;
   if (filters.gem) return pumpGems(my);
   if (navigator.onLine === false) {
     loading = true;
@@ -2459,6 +2496,10 @@ async function pump(my){
 }
 let keepOpeningArt = true;
 function restart(opts){
+  if (!(opts && opts.keepMovers)) {
+    moverQueue = [];
+    moverHunt = false;
+  }
   spice = !!(opts && opts.keepSpice);
   generation++;
   enforceTheme();
@@ -3394,11 +3435,13 @@ function paintContext(){
     if (!binderView) label = "Binders";
     else if (binderView.kind === "wish") label = "Wishlist";
     else if (binderView.kind === "deals") label = "Deals";
+    else if (binderView.kind === "movers") label = "Movers";
     else label = (binderState.binders.find(x => x.id === binderView.id) || {}).name || "Binders";
   }
   else if (tab === "daily") label = "Today's Drop";
   else if (tab === "value") label = "Value";
   else if (tab === "dex") label = "Pokédex";
+  else if (moverHunt && moverCardsLeft()) label = "Movers";
   else if (b) label = b.name;
   else if (filters.gem && filters.set) label = "Gemfinder · " + (setName(filters.set) || "Set");
   else if (filters.gem) label = "Gemfinder";
@@ -3425,7 +3468,7 @@ function paintContext(){
 /* On a desktop, an open binder takes the side panel's room too. The panel
    comes back as soon as a card's details are opened. */
 function syncReadingWide(){
-  const bookOpen = binderView && binderView.kind !== "deals";
+  const bookOpen = binderView && binderView.kind !== "deals" && binderView.kind !== "movers";
   shell.classList.toggle("reading-wide", wide() && tab === "binders" && !!bookOpen && !profilePinned);
 }
 function paintSide(){
@@ -3470,6 +3513,7 @@ function renderSetSide(){
 function binderSideKey(){
   if (!binderView) return "shelf:" + wish.length + ":" + binderState.binders.length + ":" + ownedIds.size;
   if (binderView.kind === "wish") return "wish:" + wish.length + ":" + ownedIds.size;
+  if (binderView.kind === "movers") return "movers";
   const b = binderState.binders.find(x => x.id === binderView.id);
   const theme = b ? themeOf(b) : null;
   return "binder:" + binderView.id + ":" + ((b && b.cards) || []).length + ":" + ownedIds.size + ":" + (b ? b.name : "") + ":" + (b ? b.color : "") + ":" + (theme ? theme.kind + theme.setId + theme.type + theme.name : "") + ":" + (b && binderState.discoveryId === b.id ? "1" : "0");
@@ -3518,6 +3562,10 @@ function renderBinderSide(){
   }
   if (binderView.kind === "deals") {
     profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Deals</p><h2 class="pname" id="profileTitle">Worth a look</h2><p class="fine">Wishlist cards at or below a target, or down at least 10% since you saved that target. Prices come from the cached file.</p><p class="fine">Open a wishlisted card and set Alert me at a price. The suggestion starts about 10% under the cached market.</p></div>`;
+    return;
+  }
+  if (binderView.kind === "movers") {
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Market movers</p><h2 class="pname" id="profileTitle">Check back</h2><p class="fine">Risers and fallers from the cached history. Seven and thirty days both end on each card's latest saved price.</p><p class="fine">Swipe the movers to hunt that list. When it runs out, the usual hunt continues.</p></div>`;
     return;
   }
   if (binderView.kind === "wish") {
@@ -4742,6 +4790,91 @@ function closeDeals(){
   const next = document.getElementById("openDeals") || document.getElementById("openWish");
   if (next) next.focus();
 }
+let moversAssets = null;
+function ensureMovers(){
+  if (window.BinderMoversUI && window.BinderMovers) return Promise.resolve(window.BinderMoversUI);
+  if (moversAssets) return moversAssets;
+  moversAssets = loadStyle("css/movers.css").then(() => loadScript("js/movers.js")).then(() => loadScript("js/movers-ui.js")).then(() => window.BinderMoversUI);
+  moversAssets.catch(() => { moversAssets = null; });
+  return moversAssets;
+}
+function moversHooks(){
+  return {
+    cards: () => (scrydex && scrydex.cards) || {},
+    ready: () => !!(scrydex && scrydex.ready),
+    load: () => (typeof loadScrydex === "function" ? loadScrydex() : Promise.resolve()),
+    wishIds: () => (Array.isArray(wish) ? wish.map(card => card && card.id).filter(Boolean) : []),
+    ownedIds: () => (ownedIds ? [...ownedIds] : []),
+    storage: window.localStorage,
+    setName: id => { try { return setName(id) || ""; } catch (e) { return ""; } },
+    onBack: () => {
+      binderView = null;
+      renderBinders();
+      const next = document.getElementById("openMovers") || document.getElementById("openWish");
+      if (next) next.focus();
+    },
+    onOpen: stub => openMoverCard(stub),
+    onSwipe: cards => swipeMovers(cards)
+  };
+}
+function renderMovers(root){
+  if (!root) return;
+  root.classList.remove("reading");
+  if (window.BinderMoversUI) {
+    window.BinderMoversUI.open(root, moversHooks());
+    paintContext();
+    return;
+  }
+  root.innerHTML = `<div class="movers-wrap"><div class="booktools"><button class="chip" id="backMovers" type="button">All binders</button></div><h2 class="movers-title" id="moversTitle">Market movers</h2><p class="movers-lead" role="status">Opening market movers…</p></div>`;
+  const back = document.getElementById("backMovers");
+  if (back) back.onclick = () => { binderView = null; renderBinders(); };
+  paintContext();
+  ensureMovers().then(() => {
+    if (!(tab === "binders" && binderView && binderView.kind === "movers")) return;
+    if (window.BinderMoversUI) window.BinderMoversUI.open(root, moversHooks());
+  }).catch(() => {
+    if (root) root.innerHTML = `<div class="movers-wrap"><div class="booktools"><button class="chip" id="backMovers" type="button">All binders</button></div><p class="empty-state">Market movers didn't load. Open the shelf again in a moment.</p></div>`;
+    const again = document.getElementById("backMovers");
+    if (again) again.onclick = () => { binderView = null; renderBinders(); };
+  });
+}
+function openMovers(){
+  binderView = { kind:"movers" };
+  if (tab !== "binders") showTab("binders");
+  else renderBinders();
+}
+function openMoverCard(stub){
+  if (!stub || !stub.id) return;
+  const cached = cardCache.get(stub.id);
+  openProfile(cached || stub);
+  if (cached) return;
+  hydrate(stub).then(full => {
+    if (!full || !profilePinned || !profileCard || profileCard.id !== stub.id) return;
+    renderProfile(full);
+  }).catch(() => {});
+}
+function swipeMovers(cards){
+  const ready = [];
+  (Array.isArray(cards) ? cards : []).forEach(card => {
+    if (!card || !card.id || isDigital(card) || !knownArt(card).length) return;
+    card.mover = true;
+    ready.push(card);
+  });
+  if (!ready.length) {
+    moverQueue = [];
+    moverHunt = false;
+    if (tab !== "hunt") showTab("hunt");
+    announce("No movers to swipe. The usual hunt is open.");
+    return;
+  }
+  moverQueue = ready;
+  moverHunt = true;
+  restart({ keepMovers:true, skipFilterWrite:true });
+  if (tab !== "hunt") showTab("hunt");
+  else paintContext();
+  announce("Swiping market movers. The usual hunt continues after this list.");
+  if (deck) deck.focus();
+}
 function renderDeals(root){
   if (!root) return;
   const token = ++dealsToken;
@@ -4904,6 +5037,7 @@ function paintTargetSlot(card, focusId){
 function renderBinders(){
   const root = document.getElementById("bindersScroll");
   if (binderView && binderView.kind === "deals") { renderDeals(root); return; }
+  if (binderView && binderView.kind === "movers") { renderMovers(root); return; }
   if (binderView) { renderCollection(root); return; }
   root.classList.remove("reading");
   const total = valueOf(wish);
@@ -4915,6 +5049,7 @@ function renderBinders(){
   const wishSub = wish.length ? (wantedN ? wantedN + " still to find" : "You have every card") + (ownedN ? " · " + ownedN + " got" : "") : "Swipe right on a card and it lands here.";
   root.innerHTML = `<div class="wish-slot"><button class="wish-row" id="openWish" type="button">${peekMarkup(wish, "wish-peek")}<span class="wish-copy"><span class="eyebrow">All saved cards</span><b>Wishlist</b><span class="wish-meta">${esc(wishMeta)}</span><span class="fine">${esc(wishSub)}</span></span>${droppedCountMarkup(dropped)}<span class="wish-go" aria-hidden="true">Open →</span></button><button class="chip wish-share" id="shareWish" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button></div>
     <button class="deals-row" id="openDeals" type="button"><span class="deals-copy"><span class="eyebrow">Price alerts</span><b>Deals</b><span class="fine">Cards at your target, or down since you saved one.</span></span><span class="deals-badge" data-deals-count hidden aria-hidden="true"></span></button>
+    <button class="movers-row" id="openMovers" type="button"><span class="deals-copy"><span class="eyebrow">Cached market</span><b>Market movers</b><span class="fine">Risers and fallers over 7 and 30 days.</span></span></button>
     <div class="shelf-head"><h2 class="shelf-title">Your binders</h2><p class="fine">Right-swipe always lands on your wishlist. A themed binder is another home for the same card.</p></div>
     <div class="shelf-scene"><div class="shelf" id="shelf"></div></div>`;
   const shelf = document.getElementById("shelf");
@@ -4974,6 +5109,8 @@ function renderBinders(){
   shelf.append(addSlot);
   document.getElementById("openWish").onclick = () => { binderView = { kind:"wish" }; flipPage = 0; renderBinders(); };
   document.getElementById("openDeals").onclick = () => openDeals("shelf");
+  const moversBtn = document.getElementById("openMovers");
+  if (moversBtn) moversBtn.onclick = () => openMovers();
   document.getElementById("shareWish").onclick = () => {
     if (window.BinderShare) BinderShare.openCollection({ kind:"wish", name:"Wishlist", color:"#E4E7DA", cards:wish, ownedIds });
   };
