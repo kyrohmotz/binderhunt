@@ -18,7 +18,7 @@ const Value = require(resolve(root, "js/value.js"));
 const sw = readFileSync(resolve(root, "sw.js"), "utf8");
 const html = readFileSync(resolve(root, "index.html"), "utf8");
 const app = readFileSync(resolve(root, "js/app.js"), "utf8");
-assert.match(sw, /const VERSION = "bh-17"/);
+assert.match(sw, /const VERSION = "bh-18"/);
 assert.match(sw, /"js\/movers\.js"/);
 assert.match(sw, /"js\/movers-ui\.js"/);
 assert.match(sw, /"css\/movers\.css"/);
@@ -183,7 +183,9 @@ assert.equal(deck[0].variants[0].market, deck[0].price);
 assert.equal(deck.some(card => !(card.price >= 1)), false);
 
 const cache = JSON.parse(readFileSync(resolve(root, "data/scrydex.json"), "utf8"));
-const sampleId = "ex10-113";
+// Entei ☆ (ex10-113) is flat across its current 7-day window, so Movers
+// correctly returns no move. Ninetales still has a real 7-day drop.
+const sampleId = "base1-12";
 const sample = cache.cards[sampleId];
 assert.ok(sample && sample.history && sample.history.length > 10, "sample card has dated history");
 const fromValue = Value.seriesFor(sample);

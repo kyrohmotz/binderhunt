@@ -288,3 +288,9 @@ html.reduce .movers-row:active{transform:none}
 @media (prefers-reduced-motion:reduce){
   html:not(.motion-on) .movers-row:active{transform:none}
 }
+.plan-shelf{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;margin:0 0 14px;padding:12px 14px;background:linear-gradient(180deg,#fff 30%,#eef2e4);border:2.5px solid var(--ink);border-radius:18px;box-shadow:3px 3px 0 var(--ink);min-height:72px;min-width:0}
+.plan-shelf:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink)}
+html.reduce .plan-shelf:active{transform:none}
+@media (prefers-reduced-motion:reduce){
+  html:not(.motion-on) .plan-shelf:active{transform:none}
+}

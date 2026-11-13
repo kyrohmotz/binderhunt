@@ -1131,6 +1131,16 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
     </div>
   </div>
 </div>
+<div id="budgetSheet" class="sheet" hidden>
+  <button class="backdrop" type="button" tabindex="-1" aria-label="Close budget"></button>
+  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="budgetTitle">
+    <div class="sheet-top">
+      <h2 id="budgetTitle">Monthly budget</h2>
+      <button class="chip" type="button" id="budgetDone">Done</button>
+    </div>
+    <div class="sheet-body" id="budgetBody"></div>
+  </div>
+</div>
 <div id="updateToast" class="toast update-toast" hidden role="status">
   <span>New version, tap to refresh</span>
   <button type="button" id="updateRefresh">Refresh</button>
