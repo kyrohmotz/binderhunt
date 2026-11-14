@@ -17,7 +17,7 @@ const html = readFileSync(resolve(root, "index.html"), "utf8");
 const app = readFileSync(resolve(root, "js/app.js"), "utf8");
 const ui = readFileSync(resolve(root, "js/budget-ui.js"), "utf8");
 const core = readFileSync(resolve(root, "js/budget.js"), "utf8");
-assert.match(sw, /const VERSION = "bh-18"/);
+assert.match(sw, /const VERSION = "bh-19"/);
 assert.match(sw, /"js\/budget\.js"/);
 assert.match(sw, /"js\/budget-ui\.js"/);
 assert.match(sw, /"css\/budget\.css"/);

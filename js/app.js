@@ -6472,6 +6472,21 @@ function droppedCountMarkup(n){
   const label = n === 1 ? "1 wishlisted card dropped" : n + " wishlisted cards dropped";
   return `<span class="drop-badge drop-count"><span aria-hidden="true">Dropped ${n}</span><span class="sr-only">${esc(label)}</span></span>`;
 }
+function priceUpdatedLabel(card){
+  const rec = scryRecord(card);
+  if (!rec || rec.missing) return "";
+  const raw = rec.fetched_at;
+  if (typeof raw !== "string" || !raw.trim()) return "";
+  const parsed = Date.parse(raw);
+  if (!Number.isFinite(parsed)) return "";
+  const elapsed = Date.now() - parsed;
+  if (!Number.isFinite(elapsed) || elapsed < 0) return "";
+  const days = Math.floor(elapsed / 86400000);
+  if (!Number.isFinite(days) || days < 0 || days > 3650) return "";
+  const label = days === 0 ? "Price updated today" : "Price updated " + days + "d ago";
+  if (/NaN|undefined|\$0(?:\.00)?\b/.test(label)) return "";
+  return label;
+}
 function marketBlock(card, variant, shown){
   const badge = dropBadgeMarkup(priceDrop(card));
   const price = shown ? priceText(shown.amount, shown.currency) : "—";
@@ -6480,7 +6495,9 @@ function marketBlock(card, variant, shown){
   const detail = settings.currency === "EUR"
     ? (variant && variant.label ? variant.label : "European average")
     : (printing && printing !== "Market (raw NM)" ? printing + " · near mint" : "Near mint · TCGplayer");
-  return `<div class="market"><div class="market-copy"><p class="eyebrow">${esc(caption)}</p><div class="price-row"><p class="market-price">${esc(price)}</p>${badge}</div>${detail ? `<p class="fine">${esc(detail)}</p>` : ""}</div></div>`;
+  const updated = priceUpdatedLabel(card);
+  const fresh = updated ? `<p class="price-fresh">${esc(updated)}</p>` : "";
+  return `<div class="market"><div class="market-copy"><p class="eyebrow">${esc(caption)}</p><div class="price-row"><p class="market-price">${esc(price)}</p>${badge}</div>${detail ? `<p class="fine">${esc(detail)}</p>` : ""}${fresh}</div></div>`;
 }
 function trendHistory(card){
   const variant = selectedVariant(card);
