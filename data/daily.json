@@ -13927,13 +13927,23 @@
     },
     "2026-11-15": {
       "id": "me02-102",
-      "price": 3.47,
+      "price": 3.57,
       "variant": "holofoil",
       "printing": "Holofoil",
       "alts": 1,
       "source": "tcgplayer",
       "eur": 2.47,
-      "at": "2026-11-13T15:55:26Z"
+      "at": "2026-11-14T14:46:49Z"
+    },
+    "2026-11-16": {
+      "id": "col1-SL7",
+      "price": 500.37,
+      "variant": "holofoil",
+      "printing": "Holofoil",
+      "alts": 1,
+      "source": "tcgplayer",
+      "eur": 238.1,
+      "at": "2026-11-14T14:46:49Z"
     }
   }
 }
