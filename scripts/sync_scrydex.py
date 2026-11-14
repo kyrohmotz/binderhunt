@@ -16,8 +16,11 @@ reads remaining credits. It skips the run when fewer than SCRYDEX_STORE_RESERVE
 credits would be left (default 15,000). BinderHunt's own ledger stops at
 SCRYDEX_MONTHLY_CAP (default 15,000). A run also stops at SCRYDEX_RUN_CAP
 credits (default 500) and SCRYDEX_RUN_CARD_CAP cards (default 100). Inside
-those caps, each run spends a daily allowance: credits left in the month
-divided by the days left, including today.
+those caps, each UTC day shares one allowance: the credits left in the
+month at the start of that day, divided by the days left including today.
+A later run the same day may spend only what that pace still has left.
+The usage read counts toward the day. When fewer than 2 credits remain,
+the run does not read usage and does not request cards.
 
 Unfetched cards still go first. After that the run takes the cards that are
 the furthest through their own interval, so a valuable or often-opened card
@@ -660,25 +663,40 @@ def days_left_in_month(now: datetime) -> int:
     return max(1, total - now.day + 1)
 
 
+def utc_day(now: datetime) -> str:
+    """UTC calendar day for the ledger. A naive datetime is already UTC."""
+    if now.tzinfo is None:
+        stamp = now.replace(tzinfo=timezone.utc)
+    else:
+        stamp = now.astimezone(timezone.utc)
+    return stamp.strftime("%Y-%m-%d")
+
+
 def daily_allowance(
     monthly_cap: int,
     spent: int,
     now: datetime,
     run_credit_cap: int,
     room: int,
+    spent_today: int = 0,
 ) -> tuple[int, str]:
     """Credits this run may spend, and the sentence that explains the number.
 
-    The pace is the credits still left in the month divided by the days left,
-    including today. Floor division so the days cannot add up past the cap.
-    The per-run credit cap and the store-reserve room can only lower it.
+    spent is the month balance at the start of this UTC day: every credit
+    logged this month except today's. The pace is that balance divided by
+    the days left, including today. Floor division so the days cannot add
+    up past the cap. Credits already logged today, including usage reads,
+    come off that pace. The per-run credit cap and the store-reserve room
+    can only lower what is left.
     """
     days = days_left_in_month(now)
-    remain = max(0, monthly_cap - spent)
+    remain = max(0, monthly_cap - max(0, spent))
     paced = remain // days if days else 0
+    spent_today = max(0, spent_today)
+    left = max(0, paced - spent_today)
     room = max(0, room)
     cap = max(0, run_credit_cap)
-    allowance = min(paced, cap, room)
+    allowance = min(left, cap, room)
     month = now.strftime("%Y-%m")
     day_word = "day" if days == 1 else "days"
     lead = (
@@ -686,14 +704,18 @@ def daily_allowance(
         f"{remain} credits remain in {month} over {days} {day_word} including today "
         f"({paced} a day)."
     )
-    if room < cap and room < paced:
+    if spent_today:
+        lead += f" {spent_today} already logged today, leaving {left}."
+    if room < cap and room < left:
         why = (
             f"{lead} Only {room} credits fit without dropping the shared store "
             f"under its reserve, which is below the {paced}-a-day pace and the "
             f"{cap} per-run cap."
         )
-    elif cap < paced:
+    elif cap < left:
         why = f"{lead} The {cap} per-run credit cap lowers that {paced}-a-day pace."
+    elif spent_today and allowance < paced:
+        why = f"{lead} Today's pace leaves {left}, which is under the {cap} per-run cap."
     else:
         why = f"{lead} That pace is within the {cap} per-run cap."
     return allowance, why
@@ -978,6 +1000,18 @@ def month_credits(usage: dict, month: str) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
 
 
+def day_credits(usage: dict, month: str, day: str) -> int:
+    """Credits logged on one UTC day. An old ledger with no days is zero."""
+    row = usage.get("months", {}).get(month) or {}
+    if not isinstance(row, dict):
+        return 0
+    days = row.get("days")
+    if not isinstance(days, dict):
+        return 0
+    value = days.get(day, 0)
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
+
+
 def add_usage(usage: dict, month: str, credits: int, now: datetime) -> None:
     if credits <= 0:
         return
@@ -988,6 +1022,15 @@ def add_usage(usage: dict, month: str, credits: int, now: datetime) -> None:
         months[month] = row
     row["credits"] = month_credits(usage, month) + credits
     row["updated_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    days = row.get("days")
+    if not isinstance(days, dict):
+        days = {}
+        row["days"] = days
+    day = utc_day(now)
+    already = days.get(day, 0)
+    if not isinstance(already, int) or isinstance(already, bool) or already < 0:
+        already = 0
+    days[day] = already + credits
 
 
 def write_usage(usage: dict, path: Path | None = None) -> None:
@@ -1072,11 +1115,28 @@ def sync(now: datetime | None = None) -> int:
     run_credit_cap = env_int("SCRYDEX_RUN_CAP", RUN_CREDIT_CAP)
     run_card_cap = env_int("SCRYDEX_RUN_CARD_CAP", MAX_PER_RUN)
     month = now.strftime("%Y-%m")
+    day = utc_day(now)
     usage = load_usage()
     spent_month = month_credits(usage, month)
+    spent_today = min(day_credits(usage, month, day), spent_month)
+    spent_before = spent_month - spent_today
     if spent_month >= monthly_cap:
         print(f"Skipping. BinderHunt has logged {spent_month} credits in {month}, and the cap is {monthly_cap}.")
         print(f"Allowance 0 credits. The monthly cap of {monthly_cap} is already met.")
+        return 0
+    days_left = days_left_in_month(now)
+    day_pace = max(0, monthly_cap - spent_before) // days_left if days_left else 0
+    paced_left = max(0, day_pace - spent_today)
+    # A card costs at least 2 credits, and the usage read costs 1. Fewer than
+    # 2 left cannot buy a card, so the read is skipped rather than spent alone.
+    if paced_left < 2:
+        _allowance, why = daily_allowance(
+            monthly_cap, spent_before, now, run_credit_cap, max(0, monthly_cap - spent_month), spent_today,
+        )
+        print(why)
+        print(f"Skipping. {paced_left} credit(s) left of today's pace, so this run makes no card requests.")
+        print("credits this run: 0")
+        print(f"credits this month ({month}): {spent_month} / {monthly_cap}")
         return 0
     try:
         remaining, check_credits = read_account_remaining(headers)
@@ -1089,6 +1149,7 @@ def sync(now: datetime | None = None) -> int:
     if check_credits:
         add_usage(usage, month, check_credits, now)
         spent_month += check_credits
+        spent_today += check_credits
         write_usage(usage)
     if remaining is not None and remaining - store_reserve < 2:
         print(
@@ -1103,7 +1164,9 @@ def sync(now: datetime | None = None) -> int:
     if remaining is not None:
         room = min(room, remaining - store_reserve)
     if room < 2 or run_credit_cap < 2 or run_card_cap < 1:
-        _allowance, why = daily_allowance(monthly_cap, spent_month, now, run_credit_cap, max(room, 0))
+        _allowance, why = daily_allowance(
+            monthly_cap, spent_before, now, run_credit_cap, max(room, 0), spent_today,
+        )
         print(why)
         print(
             f"Skipping. Credit room this run is {max(room, 0)} "
@@ -1112,7 +1175,7 @@ def sync(now: datetime | None = None) -> int:
         print(f"credits this run: {run_credits}")
         print(f"credits this month ({month}): {spent_month} / {monthly_cap}")
         return 0
-    allowance, why = daily_allowance(monthly_cap, spent_month, now, run_credit_cap, room)
+    allowance, why = daily_allowance(monthly_cap, spent_before, now, run_credit_cap, room, spent_today)
     print(why)
     seed = load_seed()
     cache = load_cache()

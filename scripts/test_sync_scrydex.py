@@ -1255,7 +1255,8 @@ class PaceSyncTests(unittest.TestCase):
         code, log = self._sync(self._ok, now)
         self.assertEqual(code, 0)
         self.assertIn(
-            "Allowance 6 credits. 6 credits remain in 2026-11 over 1 day including today (6 a day).",
+            "Allowance 6 credits. 7 credits remain in 2026-11 over 1 day including today (7 a day). "
+            "1 already logged today, leaving 6.",
             log,
         )
         self.assertIn("0 strictly due, 1 next-stalest", log)
@@ -1279,6 +1280,105 @@ class PaceSyncTests(unittest.TestCase):
         self.assertIn("Freshness buckets:", log)
         self.assertEqual([url for url in self.calls if "/cards/" in url], [])
         self.assertEqual(json.loads(self.usage.read_text(encoding="utf-8"))["months"]["2026-11"]["credits"], 1)
+
+    def _many_seed(self, count):
+        lines = [f"B base1-{index}" for index in range(1, count + 1)]
+        self.seed.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def test_same_day_dispatches_share_one_pace(self):
+        now = datetime(2026, 11, 1, 12, tzinfo=timezone.utc)
+        self._many_seed(400)
+        self.cache.write_text(json.dumps({"cards": {}}), encoding="utf-8")
+        pace = 15000 // 30
+        card_calls = []
+        http_calls = []
+        for _run in range(5):
+            before = len(self.calls)
+            code, _log = self._sync(self._ok, now)
+            self.assertEqual(code, 0)
+            fresh = self.calls[before:]
+            http_calls.append(len(fresh))
+            card_calls.append(sum(1 for url in fresh if "/cards/" in url))
+        ledger = json.loads(self.usage.read_text(encoding="utf-8"))
+        november = ledger["months"]["2026-11"]
+        self.assertLessEqual(november["credits"], pace)
+        self.assertGreater(november["credits"], pace - 10)
+        self.assertEqual(november["days"]["2026-11-01"], november["credits"])
+        self.assertGreater(card_calls[0], 0)
+        self.assertGreater(card_calls[1], 0)
+        self.assertEqual(card_calls[2:], [0, 0, 0])
+        self.assertEqual(http_calls[3:], [0, 0])
+
+    def test_next_day_starts_a_fresh_pace(self):
+        first = datetime(2026, 11, 1, 12, tzinfo=timezone.utc)
+        second = datetime(2026, 11, 2, 12, tzinfo=timezone.utc)
+        self._many_seed(160)
+        self.cache.write_text(json.dumps({"cards": {}}), encoding="utf-8")
+        code, _log = self._sync(self._ok, first)
+        self.assertEqual(code, 0)
+        after_first = json.loads(self.usage.read_text(encoding="utf-8"))["months"]["2026-11"]["credits"]
+        self.calls.clear()
+        code, log = self._sync(self._ok, second)
+        self.assertEqual(code, 0)
+        self.assertTrue(any("/cards/" in url for url in self.calls))
+        ledger = json.loads(self.usage.read_text(encoding="utf-8"))["months"]["2026-11"]
+        self.assertGreater(ledger["credits"], after_first)
+        self.assertEqual(ledger["days"]["2026-11-02"], ledger["credits"] - after_first)
+        day_pace = (15000 - after_first) // 29
+        self.assertLessEqual(ledger["days"]["2026-11-02"], day_pace)
+        self.assertGreater(ledger["days"]["2026-11-02"], 1)
+
+    def test_month_rollover_does_not_keep_yesterdays_day(self):
+        november = datetime(2026, 11, 30, 12, tzinfo=timezone.utc)
+        december = datetime(2026, 12, 1, 12, tzinfo=timezone.utc)
+        self.usage.write_text(json.dumps({
+            "months": {
+                "2026-11": {
+                    "credits": 1000,
+                    "runs": 4,
+                    "updated_at": "2026-11-30T12:00:00Z",
+                    "days": {"2026-11-30": 250},
+                }
+            }
+        }), encoding="utf-8")
+        self.cache.write_text(json.dumps({"cards": {
+            "base1-4": self._priced(december, 48, 4),
+            "sv03-223": self._priced(december, 48, 4),
+        }}), encoding="utf-8")
+        code, log = self._sync(self._ok, december)
+        self.assertEqual(code, 0)
+        self.assertIn("over 31 days including today", log)
+        ledger = json.loads(self.usage.read_text(encoding="utf-8"))
+        self.assertEqual(ledger["months"]["2026-11"]["credits"], 1000)
+        self.assertEqual(ledger["months"]["2026-11"]["runs"], 4)
+        self.assertEqual(ledger["months"]["2026-11"]["days"]["2026-11-30"], 250)
+        opened = ledger["months"]["2026-12"]
+        self.assertEqual(opened["days"]["2026-12-01"], opened["credits"])
+        self.assertLessEqual(opened["credits"], 15000 // 31)
+        self.assertNotIn("2026-11-30", opened["days"])
+
+    def test_legacy_ledger_counts_old_credits_as_before_today(self):
+        now = datetime(2026, 11, 14, 8, tzinfo=timezone.utc)
+        self.usage.write_text(json.dumps({
+            "months": {"2026-11": {"credits": 3336, "runs": 3, "updated_at": "2026-11-13T16:20:05Z"}}
+        }), encoding="utf-8")
+        self.cache.write_text(json.dumps({"cards": {
+            "base1-4": self._priced(now, 24 * 10, 4),
+            "sv03-223": self._priced(now, 24 * 10, 4),
+        }}), encoding="utf-8")
+        loaded = sync.load_usage(self.usage)
+        self.assertEqual(sync.month_credits(loaded, "2026-11"), 3336)
+        self.assertEqual(sync.day_credits(loaded, "2026-11", "2026-11-14"), 0)
+        code, log = self._sync(self._ok, now)
+        self.assertEqual(code, 0)
+        self.assertIn("11664 credits remain in 2026-11 over 17 days including today (686 a day)", log)
+        self.assertIn("The 500 per-run credit cap lowers that 686-a-day pace", log)
+        ledger = json.loads(self.usage.read_text(encoding="utf-8"))["months"]["2026-11"]
+        self.assertEqual(ledger["runs"], 3)
+        self.assertEqual(ledger["updated_at"], "2026-11-14T08:00:00Z")
+        self.assertEqual(ledger["days"], {"2026-11-14": ledger["credits"] - 3336})
+        self.assertLessEqual(ledger["days"]["2026-11-14"], 1 + 500)
+        self.assertGreater(ledger["credits"], 3336)
 
 
 if __name__ == "__main__":
