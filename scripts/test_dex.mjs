@@ -19,7 +19,7 @@ const html = readFileSync(resolve(root, "index.html"), "utf8");
 const app = readFileSync(resolve(root, "js/app.js"), "utf8");
 const dexJs = readFileSync(resolve(root, "js/dex.js"), "utf8");
 const dexUi = readFileSync(resolve(root, "js/dex-ui.js"), "utf8");
-assert.match(sw, /const VERSION = "bh-18"/);
+assert.match(sw, /const VERSION = "bh-19"/);
 for (const file of ["js/dex.js", "js/dex-ui.js", "css/dex.css", "data/dex.json"]) {
   assert.match(sw, new RegExp(file.replace(/[.]/g, "\\.")), file);
 }

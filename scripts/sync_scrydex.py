@@ -15,13 +15,31 @@ The subscription is shared with the store. Before any card lookup this script
 reads remaining credits. It skips the run when fewer than SCRYDEX_STORE_RESERVE
 credits would be left (default 15,000). BinderHunt's own ledger stops at
 SCRYDEX_MONTHLY_CAP (default 15,000). A run also stops at SCRYDEX_RUN_CAP
-credits (default 500) and SCRYDEX_RUN_CARD_CAP cards (default 100).
+credits (default 500) and SCRYDEX_RUN_CARD_CAP cards (default 100). Inside
+those caps, each run spends a daily allowance: credits left in the month
+divided by the days left, including today.
 
-While any seeded card has never been fetched, the run backfills the most
-valuable unfetched cards. After that, tier A (the top of the seed) refreshes
-weekly and tier B refreshes monthly. Cards people open or save often are
-read from data/price-demand.json and refresh every 90 days, only after the
-chase seed has room. Everything else keeps the TCGdex catalog price.
+Unfetched cards still go first. After that the run takes the cards that are
+the furthest through their own interval, so a valuable or often-opened card
+comes due sooner than a cheap one. The interval is the first match:
+
+  hot    latest raw market >= $500, or 8+ opens                 every 7 days
+  high   tier A, or latest market >= $200, or 4+ opens          every 14 days
+  mid    latest market >= $50, or 2+ opens                      every 21 days
+  cheap  under $50, missing, or no saved price                  every 28 days
+
+The latest raw market is the highest near-mint price on the newest history
+day. The Nov 2026 chase cache is about 2,003 cards with a median near $93,
+and about 1,293 of them are at or above $50. Refreshing every one of those
+every two or three days would be hundreds of lookups a day, past both the
+100-card run cap and the 15,000 monthly cap. These four buckets are the
+shortest intervals that still revisit the cheaper cards inside about four
+weeks, at roughly 100 cards a day.
+
+A card fetched less than 24 hours ago is left alone. That is the cache window
+Scrydex asks for. When nothing is due and the allowance remains, the run
+refreshes the next-stalest cards that are at least 24 hours old instead of
+exiting as a no-op. It never spends more than the allowance.
 
 Catalog ids from TCGdex are mapped before the request (sv03-223 becomes
 sv3-223). The record is stored under the catalog id. Secrets are read from
@@ -47,6 +65,7 @@ abort the run. HTTP 429 on a card still stops that run.
 
 from __future__ import annotations
 
+import calendar
 import json
 import os
 import re
@@ -75,6 +94,25 @@ TIER_B_HOURS = 24 * 30
 DEMAND_HOURS = 24 * 90
 DEMAND_MIN = 2
 MISSING_HOURS = 24 * 30
+# Budget-paced intervals. select_due still uses the weekly and monthly
+# gates above. The daily run uses these buckets. See the module docstring.
+HOT_MARKET = 500
+HIGH_MARKET = 200
+MID_MARKET = 50
+HOT_HOURS = 24 * 7
+HIGH_HOURS = 24 * 14
+MID_HOURS = 24 * 21
+CHEAP_HOURS = 24 * 28
+MIN_REFRESH_HOURS = 24
+DEMAND_HOT = 8
+DEMAND_HIGH = 4
+BUCKET_HOURS = {
+    "hot": HOT_HOURS,
+    "high": HIGH_HOURS,
+    "mid": MID_HOURS,
+    "cheap": CHEAP_HOURS,
+}
+BUCKET_ORDER = ("unfetched", "hot", "high", "mid", "cheap")
 REQUEST_PAUSE_SEC = 0.35
 # A 5xx skips that card. This many in a row stops the loop and fails the
 # job, so an outage does not walk the rest of the due list. HTTP 402 is
@@ -521,7 +559,11 @@ def select_due(
     max_cards: int = MAX_PER_RUN,
     demand: dict[str, int] | None = None,
 ) -> list[str]:
-    """Backfill unfetched cards first. Then weekly tier A and monthly tier B."""
+    """Strict weekly tier A and monthly tier B gate. Unfetched cards first.
+
+    The daily run uses build_refresh_plan instead, so a quiet day still spends
+    its allowance. This gate stays for the older backfill and demand checks.
+    """
     unfilled = []
     seen = set()
     for _tier, card_id in seed:
@@ -559,6 +601,234 @@ def select_due(
 def max_card_credits(card_id: str) -> int:
     """Worst case for one card: two lookups and one history read."""
     return len(scrydex_candidates(card_id)) + 3
+
+
+def latest_market(rec: dict) -> float | None:
+    """Highest raw near-mint market on the newest history day.
+
+    A missing record has no current price, even if an older history is still
+    stored. Zero and non-numbers are ignored so a placeholder cannot look valuable.
+    """
+    if not isinstance(rec, dict) or rec.get("missing"):
+        return None
+    history = rec.get("history")
+    if not isinstance(history, list):
+        return None
+    by_variant: dict[str, tuple[str, float]] = {}
+    for row in history:
+        if not isinstance(row, dict):
+            continue
+        market = as_float(row.get("m"))
+        if market is None or market <= 0:
+            continue
+        day = row.get("d")
+        day = day[:10] if isinstance(day, str) else ""
+        variant = str(row.get("v") or "normal")
+        previous = by_variant.get(variant)
+        if previous is None or day >= previous[0]:
+            by_variant[variant] = (day, market)
+    if not by_variant:
+        return None
+    newest = max(item[0] for item in by_variant.values())
+    return max(item[1] for item in by_variant.values() if item[0] == newest)
+
+
+def freshness_bucket(tier: str | None, market: float | None, demand: int) -> str:
+    """First matching bucket. Demand only promotes a card into a hotter one."""
+    if demand >= DEMAND_HOT or (market is not None and market >= HOT_MARKET):
+        return "hot"
+    if tier == "A" or (market is not None and market >= HIGH_MARKET) or demand >= DEMAND_HIGH:
+        return "high"
+    if (market is not None and market >= MID_MARKET) or demand >= DEMAND_MIN:
+        return "mid"
+    return "cheap"
+
+
+def age_hours(fetched: datetime | None, now: datetime) -> float | None:
+    if fetched is None:
+        return None
+    if fetched.tzinfo is None:
+        fetched = fetched.replace(tzinfo=timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    return (now - fetched).total_seconds() / 3600
+
+
+def days_left_in_month(now: datetime) -> int:
+    """Calendar days left in now's month, including today."""
+    total = calendar.monthrange(now.year, now.month)[1]
+    return max(1, total - now.day + 1)
+
+
+def daily_allowance(
+    monthly_cap: int,
+    spent: int,
+    now: datetime,
+    run_credit_cap: int,
+    room: int,
+) -> tuple[int, str]:
+    """Credits this run may spend, and the sentence that explains the number.
+
+    The pace is the credits still left in the month divided by the days left,
+    including today. Floor division so the days cannot add up past the cap.
+    The per-run credit cap and the store-reserve room can only lower it.
+    """
+    days = days_left_in_month(now)
+    remain = max(0, monthly_cap - spent)
+    paced = remain // days if days else 0
+    room = max(0, room)
+    cap = max(0, run_credit_cap)
+    allowance = min(paced, cap, room)
+    month = now.strftime("%Y-%m")
+    day_word = "day" if days == 1 else "days"
+    lead = (
+        f"Allowance {allowance} credits. "
+        f"{remain} credits remain in {month} over {days} {day_word} including today "
+        f"({paced} a day)."
+    )
+    if room < cap and room < paced:
+        why = (
+            f"{lead} Only {room} credits fit without dropping the shared store "
+            f"under its reserve, which is below the {paced}-a-day pace and the "
+            f"{cap} per-run cap."
+        )
+    elif cap < paced:
+        why = f"{lead} The {cap} per-run credit cap lowers that {paced}-a-day pace."
+    else:
+        why = f"{lead} That pace is within the {cap} per-run cap."
+    return allowance, why
+
+
+def _demand_count(demand: dict[str, int] | None, card_id: str) -> int:
+    if not demand:
+        return 0
+    value = demand.get(card_id, 0)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return 0
+    return max(0, value)
+
+
+def build_refresh_plan(
+    seed: list[tuple[str, str]],
+    cards: dict,
+    now: datetime,
+    demand: dict[str, int] | None,
+    max_cards: int,
+    allowance: int,
+) -> dict:
+    """Order the cards this run should consider, and how many fit in the allowance.
+
+    ids is the priority queue, capped by the card limit. fit_ids is the prefix
+    whose worst-case credit cost stays inside the allowance. Unfetched cards
+    come first. A fetched card is strictly due when it is past its bucket
+    interval. Cards at least 24 hours old fill any allowance that due cards
+    do not use. Anything newer than that stays out of the queue.
+    """
+    buckets = {name: {"cards": 0, "due": 0, "selected": 0} for name in BUCKET_ORDER}
+    seen: set[str] = set()
+    index_of: dict[str, int] = {}
+    tier_of: dict[str, str | None] = {}
+    for index, (tier, card_id) in enumerate(seed):
+        if card_id in seen:
+            continue
+        seen.add(card_id)
+        index_of[card_id] = index
+        tier_of[card_id] = tier
+    extras = []
+    if demand:
+        for card_id, count in demand.items():
+            if card_id in seen or _demand_count(demand, card_id) < DEMAND_MIN:
+                continue
+            extras.append((-count, card_id))
+    extras.sort()
+    for offset, (_neg, card_id) in enumerate(extras):
+        seen.add(card_id)
+        index_of[card_id] = 10**9 + offset
+        tier_of[card_id] = None
+
+    entries = []
+    for card_id, index in index_of.items():
+        tier = tier_of[card_id]
+        count = _demand_count(demand, card_id)
+        rec = cards.get(card_id) if isinstance(cards.get(card_id), dict) else {}
+        market = latest_market(rec)
+        unfetched = card_is_unfilled(rec, card_id)
+        if unfetched:
+            bucket = "unfetched"
+            due = True
+            eligible = True
+            key = (0, 0, index, -count, card_id)
+        else:
+            bucket = freshness_bucket(tier, market, count)
+            age = age_hours(parse_time(rec.get("fetched_at")), now)
+            limit = BUCKET_HOURS[bucket]
+            if age is None or age >= limit:
+                due = True
+                eligible = True
+                score = 1e9 if age is None else age / limit
+            elif age >= MIN_REFRESH_HOURS:
+                due = False
+                eligible = True
+                score = age / limit
+            else:
+                due = False
+                eligible = False
+                score = 0
+            key = (1, -score, -(market or 0), index, card_id)
+        buckets[bucket]["cards"] += 1
+        if due:
+            buckets[bucket]["due"] += 1
+        if eligible:
+            entries.append((key, card_id, bucket, due))
+
+    entries.sort(key=lambda item: item[0])
+    queue = entries[: max(0, max_cards)]
+    fit: list[str] = []
+    reserved = 0
+    due_selected = 0
+    fill_selected = 0
+    for _key, card_id, bucket, due in queue:
+        worst = max_card_credits(card_id)
+        if reserved + worst > allowance:
+            break
+        fit.append(card_id)
+        reserved += worst
+        buckets[bucket]["selected"] += 1
+        if due:
+            due_selected += 1
+        else:
+            fill_selected += 1
+    return {
+        "ids": [card_id for _key, card_id, _bucket, _due in queue],
+        "fit_ids": fit,
+        "buckets": buckets,
+        "due_selected": due_selected,
+        "fill_selected": fill_selected,
+        "reserved": reserved,
+    }
+
+
+def format_buckets(plan: dict) -> str:
+    parts = []
+    for name in BUCKET_ORDER:
+        row = plan["buckets"][name]
+        parts.append(f"{name} {row['cards']} cards, {row['due']} due, {row['selected']} selected")
+    return "Freshness buckets: " + "; ".join(parts) + "."
+
+
+def format_selection(plan: dict) -> str:
+    fit = plan["fit_ids"]
+    if not fit:
+        if not plan["ids"]:
+            return "Selected 0 cards. Nothing is due, and no fetched card is at least 24 hours old."
+        return (
+            f"Selected 0 cards inside the allowance. "
+            f"{len(plan['ids'])} card(s) are waiting, and the next one could pass the allowance."
+        )
+    return (
+        f"Selected {len(fit)} card(s) inside the allowance: "
+        f"{plan['due_selected']} strictly due, {plan['fill_selected']} next-stalest."
+    )
 
 
 def request_json(url: str, headers: dict) -> tuple[int, dict | list | None]:
@@ -806,6 +1076,7 @@ def sync(now: datetime | None = None) -> int:
     spent_month = month_credits(usage, month)
     if spent_month >= monthly_cap:
         print(f"Skipping. BinderHunt has logged {spent_month} credits in {month}, and the cap is {monthly_cap}.")
+        print(f"Allowance 0 credits. The monthly cap of {monthly_cap} is already met.")
         return 0
     try:
         remaining, check_credits = read_account_remaining(headers)
@@ -824,6 +1095,7 @@ def sync(now: datetime | None = None) -> int:
             f"Skipping. Scrydex has {remaining} credits left. "
             f"A card fetch would leave fewer than {store_reserve} for the store."
         )
+        print("Allowance 0 credits. The store reserve leaves no room for a card lookup.")
         print(f"credits this run: {run_credits}")
         print(f"credits this month ({month}): {spent_month} / {monthly_cap}")
         return 0
@@ -831,6 +1103,8 @@ def sync(now: datetime | None = None) -> int:
     if remaining is not None:
         room = min(room, remaining - store_reserve)
     if room < 2 or run_credit_cap < 2 or run_card_cap < 1:
+        _allowance, why = daily_allowance(monthly_cap, spent_month, now, run_credit_cap, max(room, 0))
+        print(why)
         print(
             f"Skipping. Credit room this run is {max(room, 0)} "
             f"(monthly cap {monthly_cap}, per-run cap {run_credit_cap})."
@@ -838,23 +1112,29 @@ def sync(now: datetime | None = None) -> int:
         print(f"credits this run: {run_credits}")
         print(f"credits this month ({month}): {spent_month} / {monthly_cap}")
         return 0
-    run_cap = min(run_credit_cap, room)
+    allowance, why = daily_allowance(monthly_cap, spent_month, now, run_credit_cap, room)
+    print(why)
     seed = load_seed()
     cache = load_cache()
     cards = cache["cards"]
-    due = select_due(seed, cards, now, max_cards=run_card_cap, demand=load_demand())
-    if not due:
-        print(f"No cards due. Cache has {len(cards)} card(s); nothing was requested.")
+    plan = build_refresh_plan(
+        seed,
+        cards,
+        now,
+        load_demand(),
+        max_cards=run_card_cap,
+        allowance=allowance,
+    )
+    print(format_buckets(plan))
+    print(format_selection(plan))
+    due = plan["ids"]
+    if allowance < 2 or not plan["fit_ids"]:
+        print(f"Cache has {len(cards)} card(s); nothing was requested.")
         print(f"credits this run: {run_credits}")
         print(f"credits this month ({month}): {spent_month} / {monthly_cap}")
         if remaining is not None:
             print(f"account credits remaining: {remaining}")
         return 0
-    phase = "backfill" if any(card_is_unfilled(cards.get(card_id) if isinstance(cards.get(card_id), dict) else {}, card_id) for card_id in due) else "steady"
-    print(
-        f"{phase}: up to {len(due)} card(s). "
-        f"Per-run credit cap {run_cap}. Monthly cap {monthly_cap}. Store reserve {store_reserve}."
-    )
     refreshed = 0
     card_credits = 0
     rate_limited = False
@@ -862,8 +1142,8 @@ def sync(now: datetime | None = None) -> int:
     try:
         for card_id in due:
             worst = max_card_credits(card_id)
-            if card_credits + worst > run_cap or spent_month + worst > monthly_cap:
-                print(f"Stopping before {card_id}. The next card could pass the credit cap.")
+            if card_credits + worst > allowance or spent_month + worst > monthly_cap:
+                print(f"Stopping before {card_id}. The next card could pass the allowance or the monthly cap.")
                 break
             if remaining is not None and remaining - card_credits - worst < store_reserve:
                 print(f"Stopping before {card_id}. The next card could drop the account under the store reserve.")

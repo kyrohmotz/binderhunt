@@ -3,6 +3,7 @@ name: Sync Scrydex cache
 on:
   schedule:
     # Once a day. Scrydex asks that prices be cached at least 24 hours.
+    # The script spreads the credits left in the month across the days left.
     - cron: "15 8 * * *"
   workflow_dispatch:
 

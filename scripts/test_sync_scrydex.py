@@ -960,5 +960,326 @@ class CacheWriteTests(unittest.TestCase):
             self.assertEqual(json.loads(path.read_text())["cards"]["base1-4"]["history"], [])
 
 
+class PaceTests(unittest.TestCase):
+    """Daily allowance and the value-weighted queue. No network."""
+
+    def _at(self, now, hours):
+        return (now - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def _priced(self, now, hours, market):
+        return {
+            "fetched_at": self._at(now, hours),
+            "history": [{"d": "2026-11-01", "v": "normal", "m": market}],
+        }
+
+    def test_allowance_across_the_month(self):
+        cap = 15000
+        run = 500
+        room = 40000
+        start, start_why = sync.daily_allowance(cap, 1, datetime(2026, 11, 1, tzinfo=timezone.utc), run, room)
+        self.assertEqual(start, 499)
+        self.assertEqual(
+            start_why,
+            "Allowance 499 credits. 14999 credits remain in 2026-11 over 30 days including today "
+            "(499 a day). That pace is within the 500 per-run cap.",
+        )
+        january, january_why = sync.daily_allowance(cap, 1, datetime(2026, 1, 1, tzinfo=timezone.utc), run, room)
+        self.assertEqual(january, 483)
+        self.assertIn("over 31 days including today (483 a day)", january_why)
+        self.assertIn("within the 500 per-run cap", january_why)
+
+        mid, mid_why = sync.daily_allowance(cap, 3336, datetime(2026, 11, 14, tzinfo=timezone.utc), run, room)
+        self.assertEqual(mid, 500)
+        self.assertEqual(
+            mid_why,
+            "Allowance 500 credits. 11664 credits remain in 2026-11 over 17 days including today "
+            "(686 a day). The 500 per-run credit cap lowers that 686-a-day pace.",
+        )
+
+        near, near_why = sync.daily_allowance(cap, 14950, datetime(2026, 11, 21, tzinfo=timezone.utc), run, room)
+        self.assertEqual(near, 5)
+        self.assertEqual(
+            near_why,
+            "Allowance 5 credits. 50 credits remain in 2026-11 over 10 days including today "
+            "(5 a day). That pace is within the 500 per-run cap.",
+        )
+
+        last, last_why = sync.daily_allowance(cap, 14750, datetime(2026, 11, 30, tzinfo=timezone.utc), run, room)
+        self.assertEqual(last, 250)
+        self.assertEqual(
+            last_why,
+            "Allowance 250 credits. 250 credits remain in 2026-11 over 1 day including today "
+            "(250 a day). That pace is within the 500 per-run cap.",
+        )
+
+    def test_store_room_lowers_the_allowance(self):
+        allowance, why = sync.daily_allowance(
+            15000, 3336, datetime(2026, 11, 14, tzinfo=timezone.utc), 500, 10,
+        )
+        self.assertEqual(allowance, 10)
+        self.assertEqual(
+            why,
+            "Allowance 10 credits. 11664 credits remain in 2026-11 over 17 days including today "
+            "(686 a day). Only 10 credits fit without dropping the shared store under its reserve, "
+            "which is below the 686-a-day pace and the 500 per-run cap.",
+        )
+        nothing, quiet = sync.daily_allowance(
+            15000, 3336, datetime(2026, 11, 14, tzinfo=timezone.utc), 500, 0,
+        )
+        self.assertEqual(nothing, 0)
+        self.assertIn("Only 0 credits fit", quiet)
+        self.assertIn("store", quiet)
+
+    def test_caps_stay_where_they_were(self):
+        self.assertEqual(sync.MONTHLY_CAP, 15000)
+        self.assertEqual(sync.STORE_RESERVE, 15000)
+        self.assertEqual(sync.RUN_CREDIT_CAP, 500)
+        self.assertEqual(sync.MAX_PER_RUN, 100)
+
+    def test_latest_market_uses_the_newest_day_and_ignores_zero(self):
+        market = sync.latest_market({
+            "history": [
+                {"d": "2026-11-01", "v": "normal", "m": 900},
+                {"d": "2026-11-10", "v": "holofoil", "m": 40},
+                {"d": "2026-11-10", "v": "normal", "m": 0},
+                {"d": "2026-11-10", "v": "reverse", "m": 55},
+            ],
+        })
+        self.assertEqual(market, 55)
+        self.assertIsNone(sync.latest_market({"missing": True, "history": [{"d": "2026-11-10", "v": "normal", "m": 800}]}))
+        self.assertIsNone(sync.latest_market({"history": [{"d": "2026-11-10", "v": "normal", "m": 0}]}))
+
+    def test_unfetched_and_remap_go_before_stale_cards(self):
+        now = datetime(2026, 11, 14, tzinfo=timezone.utc)
+        seed = [("B", "cheap-old"), ("A", "sv03-223"), ("A", "never")]
+        cards = {
+            "cheap-old": self._priced(now, 24 * 20, 4),
+            "sv03-223": {"missing": True, "fetched_at": self._at(now, 1)},
+        }
+        plan = sync.build_refresh_plan(seed, cards, now, None, max_cards=10, allowance=500)
+        self.assertEqual(plan["ids"][:2], ["sv03-223", "never"])
+        self.assertEqual(plan["buckets"]["unfetched"]["due"], 2)
+        self.assertGreater(plan["buckets"]["unfetched"]["selected"], 0)
+
+    def test_value_and_demand_come_due_sooner_than_age_alone(self):
+        now = datetime(2026, 11, 14, tzinfo=timezone.utc)
+        seed = [("B", "cheap-old"), ("B", "grail"), ("B", "quiet")]
+        cards = {
+            "cheap-old": self._priced(now, 24 * 10, 4),
+            "grail": self._priced(now, 24 * 4, 600),
+            "quiet": self._priced(now, 24 * 10, 4),
+            "popular": self._priced(now, 24 * 8, 2),
+        }
+        plan = sync.build_refresh_plan(seed, cards, now, {"popular": 8}, max_cards=10, allowance=500)
+        self.assertEqual(plan["ids"][0], "popular")
+        self.assertEqual(plan["buckets"]["hot"]["due"], 1)
+        self.assertLess(plan["ids"].index("grail"), plan["ids"].index("cheap-old"))
+        self.assertEqual(plan["due_selected"], 1)
+        self.assertEqual(plan["fill_selected"], 3)
+
+    def test_hot_card_eight_days_old_is_due_and_a_cheap_one_is_not(self):
+        now = datetime(2026, 11, 14, tzinfo=timezone.utc)
+        seed = [("B", "cheap"), ("A", "grail")]
+        cards = {
+            "cheap": self._priced(now, 24 * 10, 4),
+            "grail": self._priced(now, 24 * 8, 600),
+        }
+        plan = sync.build_refresh_plan(seed, cards, now, None, max_cards=1, allowance=500)
+        self.assertEqual(plan["fit_ids"], ["grail"])
+        self.assertEqual(plan["due_selected"], 1)
+        self.assertEqual(plan["fill_selected"], 0)
+        self.assertEqual(plan["buckets"]["hot"]["due"], 1)
+        self.assertEqual(plan["buckets"]["cheap"]["due"], 0)
+
+    def test_nothing_due_fills_the_allowance_and_skips_same_day_cards(self):
+        now = datetime(2026, 11, 14, tzinfo=timezone.utc)
+        seed = [("B", "base1-4"), ("B", "swsh7-215"), ("B", "ex11-3"), ("B", "fresh")]
+        cards = {
+            "base1-4": self._priced(now, 24 * 10, 4),
+            "swsh7-215": self._priced(now, 24 * 10, 4),
+            "ex11-3": self._priced(now, 24 * 10, 4),
+            "fresh": self._priced(now, 23, 4),
+        }
+        plan = sync.build_refresh_plan(seed, cards, now, None, max_cards=10, allowance=10)
+        self.assertEqual(plan["due_selected"], 0)
+        self.assertEqual(plan["fill_selected"], 2)
+        self.assertEqual(plan["fit_ids"], ["base1-4", "swsh7-215"])
+        self.assertEqual(plan["ids"], ["base1-4", "swsh7-215", "ex11-3"])
+        self.assertNotIn("fresh", plan["ids"])
+        self.assertEqual(plan["reserved"], 8)
+        self.assertIn("cheap", sync.format_buckets(plan))
+        self.assertIn("2 next-stalest", sync.format_selection(plan))
+
+        too_new = sync.build_refresh_plan(
+            [("B", "fresh")],
+            {"fresh": self._priced(now, 2, 4)},
+            now,
+            None,
+            max_cards=10,
+            allowance=500,
+        )
+        self.assertEqual(too_new["ids"], [])
+        self.assertIn("24 hours", sync.format_selection(too_new))
+
+    def test_bucket_thresholds(self):
+        self.assertEqual(sync.freshness_bucket("B", 500, 0), "hot")
+        self.assertEqual(sync.freshness_bucket("B", 499, 0), "high")
+        self.assertEqual(sync.freshness_bucket("A", 10, 0), "high")
+        self.assertEqual(sync.freshness_bucket("B", 200, 0), "high")
+        self.assertEqual(sync.freshness_bucket("B", 50, 0), "mid")
+        self.assertEqual(sync.freshness_bucket("B", 49, 0), "cheap")
+        self.assertEqual(sync.freshness_bucket("B", 4, 2), "mid")
+        self.assertEqual(sync.freshness_bucket("B", 4, 4), "high")
+        self.assertEqual(sync.freshness_bucket("B", 4, 8), "hot")
+        self.assertEqual(sync.freshness_bucket(None, None, 0), "cheap")
+
+
+class PaceSyncTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.cache = root / "scrydex.json"
+        self.usage = root / "scrydex-usage.json"
+        self.seed = root / "seed.txt"
+        self.demand = root / "price-demand.json"
+        self.seed.write_text("A base1-4\nB sv03-223\n", encoding="utf-8")
+        self.demand.write_text('{"counts": {}}\n', encoding="utf-8")
+        self.saved = {
+            "CACHE_PATH": sync.CACHE_PATH,
+            "USAGE_PATH": sync.USAGE_PATH,
+            "SEED_PATH": sync.SEED_PATH,
+            "DEMAND_PATH": sync.DEMAND_PATH,
+            "request_json": sync.request_json,
+            "sleep": sync.time.sleep,
+        }
+        sync.CACHE_PATH = self.cache
+        sync.USAGE_PATH = self.usage
+        sync.SEED_PATH = self.seed
+        sync.DEMAND_PATH = self.demand
+        sync.time.sleep = lambda *_args, **_kwargs: None
+        self.env = {name: os.environ.get(name) for name in (
+            "SCRYDEX_API_KEY", "SCRYDEX_TEAM_ID", "SCRYDEX_MONTHLY_CAP",
+            "SCRYDEX_STORE_RESERVE", "SCRYDEX_RUN_CAP", "SCRYDEX_RUN_CARD_CAP",
+        )}
+        os.environ["SCRYDEX_API_KEY"] = "super-secret-value"
+        os.environ["SCRYDEX_TEAM_ID"] = "team-secret-value"
+        os.environ["SCRYDEX_MONTHLY_CAP"] = "15000"
+        os.environ["SCRYDEX_STORE_RESERVE"] = "15000"
+        os.environ["SCRYDEX_RUN_CAP"] = "500"
+        os.environ["SCRYDEX_RUN_CARD_CAP"] = "100"
+        self.calls = []
+
+    def tearDown(self):
+        sync.CACHE_PATH = self.saved["CACHE_PATH"]
+        sync.USAGE_PATH = self.saved["USAGE_PATH"]
+        sync.SEED_PATH = self.saved["SEED_PATH"]
+        sync.DEMAND_PATH = self.saved["DEMAND_PATH"]
+        sync.request_json = self.saved["request_json"]
+        sync.time.sleep = self.saved["sleep"]
+        for name, value in self.env.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+        self.tmp.cleanup()
+
+    def _sync(self, fake, when):
+        sync.request_json = fake
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = sync.sync(when)
+        return code, buf.getvalue()
+
+    def _ok(self, url, headers):
+        self.calls.append(url)
+        if url.endswith("/usage"):
+            return 200, {"credits_remaining": 50000}
+        if "price_history" in url:
+            return 200, {"count": 0, "total_count": 0, "data": []}
+        return 200, {"data": {"name": "Card", "variants": []}}
+
+    def _priced(self, when, hours, market):
+        return {
+            "fetched_at": (when - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "history": [{"d": "2026-11-01", "v": "normal", "m": market}],
+        }
+
+    def test_reserve_too_low_makes_no_card_requests(self):
+        def fake(url, headers):
+            self.calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 14999}
+            raise AssertionError(url)
+
+        code, log = self._sync(fake, datetime(2026, 11, 14, tzinfo=timezone.utc))
+        self.assertEqual(code, 0)
+        self.assertEqual(self.calls, [sync.USAGE_API])
+        self.assertFalse(self.cache.exists())
+        self.assertIn("Allowance 0 credits. The store reserve leaves no room for a card lookup.", log)
+        self.assertIn("14999", log)
+        self.assertIn("15000", log)
+        self.assertNotIn("/cards/", " ".join(self.calls))
+
+    def test_nothing_due_still_refreshes_inside_the_allowance(self):
+        now = datetime(2026, 11, 14, tzinfo=timezone.utc)
+        self.cache.write_text(json.dumps({
+            "cards": {
+                "base1-4": self._priced(now, 24 * 5, 4),
+                "sv03-223": self._priced(now, 24 * 5, 4),
+            }
+        }), encoding="utf-8")
+        code, log = self._sync(self._ok, now)
+        self.assertEqual(code, 0)
+        self.assertIn("Allowance ", log)
+        self.assertIn("Freshness buckets:", log)
+        self.assertIn("0 strictly due, 2 next-stalest", log)
+        self.assertIn("unfetched 0 cards", log)
+        card_calls = [url for url in self.calls if "/cards/" in url]
+        self.assertEqual(len(card_calls), 4)
+        cards = json.loads(self.cache.read_text(encoding="utf-8"))["cards"]
+        self.assertIn("base1-4", cards)
+        self.assertIn("sv03-223", cards)
+        spent = json.loads(self.usage.read_text(encoding="utf-8"))["months"]["2026-11"]["credits"]
+        self.assertEqual(spent, 9)
+        self.assertLessEqual(spent, 1 + 500)
+
+    def test_last_day_near_the_cap_stops_inside_the_allowance(self):
+        now = datetime(2026, 11, 30, tzinfo=timezone.utc)
+        self.usage.write_text(json.dumps({"months": {"2026-11": {"credits": 14993}}}), encoding="utf-8")
+        self.cache.write_text(json.dumps({
+            "cards": {
+                "base1-4": self._priced(now, 24 * 10, 4),
+                "sv03-223": self._priced(now, 24 * 6, 4),
+            }
+        }), encoding="utf-8")
+        code, log = self._sync(self._ok, now)
+        self.assertEqual(code, 0)
+        self.assertIn(
+            "Allowance 6 credits. 6 credits remain in 2026-11 over 1 day including today (6 a day).",
+            log,
+        )
+        self.assertIn("0 strictly due, 1 next-stalest", log)
+        self.assertTrue(any("/base1-4" in url for url in self.calls))
+        self.assertFalse(any("sv03-223" in url or "/sv3-223" in url for url in self.calls))
+        spent = json.loads(self.usage.read_text(encoding="utf-8"))["months"]["2026-11"]["credits"]
+        self.assertEqual(spent, 14998)
+        self.assertLessEqual(spent - 14993, 1 + 6)
+
+    def test_cards_newer_than_a_day_are_not_a_fill(self):
+        now = datetime(2026, 11, 14, tzinfo=timezone.utc)
+        self.cache.write_text(json.dumps({
+            "cards": {
+                "base1-4": self._priced(now, 2, 800),
+                "sv03-223": self._priced(now, 2, 4),
+            }
+        }), encoding="utf-8")
+        code, log = self._sync(self._ok, now)
+        self.assertEqual(code, 0)
+        self.assertIn("no fetched card is at least 24 hours old", log)
+        self.assertIn("Freshness buckets:", log)
+        self.assertEqual([url for url in self.calls if "/cards/" in url], [])
+        self.assertEqual(json.loads(self.usage.read_text(encoding="utf-8"))["months"]["2026-11"]["credits"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()

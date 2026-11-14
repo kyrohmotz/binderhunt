@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Estimate Scrydex credits for chase-card coverage.
 
+The live refresh order is scripts/sync_scrydex.py. It paces a daily allowance
+and refreshes by price bucket. The arithmetic in this file is the older
+weekly tier A and monthly tier B estimate, kept so the figures stay comparable.
+
 This module only does arithmetic. It does not open a connection, read secrets,
 or contact Scrydex. The published plan prices are the public
 figures on https://scrydex.com/pricing (Starter, Growth, Professional).
