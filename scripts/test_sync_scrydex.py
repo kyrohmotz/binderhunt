@@ -940,6 +940,23 @@ class WorkflowGuardTests(unittest.TestCase):
         self.assertIn("MONTHLY_CAP = 15000", sync_text)
         self.assertIn("STORE_RESERVE = 15000", sync_text)
         self.assertIn(sync.PAYMENT_REQUIRED_MESSAGE, sync_text)
+        self.assertIn('cron: "15 8 * * *"', text)
+        # A queued rerun checks out the triggering SHA. Read the ledger and
+        # the price cache from latest main before any Scrydex call, and do
+        # not spend at all from a ref that will not commit the ledger.
+        refuse = text.index("Refusing to spend Scrydex credits")
+        sync_call = text.index("python3 scripts/sync_scrydex.py")
+        self.assertLess(refuse, sync_call)
+        self.assertLess(text.index("git fetch origin main"), sync_call)
+        self.assertLess(
+            text.index("git checkout origin/main -- data/scrydex-usage.json data/scrydex.json"),
+            sync_call,
+        )
+        self.assertIn("git reset --soft origin/main", text)
+        self.assertIn("git pull --rebase origin main", text)
+        self.assertIn('git checkout --theirs -- "$ledger"', text)
+        self.assertIn("GITHUB_REF", text)
+        self.assertIn("refs/heads/main", text)
 
 
 class CacheWriteTests(unittest.TestCase):

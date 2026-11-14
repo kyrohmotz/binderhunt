@@ -22,6 +22,14 @@ A later run the same day may spend only what that pace still has left.
 The usage read counts toward the day. When fewer than 2 credits remain,
 the run does not read usage and does not request cards.
 
+The GitHub workflow must not trust the checkout SHA. A queued rerun still
+has the commit that triggered it, which is missing the ledger the previous
+run pushed, so it would spend another full pace. The workflow fetches
+origin/main and checks out data/scrydex-usage.json and data/scrydex.json
+before this script runs, and it refuses to call Scrydex when the ref is
+not refs/heads/main. A branch run would spend credits the commit step
+never records.
+
 Unfetched cards still go first. After that the run takes the cards that are
 the furthest through their own interval, so a valuable or often-opened card
 comes due sooner than a cheap one. The interval is the first match:

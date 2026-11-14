@@ -59,7 +59,23 @@ jobs:
           SCRYDEX_STORE_RESERVE: ${{ vars.SCRYDEX_STORE_RESERVE || '15000' }}
           SCRYDEX_RUN_CAP: ${{ vars.SCRYDEX_RUN_CAP || '500' }}
           SCRYDEX_RUN_CARD_CAP: ${{ vars.SCRYDEX_RUN_CARD_CAP || '100' }}
-        run: python3 scripts/sync_scrydex.py
+        run: |
+          # Concurrency queues this job (cancel-in-progress is false), but
+          # checkout is still the SHA that triggered the run. That tree does
+          # not have the days entry the previous sync pushed, so a rerun
+          # would spend another full pace. A non-main ref spends credits
+          # and never commits the ledger, because the commit step only
+          # pushes refs/heads/main. Exit before any Scrydex HTTP call.
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Refusing to spend Scrydex credits. This run is ${GITHUB_REF}, not refs/heads/main. No Scrydex request was made."
+            exit 1
+          fi
+          git fetch origin main
+          git checkout origin/main -- data/scrydex-usage.json data/scrydex.json
+          # The sync commit has to sit on that main. Otherwise a rebase
+          # replays a stale ledger over the one we just read and can drop it.
+          git reset --soft origin/main
+          python3 scripts/sync_scrydex.py
 
       # A 402 or three card 5xx responses exit nonzero only after scrydex.json
       # and the credit ledger are written. always() still commits those files
@@ -92,9 +108,25 @@ jobs:
               git reset --hard "$base"
             fi
             git fetch origin main
+            # Rebase onto the latest main and retry. If the ledger or cache
+            # conflicts, keep this run's copy so the credits just spent are
+            # not dropped when the push races the Daily Drop job.
             if ! git pull --rebase origin main; then
-              git rebase --abort || true
-              continue
+              for ledger in data/scrydex-usage.json data/scrydex.json data/fx.json; do
+                if git ls-files -u -- "$ledger" | grep -q .; then
+                  git checkout --theirs -- "$ledger"
+                  git add -- "$ledger"
+                fi
+              done
+              if git diff --name-only --diff-filter=U | grep -q .; then
+                echo "rebase left conflicts outside the ledger; retrying"
+                git rebase --abort || true
+                continue
+              fi
+              if ! GIT_EDITOR=true git rebase --continue; then
+                git rebase --abort || true
+                continue
+              fi
             fi
             if git push origin HEAD:main; then
               ok=1
