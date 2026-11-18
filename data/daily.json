@@ -13974,6 +13974,16 @@
       "source": "tcgplayer",
       "eur": 11.28,
       "at": "2026-11-17T17:24:03Z"
+    },
+    "2026-11-20": {
+      "id": "ecard1-10",
+      "price": 52.5,
+      "variant": "reverse-holofoil",
+      "printing": "Reverse Holofoil",
+      "alts": 2,
+      "source": "tcgplayer",
+      "eur": 31.31,
+      "at": "2026-11-18T16:57:03Z"
     }
   }
 }
