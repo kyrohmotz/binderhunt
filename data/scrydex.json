@@ -339034,16 +339034,16 @@
       ]
     },
     "ecard1-22": {
-      "fetched_at": "2026-10-19T15:59:51Z",
+      "fetched_at": "2026-11-18T17:14:11Z",
       "graded": [
         {
           "company": "PSA",
           "currency": "USD",
           "grade": "10",
-          "high": 94800.0,
-          "low": 28759.0,
-          "market": 65505.55,
-          "mid": 39999.99,
+          "high": 144000.0,
+          "low": 24600.0,
+          "market": 78368.35,
+          "mid": 72370.0,
           "variant": "holofoil"
         },
         {
@@ -339051,9 +339051,9 @@
           "currency": "USD",
           "grade": "9",
           "high": 10000.0,
-          "low": 2938.0,
-          "market": 5953.47,
-          "mid": 4560.0,
+          "low": 898.0,
+          "market": 3426.13,
+          "mid": 3720.0,
           "variant": "holofoil"
         },
         {
@@ -339071,9 +339071,9 @@
           "currency": "USD",
           "grade": "8",
           "high": 2500.0,
-          "low": 858.56,
-          "market": 1871.39,
-          "mid": 1823.79,
+          "low": 595.0,
+          "market": 1638.54,
+          "mid": 1170.0,
           "variant": "holofoil"
         },
         {
@@ -339081,19 +339081,19 @@
           "currency": "USD",
           "grade": "7",
           "high": 1200.0,
-          "low": 178.5,
-          "market": 819.5,
-          "mid": 416.0,
+          "low": 217.83,
+          "market": 819.75,
+          "mid": 598.0,
           "variant": "holofoil"
         },
         {
           "company": "PSA",
           "currency": "USD",
           "grade": "6",
-          "high": 400.0,
-          "low": 177.5,
-          "market": 352.94,
-          "mid": 295.0,
+          "high": 407.0,
+          "low": 222.5,
+          "market": 371.72,
+          "mid": 336.0,
           "variant": "holofoil"
         },
         {
@@ -339130,40 +339130,40 @@
           "company": "CGC",
           "currency": "USD",
           "grade": "10",
-          "high": 2000.0,
+          "high": 10000.0,
           "low": 1000.0,
-          "market": 1764.69,
-          "mid": 1555.5,
+          "market": 4954.26,
+          "mid": 2000.0,
           "variant": "holofoil"
         },
         {
           "company": "CGC",
           "currency": "USD",
           "grade": "9.5",
-          "high": 296.0,
-          "low": 296.0,
-          "market": 296.0,
-          "mid": 296.0,
+          "high": 6900.0,
+          "low": 3720.0,
+          "market": 4868.79,
+          "mid": 5310.0,
           "variant": "holofoil"
         },
         {
           "company": "CGC",
           "currency": "USD",
           "grade": "9",
-          "high": 750.0,
-          "low": 549.99,
-          "market": 689.51,
-          "mid": 650.0,
+          "high": 1750.0,
+          "low": 1750.0,
+          "market": 1750.0,
+          "mid": 1750.0,
           "variant": "holofoil"
         },
         {
           "company": "CGC",
           "currency": "USD",
           "grade": "8.5",
-          "high": 499.0,
-          "low": 79.0,
-          "market": 385.77,
-          "mid": 166.0,
+          "high": 999.0,
+          "low": 499.0,
+          "market": 850.2,
+          "mid": 749.0,
           "variant": "holofoil"
         },
         {
@@ -339220,20 +339220,20 @@
           "company": "BGS",
           "currency": "USD",
           "grade": "9",
-          "high": 242.0,
+          "high": 634.95,
           "low": 108.0,
-          "market": 196.19,
-          "mid": 138.0,
+          "market": 580.59,
+          "mid": 190.0,
           "variant": "holofoil"
         },
         {
           "company": "BGS",
           "currency": "USD",
           "grade": "8.5",
-          "high": 310.0,
+          "high": 869.46,
           "low": 138.0,
-          "market": 282.96,
-          "mid": 224.0,
+          "market": 675.25,
+          "mid": 310.0,
           "variant": "holofoil"
         },
         {
@@ -339291,9 +339291,9 @@
           "currency": "USD",
           "grade": "8",
           "high": 850.0,
-          "low": 192.19,
-          "market": 586.93,
-          "mid": 230.0,
+          "low": 561.19,
+          "market": 739.69,
+          "mid": 705.6,
           "variant": "reverseHolofoil"
         },
         {
@@ -339321,9 +339321,9 @@
           "currency": "USD",
           "grade": "5",
           "high": 120.0,
-          "low": 34.95,
-          "market": 90.4,
-          "mid": 77.48,
+          "low": 117.5,
+          "market": 117.95,
+          "mid": 118.75,
           "variant": "reverseHolofoil"
         },
         {
@@ -339334,6 +339334,16 @@
           "low": 45.0,
           "market": 132.78,
           "mid": 92.5,
+          "variant": "reverseHolofoil"
+        },
+        {
+          "company": "CGC",
+          "currency": "USD",
+          "grade": "10",
+          "high": 1499.0,
+          "low": 1499.0,
+          "market": 1499.0,
+          "mid": 1499.0,
           "variant": "reverseHolofoil"
         },
         {
@@ -339410,305 +339420,15 @@
           "company": "BGS",
           "currency": "USD",
           "grade": "8.5",
-          "high": 242.5,
+          "high": 481.83,
           "low": 242.5,
-          "market": 242.5,
-          "mid": 242.5,
+          "market": 396.22,
+          "mid": 362.17,
           "variant": "reverseHolofoil"
         }
       ],
       "history": [
         {
-          "d": "2026/07/21",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/21",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/07/22",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/22",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/07/23",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/23",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/07/24",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/24",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/07/25",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/25",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/07/26",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/26",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/07/27",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/27",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/07/28",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/28",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/07/29",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/29",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/07/30",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/30",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/01",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/01",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/02",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/02",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/03",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/03",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/04",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/04",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/05",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/05",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/06",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/06",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/07",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/07",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/08",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/08",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/09",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/09",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/10",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/10",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/11",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/11",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/12",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/12",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/13",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/13",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/14",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/14",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/15",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/15",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/16",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/16",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/17",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/17",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/18",
-          "m": 299.99,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/18",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
-          "d": "2026/08/19",
-          "m": 300.0,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/19",
-          "m": 208.65,
-          "v": "reverseHolofoil"
-        },
-        {
           "d": "2026/08/20",
           "m": 300.0,
           "v": "holofoil"
@@ -340295,6 +340015,286 @@
         },
         {
           "d": "2026/10/19",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/10/20",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/20",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/10/21",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/21",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/10/22",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/22",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/10/23",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/23",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/10/24",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/24",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/10/26",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/26",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/10/27",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/27",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/10/28",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/28",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/10/29",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/29",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/10/30",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/30",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/10/31",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/31",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/01",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/01",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/02",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/02",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/03",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/03",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/04",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/04",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/06",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/06",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/07",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/07",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/08",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/08",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/09",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/09",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/10",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/10",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/11",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/11",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/12",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/12",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/13",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/13",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/14",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/14",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/15",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/15",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/16",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/16",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/17",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/17",
+          "m": 305.33,
+          "v": "reverseHolofoil"
+        },
+        {
+          "d": "2026/11/18",
+          "m": 305.0,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/18",
           "m": 305.33,
           "v": "reverseHolofoil"
         }
@@ -340308,7 +340308,7 @@
           "company": "PSA",
           "grades": [
             {
-              "count": 16,
+              "count": 17,
               "grade": "1"
             },
             {
@@ -340320,19 +340320,19 @@
               "grade": "3"
             },
             {
-              "count": 27,
+              "count": 28,
               "grade": "4"
             },
             {
-              "count": 58,
+              "count": 60,
               "grade": "5"
             },
             {
-              "count": 143,
+              "count": 151,
               "grade": "6"
             },
             {
-              "count": 188,
+              "count": 200,
               "grade": "7"
             },
             {
@@ -340340,7 +340340,7 @@
               "grade": "7.5"
             },
             {
-              "count": 275,
+              "count": 285,
               "grade": "8"
             },
             {
@@ -340348,7 +340348,7 @@
               "grade": "8.5"
             },
             {
-              "count": 231,
+              "count": 230,
               "grade": "9"
             },
             {
@@ -340356,7 +340356,7 @@
               "grade": "10"
             }
           ],
-          "total": 997,
+          "total": 1030,
           "variant": "holofoil"
         },
         {
@@ -340379,11 +340379,11 @@
               "grade": "4"
             },
             {
-              "count": 19,
+              "count": 20,
               "grade": "5"
             },
             {
-              "count": 38,
+              "count": 40,
               "grade": "6"
             },
             {
@@ -340391,7 +340391,7 @@
               "grade": "7"
             },
             {
-              "count": 94,
+              "count": 99,
               "grade": "8"
             },
             {
@@ -340407,7 +340407,7 @@
               "grade": "10"
             }
           ],
-          "total": 317,
+          "total": 325,
           "variant": "reverseHolofoil"
         }
       ]
@@ -447909,7 +447909,7 @@
       ]
     },
     "ecard2-H01": {
-      "fetched_at": "2026-10-19T15:59:51Z",
+      "fetched_at": "2026-11-18T17:14:11Z",
       "illustrator": "Shin-ichi Yoshida",
       "lookup_id": "ecard2-H01",
       "missing": true
@@ -502227,7 +502227,7 @@
       "missing": true
     },
     "ecard3-H03": {
-      "fetched_at": "2026-10-19T15:59:51Z",
+      "fetched_at": "2026-11-18T17:14:11Z",
       "illustrator": "Hajime Kusajima",
       "lookup_id": "ecard3-H03",
       "missing": true
@@ -896868,56 +896868,56 @@
       ]
     },
     "ex5-97": {
-      "fetched_at": "2026-10-19T15:59:51Z",
+      "fetched_at": "2026-11-18T17:14:11Z",
       "graded": [
         {
           "company": "PSA",
           "currency": "USD",
           "grade": "10",
-          "high": 10000.0,
-          "low": 1950.0,
-          "market": 6295.43,
-          "mid": 3478.5,
+          "high": 12600.0,
+          "low": 3457.0,
+          "market": 5244.91,
+          "mid": 4200.0,
           "variant": "holofoil"
         },
         {
           "company": "PSA",
           "currency": "USD",
           "grade": "9",
-          "high": 609.0,
+          "high": 1300.0,
           "low": 376.0,
-          "market": 517.79,
-          "mid": 480.0,
+          "market": 885.93,
+          "mid": 600.0,
           "variant": "holofoil"
         },
         {
           "company": "PSA",
           "currency": "USD",
           "grade": "8",
-          "high": 500.0,
-          "low": 187.5,
-          "market": 380.56,
-          "mid": 226.5,
+          "high": 1000.0,
+          "low": 226.5,
+          "market": 530.3,
+          "mid": 457.5,
           "variant": "holofoil"
         },
         {
           "company": "PSA",
           "currency": "USD",
           "grade": "7",
-          "high": 249.99,
-          "low": 118.5,
-          "market": 201.79,
-          "mid": 123.0,
+          "high": 355.6,
+          "low": 90.0,
+          "market": 235.65,
+          "mid": 249.99,
           "variant": "holofoil"
         },
         {
           "company": "PSA",
           "currency": "USD",
           "grade": "6",
-          "high": 180.0,
-          "low": 130.5,
-          "market": 146.5,
-          "mid": 155.25,
+          "high": 249.04,
+          "low": 122.5,
+          "market": 178.83,
+          "mid": 180.0,
           "variant": "holofoil"
         },
         {
@@ -896935,9 +896935,9 @@
           "currency": "USD",
           "grade": "4",
           "high": 200.0,
-          "low": 76.0,
-          "market": 160.45,
-          "mid": 138.0,
+          "low": 200.0,
+          "market": 200.0,
+          "mid": 200.0,
           "variant": "holofoil"
         },
         {
@@ -896965,9 +896965,9 @@
           "currency": "USD",
           "grade": "10",
           "high": 1600.0,
-          "low": 899.0,
-          "market": 1443.65,
-          "mid": 1499.0,
+          "low": 315.0,
+          "market": 1124.76,
+          "mid": 619.0,
           "variant": "holofoil"
         },
         {
@@ -896986,18 +896986,18 @@
           "grade": "9",
           "high": 350.0,
           "low": 90.0,
-          "market": 302.04,
-          "mid": 179.0,
+          "market": 325.5,
+          "mid": 180.0,
           "variant": "holofoil"
         },
         {
           "company": "CGC",
           "currency": "USD",
           "grade": "8.5",
-          "high": 189.99,
-          "low": 42.0,
-          "market": 165.17,
-          "mid": 108.0,
+          "high": 600.0,
+          "low": 600.0,
+          "market": 600.0,
+          "mid": 600.0,
           "variant": "holofoil"
         },
         {
@@ -897104,10 +897104,10 @@
           "company": "ACE",
           "currency": "USD",
           "grade": "9",
-          "high": 528.37,
+          "high": 705.94,
           "low": 528.37,
-          "market": 528.37,
-          "mid": 528.37,
+          "market": 641.16,
+          "mid": 617.16,
           "variant": "holofoil"
         },
         {
@@ -897132,121 +897132,6 @@
         }
       ],
       "history": [
-        {
-          "d": "2026/07/21",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/22",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/23",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/24",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/25",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/26",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/27",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/28",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/29",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/30",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/07/31",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/01",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/02",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/03",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/04",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/05",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/06",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/07",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/08",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/09",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/10",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/11",
-          "m": 145.58,
-          "v": "holofoil"
-        },
-        {
-          "d": "2026/08/12",
-          "m": 145.58,
-          "v": "holofoil"
-        },
         {
           "d": "2026/10/13",
           "m": 303.75,
@@ -897281,6 +897166,156 @@
           "d": "2026/10/19",
           "m": 303.75,
           "v": "holofoil"
+        },
+        {
+          "d": "2026/10/20",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/21",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/22",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/23",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/24",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/25",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/26",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/27",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/28",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/29",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/30",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/31",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/01",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/02",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/03",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/04",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/05",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/06",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/07",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/08",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/09",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/10",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/11",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/12",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/13",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/14",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/15",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/16",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/17",
+          "m": 303.75,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/18",
+          "m": 326.88,
+          "v": "holofoil"
         }
       ],
       "history_truncated": false,
@@ -897296,31 +897331,35 @@
               "grade": "1"
             },
             {
-              "count": 7,
+              "count": 8,
               "grade": "2"
             },
             {
-              "count": 9,
+              "count": 10,
               "grade": "3"
             },
             {
-              "count": 21,
+              "count": 23,
               "grade": "4"
             },
             {
-              "count": 37,
+              "count": 39,
               "grade": "5"
             },
             {
-              "count": 66,
+              "count": 69,
               "grade": "6"
             },
             {
-              "count": 83,
+              "count": 86,
               "grade": "7"
             },
             {
-              "count": 213,
+              "count": 1,
+              "grade": "7.5"
+            },
+            {
+              "count": 219,
               "grade": "8"
             },
             {
@@ -897328,7 +897367,7 @@
               "grade": "8.5"
             },
             {
-              "count": 255,
+              "count": 256,
               "grade": "9"
             },
             {
@@ -897336,7 +897375,7 @@
               "grade": "10"
             }
           ],
-          "total": 871,
+          "total": 891,
           "variant": "holofoil"
         }
       ]
@@ -898388,7 +898427,7 @@
       ]
     },
     "ex5-99": {
-      "fetched_at": "2026-10-19T15:59:51Z",
+      "fetched_at": "2026-11-18T17:14:11Z",
       "graded": [
         {
           "company": "PSA",
@@ -898396,8 +898435,8 @@
           "grade": "10",
           "high": 10500.0,
           "low": 5520.0,
-          "market": 9311.17,
-          "mid": 9749.5,
+          "market": 8287.21,
+          "mid": 8724.5,
           "variant": "holofoil"
         },
         {
@@ -898405,19 +898444,19 @@
           "currency": "USD",
           "grade": "9",
           "high": 1200.0,
-          "low": 378.0,
-          "market": 921.57,
-          "mid": 467.5,
+          "low": 405.0,
+          "market": 778.28,
+          "mid": 516.0,
           "variant": "holofoil"
         },
         {
           "company": "PSA",
           "currency": "USD",
           "grade": "8",
-          "high": 596.23,
-          "low": 254.13,
-          "market": 486.03,
-          "mid": 350.0,
+          "high": 700.0,
+          "low": 300.0,
+          "market": 546.25,
+          "mid": 395.0,
           "variant": "holofoil"
         },
         {
@@ -898445,9 +898484,9 @@
           "currency": "USD",
           "grade": "5",
           "high": 180.0,
-          "low": 55.0,
-          "market": 149.62,
-          "mid": 117.5,
+          "low": 142.5,
+          "market": 158.72,
+          "mid": 173.75,
           "variant": "holofoil"
         },
         {
@@ -898484,10 +898523,10 @@
           "company": "CGC",
           "currency": "USD",
           "grade": "10",
-          "high": 742.0,
-          "low": 133.0,
-          "market": 474.69,
-          "mid": 410.0,
+          "high": 899.1,
+          "low": 215.0,
+          "market": 800.61,
+          "mid": 450.0,
           "variant": "holofoil"
         },
         {
@@ -898504,10 +898543,10 @@
           "company": "CGC",
           "currency": "USD",
           "grade": "9",
-          "high": 199.99,
-          "low": 100.0,
-          "market": 189.6,
-          "mid": 117.0,
+          "high": 350.0,
+          "low": 189.0,
+          "market": 302.05,
+          "mid": 199.5,
           "variant": "holofoil"
         },
         {
@@ -898866,6 +898905,156 @@
           "d": "2026/10/19",
           "m": 300.5,
           "v": "holofoil"
+        },
+        {
+          "d": "2026/10/20",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/21",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/22",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/23",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/24",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/25",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/26",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/27",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/28",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/29",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/30",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/10/31",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/01",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/02",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/03",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/04",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/05",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/06",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/07",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/08",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/09",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/10",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/11",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/12",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/13",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/14",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/15",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/16",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/17",
+          "m": 300.5,
+          "v": "holofoil"
+        },
+        {
+          "d": "2026/11/18",
+          "m": 300.5,
+          "v": "holofoil"
         }
       ],
       "history_truncated": false,
@@ -898901,15 +899090,15 @@
               "grade": "5Q"
             },
             {
-              "count": 46,
+              "count": 47,
               "grade": "5"
             },
             {
-              "count": 73,
+              "count": 79,
               "grade": "6"
             },
             {
-              "count": 98,
+              "count": 104,
               "grade": "7"
             },
             {
@@ -898917,15 +899106,15 @@
               "grade": "8Q"
             },
             {
-              "count": 210,
+              "count": 218,
               "grade": "8"
             },
             {
-              "count": 2,
+              "count": 3,
               "grade": "8.5"
             },
             {
-              "count": 262,
+              "count": 265,
               "grade": "9"
             },
             {
@@ -898933,7 +899122,7 @@
               "grade": "10"
             }
           ],
-          "total": 914,
+          "total": 939,
           "variant": "holofoil"
         }
       ]
@@ -1200026,7 +1200215,7 @@
       "missing": true
     },
     "lc-17": {
-      "fetched_at": "2026-10-19T15:59:51Z",
+      "fetched_at": "2026-11-18T17:14:11Z",
       "illustrator": "Ken Sugimori",
       "lookup_id": "lc-17",
       "missing": true
@@ -1200176,13 +1200365,13 @@
       "missing": true
     },
     "lc-8": {
-      "fetched_at": "2026-10-19T15:59:51Z",
+      "fetched_at": "2026-11-18T17:14:11Z",
       "illustrator": "Mitsuhiro Arita",
       "lookup_id": "lc-8",
       "missing": true
     },
     "lc-9": {
-      "fetched_at": "2026-10-19T15:59:51Z",
+      "fetched_at": "2026-11-18T17:14:11Z",
       "illustrator": "Mitsuhiro Arita",
       "lookup_id": "lc-9",
       "missing": true
@@ -1739099,7 +1739288,7 @@
       "missing": true
     },
     "swsh12.5gg-GG69": {
-      "fetched_at": "2026-10-19T15:59:51Z",
+      "fetched_at": "2026-11-18T17:14:11Z",
       "illustrator": "AKIRA EGAWA",
       "lookup_id": "swsh12.5gg-GG69",
       "missing": true
@@ -1877802,7 +1877991,7 @@
       "pop": []
     }
   },
-  "generated_at": "2026-11-17T17:37:22Z",
+  "generated_at": "2026-11-18T17:14:11Z",
   "history_days": 90,
   "source": "Scrydex"
 }
