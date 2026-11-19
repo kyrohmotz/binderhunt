@@ -455,7 +455,7 @@ function loadSettings(){
     return { sound:!!raw.sound, haptics:raw.haptics !== false, reduce:raw.reduce === "on" || raw.reduce === "off" ? raw.reduce : "auto", currency:raw.currency === "EUR" ? "EUR" : "USD" };
   } catch (e) { return blank; }
 }
-function saveWish(){ try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {} paintContext(); paintCount(); if (tab === "binders") renderBinders(); if (tab === "sets") renderSets(); if (tab === "value" && window.BinderValueUI) window.BinderValueUI.refresh(); if (tab === "dex" && window.BinderDexUI) window.BinderDexUI.refresh(); }
+function saveWish(){ try { localStorage.setItem("binderhuntWish", JSON.stringify(wish)); } catch (e) {} paintContext(); paintCount(); if (tab === "binders") renderBinders(); if (tab === "sets") renderSets(); if (tab === "value" && window.BinderValueUI) window.BinderValueUI.refresh(); if (tab === "dex" && window.BinderDexUI) window.BinderDexUI.refresh(); if (tab === "rips" && window.BinderRipsUI) window.BinderRipsUI.refresh(); }
 function saveBinders(){ try { localStorage.setItem(binderStorageKey(), JSON.stringify(binderState)); } catch (e) {} if (tab === "binders") renderBinders(); paintDiscovery(); paintRail(); }
 function saveFilters(){
   if (filters.set) rememberedSet = "";
@@ -1427,6 +1427,7 @@ function applyScrydex(){
   else paintRail();
   if (tab === "value" && window.BinderValueUI) window.BinderValueUI.refresh();
   if (tab === "dex" && window.BinderDexUI) window.BinderDexUI.refresh();
+  if (tab === "rips" && window.BinderRipsUI) window.BinderRipsUI.refresh();
   ensureTargets().then(() => { if (scrydex.ready) paintDealsBadge(); }).catch(() => {});
 }
 /* The price cache is about 26MB. Parsing it on the page thread freezes swipes,
@@ -3221,9 +3222,10 @@ function blocking(){
   const prompt = document.getElementById("dropPrompt");
   const daily = document.getElementById("viewDaily");
   const value = document.getElementById("viewValue");
+  const rips = document.getElementById("viewRips");
   const showcase = document.getElementById("showcase");
   const budget = document.getElementById("budgetSheet");
-  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || (budget && !budget.hidden) || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (prompt && !prompt.hidden) || (showcase && !showcase.hidden) || (daily && !daily.hidden) || (value && !value.hidden) || (!profileEl.hidden && !wide());
+  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || (budget && !budget.hidden) || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (prompt && !prompt.hidden) || (showcase && !showcase.hidden) || (daily && !daily.hidden) || (value && !value.hidden) || (rips && !rips.hidden) || (!profileEl.hidden && !wide());
 }
 function keepSwipeFocus(trigger){
   const box = document.getElementById("hapticSwitch");
@@ -3443,6 +3445,7 @@ function paintContext(){
   else if (tab === "daily") label = "Today's Drop";
   else if (tab === "value") label = "Value";
   else if (tab === "dex") label = "Pokédex";
+  else if (tab === "rips") label = "Rip";
   else if (moverHunt && moverCardsLeft()) label = "Movers";
   else if (b) label = b.name;
   else if (filters.gem && filters.set) label = "Gemfinder · " + (setName(filters.set) || "Set");
@@ -3463,6 +3466,7 @@ function paintContext(){
   else if (tab === "sets" && browseMode) context.setAttribute("aria-label", label + ", Back to sets");
   else if (tab === "sets" && setView) context.setAttribute("aria-label", "Back to all sets");
   else if (tab === "binders" && binderView) context.setAttribute("aria-label", label + ". Back to binders");
+  else if (tab === "rips" && window.BinderRipsUI && BinderRipsUI.inPack && BinderRipsUI.inPack()) context.setAttribute("aria-label", "Rip. Back to packs");
   else context.setAttribute("aria-label", label);
   paintRail();
   paintSide();
@@ -3481,6 +3485,7 @@ function paintSide(){
   else if (tab === "daily") renderDailySide();
   else if (tab === "value") renderValueSide();
   else if (tab === "dex") renderDexSide();
+  else if (tab === "rips") renderRipsSide();
   else paintDeckSummary(currentTop());
 }
 function setSideStats(){
@@ -3747,6 +3752,20 @@ function loadScript(src){
 }
 let valueAssets = null;
 let dexAssets = null;
+let ripsAssets = null;
+function ensureRipsView(){
+  const host = document.getElementById("ripsScroll");
+  if (!host) return;
+  if (window.BinderRipsUI) { window.BinderRipsUI.open(host); return; }
+  host.innerHTML = `<p class="rip-wait" role="status">Shuffling a pack…</p>`;
+  if (!ripsAssets) ripsAssets = loadStyle("css/rips.css").then(() => loadScript("js/rips.js")).then(() => loadScript("js/rips-ui.js"));
+  ripsAssets.then(() => {
+    if (tab === "rips" && window.BinderRipsUI) window.BinderRipsUI.open(host);
+  }).catch(() => {
+    ripsAssets = null;
+    if (tab === "rips" && host) host.innerHTML = `<p class="empty-state">The pack table didn't load. Try Rip again in a moment.</p>`;
+  });
+}
 function ensureDexView(){
   const host = document.getElementById("dexScroll");
   if (!host) return;
@@ -3784,6 +3803,17 @@ function renderDexSide(){
   markProfile(false);
   profileEl.innerHTML = `<div class="profile-scroll" data-side="dex"><p class="eyebrow">Pokédex</p><h2 class="pname" id="profileTitle">Your Pokédex</h2><p class="fine">${esc(summary)}</p><p class="fine">Full color means you own a card. A rose outline means it is only on the wishlist. Grey means it is still out there. Tap a Pokémon to open its cards.</p></div>`;
 }
+function renderRipsSide(){
+  const text = window.BinderRipsUI && BinderRipsUI.sideText ? BinderRipsUI.sideText() : "Tear open a pack made from cards already saved in this browser.";
+  const key = "rips:" + text;
+  if (key === sideKey && profileEl.querySelector("[data-side='rips']")) return;
+  sideKey = key;
+  summaryId = "";
+  profileEl.hidden = false;
+  shell.classList.remove("no-profile");
+  markProfile(false);
+  profileEl.innerHTML = `<div class="profile-scroll" data-side="rips"><p class="eyebrow">Rip a pack</p><h2 class="pname" id="profileTitle">Just for fun</h2><p class="fine">${esc(text)}</p><p class="fine">Not real pull rates. Prices are the cached raw near-mint number, and a card without one says No price yet.</p></div>`;
+}
 function renderValueSide(){
   if (sideKey === "value" && profileEl.querySelector("[data-side='value']")) return;
   sideKey = "value";
@@ -3805,6 +3835,8 @@ function showTab(name){
   if (valueView) valueView.hidden = name !== "value";
   const dexView = document.getElementById("viewDex");
   if (dexView) dexView.hidden = name !== "dex";
+  const ripsView = document.getElementById("viewRips");
+  if (ripsView) ripsView.hidden = name !== "rips";
   document.querySelectorAll("[data-tab]").forEach(btn => btn.setAttribute("aria-current", btn.dataset.tab === name ? "page" : "false"));
   if (wide()) { profilePinned = false; profileCard = null; pinnedTopId = ""; summaryId = ""; sideKey = ""; }
   if (name === "sets") renderSets();
@@ -3812,6 +3844,7 @@ function showTab(name){
   if (name === "daily" && typeof window.renderDaily === "function") window.renderDaily();
   if (name === "value") ensureValueView();
   if (name === "dex") ensureDexView();
+  if (name === "rips") ensureRipsView();
   paintContext(); paintDiscovery();
   if (typeof window.paintDailyBadge === "function") window.paintDailyBadge();
   if (name === "hunt") renderDeck();
@@ -7218,6 +7251,7 @@ document.getElementById("context").onclick = () => {
   else if (tab === "sets" && browseMode) { browseMode = null; renderSets(); }
   else if (tab === "sets" && setView) { setView = null; renderSets(); }
   else if (tab === "binders" && binderView) { binderView = null; renderBinders(); }
+  else if (tab === "rips" && window.BinderRipsUI && BinderRipsUI.back) BinderRipsUI.back();
 };
 document.getElementById("skip").onclick = () => fly(-1);
 document.getElementById("save").onclick = () => fly(1);
@@ -7295,6 +7329,7 @@ document.addEventListener("keydown", e => {
       return;
     }
     if (tab === "binders" && binderView && binderView.kind === "deals" && !profilePinned) { closeDeals(); return; }
+    if (tab === "rips" && window.BinderRipsUI && BinderRipsUI.back && BinderRipsUI.back()) return;
     return;
   }
   if (typingTarget(e.target) || blocking()) return;

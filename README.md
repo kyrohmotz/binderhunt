@@ -2,7 +2,7 @@
 
 Swipe to find the cards your binder is missing.
 
-A swipe-style browser for real Pokémon TCG cards (data from the free Pokémon TCG API). Swipe right to add a card to your wishlist, left to skip. No packs, no gambling.
+A swipe-style browser for real Pokémon TCG cards (data from the free Pokémon TCG API). Swipe right to add a card to your wishlist, left to skip. Rip a pack deals a just-for-fun opener from cards already saved in this browser. It is not a real pack and it is not gambling.
 
 Live: https://kyrohmotz.github.io/binderhunt/
 
