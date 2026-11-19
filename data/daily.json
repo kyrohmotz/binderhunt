@@ -13984,6 +13984,16 @@
       "source": "tcgplayer",
       "eur": 31.31,
       "at": "2026-11-18T16:57:03Z"
+    },
+    "2026-11-21": {
+      "id": "swsh4-119",
+      "price": 10.88,
+      "variant": "holofoil",
+      "printing": "Holofoil",
+      "alts": 1,
+      "source": "tcgplayer",
+      "eur": 13.81,
+      "at": "2026-11-19T17:04:05Z"
     }
   }
 }
