@@ -72,9 +72,11 @@ jobs:
           fi
           git fetch origin main
           git checkout origin/main -- data/scrydex-usage.json data/scrydex.json
-          # The sync commit has to sit on that main. Otherwise a rebase
-          # replays a stale ledger over the one we just read and can drop it.
-          git reset --soft origin/main
+          # Mixed, not soft. Soft would leave the triggering commit's index,
+          # and the later commit would revert newer code, sw.js, and
+          # data/daily.json. Mixed points the index at origin/main and keeps
+          # the worktree, including fx.json written by the rate step above.
+          git reset --mixed origin/main
           python3 scripts/sync_scrydex.py
 
       # A 402 or three card 5xx responses exit nonzero only after scrydex.json

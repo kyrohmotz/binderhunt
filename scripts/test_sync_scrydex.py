@@ -2,6 +2,7 @@
 import io
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -952,11 +953,78 @@ class WorkflowGuardTests(unittest.TestCase):
             text.index("git checkout origin/main -- data/scrydex-usage.json data/scrydex.json"),
             sync_call,
         )
-        self.assertIn("git reset --soft origin/main", text)
+        self.assertIn("git reset --mixed origin/main", text)
+        self.assertNotIn("git reset --soft", text)
+        checkout = text.index("git checkout origin/main -- data/scrydex-usage.json data/scrydex.json")
+        mixed = text.index("git reset --mixed origin/main")
+        self.assertLess(checkout, mixed)
+        self.assertLess(mixed, sync_call)
+        self.assertIn("git add data/scrydex.json data/scrydex-usage.json data/fx.json", text)
         self.assertIn("git pull --rebase origin main", text)
         self.assertIn('git checkout --theirs -- "$ledger"', text)
         self.assertIn("GITHUB_REF", text)
         self.assertIn("refs/heads/main", text)
+
+    def test_mixed_reset_commit_differs_from_main_only_in_data_files(self):
+        """A soft reset would commit the triggering index and revert newer main."""
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            env = os.environ.copy()
+            env.update({
+                "GIT_AUTHOR_NAME": "BinderHunt Test",
+                "GIT_AUTHOR_EMAIL": "test@example.com",
+                "GIT_COMMITTER_NAME": "BinderHunt Test",
+                "GIT_COMMITTER_EMAIL": "test@example.com",
+            })
+
+            def git(*args):
+                result = subprocess.run(
+                    ["git", *args],
+                    cwd=repo,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env=env,
+                )
+                return result.stdout.strip()
+
+            git("init", "-b", "main")
+            data = repo / "data"
+            data.mkdir()
+            (repo / "sw.js").write_text("old-sw\n", encoding="utf-8")
+            (data / "daily.json").write_text('{"day":"old"}\n', encoding="utf-8")
+            (data / "scrydex.json").write_text('{"cards":{}}\n', encoding="utf-8")
+            (data / "scrydex-usage.json").write_text('{"months":{}}\n', encoding="utf-8")
+            (data / "fx.json").write_text('{"eur":1}\n', encoding="utf-8")
+            git("add", "-A")
+            git("commit", "-m", "trigger")
+            trigger = git("rev-parse", "HEAD")
+            (repo / "sw.js").write_text("new-sw\n", encoding="utf-8")
+            (data / "daily.json").write_text('{"day":"new"}\n', encoding="utf-8")
+            (data / "scrydex.json").write_text('{"cards":{"a":1}}\n', encoding="utf-8")
+            (data / "scrydex-usage.json").write_text(
+                '{"months":{"2026-11":{"credits":1,"days":{"2026-11-01":1}}}}\n',
+                encoding="utf-8",
+            )
+            git("add", "-A")
+            git("commit", "-m", "main moves")
+            git("checkout", "--detach", trigger)
+            (data / "fx.json").write_text('{"eur":1.2}\n', encoding="utf-8")
+            git("checkout", "main", "--", "data/scrydex-usage.json", "data/scrydex.json")
+            git("reset", "--mixed", "main")
+            (data / "scrydex.json").write_text('{"cards":{"a":1,"b":2}}\n', encoding="utf-8")
+            (data / "scrydex-usage.json").write_text(
+                '{"months":{"2026-11":{"credits":5,"days":{"2026-11-01":5}}}}\n',
+                encoding="utf-8",
+            )
+            git("add", "data/scrydex.json", "data/scrydex-usage.json", "data/fx.json")
+            git("commit", "-m", "Update cached Scrydex prices")
+            names = [line for line in git("diff", "--name-only", "main", "HEAD").splitlines() if line]
+            self.assertEqual(sorted(names), ["data/fx.json", "data/scrydex-usage.json", "data/scrydex.json"])
+            self.assertEqual(git("show", "HEAD:sw.js"), "new-sw")
+            self.assertEqual(git("show", "HEAD:data/daily.json"), '{"day":"new"}')
+            self.assertIn('"eur":1.2', git("show", "HEAD:data/fx.json"))
+            self.assertIn('"credits":5', git("show", "HEAD:data/scrydex-usage.json"))
 
 
 class CacheWriteTests(unittest.TestCase):
