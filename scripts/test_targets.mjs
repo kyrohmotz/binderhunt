@@ -17,7 +17,7 @@ const Targets = require(resolve(root, "js/targets.js"));
 const sw = readFileSync(resolve(root, "sw.js"), "utf8");
 const html = readFileSync(resolve(root, "index.html"), "utf8");
 const app = readFileSync(resolve(root, "js/app.js"), "utf8");
-assert.match(sw, /const VERSION = "bh-18"/);
+assert.match(sw, /const VERSION = "bh-19"/);
 assert.match(sw, /"js\/targets\.js"/);
 assert.match(sw, /"css\/targets\.css"/);
 assert.equal(html.includes("js/targets.js"), false, "targets script stays out of the first paint");
