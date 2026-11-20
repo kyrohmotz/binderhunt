@@ -13994,6 +13994,16 @@
       "source": "tcgplayer",
       "eur": 13.81,
       "at": "2026-11-19T17:04:05Z"
+    },
+    "2026-11-22": {
+      "id": "ex1-14",
+      "price": 51.88,
+      "variant": "holofoil",
+      "printing": "Holofoil",
+      "alts": 2,
+      "source": "tcgplayer",
+      "eur": 16.93,
+      "at": "2026-11-20T16:42:47Z"
     }
   }
 }
