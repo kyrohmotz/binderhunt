@@ -1,10 +1,10 @@
 /* Rip a pack. Just for fun, not real pull rates.
    Loaded as a classic script (window.BinderRips) and as CommonJS.
-   Packs are dealt from cards already in memory: the Scrydex cache for
-   raw near-mint prices, the seed file and Daily Drop pool for rarity,
-   and any card the hunt has already opened. It does not fetch Scrydex
-   or any other price API. Prices under one cent, zeroes, and non-finite
-   numbers are "No price yet", never $0 or NaN. */
+   A pack follows that era's slots. Commons, uncommons, and the rare
+   line come from data/pack-pools.json (a TCGdex checklist). A price is
+   filled in only when the Scrydex cache already has one. This file does
+   not fetch Scrydex. Missing prices are "Bulk" or "No price yet",
+   never $0, NaN, or undefined. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === "object" && module.exports) module.exports = api;
@@ -16,10 +16,15 @@
   const DISCLAIMER = "Just for fun, not real pull rates.";
   const HIT_ULTRA = 0.08;
   const HIT_HOLO = 0.30;
+  /* The modern second foil slot upgrades about this often. Otherwise it is another reverse holo. */
+  const ART_RATE = 0.10;
   const RANK = { common: 1, uncommon: 2, rare: 3, holo: 4, ultra: 5 };
+  /* English boosters, just for fun. "hit" is the rare slot: usually a non-holo rare. */
   const VINTAGE = ["common", "common", "common", "common", "common", "common", "common", "uncommon", "uncommon", "uncommon", "hit"];
-  const MID = ["common", "common", "common", "common", "common", "uncommon", "uncommon", "uncommon", "rare", "hit"];
-  const MODERN = ["common", "common", "common", "common", "uncommon", "uncommon", "uncommon", "rare", "rare", "hit"];
+  const LC = ["common", "common", "common", "common", "common", "common", "uncommon", "uncommon", "uncommon", "reverse", "hit"];
+  const EX = ["common", "common", "common", "common", "common", "uncommon", "uncommon", "reverse", "hit"];
+  const DP = ["common", "common", "common", "common", "common", "uncommon", "uncommon", "uncommon", "reverse", "hit"];
+  const SV = ["common", "common", "common", "common", "uncommon", "uncommon", "uncommon", "reverse", "art", "hit"];
   const FALLBACK = {
     common: ["common", "uncommon", "rare", "holo", "ultra"],
     uncommon: ["uncommon", "common", "rare", "holo", "ultra"],
@@ -68,10 +73,29 @@
   }
 
   function slotsFor(setId) {
-    const era = eraOf(setId);
+    const id = String(setId || "");
+    const era = eraOf(id);
+    if (id === "lc") return LC.slice();
+    if (/^ecard/.test(id) || era === "EX") return EX.slice();
     if (era === "WOTC") return VINTAGE.slice();
-    if (era === "EX" || era === "Diamond & Pearl" || era === "HeartGold & SoulSilver") return MID.slice();
-    return MODERN.slice();
+    if (era === "Scarlet & Violet" || era === "Mega Evolution" || id === "30th") return SV.slice();
+    return DP.slice();
+  }
+
+  function shapeOf(setId) {
+    const slots = slotsFor(setId);
+    const count = name => slots.filter(slot => slot === name).length;
+    const parts = [];
+    const commons = count("common");
+    const uncommons = count("uncommon");
+    if (commons) parts.push(commons + (commons === 1 ? " common" : " commons"));
+    if (uncommons) parts.push(uncommons + (uncommons === 1 ? " uncommon" : " uncommons"));
+    if (count("art")) {
+      parts.push("a reverse holo");
+      parts.push("a foil slot");
+    } else if (count("reverse")) parts.push("a reverse holo");
+    parts.push("a rare slot");
+    return { slots, cards: slots.length, text: parts.join(", ") };
   }
 
   function bucketOf(rarity) {
@@ -101,8 +125,19 @@
     } catch (e) {
       text = "$" + amount.toFixed(2);
     }
-    if (!text || /NaN|Infinity/i.test(text) || /^[^0-9]*0(?:\.00)?$/.test(text)) return "No price yet";
+    if (!text || /NaN|Infinity|undefined/i.test(text) || /^[^0-9]*0(?:\.00)?$/.test(text)) return "No price yet";
     return text;
+  }
+
+  /* Commons and uncommons without a cached price are bulk. A rare slot
+     card without one says so, instead of pretending it is worth nothing. */
+  function displayPrice(card) {
+    const amount = positivePrice(card && card.price);
+    if (amount != null) return priceLabel(amount);
+    const bucket = card && card.bucket;
+    if (bucket === "common" || bucket === "uncommon") return "Bulk";
+    if (card && card.finish === "reverse" && bucket !== "rare" && bucket !== "holo" && bucket !== "ultra") return "Bulk";
+    return "No price yet";
   }
 
   function localLatest(rec) {
@@ -132,7 +167,7 @@
     return localLatest(rec);
   }
 
-  function localArt(id) {
+  function localArt(id, serieHint) {
     const blank = { image: "", thumb: "", img: "", backup: "" };
     const parts = splitId(id);
     if (!parts.setId || !parts.number) return blank;
@@ -142,7 +177,8 @@
       const png = "https://images.pokemontcg.io/" + parts.setId + "/H" + n + ".png";
       return { image: "", thumb: png, img: png, backup: png };
     }
-    const serie = (/^[a-z]+/i.exec(parts.setId) || [""])[0].toLowerCase();
+    const hinted = norm(serieHint).toLowerCase();
+    const serie = hinted || ((/^[a-z]+/i.exec(parts.setId) || [""])[0].toLowerCase());
     if (!serie) return blank;
     const base = "https://assets.tcgdex.net/en/" + serie + "/" + parts.setId + "/" + parts.number;
     return {
@@ -153,7 +189,8 @@
     };
   }
 
-  function artFor(id) {
+  function artFor(id, serieHint) {
+    if (serieHint) return localArt(id, serieHint);
     const browse = browseApi();
     if (browse && browse.artFor) return browse.artFor(id);
     return localArt(id);
@@ -193,10 +230,56 @@
     };
   }
 
+  function parsePoolRow(setId, raw, bucket, art) {
+    const parts = String(raw || "").split("\t");
+    const local = norm(parts[0]);
+    const name = norm(parts[1]);
+    const rarity = norm(parts[2]);
+    if (!local || !name || local.length > 12) return null;
+    const id = cleanId(setId + "-" + local);
+    if (!id) return null;
+    return { id, name, rarity: rarity || bucket, bucket, art: art === true };
+  }
+
+  function applyPools(pools, take, names) {
+    const sets = pools && pools.sets && typeof pools.sets === "object" ? pools.sets : null;
+    if (!sets) return;
+    const keys = { c: "common", u: "uncommon", r: "rare", h: "holo", x: "ultra", a: "ultra" };
+    Object.keys(sets).forEach(setId => {
+      const set = sets[setId];
+      if (!set || typeof set !== "object" || !cleanId(setId + "-1")) return;
+      if (set.name && !names[setId]) names[setId] = norm(set.name);
+      const serie = norm(set.serie);
+      Object.keys(keys).forEach(key => {
+        const list = Array.isArray(set[key]) ? set[key] : [];
+        list.forEach(raw => {
+          const parsed = parsePoolRow(setId, raw, keys[key], key === "a");
+          if (!parsed) return;
+          const row = take(parsed.id);
+          if (!row) return;
+          if (!row.name) row.name = parsed.name;
+          if (!row.rarity || row.locked) row.rarity = parsed.rarity;
+          row.bucket = parsed.bucket;
+          row.locked = true;
+          row.art = parsed.art;
+          if (serie) row.serie = serie;
+          if (set.name && !row.setName) row.setName = norm(set.name);
+          const art = localArt(parsed.id, serie);
+          if (art.thumb || art.backup) {
+            row.image = art.image;
+            row.thumb = art.thumb;
+            row.img = art.img;
+            row.backup = art.backup;
+          }
+        });
+      });
+    });
+  }
+
   function buildCatalog(input) {
     const opts = input && typeof input === "object" ? input : {};
     const cache = opts.cards && typeof opts.cards === "object" ? opts.cards : {};
-    const names = opts.names && typeof opts.names === "object" ? opts.names : {};
+    const names = Object.assign({}, opts.names && typeof opts.names === "object" ? opts.names : {});
     const byId = new Map();
 
     function take(id) {
@@ -209,6 +292,8 @@
       }
       return row;
     }
+
+    applyPools(opts.pools, take, names);
 
     Object.keys(cache).forEach(id => {
       const rec = cache[id];
@@ -257,8 +342,9 @@
 
     const sets = new Map();
     byId.forEach(row => {
-      row.bucket = bucketOf(row.rarity);
+      if (!row.locked) row.bucket = bucketOf(row.rarity);
       if (!row.bucket || !row.setId) return;
+      if (row.locked && !row.thumb && !row.backup) return;
       if (!row.name) row.name = row.id;
       if (!row.setName && names[row.setId]) row.setName = norm(names[row.setId]);
       if (!row.priceLabel) row.priceLabel = priceLabel(row.price);
@@ -269,12 +355,14 @@
           name: row.setName || names[row.setId] || row.setId,
           era: eraOf(row.setId),
           cards: [],
+          pooled: false,
           buckets: { common: 0, uncommon: 0, rare: 0, holo: 0, ultra: 0 }
         };
         sets.set(row.setId, set);
       }
       if (row.setName && set.name === set.id) set.name = row.setName;
       set.cards.push(row);
+      if (row.locked) set.pooled = true;
       set.buckets[row.bucket] += 1;
     });
 
@@ -342,7 +430,7 @@
   }
 
   function copyCard(card) {
-    return {
+    const next = {
       id: card.id,
       name: card.name,
       setId: card.setId,
@@ -351,27 +439,46 @@
       rarity: card.rarity,
       bucket: card.bucket,
       price: card.price,
-      priceLabel: card.priceLabel || priceLabel(card.price),
+      priceLabel: priceLabel(card.price),
       image: card.image,
       thumb: card.thumb,
       img: card.img,
       backup: card.backup,
+      art: card.art === true,
+      finish: card.finish === "reverse" ? "reverse" : "",
+      slot: card.slot || "",
       hit: false
     };
+    next.priceLabel = displayPrice(next);
+    return next;
   }
 
   function packValue(cards) {
     let total = 0;
     let priced = 0;
-    (Array.isArray(cards) ? cards : []).forEach(card => {
+    const list = (Array.isArray(cards) ? cards : []).filter(Boolean);
+    list.forEach(card => {
       const amount = positivePrice(card && card.price);
       if (amount == null) return;
       total += amount;
       priced += 1;
     });
-    if (!priced) return { total: null, priced: 0, label: "No price yet" };
+    const count = list.length;
+    if (!priced) {
+      return {
+        total: null,
+        priced: 0,
+        count,
+        label: "No price yet",
+        note: count ? "No saved prices in this pack. These cards are bulk." : "No saved prices in this pack."
+      };
+    }
     const rounded = positivePrice(Math.round(total * 100) / 100);
-    return { total: rounded, priced, label: priceLabel(rounded) };
+    const rest = count - priced;
+    const note = rest
+      ? "From " + priced + (priced === 1 ? " priced card. " : " priced cards. ") + rest + (rest === 1 ? " is bulk." : " are bulk.")
+      : "Every card in this pack has a saved price.";
+    return { total: rounded, priced, count, label: priceLabel(rounded), note };
   }
 
   function bestCard(cards) {
@@ -389,9 +496,48 @@
     return list.reduce((top, card) => (RANK[card.bucket] || 0) >= (RANK[top.bucket] || 0) ? card : top, list[0]);
   }
 
+  function revealScore(card) {
+    if (card.finish === "reverse" && card.bucket !== "holo" && card.bucket !== "ultra") {
+      return 30 + (card.slot === "art" ? 1 : 0);
+    }
+    const rank = { common: 10, uncommon: 20, rare: 40, holo: 50, ultra: 60 }[card.bucket] || 0;
+    return rank + (card.slot === "hit" ? 1 : card.slot === "art" ? 2 : 0);
+  }
+
+  function stamp(card, slot) {
+    const copy = copyCard(card);
+    copy.slot = slot;
+    if ((slot === "reverse" || slot === "art") && copy.bucket !== "holo" && copy.bucket !== "ultra") copy.finish = "reverse";
+    else copy.finish = "";
+    copy.priceLabel = displayPrice(copy);
+    return copy;
+  }
+
+  function drawReverse(pools, rng) {
+    const roll = rng();
+    let bucket = "common";
+    if (roll < 0.10 && pools.rare.length) bucket = "rare";
+    else if (roll < 0.35 && pools.uncommon.length) bucket = "uncommon";
+    else if (!pools.common.length && pools.uncommon.length) bucket = "uncommon";
+    else if (!pools.common.length && !pools.uncommon.length && pools.rare.length) bucket = "rare";
+    return takeFrom(pools, bucket, rng);
+  }
+
+  function markHits(cards) {
+    cards.forEach(card => { card.hit = false; });
+    if (!cards.length) return;
+    let best = 0;
+    cards.forEach((card, index) => {
+      if (revealScore(card) >= revealScore(cards[best])) best = index;
+    });
+    const top = cards[best];
+    top.hit = top.bucket === "holo" || top.bucket === "ultra";
+  }
+
   function buildPack(cards, opts) {
     const options = opts && typeof opts === "object" ? opts : {};
-    const source = (Array.isArray(cards) ? cards : []).filter(card => card && card.id && card.bucket);
+    let source = (Array.isArray(cards) ? cards : []).filter(card => card && card.id && card.bucket);
+    if (options.requireArt) source = source.filter(card => card.thumb || card.img || card.backup);
     const seen = new Set();
     const unique = [];
     source.forEach(card => {
@@ -403,15 +549,17 @@
     const setId = options.setId || unique[0].setId || "";
     let slots = slotsFor(setId);
     if (unique.length < slots.length) slots = slots.slice(slots.length - unique.length);
-    const pools = { common: [], uncommon: [], rare: [], holo: [], ultra: [] };
+    const pools = { common: [], uncommon: [], rare: [], holo: [], ultra: [], art: [] };
     unique.forEach(card => {
-      if (pools[card.bucket]) pools[card.bucket].push(card);
+      if (card.art) pools.art.push(card);
+      else if (pools[card.bucket]) pools[card.bucket].push(card);
     });
     const rng = typeof options.rng === "function" ? options.rng : rngFrom(options.seed != null ? options.seed : String(Math.random()));
     const drawn = [];
     for (let i = 0; i < slots.length; i++) {
-      let bucket = slots[i];
-      if (bucket === "hit") {
+      const slot = slots[i];
+      let card = null;
+      if (slot === "hit") {
         const counts = {
           common: pools.common.length,
           uncommon: pools.uncommon.length,
@@ -419,33 +567,55 @@
           holo: pools.holo.length,
           ultra: pools.ultra.length
         };
-        bucket = hitBucket(rng(), counts);
-      }
-      const card = bucket ? takeFrom(pools, bucket, rng) : null;
-      if (card) drawn.push(copyCard(card));
+        card = takeFrom(pools, hitBucket(rng(), counts), rng);
+      } else if (slot === "reverse") {
+        card = drawReverse(pools, rng);
+      } else if (slot === "art") {
+        if (rng() < ART_RATE && pools.art.length) {
+          const index = Math.min(pools.art.length - 1, Math.floor(rng() * pools.art.length));
+          card = pools.art.splice(index, 1)[0];
+        } else card = drawReverse(pools, rng);
+      } else card = takeFrom(pools, slot, rng);
+      if (card) drawn.push(stamp(card, slot));
     }
     if (!drawn.length) return null;
-    const hit = drawn[drawn.length - 1];
-    const rest = drawn.slice(0, -1);
-    rest.sort((a, b) => (RANK[a.bucket] || 0) - (RANK[b.bucket] || 0) || a.id.localeCompare(b.id));
-    const ordered = rest.concat(hit);
-    let maxIndex = 0;
-    ordered.forEach((card, index) => {
-      if ((RANK[card.bucket] || 0) >= (RANK[ordered[maxIndex].bucket] || 0)) maxIndex = index;
-    });
-    if (maxIndex !== ordered.length - 1) ordered.push(ordered.splice(maxIndex, 1)[0]);
-    ordered[ordered.length - 1].hit = true;
-    const setName = options.setName || ordered[0].setName || setId;
-    ordered.forEach(card => { card.setName = card.setName || setName; });
+    drawn.sort((a, b) => revealScore(a) - revealScore(b) || String(a.id).localeCompare(String(b.id)));
+    markHits(drawn);
+    const setName = options.setName || drawn[0].setName || setId;
+    drawn.forEach(card => { card.setName = card.setName || setName; });
+    const shape = shapeOf(setId);
     return {
       setId,
       setName,
       era: eraOf(setId),
       disclaimer: DISCLAIMER,
-      cards: ordered,
-      value: packValue(ordered),
-      best: bestCard(ordered)
+      shape: shape.text,
+      cards: drawn,
+      value: packValue(drawn),
+      best: bestCard(drawn)
     };
+  }
+
+  function swapBroken(pack, index, cards) {
+    if (!pack || !Array.isArray(pack.cards) || index < 0 || index >= pack.cards.length) return pack;
+    const bad = pack.cards[index];
+    const used = new Set(pack.cards.map(card => card && card.id));
+    const needsArt = !!(bad.thumb || bad.img || bad.backup);
+    const pool = (Array.isArray(cards) ? cards : []).filter(card => card && card.id && !used.has(card.id) && (!needsArt || card.thumb || card.img || card.backup));
+    const same = pool.find(card => card.bucket === bad.bucket && card.art === bad.art) || pool.find(card => card.bucket === bad.bucket) || null;
+    const nextCards = pack.cards.slice();
+    if (!same) {
+      if (nextCards.length <= MIN_CARDS) return pack;
+      nextCards.splice(index, 1);
+    } else {
+      nextCards[index] = stamp(same, bad.slot || bad.bucket || "common");
+    }
+    markHits(nextCards);
+    return Object.assign({}, pack, {
+      cards: nextCards,
+      value: packValue(nextCards),
+      best: bestCard(nextCards)
+    });
   }
 
   function bonusSetId(sets, dayKey, prefer) {
@@ -571,16 +741,20 @@
     DISCLAIMER,
     HIT_ULTRA,
     HIT_HOLO,
+    ART_RATE,
     bucketOf,
     eraOf,
     slotsFor,
+    shapeOf,
     priceLabel,
+    displayPrice,
     packValue,
     bestCard,
     parseSeed,
     buildCatalog,
     listSets,
     buildPack,
+    swapBroken,
     hitBucket,
     bonusSetId,
     bonusReady,
