@@ -3814,7 +3814,7 @@ function renderRipsSide(){
   profileEl.hidden = false;
   shell.classList.remove("no-profile");
   markProfile(false);
-  profileEl.innerHTML = `<div class="profile-scroll" data-side="rips"><p class="eyebrow">Rip a pack</p><h2 class="pname" id="profileTitle">Just for fun</h2><p class="fine">${esc(text)}</p><p class="fine">Not real pull rates. Prices are the cached raw near-mint number, and a card without one says No price yet.</p></div>`;
+  profileEl.innerHTML = `<div class="profile-scroll" data-side="rips"><p class="eyebrow">Rip a pack</p><h2 class="pname" id="profileTitle">Just for fun</h2><p class="fine">${esc(text)}</p><p class="fine">Not real pull rates. A price is the cached raw near-mint number. A card without one says Bulk, or No price yet when it is a rare.</p></div>`;
 }
 function renderValueSide(){
   if (sideKey === "value" && profileEl.querySelector("[data-side='value']")) return;

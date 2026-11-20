@@ -18,7 +18,8 @@ const html = readFileSync(resolve(root, "index.html"), "utf8");
 const app = readFileSync(resolve(root, "js/app.js"), "utf8");
 const ripCss = readFileSync(resolve(root, "css/rips.css"), "utf8");
 assert.match(ripCss, /prefers-reduced-motion/);
-assert.match(sw, /const VERSION = "bh-21"/);
+assert.match(sw, /const VERSION = "bh-22"/);
+assert.match(sw, /data\/pack-pools\.json/);
 assert.match(sw, /"js\/rips\.js"/);
 assert.match(sw, /"js\/rips-ui\.js"/);
 assert.match(sw, /"css\/rips\.css"/);
@@ -45,10 +46,23 @@ assert.equal(Rips.bucketOf(""), "");
 assert.equal(Rips.bucketOf("Promo"), "rare");
 assert.equal(Rips.slotsFor("base1").length, 11);
 assert.equal(Rips.slotsFor("base1").filter(slot => slot === "common").length, 7);
-assert.equal(Rips.slotsFor("lc-1").slice(-1)[0], "hit");
+assert.equal(Rips.slotsFor("base1").includes("reverse"), false);
+assert.equal(Rips.slotsFor("lc").filter(slot => slot === "reverse").length, 1);
+assert.equal(Rips.slotsFor("lc").slice(-1)[0], "hit");
+assert.equal(Rips.slotsFor("ecard2").length, 9);
+assert.equal(Rips.slotsFor("ecard2").filter(slot => slot === "common").length, 5);
+assert.equal(Rips.slotsFor("ecard3").filter(slot => slot === "reverse").length, 1);
 assert.equal(Rips.slotsFor("ex1").filter(slot => slot === "common").length, 5);
-assert.equal(Rips.slotsFor("sv01").filter(slot => slot === "common").length, 4);
+assert.equal(Rips.slotsFor("ex1").filter(slot => slot === "uncommon").length, 2);
+assert.equal(Rips.slotsFor("dp1").length, 10);
+assert.equal(Rips.slotsFor("hgss1").filter(slot => slot === "reverse").length, 1);
 assert.equal(Rips.slotsFor("swsh7").slice(-1)[0], "hit");
+assert.equal(Rips.slotsFor("swsh7").filter(slot => slot === "common").length, 5);
+assert.equal(Rips.slotsFor("sv01").filter(slot => slot === "common").length, 4);
+assert.equal(Rips.slotsFor("sv01").filter(slot => slot === "art").length, 1);
+assert.equal(Rips.slotsFor("me02").length, 10);
+assert.equal(Rips.shapeOf("base1").text, "7 commons, 3 uncommons, a rare slot");
+assert.match(Rips.shapeOf("sv08").text, /4 commons, 3 uncommons, a reverse holo, a foil slot, a rare slot/);
 assert.equal(Rips.hitBucket(0.01, { ultra: 1, holo: 1, rare: 1 }), "ultra");
 assert.equal(Rips.hitBucket(0.1, { ultra: 1, holo: 1, rare: 1 }), "holo");
 assert.equal(Rips.hitBucket(0.5, { ultra: 1, holo: 1, rare: 1 }), "rare");
@@ -66,6 +80,16 @@ assert.equal(Rips.hitBucket(0.9, { common: 4 }), "common");
 assert.equal(Rips.priceLabel(1.5), "$1.50");
 assert.equal(Rips.priceLabel(1200), "$1,200.00");
 assert.equal(Rips.priceLabel(0), "No price yet");
+assert.equal(Rips.displayPrice({ bucket: "common", price: null }), "Bulk");
+assert.equal(Rips.displayPrice({ bucket: "uncommon", price: 0 }), "Bulk");
+assert.equal(Rips.displayPrice({ bucket: "common", finish: "reverse", price: null }), "Bulk");
+assert.equal(Rips.displayPrice({ bucket: "rare", price: null }), "No price yet");
+assert.equal(Rips.displayPrice({ bucket: "rare", finish: "reverse", price: null }), "No price yet");
+assert.equal(Rips.displayPrice({ bucket: "holo", price: NaN }), "No price yet");
+assert.equal(Rips.displayPrice({ bucket: "ultra", price: undefined }), "No price yet");
+assert.equal(Rips.displayPrice({ bucket: "common", price: 0.5 }), "$0.50");
+assert.equal(Rips.displayPrice({ bucket: "common", price: 0 }).includes("NaN"), false);
+assert.equal(Rips.displayPrice({ bucket: "common", price: 0 }).includes("$"), false);
 
 function card(id, bucket, price, rarity) {
   const cut = id.lastIndexOf("-");
@@ -97,34 +121,44 @@ function stocked(setId) {
 }
 
 const RANK = { common: 1, uncommon: 2, rare: 3, holo: 4, ultra: 5 };
-function assertShape(pack, expect) {
-  assert.ok(pack && pack.cards.length >= 4, "length " + (pack && pack.cards.length));
+function assertSlots(pack, slots) {
+  assert.ok(pack && pack.cards.length === slots.length, "length " + (pack && pack.cards.length) + " vs " + slots.length);
   const ids = new Set();
+  const got = {};
   pack.cards.forEach(item => {
     assert.ok(item.id);
     assert.equal(ids.has(item.id), false, item.id);
     ids.add(item.id);
-    const label = Rips.priceLabel(item.price);
-    assert.equal(label.includes("NaN") || label === "$0" || label === "$0.00", false, label);
+    got[item.slot] = (got[item.slot] || 0) + 1;
+    const label = item.priceLabel || Rips.displayPrice(item);
+    assert.equal(/NaN|undefined/i.test(label), false, label);
+    assert.equal(label === "$0" || label === "$0.00", false, label);
   });
-  const counts = { common: 0, uncommon: 0, rare: 0, holo: 0, ultra: 0 };
-  pack.cards.forEach(item => { counts[item.bucket] += 1; });
-  Object.keys(expect).forEach(key => assert.equal(counts[key], expect[key], key + " " + JSON.stringify(counts)));
-  const last = RANK[pack.cards[pack.cards.length - 1].bucket];
-  pack.cards.forEach(item => assert.ok(RANK[item.bucket] <= last, item.bucket));
-  assert.equal(pack.cards[pack.cards.length - 1].hit, true);
+  const expect = {};
+  slots.forEach(slot => { expect[slot] = (expect[slot] || 0) + 1; });
+  Object.keys(expect).forEach(key => assert.equal(got[key], expect[key], key + " " + JSON.stringify(got)));
+  let prev = -1;
+  pack.cards.forEach(item => {
+    const score = item.finish === "reverse" && item.bucket !== "holo" && item.bucket !== "ultra"
+      ? 30
+      : (RANK[item.bucket] || 0) * 10;
+    assert.ok(score >= prev, item.slot + " " + item.bucket);
+    prev = score;
+  });
+  const last = pack.cards[pack.cards.length - 1];
+  assert.equal(last.hit, last.bucket === "holo" || last.bucket === "ultra");
   assert.equal(pack.disclaimer, "Just for fun, not real pull rates.");
 }
 
 const tallies = { rare: 0, holo: 0, ultra: 0 };
 for (let i = 0; i < 200; i++) {
   const pack = Rips.buildPack(stocked("sv01"), { setId: "sv01", setName: "Test", seed: "modern-" + i });
-  assert.equal(pack && pack.cards.length, 10);
-  assertShape(pack, { common: 4, uncommon: 3 });
-  assert.equal(pack.cards.filter(item => item.bucket === "rare" || item.bucket === "holo" || item.bucket === "ultra").length, 3);
-  const hit = pack.cards[pack.cards.length - 1].bucket;
-  assert.ok(hit === "rare" || hit === "holo" || hit === "ultra", hit);
-  tallies[hit] += 1;
+  assertSlots(pack, Rips.slotsFor("sv01"));
+  assert.ok(pack.cards.filter(item => item.slot === "common").every(item => item.bucket === "common"));
+  assert.ok(pack.cards.filter(item => item.slot === "uncommon").every(item => item.bucket === "uncommon"));
+  const hit = pack.cards.find(item => item.slot === "hit");
+  assert.ok(hit && (hit.bucket === "rare" || hit.bucket === "holo" || hit.bucket === "ultra"), hit && hit.bucket);
+  tallies[hit.bucket] += 1;
 }
 assert.ok(tallies.ultra >= 4 && tallies.ultra <= 36, "ultra hits " + tallies.ultra);
 assert.ok(tallies.holo >= 20 && tallies.holo <= 80, "holo hits " + tallies.holo);
@@ -134,11 +168,15 @@ const once = Rips.buildPack(stocked("sv01"), { setId: "sv01", setName: "Test", s
 assert.deepEqual(again.cards.map(item => item.id), once.cards.map(item => item.id));
 
 const vintage = Rips.buildPack(stocked("base1"), { setId: "base1", setName: "Base", seed: "vintage" });
-assertShape(vintage, { common: 7, uncommon: 3 });
-assert.equal(vintage.cards.length, 11);
+assertSlots(vintage, Rips.slotsFor("base1"));
+assert.equal(vintage.cards.filter(item => item.finish === "reverse").length, 0);
+assert.equal(vintage.cards.filter(item => item.slot === "common" && item.bucket === "common").length, 7);
+const aquapolis = Rips.buildPack(stocked("ecard2"), { setId: "ecard2", setName: "Aquapolis", seed: "ecard" });
+assertSlots(aquapolis, Rips.slotsFor("ecard2"));
+assert.equal(aquapolis.cards.filter(item => item.finish === "reverse").length, 1);
 const mid = Rips.buildPack(stocked("ex1"), { setId: "ex1", setName: "Ruby", seed: "mid" });
-assertShape(mid, { common: 5, uncommon: 3 });
-assert.equal(mid.cards.filter(item => item.bucket === "rare" || item.bucket === "holo" || item.bucket === "ultra").length, 2);
+assertSlots(mid, Rips.slotsFor("ex1"));
+assert.equal(mid.cards.filter(item => item.slot === "hit").length, 1);
 
 const rares = [];
 for (let i = 0; i < 8; i++) rares.push(card("sv03-r" + i, "rare", i === 0 ? 0 : 4, "Rare"));
@@ -156,7 +194,14 @@ const shortPack = Rips.buildPack(thin, { setId: "me01", setName: "Short", seed: 
 assert.ok(shortPack && shortPack.cards.length === 4);
 assert.equal(Rips.buildPack(thin.slice(0, 3), { setId: "me01", seed: "too-few" }), null);
 assert.equal(Rips.packValue([{ price: NaN }, { price: 0 }, { price: null }]).label, "No price yet");
+assert.match(Rips.packValue([{ price: NaN }, { price: 0 }, { price: null }]).note, /bulk/i);
 assert.equal(Rips.packValue([{ price: 1.25 }, { price: NaN }, { price: 0 }]).label, "$1.25");
+assert.match(Rips.packValue([{ price: 1.25 }, { price: NaN }, { price: 0 }]).note, /1 priced card/);
+assert.match(Rips.packValue([{ price: 1.25 }, { price: NaN }, { price: 0 }]).note, /bulk/i);
+const swapped = Rips.swapBroken(vintage, 0, stocked("base1"));
+assert.notEqual(swapped.cards[0].id, vintage.cards[0].id);
+assert.equal(swapped.cards.length, vintage.cards.length);
+assert.equal(swapped.cards[0].slot, vintage.cards[0].slot);
 
 const catalog = Rips.buildCatalog({
   cards: {
@@ -227,6 +272,30 @@ assert.equal(loaded.best.price, 80);
 assert.equal(loaded.bonusDay, "2026-11-19");
 assert.equal(store.getItem("binderhuntWish"), "[]");
 assert.equal(store.getItem("bh.binders.v1"), "{}");
+store.setItem(Rips.KEY, JSON.stringify({
+  v: 1,
+  bonusDay: "2026-11-01",
+  best: { id: "base1-4", name: "Charizard", rarity: "Holo Rare", bucket: "holo", price: 12, setId: "base1", setName: "Base Set", at: 4 },
+  rips: [{
+    at: 4,
+    day: "2026-11-01",
+    setId: "base1",
+    setName: "Base Set",
+    total: 12,
+    priced: 1,
+    cards: [{ id: "base1-4", name: "Charizard", rarity: "Holo Rare", bucket: "holo", price: 12, setId: "base1", setName: "Base Set" }],
+    best: { id: "base1-4", name: "Charizard", rarity: "Holo Rare", bucket: "holo", price: 12, setId: "base1", setName: "Base Set" }
+  }]
+}));
+const migrated = Rips.loadLog(store);
+assert.equal(migrated.v, 1);
+assert.equal(migrated.rips.length, 1);
+assert.equal(migrated.rips[0].cards[0].id, "base1-4");
+assert.equal(migrated.rips[0].cards[0].price, 12);
+assert.equal(migrated.best.id, "base1-4");
+assert.equal(migrated.bonusDay, "2026-11-01");
+assert.equal(Rips.saveLog(store, migrated), true);
+assert.equal(Rips.loadLog(store).best.price, 12);
 store.setItem(Rips.KEY, "{");
 assert.equal(Rips.loadLog(store).rips.length, 0);
 let capped = Rips.normalizeLog(null);
@@ -273,7 +342,63 @@ real.sets.forEach(set => {
   assert.ok(total === "No price yet" || /^\$\d/.test(total), set.id + " " + total);
   assert.equal(/NaN|\$0(?:\.00)?$/.test(total), false, total);
 });
-console.log("rips math ok", { sets: real.sets.length, hits: tallies });
+const poolsFile = resolve(root, "data/pack-pools.json");
+const pools = JSON.parse(readFileSync(poolsFile, "utf8"));
+assert.equal(pools.v, 1);
+assert.equal(pools.source, "tcgdex");
+["base1", "ecard2", "ecard3", "ex1", "swsh7", "sv01", "sv08", "me02"].forEach(id => {
+  assert.ok(pools.sets[id], "missing pool " + id);
+  assert.ok(pools.sets[id].c.length >= 4, id + " commons");
+  assert.ok(pools.sets[id].u.length >= 2, id + " uncommons");
+  assert.ok(pools.sets[id].r.length + pools.sets[id].h.length + pools.sets[id].x.length > 0, id + " rare slot");
+});
+const pooled = Rips.buildCatalog({ cards: cache.cards, seedText, pool: daily.pool, pools });
+function ripSet(setId, seed) {
+  const set = pooled.sets.find(item => item.id === setId);
+  assert.ok(set && set.pooled, setId);
+  const pack = Rips.buildPack(set.cards, { setId, setName: set.name, seed, requireArt: true });
+  assert.ok(pack, setId);
+  assertSlots(pack, Rips.slotsFor(setId));
+  pack.cards.forEach(card => {
+    assert.ok(card.thumb || card.img || card.backup, card.id + " image");
+    assert.equal(/undefined|NaN/.test(String(card.name) + String(card.priceLabel) + String(card.rarity)), false, card.id);
+    if (card.price == null) assert.ok(card.priceLabel === "Bulk" || card.priceLabel === "No price yet", card.id + " " + card.priceLabel);
+  });
+  return pack;
+}
+function hitRates(setId, count) {
+  const hits = { rare: 0, holo: 0, ultra: 0 };
+  let reverses = 0;
+  for (let i = 0; i < count; i++) {
+    const pack = ripSet(setId, setId + "-pool-" + i);
+    const hit = pack.cards.find(card => card.slot === "hit");
+    hits[hit.bucket] += 1;
+    reverses += pack.cards.filter(card => card.finish === "reverse").length;
+  }
+  return { hits, reverses };
+}
+const baseRates = hitRates("base1", 80);
+assert.ok(baseRates.hits.rare > baseRates.hits.holo + baseRates.hits.ultra, "base rare slot " + JSON.stringify(baseRates));
+assert.equal(baseRates.reverses, 0);
+const aquaRates = hitRates("ecard2", 40);
+assert.ok(aquaRates.reverses >= 40, "aquapolis reverse " + aquaRates.reverses);
+assert.ok(aquaRates.hits.rare > aquaRates.hits.holo, "aquapolis rare slot " + JSON.stringify(aquaRates.hits));
+const sky = ripSet("ecard3", "skyridge");
+assert.equal(sky.cards.length, 9);
+assert.ok(sky.cards.some(card => card.finish === "reverse"));
+const modernRates = hitRates("sv08", 40);
+assert.ok(modernRates.hits.rare > modernRates.hits.holo, "modern rare slot " + JSON.stringify(modernRates.hits));
+assert.ok(modernRates.reverses >= 40, "modern foil slots");
+const probePacks = [ripSet("base1", "probe-base"), ripSet("ecard2", "probe-aqua"), ripSet("sv08", "probe-sv")];
+console.log("rips math ok", { sets: real.sets.length, pooled: pooled.sets.length, hits: tallies, base: baseRates.hits, modern: modernRates.hits });
+const probeUrls = [];
+probePacks.forEach(pack => pack.cards.forEach(card => { if (card.thumb && probeUrls.indexOf(card.thumb) === -1) probeUrls.push(card.thumb); }));
+for (const url of probeUrls) {
+  const res = await fetch(url, { method: "GET", headers: { Range: "bytes=0-64" } });
+  assert.ok(res.ok || res.status === 206, url + " " + res.status);
+  assert.match(res.headers.get("content-type") || "", /image\//, url);
+}
+console.log("pack images ok", probeUrls.length);
 
 const PORT = 8819;
 const vendor = "/tmp/binderhunt-playwright";
@@ -459,6 +584,37 @@ note(!picker.off.length, "picker stays inside 390px", picker.off.join(" | "));
 const pickerAxe = await axe(page, "rips-picker-390");
 note(!pickerAxe.length, "0 axe violations on the picker at 390", pickerAxe.join(" || "));
 
+async function ripToSummary(labelQuery, setId) {
+  await page.locator("#ripFind").fill(labelQuery);
+  await page.locator("[data-rip-set='" + setId + "']").click();
+  await page.waitForSelector("#ripTear");
+  await page.locator("#ripOpen").click();
+  await page.waitForSelector("[data-screen=reveal]");
+  for (let i = 0; i < 40; i++) {
+    const screen = await page.evaluate(() => {
+      const node = document.querySelector("#ripsScroll [data-screen]");
+      return node ? node.getAttribute("data-screen") : "";
+    });
+    if (screen === "summary") break;
+    await page.locator("#ripAdvance").click();
+  }
+  await page.waitForSelector("[data-screen=summary]");
+  await page.waitForFunction(() => {
+    const imgs = [...document.querySelectorAll("#viewRips img")];
+    return imgs.length > 0 && imgs.every(img => img.complete && img.naturalWidth > 0);
+  }, null, { timeout: 15000 }).catch(() => {});
+}
+
+await ripToSummary("Base Set", "base1");
+await shot(page, "after-base-summary-390");
+const baseSummary = await page.evaluate(layoutScript);
+const baseCommons = (baseSummary.text.match(/\bCommon\b/g) || []).length;
+note(baseCommons >= 5, "base pack shows commons, not a stack of holos", String(baseCommons) + " " + baseSummary.text.slice(0, 280));
+note(!baseSummary.text.includes("NaN") && !/undefined|\$0(?:\.00)?\b/.test(baseSummary.text), "base summary has no NaN, undefined, or $0");
+note(!baseSummary.broken.length && !baseSummary.off.length, "base summary images and layout at 390", baseSummary.broken.join(" | ") + baseSummary.off.join(" | "));
+await page.locator("#ripBack").click();
+await page.waitForSelector("#ripTitle");
+
 await page.locator("#ripFind").fill("Aquapolis");
 await page.locator("[data-rip-set='ecard2']").click();
 await page.waitForSelector("#ripTear");
@@ -483,7 +639,7 @@ await sleep(500);
 await shot(page, "rip-mid-390");
 const midView = await page.evaluate(layoutScript);
 note(midView.screen === "reveal", "a card is mid-reveal");
-note(/No price yet|\$\d/.test(midView.text), "the flipped card shows a price or No price yet", midView.text.slice(0, 240));
+note(/No price yet|Bulk|\$\d/.test(midView.text), "the flipped card shows a price, Bulk, or No price yet", midView.text.slice(0, 240));
 note(!midView.text.includes("NaN") && !/\$0(?:\.00)?\b/.test(midView.text), "no NaN or $0 on the reveal", midView.text.slice(0, 300));
 note(!midView.off.length, "reveal stays inside 390px", midView.off.join(" | "));
 await page.waitForFunction(() => {
@@ -544,10 +700,24 @@ note(saved.count === 1 && !!saved.id && saved.pressed === "true", "save uses the
 note(saved.price == null || (typeof saved.price === "number" && saved.price > 0), "saved price is not $0", String(saved.price));
 note(beforeWish === "[]", "wishlist started empty");
 note(saved.binders === localStorageBinders(), "binders storage stays put");
-note(saved.log && saved.log.v === 1 && saved.log.rips.length === 1 && saved.log.rips.length <= 50, "pull log stored one rip", JSON.stringify(saved.log && saved.log.rips && saved.log.rips.length));
-note(saved.log && saved.log.best && saved.log.best.price > 0, "best pull is priced", JSON.stringify(saved.log && saved.log.best));
+note(saved.log && saved.log.v === 1 && saved.log.rips.length >= 1 && saved.log.rips.length <= 50, "pull log kept the rips", JSON.stringify(saved.log && saved.log.rips && saved.log.rips.length));
+const bestPrice = saved.log && saved.log.best && saved.log.best.price;
+const anyPriced = saved.log && saved.log.rips[0] && saved.log.rips[0].cards.some(card => typeof card.price === "number" && card.price > 0);
+note(!anyPriced || (typeof bestPrice === "number" && bestPrice > 0), "a priced card becomes the best pull", JSON.stringify(saved.log && saved.log.best));
+note(bestPrice == null || (typeof bestPrice === "number" && bestPrice > 0), "best pull is not $0", String(bestPrice));
 
 function localStorageBinders() { return "{\"discoveryId\":\"\",\"binders\":[]}"; }
+
+await page.locator("#ripBack").click();
+await page.waitForSelector("#ripTitle");
+await ripToSummary("Surging", "sv08");
+await shot(page, "after-modern-summary-390");
+const modernSummary = await page.evaluate(layoutScript);
+note(/Common/.test(modernSummary.text) && /Reverse holo|Uncommon/.test(modernSummary.text), "modern pack has commons and a foil slot", modernSummary.text.slice(0, 320));
+note(!modernSummary.text.includes("NaN") && !/undefined|\$0(?:\.00)?\b/.test(modernSummary.text), "modern summary is clean");
+note(!modernSummary.broken.length && !modernSummary.off.length, "modern summary at 390", modernSummary.broken.join(" | ") + modernSummary.off.join(" | "));
+await page.locator("#ripBack").click();
+await page.waitForSelector("#ripTitle");
 
 await page.locator(".tabs [data-tab=hunt]").click();
 await page.waitForSelector("#deck .card img");
@@ -622,6 +792,7 @@ for (let i = 0; i < wideSteps * 2 + 2; i++) {
 }
 await page.waitForSelector("[data-screen=summary]");
 await shot(page, "rip-summary-1440");
+await shot(page, "after-skyridge-summary-1440");
 const wide = await page.evaluate(layoutScript);
 note(!wide.off.length, "summary stays inside 1440px", wide.off.join(" | "));
 note(!wide.text.includes("NaN"), "no NaN at 1440");
@@ -629,6 +800,14 @@ const wideAxe = await axe(page, "rips-summary-1440");
 note(!wideAxe.length, "0 axe violations on the summary at 1440", wideAxe.join(" || "));
 const wideBroken = await page.evaluate(() => [...document.querySelectorAll("#viewRips img")].filter(img => img.complete && img.naturalWidth === 0).map(img => img.src));
 note(!wideBroken.length, "no broken images at 1440", wideBroken.join(" | "));
+await page.locator("#ripBack").click();
+await page.waitForSelector("#ripTitle");
+await ripToSummary("Base Set", "base1");
+await shot(page, "after-base-summary-1440");
+const wideBase = await page.evaluate(layoutScript);
+note((wideBase.text.match(/\bCommon\b/g) || []).length >= 5, "base pack at 1440 is not all holos", wideBase.text.slice(0, 240));
+note(!wideBase.off.length && !wideBase.broken.length, "base summary stays inside 1440 and images load", wideBase.off.join(" | ") + wideBase.broken.join(" | "));
+note(!wideBase.text.includes("NaN") && !/undefined|\$0(?:\.00)?\b/.test(wideBase.text), "base summary at 1440 is clean");
 
 note(!consoleErrors.length, "no console errors", consoleErrors.slice(0, 6).join(" | "));
 

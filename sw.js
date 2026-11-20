@@ -6,7 +6,7 @@
    index.html, js, or css. Any change to this file is a new worker: it
    calls skipWaiting immediately and takes over, and the page asks before
    it reloads. */
-const VERSION = "bh-21";
+const VERSION = "bh-22";
 const SHELL = "bh-shell-" + VERSION;
 const DATA = "bh-data-" + VERSION;
 const IMG = "bh-img-" + VERSION;
@@ -47,6 +47,7 @@ const SHELL_FILES = [
   "css/themes.css",
   "css/share.css",
   "data/scrydex-seed.txt",
+  "data/pack-pools.json",
   "css/binder.css",
   "css/polish.css",
   "manifest.webmanifest",
@@ -187,7 +188,9 @@ function relPath(url) {
 }
 
 function isData(url) {
-  return /^data\/[^/]+\.json$/.test(relPath(url));
+  const path = relPath(url);
+  if (path === "data/pack-pools.json") return false;
+  return /^data\/[^/]+\.json$/.test(path);
 }
 
 function isFont(url) {
@@ -200,6 +203,7 @@ function isShell(url) {
   if (path === "sw.js") return false;
   return path === "index.html"
     || path === "data/scrydex-seed.txt"
+    || path === "data/pack-pools.json"
     || path === "manifest.webmanifest"
     || path.startsWith("js/")
     || path.startsWith("css/")

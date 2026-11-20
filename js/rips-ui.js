@@ -7,7 +7,9 @@
   let hostEl = null;
   let seedText = "";
   let pool = [];
+  let pools = null;
   let dailyData = null;
+  const badArt = new Set();
   let filesPromise = null;
   let catalog = null;
   let screen = "picker";
@@ -80,6 +82,7 @@
       cards,
       seedText,
       pool,
+      pools,
       extras: extrasFromCache(),
       names: namesFromMeta()
     });
@@ -88,8 +91,8 @@
         const fresh = catalog.byId.get(card.id);
         if (!fresh) return;
         card.price = fresh.price;
-        card.priceLabel = fresh.priceLabel || R.priceLabel(fresh.price);
         if (!card.name && fresh.name) card.name = fresh.name;
+        card.priceLabel = R.displayPrice(card);
       });
       pack.value = R.packValue(pack.cards);
       pack.best = R.bestCard(pack.cards);
@@ -100,10 +103,12 @@
     if (filesPromise) return filesPromise;
     filesPromise = Promise.all([
       fetch("data/scrydex-seed.txt", { cache: "no-cache" }).then(res => res.ok ? res.text() : "").catch(() => ""),
-      fetch("data/daily.json", { cache: "no-cache" }).then(res => res.ok ? res.json() : null).catch(() => null)
+      fetch("data/daily.json", { cache: "no-cache" }).then(res => res.ok ? res.json() : null).catch(() => null),
+      fetch("data/pack-pools.json", { cache: "no-cache" }).then(res => res.ok ? res.json() : null).catch(() => null)
     ]).then(pair => {
       seedText = pair[0] || "";
       dailyData = pair[1];
+      pools = pair[2] && pair[2].sets ? pair[2] : null;
       pool = dailyData && Array.isArray(dailyData.pool) ? dailyData.pool : [];
       rebuild();
     }).catch(() => {
@@ -146,22 +151,62 @@
     if (node && typeof node.focus === "function") node.focus();
   }
 
+  function priceText(card) {
+    const text = R.displayPrice ? R.displayPrice(card) : R.priceLabel(card && card.price);
+    if (!text || /NaN|undefined/i.test(text)) return "No price yet";
+    return text;
+  }
+
+  function priceHtml(card) {
+    const text = priceText(card);
+    if (text.charAt(0) === "$") return esc(text);
+    const missing = text !== "Bulk";
+    return `<span class="rip-chip${missing ? " is-missing" : ""}">${esc(text)}</span>`;
+  }
+
+  function rarityLine(card) {
+    const parts = [];
+    if (card && card.finish === "reverse") parts.push("Reverse holo");
+    if (card && card.rarity) parts.push(card.rarity);
+    return parts.join(" · ");
+  }
+
   function bindArt(img, card) {
     const urls = [];
     if (card.thumb) urls.push(card.thumb);
     if (card.img && urls.indexOf(card.img) === -1) urls.push(card.img);
     if (card.backup && urls.indexOf(card.backup) === -1) urls.push(card.backup);
     let step = 0;
+    const placeholder = () => {
+      const ph = document.createElement("span");
+      ph.className = "rip-ph";
+      ph.textContent = card.name || "Card";
+      if (img.isConnected) img.replaceWith(ph);
+    };
     const fail = () => {
       step += 1;
       if (urls[step]) {
         img.src = urls[step];
         return;
       }
-      const ph = document.createElement("span");
-      ph.className = "rip-ph";
-      ph.textContent = card.name || "Card";
-      img.replaceWith(ph);
+      badArt.add(card.id);
+      const idx = pack && pack.cards.findIndex(item => item.id === card.id);
+      const set = catalog && pack && catalog.sets.find(item => item.id === pack.setId);
+      const spares = ((set && set.cards) || []).filter(item => item && !badArt.has(item.id));
+      if (pack && idx >= 0 && typeof R.swapBroken === "function") {
+        const next = R.swapBroken(pack, idx, spares);
+        const replaced = next && next.cards[idx] && next.cards[idx].id !== card.id;
+        const dropped = next && next.cards.length < pack.cards.length;
+        if (replaced || dropped) {
+          pack = next;
+          if (index >= pack.cards.length) index = Math.max(0, pack.cards.length - 1);
+          pack.value = R.packValue(pack.cards);
+          pack.best = R.bestCard(pack.cards);
+          render();
+          return;
+        }
+      }
+      placeholder();
     };
     img.addEventListener("error", fail);
     if (!urls.length) fail();
@@ -237,7 +282,7 @@
     if (!card) return;
     faceUp = true;
     const last = index === pack.cards.length - 1;
-    const price = R.priceLabel(card.price);
+    const price = priceText(card);
     const cardEl = document.getElementById("ripCard");
     if (cardEl) cardEl.classList.remove("is-down");
     const front = cardEl && cardEl.querySelector(".rip-front");
@@ -248,15 +293,15 @@
     const meta = document.getElementById("ripMeta");
     if (meta) meta.innerHTML = `${esc(card.name || "Card")}${card.hit ? ` <span class="rip-hit">Hit</span>` : ""}`;
     const rarity = document.getElementById("ripRarity");
-    if (rarity) rarity.textContent = card.rarity || "";
+    if (rarity) rarity.textContent = rarityLine(card);
     const priceEl = document.getElementById("ripPrice");
-    if (priceEl) priceEl.textContent = price;
+    if (priceEl) priceEl.innerHTML = priceHtml(card);
     const live = document.getElementById("ripLive");
-    if (live) live.textContent = (card.name || "Card") + ", " + (card.rarity || "") + ", " + price + ".";
+    if (live) live.textContent = (card.name || "Card") + ", " + (rarityLine(card) || "") + ", " + price + ".";
     const button = document.getElementById("ripAdvance");
     const action = button && button.querySelector(".rip-action");
     if (action) action.textContent = last ? "See the pack" : "Next card";
-    announceTo((card.name || "Card") + ", " + (card.rarity || "unknown rarity") + ", " + price + ".");
+    announceTo((card.name || "Card") + ", " + (rarityLine(card) || "unknown rarity") + ", " + price + ".");
   }
 
   function advance() {
@@ -278,7 +323,7 @@
     screen = "summary";
     const value = pack.value ? pack.value.label : "No price yet";
     const best = pack.best;
-    announceTo("Pack value " + value + (best ? ". Best hit " + (best.name || "card") + ", " + R.priceLabel(best.price) + "." : "."));
+    announceTo("Pack value " + value + (pack.value && pack.value.note ? ". " + pack.value.note : "") + (best ? " Best hit " + (best.name || "card") + ", " + priceText(best) + "." : "."));
     render();
     focusId("ripSummaryTitle");
   }
@@ -287,9 +332,9 @@
     const set = (catalog && catalog.sets || []).find(item => item.id === setId);
     if (!set) return;
     const seed = asBonus ? "bonus:" + dayKey() + ":" + set.id : set.id + ":" + Date.now();
-    const dealt = R.buildPack(set.cards, { setId: set.id, setName: set.name, seed });
+    const dealt = R.buildPack(set.cards, { setId: set.id, setName: set.name, seed, requireArt: true });
     if (!dealt || !dealt.cards.length) {
-      announceTo(set.name + " doesn't have enough saved cards to rip.");
+      announceTo(set.name + " doesn't have enough cards to rip.");
       return;
     }
     pack = dealt;
@@ -379,7 +424,7 @@
     const log = readLog();
     const best = log.best;
     const bestLine = best
-      ? `<p class="rip-stat"><span class="eyebrow">Best pull</span><b>${esc(best.name || "Card")}</b><span class="rip-money">${esc(R.priceLabel(best.price))}</span><span class="fine">${esc([best.setName || best.setId, best.rarity].filter(Boolean).join(" · "))}</span></p>`
+      ? `<p class="rip-stat"><span class="eyebrow">Best pull</span><b>${esc(best.name || "Card")}</b><span class="rip-money">${priceHtml(best)}</span><span class="fine">${esc([best.setName || best.setId, best.rarity].filter(Boolean).join(" · "))}</span></p>`
       : `<p class="rip-stat"><span class="eyebrow">Best pull</span><b>None yet</b><span class="fine">Your biggest hit will land here.</span></p>`;
     const today = dayKey();
     const ready = R.bonusReady(log, today);
@@ -400,17 +445,19 @@
     const eras = [];
     groups.forEach((list, era) => {
       eras.push(`<h2 class="era-h">${esc(era)} <span class="fine">${list.length}</span></h2><div class="set-grid">${list.map(set => {
-        return `<button class="set-tile" type="button" data-rip-set="${esc(set.id)}"><b>${esc(set.name)}</b><span class="fine">${esc(set.count + " saved cards")}</span></button>`;
+        const shape = R.shapeOf ? R.shapeOf(set.id) : null;
+        return `<button class="set-tile" type="button" data-rip-set="${esc(set.id)}"><b>${esc(set.name)}</b><span class="fine">${esc((shape ? shape.cards + "-card booster" : set.count + " cards"))}</span></button>`;
       }).join("")}</div>`);
     });
-    const empty = sets.length ? "" : `<p class="empty-state">No set has enough saved cards to rip yet. ${typeof toad === "function" ? toad() : ""}</p>`;
-    const prices = typeof scrydex !== "undefined" && scrydex && scrydex.ready ? "" : `<p class="fine" role="status">Reading saved prices… Cards without one will say No price yet.</p>`;
-    return `<div class="rip-wrap" data-screen="picker"><p class="eyebrow">Rip a pack</p><h2 class="rip-title" id="ripTitle">Tear one open</h2><p class="fine rip-note">${esc(R.DISCLAIMER)} Packs are dealt from cards already saved in this browser.</p>${prices}${bestLine}${bonusHtml}<label class="sr-only" for="ripFind">Search sets</label><input class="search" id="ripFind" type="search" placeholder="Search sets" enterkeyhint="search" autocomplete="off" value="${esc(query)}">${eras.join("")}${empty}${logHtml}</div>`;
+    const empty = sets.length ? "" : `<p class="empty-state">No set has enough cards to rip yet. ${typeof toad === "function" ? toad() : ""}</p>`;
+    const prices = typeof scrydex !== "undefined" && scrydex && scrydex.ready ? "" : `<p class="fine" role="status">Reading saved prices… Cards without one will say Bulk.</p>`;
+    return `<div class="rip-wrap" data-screen="picker"><p class="eyebrow">Rip a pack</p><h2 class="rip-title" id="ripTitle">Tear one open</h2><p class="fine rip-note">${esc(R.DISCLAIMER)} Each pack follows that era's slots. A price shows only when one is already saved.</p>${prices}${bestLine}${bonusHtml}<label class="sr-only" for="ripFind">Search sets</label><input class="search" id="ripFind" type="search" placeholder="Search sets" enterkeyhint="search" autocomplete="off" value="${esc(query)}">${eras.join("")}${empty}${logHtml}</div>`;
   }
 
   function renderSealed() {
     const era = pack.era === "WOTC" ? "era-vintage" : (pack.era === "EX" || pack.era === "Diamond & Pearl" || pack.era === "HeartGold & SoulSilver" ? "era-mid" : "era-modern");
-    return `<div class="rip-wrap" data-screen="sealed"><p class="eyebrow">${bonus ? "Bonus pack" : "Sealed pack"}</p><h2 class="rip-title" id="ripPackTitle">${esc(pack.setName || "Pack")}</h2><p class="fine rip-note">${esc(R.DISCLAIMER)} Drag across the top edge. ${pack.cards.length} cards, rarest last.</p>
+    const shape = pack.shape || (R.shapeOf ? R.shapeOf(pack.setId).text : "");
+    return `<div class="rip-wrap" data-screen="sealed"><p class="eyebrow">${bonus ? "Bonus pack" : "Sealed pack"}</p><h2 class="rip-title" id="ripPackTitle">${esc(pack.setName || "Pack")}</h2><p class="fine rip-note">${esc(R.DISCLAIMER)} Drag across the top edge. ${esc(shape || pack.cards.length + " cards")}. Rarest last.</p>
       <div class="rip-pack ${era}">
         <div class="rip-tear" id="ripTear" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="Sealed" aria-label="Tear across the top of the pack" style="--tear:0"><span class="rip-tear-fill" aria-hidden="true"></span><span class="rip-tear-label">Tear here</span></div>
         <p class="rip-pack-kicker">Sealed</p>
@@ -425,8 +472,9 @@
     const last = index === pack.cards.length - 1;
     const down = !faceUp;
     const action = down ? "Reveal this card" : (last ? "See the pack" : "Next card");
-    const price = down ? "" : R.priceLabel(card.price);
-    const live = down ? "Face down." : (card.name || "Card") + ", " + (card.rarity || "") + ", " + price + ".";
+    const price = down ? "" : priceHtml(card);
+    const spoken = down ? "" : priceText(card);
+    const live = down ? "Face down." : (card.name || "Card") + ", " + (rarityLine(card) || "unknown rarity") + ", " + spoken + ".";
     const art = down ? "" : `<img alt="" data-rip-art="${esc(card.id)}" width="200" height="280" decoding="async">`;
     return `<div class="rip-wrap" data-screen="reveal"><p class="rip-step fine" id="ripStep">Card ${index + 1} of ${pack.cards.length}. Rarest last.</p>
       <div class="rip-stage">
@@ -438,24 +486,24 @@
           <span class="rip-action">${esc(action)}</span>
         </button>
         <p class="rip-meta" id="ripMeta">${down ? "" : esc(card.name || "Card")}${!down && card.hit ? ` <span class="rip-hit">Hit</span>` : ""}</p>
-        <p class="fine" id="ripRarity">${down ? "" : esc(card.rarity || "")}</p>
-        <p class="rip-price" id="ripPrice">${esc(price)}</p>
+        <p class="fine" id="ripRarity">${down ? "" : esc(rarityLine(card))}</p>
+        <p class="rip-price" id="ripPrice">${price}</p>
       </div>
       <p class="sr-only" aria-live="polite" id="ripLive">${esc(live)}</p>
       <div class="rip-actions"><button class="rip-back" type="button" id="ripBack">Back</button></div></div>`;
   }
 
   function renderSummary() {
-    const value = pack.value || { label: "No price yet", priced: 0 };
-    const missing = pack.cards.length - (value.priced || 0);
+    const value = pack.value || { label: "No price yet", priced: 0, note: "" };
     const best = pack.best;
-    const bestHtml = best ? `<section class="rip-stat" aria-labelledby="ripHitTitle"><span class="eyebrow" id="ripHitTitle">Best hit</span><b>${esc(best.name || "Card")}</b><span class="rip-money">${esc(R.priceLabel(best.price))}</span><span class="fine">${esc([best.rarity, best.setName].filter(Boolean).join(" · "))}</span></section>` : "";
+    const bestHtml = best ? `<section class="rip-stat" aria-labelledby="ripHitTitle"><span class="eyebrow" id="ripHitTitle">Best hit</span><b>${esc(best.name || "Card")}</b><span class="rip-money">${priceHtml(best)}</span><span class="fine">${esc(rarityLine(best))}</span></section>` : "";
     const rows = pack.cards.map(card => {
       const on = wished(card.id);
-      return `<li class="rip-row"><img alt="" data-rip-art="${esc(card.id)}" width="46" height="64" decoding="async" loading="lazy"><span class="rip-copy"><b>${esc(card.name || "Card")}</b><span class="fine">${esc(card.rarity || "")}</span><span class="rip-money">${esc(R.priceLabel(card.price))}</span></span><button class="rip-save" type="button" data-save="${esc(card.id)}" aria-pressed="${on ? "true" : "false"}" aria-label="${esc((on ? "Saved " : "Save ") + (card.name || "card") + (on ? " on the wishlist" : " to wishlist"))}">${on ? "Saved" : "Save"}</button></li>`;
+      return `<li class="rip-row"><img alt="" data-rip-art="${esc(card.id)}" width="46" height="64" decoding="async" loading="lazy"><span class="rip-copy"><b>${esc(card.name || "Card")}</b><span class="fine">${esc(rarityLine(card))}</span><span class="rip-money">${priceHtml(card)}</span></span><button class="rip-save" type="button" data-save="${esc(card.id)}" aria-pressed="${on ? "true" : "false"}" aria-label="${esc((on ? "Saved " : "Save ") + (card.name || "card") + (on ? " on the wishlist" : " to wishlist"))}">${on ? "Saved" : "Save"}</button></li>`;
     }).join("");
-    const gap = missing ? `<p class="fine">${missing === 1 ? "1 card has no price yet." : missing + " cards have no price yet."}</p>` : "";
-    return `<div class="rip-wrap" data-screen="summary"><p class="eyebrow">${esc(pack.setName || "Pack")}</p><h2 class="rip-title" id="ripSummaryTitle" tabindex="-1">Pack value</h2><p class="rip-price rip-total">${esc(value.label || "No price yet")}</p>${gap}<p class="fine rip-note">${esc(R.DISCLAIMER)}</p>${bestHtml}<ul class="rip-rows">${rows}</ul><div class="rip-actions"><button class="rip-open" type="button" id="ripAgain">Rip another</button><button class="rip-back" type="button" id="ripBack">Back to sets</button></div></div>`;
+    const total = value.label && value.label.charAt(0) === "$" ? esc(value.label) : `<span class="rip-chip is-missing">${esc(value.label || "No price yet")}</span>`;
+    const gap = value.note ? `<p class="fine">${esc(value.note)}</p>` : "";
+    return `<div class="rip-wrap" data-screen="summary"><p class="eyebrow">${esc(pack.setName || "Pack")}</p><h2 class="rip-title" id="ripSummaryTitle" tabindex="-1">Pack value</h2><p class="rip-price rip-total">${total}</p>${gap}<p class="fine rip-note">${esc(R.DISCLAIMER)}</p>${bestHtml}<ul class="rip-rows">${rows}</ul><div class="rip-actions"><button class="rip-open" type="button" id="ripAgain">Rip another</button><button class="rip-back" type="button" id="ripBack">Back to sets</button></div></div>`;
   }
 
   function render() {
@@ -575,7 +623,7 @@
   }
 
   function refresh() {
-    if (!hostEl || (!seedText && !pool.length)) return;
+    if (!hostEl || (!seedText && !pool.length && !pools)) return;
     rebuild();
     syncLoggedPrices();
     if (screen === "picker" || screen === "summary" || (screen === "reveal" && faceUp)) render();
