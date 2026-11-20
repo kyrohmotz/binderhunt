@@ -374,6 +374,8 @@ function whole(value, fallback, max) {
         if (card.art) {
           const img = document.createElement("img");
           img.alt = cardAlt(card);
+          img.width = 245;
+          img.height = 342;
           img.decoding = "async";
           img.draggable = false;
           img.addEventListener("error", () => { if (img.parentNode) img.replaceWith(nameFallback(card)); });

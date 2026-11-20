@@ -51,6 +51,7 @@ let tab = "hunt";
 let browseIndex = null;
 let browseReady = false;
 let browseMode = null;
+let restoreBrowseTab = false;
 let browseBuildStarted = false;
 let nameCacheDone = false;
 /* A set or type string the catalog has not confirmed yet. It is kept in
@@ -3389,7 +3390,8 @@ function paintChips(){
   const reset = document.getElementById("resetFilters");
   const facts = filterFacts();
   const n = facts.length;
-  if (open) open.setAttribute("aria-label", n ? "Filters, " + n + " active" : "Filters, none active. All physical cards.");
+  const countText = n > 9 ? "9+" : String(n);
+  if (open) open.setAttribute("aria-label", n ? "Filters " + countText + ", " + n + (n === 1 ? " filter active" : " filters active") : "Filters, none active. All physical cards.");
   const badge = document.getElementById("filterCount");
   if (badge) {
     badge.hidden = !n;
@@ -4287,7 +4289,7 @@ function nameHeading(card){
   const title = card && card.name || "Card";
   const species = browseSpeciesOf(card);
   if (!species) return `<h2 class="pname" id="profileTitle">${esc(title)}</h2>`;
-  return `<h2 class="pname" id="profileTitle"><button type="button" class="name-link" id="browseSpecies" aria-label="${esc("Browse " + species + " cards")}">${esc(title)}</button></h2>`;
+  return `<h2 class="pname" id="profileTitle"><button type="button" class="name-link" id="browseSpecies" aria-label="${esc(title + ". Browse " + species + " cards")}">${esc(title)}</button></h2>`;
 }
 function artistFact(card){
   const B = window.BinderBrowse;
@@ -4359,9 +4361,31 @@ function bindBrowseModes(root){
   const sets = root.querySelector("#modeSets");
   const pokemon = root.querySelector("#modePokemon");
   const artists = root.querySelector("#modeArtists");
-  if (sets) sets.onclick = () => { browseMode = null; setView = null; renderSets(); };
-  if (pokemon) pokemon.onclick = () => openBrowse("pokemon", "");
-  if (artists) artists.onclick = () => openBrowse("illustrator", "");
+  const fromTab = button => document.activeElement === button;
+  if (sets) sets.onclick = () => { restoreBrowseTab = fromTab(sets); browseMode = null; setView = null; renderSets(); };
+  if (pokemon) pokemon.onclick = () => { restoreBrowseTab = fromTab(pokemon); openBrowse("pokemon", ""); };
+  if (artists) artists.onclick = () => { restoreBrowseTab = fromTab(artists); openBrowse("illustrator", ""); };
+  const list = root.querySelector("[role='tablist']");
+  if (list) list.onkeydown = event => {
+    const tabs = [...list.querySelectorAll("[role='tab']")];
+    const index = tabs.indexOf(document.activeElement);
+    if (index < 0) return;
+    let next = -1;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (index + 1) % tabs.length;
+    else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (index - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    event.stopPropagation();
+    tabs[next].focus();
+    tabs[next].click();
+  };
+  if (restoreBrowseTab) {
+    restoreBrowseTab = false;
+    const selected = root.querySelector("[role='tab'][aria-selected='true']");
+    if (selected) selected.focus();
+  }
 }
 function browseChoices(){
   const B = window.BinderBrowse;
@@ -4471,7 +4495,7 @@ function renderBrowseShelf(root, kind, name){
   const widen = document.getElementById("browseWiden");
   if (widen) widen.onclick = () => widenBrowse();
   const grid = document.getElementById("browseGrid");
-  shown.forEach(row => {
+  shown.forEach((row, index) => {
     const price = priceText(row.price, "USD");
     const setLabel = setName(row.setId) || row.setId || "";
     const metaLine = [setLabel, row.number ? "#" + row.number : ""].filter(Boolean).join(" · ");
@@ -4483,7 +4507,7 @@ function renderBrowseShelf(root, kind, name){
     btn.innerHTML = `<span class="tile-price">${esc(price)}</span> <span class="art"></span> <b class="tile-name">${esc(row.name || "Card")}</b> <span class="fine">${esc(metaLine)}</span>`;
     const card = cardFromBrowse(row);
     if (card) {
-      paintArt(btn.querySelector(".art"), card, { lazy:true, priority:"low" });
+      paintArt(btn.querySelector(".art"), card, { lazy:index > 3, priority:index ? "low" : "auto" });
       const img = btn.querySelector("img");
       if (img) img.alt = "";
     }
@@ -4527,7 +4551,8 @@ function renderSets(){
     if (!groups.has(era)) groups.set(era, []);
     groups.get(era).push(s);
   });
-  const html = [`<input class="search" id="setFind" type="search" placeholder="Search sets" aria-label="Search sets" enterkeyhint="search" autocomplete="off" value="${esc(q)}">`,`<p class="fine setlead">Grouped by era. Open a set to flip through it, or swipe just that set.</p>`,`<div class="modes" role="tablist" aria-label="Browse">${browseModeButtons("sets")}<button class="chip gem-toggle${filters.gem ? " on" : ""}" id="openGemfinder" type="button" aria-pressed="${filters.gem ? "true" : "false"}">Gemfinder</button></div>`];
+  const html = [`<input class="search" id="setFind" type="search" placeholder="Search sets" aria-label="Search sets" enterkeyhint="search" autocomplete="off" value="${esc(q)}">`,`<p class="fine setlead">Grouped by era. Open a set to flip through it, or swipe just that set.</p>`,`<div class="modebar"><div class="modes" role="tablist" aria-label="Browse">${browseModeButtons("sets")}</div><button class="chip gem-toggle${filters.gem ? " on" : ""}" id="openGemfinder" type="button" aria-pressed="${filters.gem ? "true" : "false"}">Gemfinder</button></div>`];
+  let tileIndex = 0;
   ERA_ORDER.forEach(era => {
     const list = groups.get(era);
     if (!list || !list.length) return;
@@ -4539,9 +4564,15 @@ function renderSets(){
       const owned = countOwnedInSet(s.id);
       const metaLine = [count ? count + " cards" : era, year].filter(Boolean).join(" · ");
       const ownedLine = owned ? owned + " owned" : "";
-      const aria = [s.name, era, count ? count + " cards" : "", wish.full, ownedLine].filter(Boolean).join(", ");
+      const fineText = metaLine + (ownedLine ? " · " + ownedLine : "");
+      const heart = wish.saved ? "♥" : "♡";
+      const visibleName = [s.name, fineText, heart + " " + wish.short].filter(Boolean).join(" ");
+      const aria = visibleName + ". " + [era, wish.full].filter(Boolean).join(". ");
       const art = setArtUrl(s);
-      html.push(`<button class="set-tile" type="button" data-set="${esc(s.id)}" aria-label="${esc(aria)}">${art ? `<img alt="" src="${esc(art)}" data-symbol="${esc(s.symbol || "")}">` : ""}<b>${esc(s.name)}</b><span class="fine">${esc(metaLine)}${ownedLine ? " · " + esc(ownedLine) : ""}</span><span class="setpct${wish.saved ? "" : " zero"}"><span class="bar" aria-hidden="true"><span style="width:${wish.pct}%"></span></span><span class="pct"><span class="wishheart" aria-hidden="true">${wish.saved ? "♥" : "♡"}</span> ${esc(wish.short)}</span></span></button>`);
+      const eager = tileIndex < 4;
+      tileIndex += 1;
+      const img = art ? `<img alt="" width="84" height="36" src="${esc(art)}" data-symbol="${esc(s.symbol || "")}" decoding="async"${eager ? "" : " loading=\"lazy\""}>` : "";
+      html.push(`<button class="set-tile" type="button" data-set="${esc(s.id)}" aria-label="${esc(aria)}">${img}<b>${esc(s.name)}</b> <span class="fine">${esc(fineText)}</span> <span class="setpct${wish.saved ? "" : " zero"}"><span class="bar" aria-hidden="true"><span style="width:${wish.pct}%"></span></span><span class="pct"><span class="wishheart" aria-hidden="true">${heart}</span> ${esc(wish.short)}</span></span></button>`);
     });
     html.push(`</div>`);
   });
@@ -4981,11 +5012,11 @@ function fillDeals(root){
     return;
   }
   body.innerHTML = `<p class="deals-lead" role="status">${esc(status)} Cached raw prices, in US dollars.</p><ul class="deals-list">${rendered.join("")}</ul>`;
-  body.querySelectorAll(".deal-row").forEach(btn => {
+  body.querySelectorAll(".deal-row").forEach((btn, index) => {
     const card = wish.find(c => c && c.id === btn.dataset.deal);
     const art = btn.querySelector(".deal-art");
     if (art && card) {
-      paintArt(art, card, { priority:"low" });
+      paintArt(art, card, { priority:index ? "low" : "auto", lazy:index > 0 });
       const img = art.querySelector("img");
       if (img) img.alt = "";
     }
@@ -6966,7 +6997,7 @@ function paintSummaryEmpty(){
   profileEl.hidden = false;
   shell.classList.remove("no-profile");
   markProfile(false);
-  profileEl.innerHTML = `<div class="profile-scroll" data-summary-empty="1"><p class="eyebrow">On the table</p><p class="empty-state">The next card's price lands here. ${toad()}</p></div>`;
+  profileEl.innerHTML = `<div class="profile-scroll" data-summary-empty="1"><h2 class="sr-only" id="profileTitle">On the table</h2><p class="eyebrow">On the table</p><p class="empty-state">The next card's price lands here. ${toad()}</p></div>`;
 }
 function renderSummary(card){
   profileEl.hidden = false;
@@ -7094,6 +7125,9 @@ function syncProfilePane(){
   syncInert();
 }
 function renderProfile(card){
+  const marker = profileEl.querySelector("[data-profile-id]");
+  const sameCard = !!(marker && card && marker.getAttribute("data-profile-id") === card.id);
+  const prevPrice = sameCard ? ((profileEl.querySelector(".market-price") || {}).textContent || "").trim() : "";
   profileCard = card;
   const priceQueued = scrydex.ready && needsPriceFetch(card.id) && !!priceProxyUrl();
   const story = priceStory(card, { thumbId:"profileThumb", queued:priceQueued });
@@ -7107,7 +7141,7 @@ function renderProfile(card){
   const inBinder = binder && binder.cards.some(c => c.id === card.id);
   const legal = card.legal ? [card.legal.standard ? "Standard" : "", card.legal.expanded ? "Expanded" : ""].filter(Boolean).join(", ") || "Not legal" : "";
   const gemLine = card.gemHint ? `<p class="gem-note"><b>Why it's a gem.</b> ${esc(card.gemWhy || card.gemHint)}</p>` : "";
-  profileEl.innerHTML = `<div class="profile-scroll">
+  profileEl.innerHTML = `<div class="profile-scroll" data-profile-id="${esc(card.id)}">
     <div class="phead profile-tools">
       <button class="iconbtn" id="closeProfile" type="button" aria-label="Close profile">✕</button>
     </div>
@@ -7175,6 +7209,12 @@ function renderProfile(card){
         if (node) node.querySelector("b").textContent = card.releaseDate;
       }
     }).catch(() => {});
+  }
+  const nextPrice = ((profileEl.querySelector(".market-price") || {}).textContent || "").trim();
+  const fresh = profileEl.querySelector(".price-fresh");
+  const freshText = fresh ? fresh.textContent.trim() : "";
+  if (sameCard && nextPrice && nextPrice !== "—" && nextPrice !== prevPrice) {
+    announce((card.name || "Card") + ", " + nextPrice + (freshText ? ", " + freshText : "") + ".");
   }
 }
 function fact(label, value){
@@ -7285,7 +7325,35 @@ function trapTab(event, root){
   else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus(); }
   return true;
 }
+function moveShelf(event){
+  if (event.altKey || event.metaKey || event.ctrlKey) return false;
+  if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") return false;
+  const current = event.target;
+  if (!current || !current.closest) return false;
+  if (current.closest("[role='tablist'], [role='radiogroup'], [role='slider'], input, textarea, select")) return false;
+  const scroller = current.closest(".active-scroll, .dex-gens, .booktools");
+  if (!scroller) return false;
+  if (scroller.classList.contains("booktools") && document.querySelector("#pagePrev, #pageNext, #setPrev, #setNext")) return false;
+  const items = focusableIn(scroller);
+  const index = items.indexOf(current);
+  if (index < 0) return false;
+  let next = index;
+  if (event.key === "ArrowRight") next = index + 1;
+  else if (event.key === "ArrowLeft") next = index - 1;
+  else if (event.key === "Home") next = 0;
+  else if (event.key === "End") next = items.length - 1;
+  if (next === index || next < 0 || next >= items.length) {
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  items[next].focus();
+  return true;
+}
 document.addEventListener("keydown", e => {
+  if (moveShelf(e)) return;
   const menu = document.getElementById("menu");
   if (menu && !menu.hidden && e.key === "Tab") { trapTab(e, menu); return; }
   const open = ["fillSheet","binderSheet","settingsSheet","filterSheet","budgetSheet","dropPrompt"].map(id => document.getElementById(id)).find(el => el && !el.hidden);

@@ -67,8 +67,11 @@ html.reduce .cover-peek img,html.reduce .cover-peek i{transition:none}
 
 /* ---------- set tiles ---------- */
 
+.modebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 4px}
+.modebar .modes{margin:0;flex:1 1 auto}
+.modebar #openGemfinder{flex:none;max-width:none}
 .set-tile{gap:3px}
-.set-tile img{height:42px;max-width:100%}
+.set-tile img{width:84px;height:36px;max-width:100%;object-fit:contain;object-position:left center}
 .set-tile b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal}
 .setpct .pct{min-width:0;white-space:nowrap}
 .setpct.zero .bar{opacity:.35}

@@ -296,7 +296,7 @@ h2,h3{font-family:var(--display);font-weight:700;line-height:1.2}
 .pagefoot{font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:13px}
 .set-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .set-tile{text-align:left;background:#fff;border:2.5px solid var(--ink);border-radius:16px;padding:8px;box-shadow:2px 2px 0 var(--ink);min-height:96px}
-.set-tile img{height:36px;width:auto;object-fit:contain}
+.set-tile img{height:36px;width:84px;object-fit:contain;object-position:left center}
 .set-tile b{display:block;font-family:var(--display);font-size:14px;line-height:1.25}
 .modes{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
 .bar{height:10px;border:2px solid var(--ink);border-radius:999px;overflow:hidden;background:#fff}
@@ -930,7 +930,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 <div id="live" class="sr-only" aria-live="polite"></div>
 <input id="hapticSwitch" type="checkbox" switch tabindex="-1" aria-hidden="true">
 <div class="shell no-profile" id="shell">
-  <aside class="rail">
+  <aside class="rail" aria-label="BinderHunt menu">
     <div class="rail-brand">
       <h1 class="word">BinderHunt</h1>
       <button class="iconbtn" data-gear type="button" aria-label="Settings">⚙</button>
@@ -977,7 +977,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
     <div id="viewHunt" class="view">
       <div class="hunt-align">
       <div class="chipbar" id="chipbar" role="toolbar" aria-label="Filters">
-        <button class="chip" type="button" id="openFilters" aria-haspopup="dialog" aria-controls="filterSheet" aria-expanded="false">Filters<span class="filter-count" id="filterCount" hidden aria-hidden="true">0</span></button>
+        <button class="chip" type="button" id="openFilters" aria-haspopup="dialog" aria-controls="filterSheet" aria-expanded="false">Filters <span class="filter-count" id="filterCount" hidden aria-hidden="true">0</span></button>
         <div class="active-scroll" id="activeChips"></div>
         <button class="chip" type="button" id="resetFilters" hidden>Clear</button>
       </div>

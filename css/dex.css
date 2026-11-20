@@ -11,7 +11,8 @@
 .dex-swatch.wish{background:#fff6f6;box-shadow:inset 0 0 0 3px #F6C9C9}
 .dex-swatch.missing{background:#e4e7da}
 .dex-gens{display:flex;flex-wrap:wrap;gap:6px;margin:0}
-.dex-genchip{flex:none;border:2px solid var(--ink);border-radius:999px;background:#fff;padding:4px 8px;font-family:Nunito,sans-serif;font-weight:800;font-size:12px;line-height:1.3;font-variant-numeric:tabular-nums;box-shadow:1px 1px 0 var(--ink)}
+.dex-genchip{flex:none;border:2px solid var(--ink);border-radius:999px;background:#fff;padding:4px 8px;font-family:Nunito,sans-serif;font-weight:800;font-size:12px;line-height:1.3;font-variant-numeric:tabular-nums;box-shadow:1px 1px 0 var(--ink);color:var(--ink)}
+button.dex-genchip{appearance:none;margin:0}
 .dex-tools{display:flex;flex-direction:column;gap:8px;min-width:0}
 .dex-filters{display:flex;flex-wrap:wrap;gap:6px}
 .dex-filters .chip{max-width:none}

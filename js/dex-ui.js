@@ -132,7 +132,7 @@
     const finding = document.activeElement && document.activeElement.id === "dexFind";
     const caret = finding ? document.activeElement.selectionStart : null;
     const scroll = finding ? host.scrollTop : 0;
-    const chips = model.generations.map(gen => `<span class="dex-genchip">${esc(Dex.countLabel(gen.id, gen.owned, gen.total))}</span>`).join("");
+    const chips = model.generations.map(gen => `<button type="button" class="dex-genchip" data-dex-gen="${gen.id}">${esc(Dex.countLabel(gen.id, gen.owned, gen.total))}</button>`).join("");
     const filters = [
       ["all", "All"],
       ["owned", "Owned"],
@@ -172,12 +172,20 @@
     const bar = overall.total
       ? `<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${overall.total}" aria-valuenow="${overall.owned}" aria-label="${esc(caughtLabel)}"><span style="width:${overall.pct}%"></span></div>`
       : "";
-    host.innerHTML = `<div class="dex-wrap"><h2 class="dex-title" id="dexTitle">Pokédex</h2><p class="dex-caught">${esc(overall.total ? caughtLabel : "Caught 0 of 0")}</p>${wishLine}${bar}<ul class="dex-legend"><li><span class="dex-swatch owned" aria-hidden="true"></span> Owned, full color</li><li><span class="dex-swatch wish" aria-hidden="true"></span> Wishlisted, pastel outline</li><li><span class="dex-swatch missing" aria-hidden="true"></span> Missing, grey</li></ul><div class="dex-gens">${chips}</div><div class="dex-tools"><div class="dex-filters" role="group" aria-label="Pokédex filters">${filters}</div><label class="sr-only" for="dexFind">Search Pokémon</label><input class="search" id="dexFind" type="search" placeholder="e.g. Pikachu" enterkeyhint="search" autocomplete="off" value="${esc(query)}">${showing}</div><p class="sr-only">Arrow keys move between Pokémon in a generation. Enter opens that Pokémon's cards.</p>${sections}${empty}</div>`;
+    host.innerHTML = `<div class="dex-wrap"><h2 class="dex-title" id="dexTitle">Pokédex</h2><p class="dex-caught">${esc(overall.total ? caughtLabel : "Caught 0 of 0")}</p>${wishLine}${bar}<ul class="dex-legend"><li><span class="dex-swatch owned" aria-hidden="true"></span> Owned, full color</li><li><span class="dex-swatch wish" aria-hidden="true"></span> Wishlisted, pastel outline</li><li><span class="dex-swatch missing" aria-hidden="true"></span> Missing, grey</li></ul><div class="dex-gens" role="group" aria-label="Generations">${chips}</div><div class="dex-tools"><div class="dex-filters" role="group" aria-label="Pokédex filters">${filters}</div><label class="sr-only" for="dexFind">Search Pokémon</label><input class="search" id="dexFind" type="search" placeholder="e.g. Pikachu" enterkeyhint="search" autocomplete="off" value="${esc(query)}">${showing}</div><p class="sr-only">Arrow keys move between Pokémon in a generation. Enter opens that Pokémon's cards.</p>${sections}${empty}</div>`;
     host.querySelectorAll("[data-dex-filter]").forEach(btn => {
       btn.onclick = () => {
         if (typeof popBtn === "function") popBtn(btn);
         filter = btn.getAttribute("data-dex-filter") || "all";
         paint();
+      };
+    });
+    host.querySelectorAll("[data-dex-gen]").forEach(btn => {
+      btn.onclick = () => {
+        const section = document.getElementById("dex-gen-" + btn.getAttribute("data-dex-gen"));
+        const motion = typeof reduceMotion === "function" && reduceMotion();
+        if (section && section.scrollIntoView) section.scrollIntoView({ block: "start", behavior: motion ? "auto" : "smooth" });
+        if (typeof announce === "function") announce(btn.textContent.trim());
       };
     });
     host.querySelectorAll(".dex-cell").forEach(btn => {
