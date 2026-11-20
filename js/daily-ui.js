@@ -138,6 +138,8 @@
       if (!url) { giveUp(); return; }
       const img = document.createElement("img");
       img.alt = (card.name || "Card") + (card.set ? ", " + card.set : "");
+      img.width = 245;
+      img.height = 342;
       img.decoding = "async";
       img.draggable = false;
       img.addEventListener("dragstart", event => event.preventDefault());
