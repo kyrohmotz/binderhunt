@@ -3390,7 +3390,8 @@ function paintChips(){
   const reset = document.getElementById("resetFilters");
   const facts = filterFacts();
   const n = facts.length;
-  if (open) open.setAttribute("aria-label", n ? "Filters, " + n + " active" : "Filters, none active. All physical cards.");
+  const countText = n > 9 ? "9+" : String(n);
+  if (open) open.setAttribute("aria-label", n ? "Filters " + countText + ", " + n + (n === 1 ? " filter active" : " filters active") : "Filters, none active. All physical cards.");
   const badge = document.getElementById("filterCount");
   if (badge) {
     badge.hidden = !n;
@@ -4564,13 +4565,14 @@ function renderSets(){
       const metaLine = [count ? count + " cards" : era, year].filter(Boolean).join(" · ");
       const ownedLine = owned ? owned + " owned" : "";
       const fineText = metaLine + (ownedLine ? " · " + ownedLine : "");
-      const visibleName = [s.name, fineText, wish.short].filter(Boolean).join(" ");
+      const heart = wish.saved ? "♥" : "♡";
+      const visibleName = [s.name, fineText, heart + " " + wish.short].filter(Boolean).join(" ");
       const aria = visibleName + ". " + [era, wish.full].filter(Boolean).join(". ");
       const art = setArtUrl(s);
       const eager = tileIndex < 4;
       tileIndex += 1;
       const img = art ? `<img alt="" width="84" height="36" src="${esc(art)}" data-symbol="${esc(s.symbol || "")}" decoding="async"${eager ? "" : " loading=\"lazy\""}>` : "";
-      html.push(`<button class="set-tile" type="button" data-set="${esc(s.id)}" aria-label="${esc(aria)}">${img}<b>${esc(s.name)}</b><span class="fine">${esc(fineText)}</span><span class="setpct${wish.saved ? "" : " zero"}"><span class="bar" aria-hidden="true"><span style="width:${wish.pct}%"></span></span><span class="pct"><span class="wishheart" aria-hidden="true">${wish.saved ? "♥" : "♡"}</span> ${esc(wish.short)}</span></span></button>`);
+      html.push(`<button class="set-tile" type="button" data-set="${esc(s.id)}" aria-label="${esc(aria)}">${img}<b>${esc(s.name)}</b> <span class="fine">${esc(fineText)}</span> <span class="setpct${wish.saved ? "" : " zero"}"><span class="bar" aria-hidden="true"><span style="width:${wish.pct}%"></span></span><span class="pct"><span class="wishheart" aria-hidden="true">${heart}</span> ${esc(wish.short)}</span></span></button>`);
     });
     html.push(`</div>`);
   });
@@ -7340,7 +7342,11 @@ function moveShelf(event){
   else if (event.key === "ArrowLeft") next = index - 1;
   else if (event.key === "Home") next = 0;
   else if (event.key === "End") next = items.length - 1;
-  if (next === index || next < 0 || next >= items.length) return false;
+  if (next === index || next < 0 || next >= items.length) {
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
+  }
   event.preventDefault();
   event.stopPropagation();
   items[next].focus();
