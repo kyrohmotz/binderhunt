@@ -18,7 +18,7 @@ const Value = require(resolve(root, "js/value.js"));
 const sw = readFileSync(resolve(root, "sw.js"), "utf8");
 const html = readFileSync(resolve(root, "index.html"), "utf8");
 const app = readFileSync(resolve(root, "js/app.js"), "utf8");
-assert.match(sw, /const VERSION = "bh-22"/);
+assert.match(sw, /const VERSION = "bh-23"/);
 assert.match(sw, /"js\/movers\.js"/);
 assert.match(sw, /"js\/movers-ui\.js"/);
 assert.match(sw, /"css\/movers\.css"/);
@@ -509,7 +509,7 @@ await page.locator(".mover-row", { hasText: "Charizard" }).click();
 await page.waitForSelector("#profile:not([hidden])");
 const profile = await page.evaluate(() => {
   const el = document.getElementById("profile");
-  return { text: el.innerText.slice(0, 400), hidden: el.hidden };
+  return { text: el.innerText, hidden: el.hidden };
 });
 note(!profile.hidden && /Charizard/.test(profile.text) && !/NaN|\$0(?:\.00)?\b/.test(profile.text), "tapping a mover opens the card profile", profile.text.slice(0, 180));
 await page.evaluate(() => { if (typeof closeProfile === "function") closeProfile(); });
