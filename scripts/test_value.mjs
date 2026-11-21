@@ -16,7 +16,7 @@ const Value = require(resolve(root, "js/value.js"));
 
 const sw = readFileSync(resolve(root, "sw.js"), "utf8");
 const html = readFileSync(resolve(root, "index.html"), "utf8");
-assert.match(sw, /const VERSION = "bh-22"/);
+assert.match(sw, /const VERSION = "bh-23"/);
 assert.match(sw, /"js\/value\.js"/);
 assert.match(sw, /"js\/value-ui\.js"/);
 assert.match(sw, /"css\/value\.css"/);
@@ -381,7 +381,7 @@ await page.locator(".value-row", { hasText: "Charizard" }).click();
 await page.waitForSelector("#profile:not([hidden])");
 const profile = await page.evaluate(() => {
   const el = document.getElementById("profile");
-  return { text: el.innerText.slice(0, 500), hidden: el.hidden };
+  return { text: el.innerText, hidden: el.hidden };
 });
 note(!profile.hidden && /Charizard/.test(profile.text) && !profile.text.includes("NaN"), "mover opens the card profile", profile.text.slice(0, 180));
 await page.evaluate(() => { if (typeof closeProfile === "function") closeProfile(); });

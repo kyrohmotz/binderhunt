@@ -6785,7 +6785,7 @@ function gradeSlot(facts, row){
   const popReport = (facts.pops || []).find(p => p.company === row.company);
   const pop = popReport && (popReport.grades || []).find(g => String(g.grade) === String(row.grade));
   const count = pop && typeof pop.count === "number" && Number.isFinite(pop.count) && pop.count >= 0 ? pop.count : null;
-  return { company:row.company, grade:String(row.grade), text, count };
+  return { company:row.company, grade:String(row.grade), text, count, market, currency:row.currency || "USD" };
 }
 function headlineGrades(facts){
   const out = [];
@@ -6807,18 +6807,211 @@ function headlineGrades(facts){
   });
   return out;
 }
-function gradedSection(facts, queued){
-  const head = `<section class="price-block" aria-label="Graded prices"><p class="eyebrow">Graded</p>`;
-  if (!scrydex.ready) return head + `<p class="fine">Checking graded prices…</p></section>`;
-  const slots = headlineGrades(facts);
-  if (!slots.length) {
-    return head + `<p class="quiet">No graded sales yet</p>${queued ? `<p class="fine">Queued for the next price batch.</p>` : ""}</section>`;
+// Graded ladder and the worth-grading guess read the committed Scrydex cache
+// only. A graded row is {variant, company, grade, market, low, mid, high,
+// currency}. History rows are raw near-mint {d, v, m} — no graded series —
+// so the top-grade trend stays hidden unless a row actually carries a company
+// and a grade. Nothing here calls Scrydex.
+const GRADING_KEY = "bh.grading.v1";
+const GRADING_DEFAULT = 25;
+const LADDER_PLAN = [["PSA", "10"], ["PSA", "9"], ["BGS", "10"], ["BGS", "9.5"], ["CGC", "10"], ["CGC", "9.5"], ["BGS", "9"], ["CGC", "9"]];
+const LADDER_CAP = 6;
+const LADDER_COMPANIES = ["PSA", "BGS", "CGC"];
+function companyRank(company){
+  const i = LADDER_COMPANIES.indexOf(company);
+  return i === -1 ? 50 : i;
+}
+function cleanMoneyText(text){
+  if (!text || /NaN|undefined/.test(text)) return "";
+  if (/^[^0-9]*0(?:\.00)?$/.test(String(text).trim())) return "";
+  return text;
+}
+function ladderSlots(facts){
+  const out = [];
+  const push = row => {
+    if (out.length >= LADDER_CAP) return;
+    const slot = gradeSlot(facts, row);
+    if (!slot || slot.currency !== "USD" || !(slot.market > 0) || !cleanMoneyText(slot.text)) return;
+    if (out.some(s => s.company === slot.company && s.grade === slot.grade)) return;
+    out.push(slot);
+  };
+  LADDER_PLAN.forEach(([company, grade]) => push(pickGrade(rowsForCompany(facts, company), grade)));
+  LADDER_COMPANIES.forEach(company => {
+    if (out.some(s => s.company === company)) return;
+    push(highestGrade(rowsForCompany(facts, company)));
+  });
+  const bare = !out.length;
+  const extras = [...new Set((facts.prices || []).map(p => p && p.company).filter(c => c && !out.some(s => s.company === c)))];
+  extras.sort((a, b) => companyRank(a) - companyRank(b) || String(a).localeCompare(String(b)));
+  extras.forEach(company => {
+    const top = highestGrade(rowsForCompany(facts, company));
+    if (bare || (top && gradeRank(top.grade) >= 9)) push(top);
+  });
+  out.sort((a, b) => companyRank(a.company) - companyRank(b.company) || gradeRank(b.grade) - gradeRank(a.grade) || String(a.grade).localeCompare(String(b.grade)));
+  return out;
+}
+function topLadderSlot(slots){
+  let best = null;
+  (slots || []).forEach(slot => {
+    if (!best) { best = slot; return; }
+    const diff = gradeRank(slot.grade) - gradeRank(best.grade);
+    if (diff > 0 || (diff === 0 && companyRank(slot.company) < companyRank(best.company))) best = slot;
+  });
+  return best;
+}
+function gradedTrendPoints(card, slot){
+  const rec = scryRecord(card);
+  const variant = selectedVariant(card);
+  if (!rec || rec.missing || !variant || !slot) return [];
+  const names = [...new Set((rec.history || []).map(row => row && row.v).filter(Boolean))];
+  const name = chosenVariant(names, variant.key);
+  if (!name) return [];
+  return (rec.history || []).filter(row => {
+    if (!row || row.v !== name || !pos(row.m)) return false;
+    if (row.company == null || row.grade == null || row.type === "raw") return false;
+    return String(row.company) === String(slot.company) && String(row.grade) === String(slot.grade);
+  }).map(row => ({ t:parseDay(row.d), label:String(row.d).slice(0, 10), value:pos(row.m) })).filter(p => p.t && p.value).sort((a, b) => a.t - b.t);
+}
+function gradedTrendMarkup(card, slot){
+  const points = gradedTrendPoints(card, slot);
+  if (points.length < 2 || !slot) return "";
+  const first = cleanMoneyText(priceText(points[0].value, "USD"));
+  const last = cleanMoneyText(priceText(points[points.length - 1].value, "USD"));
+  if (!first || !last || first === "—" || last === "—") return "";
+  const aria = slot.company + " " + slot.grade + " trend, from " + first + " to " + last;
+  const svg = chartSvg(points, null, "USD", aria, lineStroke(windowMove(points, 30, 20, 50)), { w:320, h:92, padL:48, padR:8, padT:14, padB:20, interactive:false });
+  if (!svg) return "";
+  return `<div class="grade-trend"><p class="fine">${esc(slot.company + " " + slot.grade)} over the cached days</p>${svg}</div>`;
+}
+function rungMarkup(slot, fresh){
+  const price = cleanMoneyText(slot && slot.text);
+  if (!price) return "";
+  const meta = [];
+  if (slot.count != null) meta.push("Pop " + groupNum(slot.count));
+  if (fresh) meta.push(fresh);
+  const metaHtml = meta.length ? `<span class="rung-meta">${esc(meta.join(" · "))}</span>` : "";
+  return `<li class="grade-rung"><span class="rung-name">${esc(slot.company + " " + slot.grade)}</span><b class="rung-price">${esc(price)}</b>${metaHtml}</li>`;
+}
+function readGradingCost(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(GRADING_KEY) || "null");
+    const cost = raw && typeof raw === "object" && !Array.isArray(raw) ? Number(raw.cost) : null;
+    if (cost != null && Number.isFinite(cost) && cost >= 0 && cost <= 5000) return Math.round(cost * 100) / 100;
+  } catch (e) {}
+  return GRADING_DEFAULT;
+}
+function saveGradingCost(cost){
+  try { localStorage.setItem(GRADING_KEY, JSON.stringify({ cost:Math.round(cost * 100) / 100 })); } catch (e) {}
+}
+function formatCostInput(cost){
+  const rounded = Math.round(Number(cost) * 100) / 100;
+  return Number.isFinite(rounded) ? String(rounded) : String(GRADING_DEFAULT);
+}
+function parseGradingCost(value){
+  const text = String(value == null ? "" : value).trim();
+  if (!text || text === "." || /nan|infinity|undefined/i.test(text)) return { ok:false };
+  const normalized = text.startsWith(".") ? "0" + text : text;
+  if (!/^\d+(\.\d+)?$/.test(normalized)) return { ok:false };
+  const cost = Math.round(Number(normalized) * 100) / 100;
+  if (!Number.isFinite(cost) || cost < 0 || cost > 5000) return { ok:false };
+  return { ok:true, cost };
+}
+function gradingRawAmount(card, variant){
+  if (settings.currency !== "EUR") {
+    const shown = printingMoney(card, variant);
+    if (shown && shown.currency === "USD" && pos(shown.amount)) return shown.amount;
+    return null;
   }
-  const cells = slots.map(slot => {
-    const pop = slot.count == null ? "" : `<small class="fine">Pop ${esc(groupNum(slot.count))}</small>`;
-    return `<li class="grade"><span>${esc(slot.company + " " + slot.grade)}</span><b>${esc(slot.text)}</b>${pop}</li>`;
+  const v = variant || selectedVariant(card);
+  if (v && pos(v.market)) return v.market;
+  return pos(card && card.price);
+}
+function gradeWord(grade){
+  const n = Number(grade);
+  if (!Number.isFinite(n)) return String(grade || "").trim();
+  return String(Math.round(n * 10) / 10).replace(/\.0$/, "");
+}
+function spreadSentence(name, spread){
+  if (!name || typeof spread !== "number" || !Number.isFinite(spread)) return "";
+  const text = cleanMoneyText(money(Math.abs(spread), "USD"));
+  const line = !text
+    ? name + " is about even with raw after fees"
+    : spread > 0
+      ? name + " is +" + text + " over raw after fees"
+      : name + " is " + text + " under raw after fees";
+  return /NaN|undefined/.test(line) ? "" : line;
+}
+function verdictFor(rows){
+  const usable = (rows || []).filter(row => row && typeof row.spread === "number" && Number.isFinite(row.spread));
+  const pays = usable.filter(row => row.spread >= 0.01);
+  if (!pays.length) return { label:"Keep raw", tone:"keep" };
+  let top = -Infinity;
+  usable.forEach(row => { const rank = gradeRank(row.grade); if (rank > top) top = rank; });
+  const lower = usable.some(row => gradeRank(row.grade) < top - 0.001);
+  const lowerPays = pays.some(row => gradeRank(row.grade) < top - 0.001);
+  const onlyTop = pays.every(row => Math.abs(gradeRank(row.grade) - top) < 0.001);
+  if (lower && !lowerPays && onlyTop) return { label:"Only a " + gradeWord(top) + " pays", tone:"only" };
+  return { label:"Grade-worthy", tone:"go" };
+}
+function worthBody(slots, raw, cost){
+  if (!(raw > 0) || !Number.isFinite(raw)) {
+    return { lines:"", verdict:`<p class="quiet">No raw price for this printing, so the spread stays blank.</p>` };
+  }
+  if (cost == null || !Number.isFinite(cost)) {
+    return { lines:"", verdict:`<p class="quiet">Enter a grading cost up to $5,000.</p>` };
+  }
+  const rows = (slots || []).map(slot => ({
+    name:slot.company + " " + slot.grade,
+    grade:slot.grade,
+    spread:slot.market - raw - cost
+  })).filter(row => Number.isFinite(row.spread));
+  const lines = rows.map(row => {
+    const sentence = spreadSentence(row.name, row.spread);
+    return sentence ? `<li>${esc(sentence)}</li>` : "";
   }).join("");
-  return head + `<ul class="grade-grid">${cells}</ul></section>`;
+  const verdict = verdictFor(rows);
+  const chip = verdict && verdict.label ? `<span class="verdict-chip ${esc(verdict.tone)}">${esc(verdict.label)}</span>` : "";
+  return { lines, verdict:chip };
+}
+function worthSection(worth){
+  const cost = readGradingCost();
+  const body = worthBody(worth.slots, worth.raw, cost);
+  const rawText = worth.raw > 0 ? cleanMoneyText(money(worth.raw, "USD")) : "";
+  const basis = rawText ? `<p class="fine">Subtracts this printing's raw price, ${esc(rawText)}, then the fee.</p>` : "";
+  const euro = settings.currency === "EUR" ? `<p class="fine">The headline is the Cardmarket average. This panel stays in US dollars, same as the cached graded sales.</p>` : "";
+  return `<section class="price-block worth" aria-label="Worth grading"><p class="eyebrow">Worth grading?</p><div class="worth-field"><label for="gradeCost">Grading cost (USD)</label><input id="gradeCost" type="number" inputmode="decimal" min="0" max="5000" step="0.01" value="${esc(formatCostInput(cost))}" aria-describedby="gradeCostHint" autocomplete="off"></div><p class="fine" id="gradeCostHint">Starts at $25, a stand-in for one low-tier grading fee. Shipping is extra, and the grade is never guaranteed. Change it. This is an estimate, not a quote.</p>${basis}${euro}<ul class="worth-spreads" id="worthSpreads" aria-label="Spread after the grading cost">${body.lines}</ul><div id="worthLive" class="worth-live" aria-live="polite" aria-atomic="true">${body.verdict}</div><p class="fine worth-disclaimer">Estimate, not advice.</p></section>`;
+}
+function buildGraded(card, facts, queued){
+  const head = `<section class="price-block" aria-label="Raw versus graded"><p class="eyebrow">Raw vs graded</p>`;
+  if (!scrydex.ready) return { html:head + `<p class="fine">Checking graded prices…</p></section>`, worth:null };
+  const slots = ladderSlots(facts);
+  if (!slots.length) {
+    return { html:head + `<p class="quiet">No graded sales cached yet</p>${queued ? `<p class="fine">Queued for the next price batch.</p>` : ""}</section>`, worth:null };
+  }
+  const cells = slots.map(slot => rungMarkup(slot, priceUpdatedLabel(card))).join("");
+  if (!cells) {
+    return { html:head + `<p class="quiet">No graded sales cached yet</p></section>`, worth:null };
+  }
+  const trend = gradedTrendMarkup(card, topLadderSlot(slots));
+  const variant = selectedVariant(card);
+  const worth = { slots, raw:gradingRawAmount(card, variant) };
+  return { html:head + `<ul class="grade-ladder">${cells}</ul>${trend}</section>` + worthSection(worth), worth };
+}
+function bindWorth(story){
+  const input = profileEl.querySelector("#gradeCost");
+  if (!input || !story || !story.worth) return;
+  const paint = () => {
+    const parsed = parseGradingCost(input.value);
+    if (parsed.ok) saveGradingCost(parsed.cost);
+    const body = worthBody(story.worth.slots, story.worth.raw, parsed.ok ? parsed.cost : null);
+    const spreads = document.getElementById("worthSpreads");
+    const live = document.getElementById("worthLive");
+    if (spreads) spreads.innerHTML = body.lines;
+    if (live) live.innerHTML = body.verdict;
+  };
+  input.addEventListener("input", paint);
+  input.addEventListener("change", paint);
+  input.addEventListener("wheel", event => { if (document.activeElement === input) event.preventDefault(); }, { passive:false });
 }
 function historySection(view, series, move30, move90, svg, scrubId){
   const quiet = series.pendingFx ? "Checking the dollar rate…" : "Not enough price history";
@@ -6844,12 +7037,13 @@ function priceStory(card, opts){
   const aria = historyAria(view, series.currency || "USD", move30, move90);
   const svg = view.ok ? chartSvg(view.points, null, series.currency, aria, stroke) : "";
   const facts = gradeFacts(card);
+  const graded = buildGraded(card, facts, queued);
   const banner = scanBanner(card);
   const scrubId = summary ? "summaryScrub" : "scrub";
   const thumbId = opts && opts.thumbId;
   const thumb = thumbId ? `<button class="thumb" id="${thumbId}" type="button" aria-label="Look at ${esc(card.name || "this card")} up close"></button>` : "";
-  const html = `<section class="price-hero" aria-label="Raw ungraded market price"><div class="phead hero-row">${marketBlock(card, variant, shown)}${thumb}</div></section>${banner ? `<p class="note">${esc(banner)}</p>` : ""}${gradedSection(facts, queued)}${historySection(view, series, move30, move90, svg, scrubId)}`;
-  return { html, series, windowed:view.ok ? view.points : [], scrubId, variant };
+  const html = `<section class="price-hero" aria-label="Raw ungraded market price"><div class="phead hero-row">${marketBlock(card, variant, shown)}${thumb}</div></section>${banner ? `<p class="note">${esc(banner)}</p>` : ""}${graded.html}${historySection(view, series, move30, move90, svg, scrubId)}`;
+  return { html, series, windowed:view.ok ? view.points : [], scrubId, variant, worth:graded.worth };
 }
 function bindChart(svgEl, points, currency, scrub){
   if (!svgEl || !points || points.length < 2) return;
@@ -6901,6 +7095,7 @@ function bindPriceStory(story, rerender){
     ranges.addEventListener("scroll", fade, { passive:true });
     requestAnimationFrame(fade);
   }
+  bindWorth(story);
 }
 function coreFacts(card){
   return [
@@ -6931,7 +7126,7 @@ function gradeFacts(card){
     pops: name ? (rec.pop || []).filter(p => p.variant === name) : []
   };
 }
-function chartSvg(points, guide, currency, label, stroke){
+function chartSvg(points, guide, currency, label, stroke, box){
   if (!points || points.length < 2) return "";
   const vals = points.map(p => p.value);
   if (!vals.every(v => typeof v === "number" && Number.isFinite(v) && v > 0)) return "";
@@ -6943,7 +7138,8 @@ function chartSvg(points, guide, currency, label, stroke){
   if (!(max > 0) || !Number.isFinite(min) || !Number.isFinite(max)) return "";
   if (min === max) { min *= 0.9; max *= 1.1; }
   if (!(max > min)) return "";
-  const w = 360, h = 124, padL = 56, padR = 10, padT = 16, padB = 24;
+  const w = box && box.w || 360, h = box && box.h || 124, padL = box && box.padL || 56, padR = box && box.padR || 10, padT = box && box.padT || 16, padB = box && box.padB || 24;
+  const interactive = !box || box.interactive !== false;
   const xOf = i => padL + i * (w - padL - padR) / (points.length - 1);
   const yOf = v => padT + (1 - (v - min) / (max - min)) * (h - padT - padB);
   const d = points.map((p, i) => `${i ? "L" : "M"}${xOf(i).toFixed(1)},${yOf(p.value).toFixed(1)}`).join(" ");
@@ -6962,7 +7158,9 @@ function chartSvg(points, guide, currency, label, stroke){
   const lastX = xOf(points.length - 1).toFixed(1);
   const lastY = yOf(points[points.length - 1].value).toFixed(1);
   const aria = label || "Price history";
-  return `<svg class="chart" tabindex="0" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(aria)}"><path d="${d}" fill="none" stroke="${line}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${lastX}" cy="${lastY}" r="4" fill="${line}"/>${guideLine}${hi ? `<text x="4" y="14" fill="#404241" font-size="11">${esc(hi)}</text>` : ""}${lo ? `<text x="4" y="${h - padB}" fill="#404241" font-size="11">${esc(lo)}</text>` : ""}${axis}</svg>`;
+  const cls = interactive ? "chart" : "grade-chart";
+  const tab = interactive ? " tabindex=\"0\"" : "";
+  return `<svg class="${cls}"${tab} viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(aria)}"><path d="${d}" fill="none" stroke="${line}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${lastX}" cy="${lastY}" r="4" fill="${line}"/>${guideLine}${hi ? `<text x="4" y="14" fill="#404241" font-size="11">${esc(hi)}</text>` : ""}${lo ? `<text x="4" y="${h - padB}" fill="#404241" font-size="11">${esc(lo)}</text>` : ""}${axis}</svg>`;
 }
 function currentTop(){
   const top = [...deck.querySelectorAll(".card")].reverse().find(el => el.card && !el.classList.contains("leaving"));
@@ -7166,7 +7364,7 @@ function renderProfile(card){
       </div>
       <div class="shoplinks"><p class="eyebrow">Check prices on</p><div class="links">${buyLinks(card).map(l => `<a class="buy-btn" href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label.replace(/^View on /, ""))} ↗</a>`).join("")}</div></div>
       ${card.flavor ? `<p class="fine">${esc(card.flavor)}</p>` : ""}
-      <p class="fine">The big price is today's raw TCGplayer market. Graded prices, and the 30-day and 90-day changes, come from the cached Scrydex history for this printing. Prices are estimates, not financial advice. Buy links are not affiliate links yet.</p>
+      <p class="fine">The big price is today's raw TCGplayer market. The graded ladder uses cached Scrydex prices for this printing, and the 30-day and 90-day changes use that same saved history. Worth grading? subtracts a fee you can edit. Prices are estimates, not advice. Buy links are not affiliate links yet.</p>
       <button class="chip" id="copyLink" type="button">Copy link</button>
     </div>
   </div>`;

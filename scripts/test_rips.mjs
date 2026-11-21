@@ -18,7 +18,7 @@ const html = readFileSync(resolve(root, "index.html"), "utf8");
 const app = readFileSync(resolve(root, "js/app.js"), "utf8");
 const ripCss = readFileSync(resolve(root, "css/rips.css"), "utf8");
 assert.match(ripCss, /prefers-reduced-motion/);
-assert.match(sw, /const VERSION = "bh-22"/);
+assert.match(sw, /const VERSION = "bh-23"/);
 assert.match(sw, /data\/pack-pools\.json/);
 assert.match(sw, /"js\/rips\.js"/);
 assert.match(sw, /"js\/rips-ui\.js"/);
