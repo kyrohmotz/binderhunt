@@ -14024,6 +14024,16 @@
       "source": "tcgplayer",
       "eur": 2.13,
       "at": "2026-11-22T15:55:57Z"
+    },
+    "2026-11-25": {
+      "id": "sm10-199",
+      "price": 240.6,
+      "variant": "holofoil",
+      "printing": "Holofoil",
+      "alts": 1,
+      "source": "tcgplayer",
+      "eur": 1.79,
+      "at": "2026-11-23T19:51:53Z"
     }
   }
 }
