@@ -6951,7 +6951,7 @@ function verdictFor(rows){
   const lowerPays = pays.some(row => gradeRank(row.grade) < top - 0.001);
   const onlyTop = pays.every(row => Math.abs(gradeRank(row.grade) - top) < 0.001);
   if (lower && !lowerPays && onlyTop) return { label:"Only a " + gradeWord(top) + " pays", tone:"only" };
-  return { label:"Grade-worthy", tone:"go" };
+  return { label:"Grade-worthy", tone:"worth-go" };
 }
 function worthBody(slots, raw, cost){
   if (!(raw > 0) || !Number.isFinite(raw)) {
