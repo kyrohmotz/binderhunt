@@ -14054,6 +14054,16 @@
       "source": "tcgplayer",
       "eur": 15.63,
       "at": "2026-11-25T18:26:32Z"
+    },
+    "2026-11-28": {
+      "id": "ecard2-118",
+      "price": 8.88,
+      "variant": "normal",
+      "printing": "Normal",
+      "alts": 2,
+      "source": "tcgplayer",
+      "eur": 2.5,
+      "at": "2026-11-26T18:08:27Z"
     }
   }
 }
