@@ -12,6 +12,9 @@ permissions:
   pages: write
   id-token: write
 
+# Queues a second sync instead of cancelling it. The deploy job joins the
+# shared `pages` group. This group stays on the workflow so two syncs still
+# cannot spend credits at the same time.
 concurrency:
   group: scrydex-cache
   cancel-in-progress: false
@@ -19,9 +22,13 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+      sha: ${{ steps.commit.outputs.sha }}
+    # This job already runs in github-pages. Keep that so its secrets and
+    # variables resolve the same way. Publishing happens in the deploy job.
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,8 +90,9 @@ jobs:
       # and the credit ledger are written. always() still commits those files
       # when they changed. The failed refresh step keeps the job red.
       # !cancelled() skips the push when the run was cancelled mid-request.
-      # Pages deploy below still requires a green refresh, so this red run
-      # saves the files and the next successful run publishes them.
+      # The deploy job publishes when this push landed, including after a
+      # red refresh, so the saved cache still reaches the site. That job
+      # only checks out main and uploads it. It does not call Scrydex.
       - name: Commit cache
         id: commit
         if: "${{ always() && !cancelled() && github.ref == 'refs/heads/main' }}"
@@ -139,21 +147,37 @@ jobs:
             echo "push failed after retries"
             exit 1
           fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
-      - name: Setup Pages
-        if: github.ref == 'refs/heads/main' && steps.commit.outputs.changed == 'true'
-        uses: actions/configure-pages@v5
+  deploy:
+    needs: sync
+    if: ${{ always() && !cancelled() && github.ref == 'refs/heads/main' && needs.sync.outputs.changed == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          enablement: true
+          ref: main
+          fetch-depth: 50
 
-      - name: Upload site
-        if: github.ref == 'refs/heads/main' && steps.commit.outputs.changed == 'true'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
+      # github.sha on a schedule is the commit from before this sync.
+      # No Scrydex call. The script only fetches origin/main.
+      - name: Checkout pushed main
+        env:
+          PAGES_SHA: ${{ needs.sync.outputs.sha }}
+        run: bash scripts/pages_checkout_main.sh "$PAGES_SHA"
 
       - name: Deploy to GitHub Pages
         id: deployment
-        if: github.ref == 'refs/heads/main' && steps.commit.outputs.changed == 'true'
-        uses: actions/deploy-pages@v4
+        uses: ./.github/actions/deploy-pages

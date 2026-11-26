@@ -1,0 +1,63 @@
+name: Deploy site to GitHub Pages
+description: >
+  Upload the working tree and deploy it. deploy-pages sometimes lists zero
+  artifacts in the same second the upload finishes. Retry the deploy only.
+  A second upload of the github-pages artifact fails because overwrite is false.
+
+outputs:
+  page_url:
+    description: URL of the Pages deployment that succeeded.
+    value: ${{ steps.publish.outputs.page_url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Pages
+      uses: actions/configure-pages@v5
+      with:
+        enablement: true
+
+    - name: Upload site
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: .
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
+      continue-on-error: true
+
+    - name: Wait 15s before deploy retry
+      if: steps.deployment.outcome == 'failure'
+      shell: bash
+      run: sleep 15
+
+    - name: Deploy to GitHub Pages (attempt 2)
+      id: deployment_retry
+      if: steps.deployment.outcome == 'failure'
+      uses: actions/deploy-pages@v4
+      continue-on-error: true
+
+    - name: Wait 30s before deploy retry
+      if: steps.deployment.outcome == 'failure' && steps.deployment_retry.outcome == 'failure'
+      shell: bash
+      run: sleep 30
+
+    - name: Deploy to GitHub Pages (attempt 3)
+      id: deployment_retry_2
+      if: steps.deployment.outcome == 'failure' && steps.deployment_retry.outcome == 'failure'
+      uses: actions/deploy-pages@v4
+      continue-on-error: true
+
+    - name: Record Pages URL
+      id: publish
+      if: ${{ always() && !cancelled() }}
+      shell: bash
+      env:
+        OUTCOME1: ${{ steps.deployment.outcome }}
+        OUTCOME2: ${{ steps.deployment_retry.outcome }}
+        OUTCOME3: ${{ steps.deployment_retry_2.outcome }}
+        URL1: ${{ steps.deployment.outputs.page_url }}
+        URL2: ${{ steps.deployment_retry.outputs.page_url }}
+        URL3: ${{ steps.deployment_retry_2.outputs.page_url }}
+      run: bash scripts/pages_deploy_result.sh
