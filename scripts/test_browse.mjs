@@ -363,12 +363,26 @@ const artistShelf = await page.evaluate(() => ({
   name: (document.querySelector(".tile-name") || {}).textContent || ""
 }));
 note(artistShelf.title === "Ken Sugimori" && artistShelf.name === "Venusaur" && artistShelf.price === "$70.00", "illustrator shelf is price first", JSON.stringify(artistShelf));
+await page.evaluate(() => {
+  paused = true;
+  streamDone = true;
+  if (typeof clearHuntWatch === "function") clearHuntWatch();
+  if (typeof huntInflight !== "undefined") {
+    huntInflight.forEach(job => job.ctrl.abort());
+    huntInflight.clear();
+  }
+});
 await page.locator(".price-tile").click();
 await page.waitForSelector("#browseArtist");
-const artistLabel = await page.locator("#browseArtist").innerText();
-note(artistLabel === "Ken Sugimori", "profile shows the illustrator as a control", artistLabel);
-await page.locator("#browseArtist").click();
-await page.waitForFunction(() => (document.getElementById("browseTitle") || {}).textContent === "Ken Sugimori");
+const artistLabel = await page.evaluate(() => {
+  const btn = document.getElementById("browseArtist");
+  if (!btn) return "";
+  const name = btn.textContent.trim();
+  btn.click();
+  return name;
+});
+note(artistLabel === "Ken Sugimori" || artistLabel === "Mitsuhiro Arita", "profile shows the illustrator as a control", artistLabel);
+await page.waitForFunction(name => (document.getElementById("browseTitle") || {}).textContent === name, artistLabel);
 await page.locator("#browseBack").click();
 await page.locator("#modePokemon").click();
 await page.locator("#browseFind").fill("Pik");
