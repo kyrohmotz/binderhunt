@@ -27,6 +27,8 @@ permissions:
   pages: write
   id-token: write
 
+# Queues a second Daily Drop instead of cancelling it. The deploy job
+# joins the shared `pages` group used by pages.yml and the Scrydex sync.
 concurrency:
   group: daily-drop
   cancel-in-progress: false
@@ -34,9 +36,9 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+      sha: ${{ steps.commit.outputs.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -86,21 +88,37 @@ jobs:
             echo "push failed after retries"
             exit 1
           fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
-      - name: Setup Pages
-        if: github.ref == 'refs/heads/main' && steps.commit.outputs.changed == 'true'
-        uses: actions/configure-pages@v5
+  deploy:
+    needs: publish
+    if: ${{ always() && !cancelled() && github.ref == 'refs/heads/main' && needs.publish.outputs.changed == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          enablement: true
+          ref: main
+          fetch-depth: 50
 
-      - name: Upload site
-        if: github.ref == 'refs/heads/main' && steps.commit.outputs.changed == 'true'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
+      # github.sha for this run is main from before the push. Move to the
+      # tip once it contains the commit we just pushed.
+      - name: Checkout pushed main
+        env:
+          PAGES_SHA: ${{ needs.publish.outputs.sha }}
+        run: bash scripts/pages_checkout_main.sh "$PAGES_SHA"
 
       - name: Deploy to GitHub Pages
         id: deployment
-        if: github.ref == 'refs/heads/main' && steps.commit.outputs.changed == 'true'
-        uses: actions/deploy-pages@v4
+        uses: ./.github/actions/deploy-pages

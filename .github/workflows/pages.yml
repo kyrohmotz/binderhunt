@@ -10,6 +10,9 @@ permissions:
   pages: write
   id-token: write
 
+# Shared with the deploy jobs in daily.yml and scrydex.yml.
+# Queued deploys wait. They are not cancelled, so a price publish is not
+# dropped when a push starts a second deploy.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -23,17 +26,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
         with:
-          enablement: true
-
-      - name: Upload site
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
+          # This run may have waited behind a data deploy. The triggering
+          # SHA can be older than main by then, and deploying it would roll
+          # the new prices back. A manual run still deploys the ref that
+          # was selected.
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || 'main' }}
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: ./.github/actions/deploy-pages
