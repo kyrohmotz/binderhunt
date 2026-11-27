@@ -18,7 +18,7 @@ const html = readFileSync(resolve(root, "index.html"), "utf8");
 const app = readFileSync(resolve(root, "js/app.js"), "utf8");
 const file = JSON.parse(readFileSync(resolve(root, "data/price-history.json"), "utf8"));
 
-assert.match(sw, /const VERSION = "bh-24"/);
+assert.match(sw, /const VERSION = "bh-25"/);
 assert.match(sw, /"js\/price-history\.js"/);
 assert.match(sw, /"data\/price-history\.json"/);
 assert.match(sw, /data\/price-history\.json/);

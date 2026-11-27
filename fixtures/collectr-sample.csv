@@ -1,0 +1,9 @@
+﻿# Synthetic Collectr-style export for BinderHunt tests. Not a real collection.
+Portfolio Name,Category,Set,Product Name,Card Number,Rarity,Variance,Grade,Card Condition,Average Cost Paid,Quantity,Market Price,Notes
+Main,Pokemon,Base Set,Charizard,4/102,Holo Rare,Holofoil,,Near Mint,12.00,1,400.00,made up
+Main,Pokemon,"Base Set, Unlimited",Pikachu,58,Common,Normal,,Lightly Played,0.25,2,1.50,"quoted, note"
+Main,Pokemon,Base Set,Pikachu,,Common,,,Near Mint,0.10,1,1.00,no number
+Main,Pokemon,Jungle,Scyther,99,Holo Rare,,,Near Mint,3.00,1,20.00,bad number
+Main,Pokemon,Fakemon Island,Missingno,1,Rare,,,Damaged,0,1,0,unknown set
+Main,Pokemon,Base Set,Charizard,4,Holo Rare,,,Near Mint,12,1,400,duplicate
+Main,Pokemon,Base Set,Abra,43,Common,,,Near Mint,0.05,0,0.20,zero qty
