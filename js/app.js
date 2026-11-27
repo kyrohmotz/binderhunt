@@ -3205,7 +3205,7 @@ function markProfile(dialog){
   }
 }
 function outsideModal(){
-  return ["filterSheet","settingsSheet","binderSheet","fillSheet","budgetSheet","onboard","dropPrompt","showcase"].some(id => {
+  return ["filterSheet","settingsSheet","binderSheet","fillSheet","budgetSheet","importSheet","onboard","dropPrompt","showcase"].some(id => {
     const el = document.getElementById(id);
     return el && !el.hidden;
   });
@@ -3229,7 +3229,8 @@ function blocking(){
   const rips = document.getElementById("viewRips");
   const showcase = document.getElementById("showcase");
   const budget = document.getElementById("budgetSheet");
-  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || (budget && !budget.hidden) || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (prompt && !prompt.hidden) || (showcase && !showcase.hidden) || (daily && !daily.hidden) || (value && !value.hidden) || (rips && !rips.hidden) || (!profileEl.hidden && !wide());
+  const importing = document.getElementById("importSheet");
+  return !document.getElementById("filterSheet").hidden || !document.getElementById("settingsSheet").hidden || !document.getElementById("binderSheet").hidden || !document.getElementById("fillSheet").hidden || (budget && !budget.hidden) || (importing && !importing.hidden) || !document.getElementById("menu").hidden || !document.getElementById("onboard").hidden || (prompt && !prompt.hidden) || (showcase && !showcase.hidden) || (daily && !daily.hidden) || (value && !value.hidden) || (rips && !rips.hidden) || (!profileEl.hidden && !wide());
 }
 function keepSwipeFocus(trigger){
   const box = document.getElementById("hapticSwitch");
@@ -5109,6 +5110,83 @@ function paintTargetSlot(card, focusId){
   }
 }
 let budgetAssets = null;
+let importAssets = null;
+let importPools = null;
+function ensureImport(){
+  if (window.BinderImportUI && window.BinderImport) return Promise.resolve(window.BinderImportUI);
+  if (importAssets) return importAssets;
+  importAssets = loadStyle("css/import.css").then(() => loadScript("js/import-csv.js")).then(() => loadScript("js/import-ui.js")).then(() => window.BinderImportUI);
+  importAssets.catch(() => { importAssets = null; });
+  return importAssets;
+}
+function loadImportPools(){
+  if (importPools) return importPools;
+  importPools = fetch("data/pack-pools.json", { cache:"no-cache" }).then(res => {
+    if (!res.ok) throw new Error("pools");
+    return res.json();
+  });
+  importPools.catch(() => { importPools = null; });
+  return importPools;
+}
+function adoptImport(result){
+  if (!result) return;
+  if (result.undo) {
+    if (result.destination === "wish" && result.wrote && result.wrote.wish) wish = loadWish();
+    else if (result.destination === "owned" && result.wrote && result.wrote.owned) {
+      (result.removed || []).forEach(id => {
+        ownedIds.delete(id);
+        ownedSetById.delete(id);
+      });
+    }
+  } else if (result.destination === "wish" && result.wrote && result.wrote.wish) {
+    wish = loadWish();
+  } else if (result.destination === "owned" && result.wrote && result.wrote.owned) {
+    (result.added || []).forEach(card => {
+      if (!card || !card.id) return;
+      ownedIds.add(card.id);
+      if (card.setId) ownedSetById.set(card.id, card.setId);
+    });
+  }
+  paintContext();
+  paintCount();
+  paintRail();
+  if (tab === "binders") renderBinders();
+  if (tab === "sets") renderSets();
+  if (tab === "value" && window.BinderValueUI) window.BinderValueUI.refresh();
+  if (tab === "dex" && window.BinderDexUI) window.BinderDexUI.refresh();
+}
+function closeImport(){
+  const sheet = document.getElementById("importSheet");
+  if (sheet && !sheet.hidden) closeSheet("importSheet");
+  const shelf = document.getElementById("openImportShelf");
+  const gear = document.querySelector("[data-gear]");
+  const next = shelf && shelf.getClientRects().length ? shelf : gear;
+  if (next && typeof next.focus === "function") next.focus();
+}
+function openImport(){
+  const settings = document.getElementById("settingsSheet");
+  if (settings && !settings.hidden) closeSheet("settingsSheet");
+  const body = document.getElementById("importBody");
+  ensureImport().then(ui => {
+    if (!ui || !body) { announce("Import didn't load."); return; }
+    ui.open(body, {
+      storage: () => localStorage,
+      ownedIds: () => [...ownedIds],
+      wishIds: () => wish.map(card => card && card.id).filter(Boolean),
+      cards: () => (scrydex && scrydex.cards) || {},
+      setNames: () => {
+        const names = {};
+        (meta.sets || []).forEach(set => { if (set && set.id && set.name) names[set.id] = set.name; });
+        return names;
+      },
+      pools: () => loadImportPools(),
+      afterWrite: adoptImport
+    });
+    openSheet("importSheet");
+    const file = document.getElementById("importFile");
+    if (file) file.focus();
+  }).catch(() => announce("Import didn't load."));
+}
 function ensureBudget(){
   if (window.BinderBudgetUI && window.BinderBudget) return Promise.resolve(window.BinderBudgetUI);
   if (budgetAssets) return budgetAssets;
@@ -5188,6 +5266,7 @@ function renderBinders(){
     <button class="deals-row" id="openDeals" type="button"><span class="deals-copy"><span class="eyebrow">Price alerts</span><b>Deals</b><span class="fine">Cards at your target, or down since you saved one.</span></span><span class="deals-badge" data-deals-count hidden aria-hidden="true"></span></button>
     <button class="movers-row" id="openMovers" type="button"><span class="deals-copy"><span class="eyebrow">Cached market</span><b>Market movers</b><span class="fine">Risers and fallers over 7 and 30 days.</span></span></button>
     <button class="plan-shelf" id="openPlan" type="button"><span class="deals-copy"><span class="eyebrow">This month</span><b>Buy plan</b><span class="fine">Wishlist cards that fit the number you picked.</span></span></button>
+    <button class="import-row" id="openImportShelf" type="button"><span class="deals-copy"><span class="eyebrow">CSV</span><b>Import your collection</b><span class="fine">Collectr, TCGplayer, or a spreadsheet.</span></span></button>
     <div class="shelf-head"><h2 class="shelf-title">Your binders</h2><p class="fine">Right-swipe always lands on your wishlist. A themed binder is another home for the same card.</p></div>
     <div class="shelf-scene"><div class="shelf" id="shelf"></div></div>`;
   const shelf = document.getElementById("shelf");
@@ -5251,6 +5330,8 @@ function renderBinders(){
   if (moversBtn) moversBtn.onclick = () => openMovers();
   const planBtn = document.getElementById("openPlan");
   if (planBtn) planBtn.onclick = () => openPlan();
+  const importShelf = document.getElementById("openImportShelf");
+  if (importShelf) importShelf.onclick = () => openImport();
   document.getElementById("shareWish").onclick = () => {
     if (window.BinderShare) BinderShare.openCollection({ kind:"wish", name:"Wishlist", color:"#E4E7DA", cards:wish, ownedIds });
   };
@@ -7699,6 +7780,8 @@ function openSettingsPanel(){
     <label class="choice"><input type="checkbox" id="setHaptic" ${settings.haptics ? "checked" : ""}> Haptics</label>
     <label class="field">Reduce motion<select id="setMotion"><option value="auto">Follow system</option><option value="on">On</option><option value="off">Off</option></select></label>
     <label class="field">Currency<select id="setCur"><option value="USD">US dollars</option><option value="EUR">Cardmarket euros</option></select></label>
+    <button class="chip" id="openImport" type="button">Import your collection</button>
+    <p class="fine">Bring in a Collectr, TCGplayer, or other CSV. Nothing is saved until you confirm.</p>
     <button class="chip" id="retakeOnboard" type="button">Retake the hunt quiz</button>
     <h2>About</h2>
     <p class="fine">BinderHunt is not affiliated with Pokémon, Nintendo, Creatures, or GAME FREAK. There is no account. Wishlists, binders, price alerts, the monthly budget, owned marks, filters, settings, and the daily streak stay in this browser.</p>
@@ -7712,6 +7795,8 @@ function openSettingsPanel(){
   document.getElementById("setMotion").onchange = e => { settings.reduce = e.target.value; saveSettings(); };
   document.getElementById("setCur").onchange = e => { settings.currency = e.target.value; saveSettings(); summaryId = ""; renderDeck(); if (profilePinned && profileCard && !profileEl.hidden) renderProfile(profileCard); };
   document.getElementById("retakeOnboard").onclick = () => { closeSheet("settingsSheet"); openOnboard("retake"); };
+  const openImportBtn = document.getElementById("openImport");
+  if (openImportBtn) openImportBtn.onclick = () => openImport();
   openSheet("settingsSheet");
   const firstSetting = document.getElementById("setSound");
   if (firstSetting) firstSetting.focus();
@@ -7720,8 +7805,11 @@ document.querySelectorAll("[data-gear]").forEach(btn => btn.onclick = openSettin
 document.getElementById("railWish").onclick = () => { binderView = { kind:"wish" }; flipPage = 0; showTab("binders"); };
 document.querySelectorAll(".backdrop").forEach(btn => btn.onclick = () => {
   const sheet = btn.parentElement;
+  if (sheet && sheet.id === "importSheet") { closeImport(); return; }
   if (sheet && sheet.id) closeSheet(sheet.id);
 });
+const importDone = document.getElementById("importDone");
+if (importDone) importDone.onclick = () => closeImport();
 document.getElementById("openFilters").onclick = () => openFilter("all", document.getElementById("openFilters"));
 document.getElementById("filterDone").onclick = () => closeSheet("filterSheet");
 document.getElementById("settingsDone").onclick = () => closeSheet("settingsSheet");
@@ -7805,7 +7893,7 @@ document.addEventListener("keydown", e => {
   if (moveShelf(e)) return;
   const menu = document.getElementById("menu");
   if (menu && !menu.hidden && e.key === "Tab") { trapTab(e, menu); return; }
-  const open = ["fillSheet","binderSheet","settingsSheet","filterSheet","budgetSheet","dropPrompt"].map(id => document.getElementById(id)).find(el => el && !el.hidden);
+  const open = ["importSheet","fillSheet","binderSheet","settingsSheet","filterSheet","budgetSheet","dropPrompt"].map(id => document.getElementById(id)).find(el => el && !el.hidden);
   const onboardLayer = document.getElementById("onboard");
   const showcaseLayer = document.getElementById("showcase");
   const layer = !open && onboardLayer && !onboardLayer.hidden ? onboardLayer : (!open && showcaseLayer && !showcaseLayer.hidden ? showcaseLayer : null);
@@ -7821,10 +7909,13 @@ document.addEventListener("keydown", e => {
     if (menu && !menu.hidden) { closeMenu(); return; }
     const budgetSheet = document.getElementById("budgetSheet");
     const budgetWasOpen = budgetSheet && !budgetSheet.hidden;
+    const importSheet = document.getElementById("importSheet");
+    const importWasOpen = importSheet && !importSheet.hidden;
     ["fillSheet","binderSheet","settingsSheet","filterSheet","budgetSheet"].forEach(id => {
       const el = document.getElementById(id);
       if (el && !el.hidden) closeSheet(id);
     });
+    if (importWasOpen) { closeImport(); return; }
     if (budgetWasOpen) return;
     const prompt = document.getElementById("dropPrompt");
     if (prompt && !prompt.hidden) {

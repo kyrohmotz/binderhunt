@@ -955,6 +955,7 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
 }
 </style>
 <link rel="stylesheet" href="css/polish.css">
+<link rel="stylesheet" href="css/import.css">
 <noscript>
 <link rel="stylesheet" href="css/binder.css">
 <link rel="stylesheet" href="css/share.css">
@@ -1171,6 +1172,16 @@ html.reduce .book .sleeve .cardhit,html.reduce .showcase-card{transform:none !im
       <button type="button" class="skip" id="onboardBack" hidden>Back</button>
       <button type="button" class="go" id="onboardNext">Next</button>
     </div>
+  </div>
+</div>
+<div id="importSheet" class="sheet" hidden>
+  <button class="backdrop" type="button" tabindex="-1" aria-label="Close import"></button>
+  <div class="sheet-card tall" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+    <div class="sheet-top">
+      <h2 id="importTitle">Import your collection</h2>
+      <button class="chip" type="button" id="importDone">Close</button>
+    </div>
+    <div class="sheet-body" id="importBody"></div>
   </div>
 </div>
 <div id="budgetSheet" class="sheet" hidden>
