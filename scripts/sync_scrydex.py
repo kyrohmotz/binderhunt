@@ -1034,6 +1034,14 @@ def _compress_series(points: list[tuple[date, int]]) -> list[int]:
     last_index = len(points) - 1
     for index, (day, cents) in enumerate(points[1:], start=1):
         if (day - prev_day).days != 1:
+            # A flat run that ends the day before a gap still happened.
+            # Emit that last observed day, or the gap swallows it.
+            if observed and prev_day != emitted_day:
+                held = (prev_day - emitted_day).days
+                if held > 0:
+                    packed.append(held)
+                    packed.append(0)
+                    emitted_day = prev_day
             observed = False
         same = cents == emitted_cents
         if same and observed and index != last_index:
@@ -1405,8 +1413,17 @@ def sync(now: datetime | None = None) -> int:
             cache["history_days"] = HISTORY_DAYS
             cache["cards"] = cards
             write_cache(cache)
-            write_price_history(project_price_history(cache))
-            print(f"Wrote {CACHE_PATH.name} and {price_history_path().name} ({refreshed} card(s) updated).")
+            # The history file is a projection of the cache just written.
+            # A failure here must not skip the credit ledger or the cache
+            # commit, or the next run would spend the pace again.
+            try:
+                write_price_history(project_price_history(cache))
+            except Exception as exc:
+                print(
+                    f"::warning::Could not write {price_history_path().name}: {exc}. "
+                    "The price cache and the credit ledger are still saved."
+                )
+            print(f"Wrote {CACHE_PATH.name} ({refreshed} card(s) updated).")
         if card_credits or check_credits:
             write_usage(usage)
         run_credits += card_credits

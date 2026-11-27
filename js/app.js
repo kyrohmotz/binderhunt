@@ -7099,7 +7099,9 @@ function historyChips(model){
     const move = model.moves ? model.moves[id] : null;
     const tone = move ? "move " + move.dir : "";
     const pressed = model.active === id;
-    return `<button type="button" class="${tone}" data-range="${id}" aria-pressed="${pressed ? "true" : "false"}" aria-label="${esc(chipLabel(id, move))}">${esc(chipFace(id, move))}</button>`;
+    const face = chipFace(id, move);
+    const spoken = chipLabel(id, move);
+    return `<button type="button" class="${tone}" data-range="${id}" aria-pressed="${pressed ? "true" : "false"}" aria-label="${esc(face + ". " + spoken)}">${esc(face)}</button>`;
   }).join("");
   return `<div class="rangebar"><div class="ranges history-chips" role="group" aria-label="7 day, 30 day, and 90 day change">${buttons}</div></div>`;
 }
