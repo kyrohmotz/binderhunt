@@ -612,7 +612,7 @@
       }
       if (!card || !card.id) return;
       if (seen.has(card.id) || have.has(card.id)) {
-        duplicate.push({ row: item.row, card, because: seen.has(card.id) ? "file" : "saved" });
+        duplicate.push({ row: item.row, card, because: have.has(card.id) ? "saved" : "file" });
         seen.add(card.id);
         return;
       }

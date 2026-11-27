@@ -59,10 +59,14 @@
     if (counts.ambiguous) bits.push(counts.ambiguous === 1 ? "1 needs a pick" : counts.ambiguous + " need a pick");
     const missed = counts.unmatched + counts.skipped;
     if (missed) bits.push(missed === 1 ? "1 not matched" : missed + " not matched");
-    if (planned.duplicate.length) bits.push(planned.duplicate.length === 1 ? "1 already saved" : planned.duplicate.length + " already saved");
+    const saved = planned.duplicate.filter(row => row.because === "saved").length;
+    const repeated = planned.duplicate.length - saved;
+    if (saved) bits.push(saved === 1 ? "1 already saved" : saved + " already saved");
+    if (repeated) bits.push(repeated === 1 ? "1 repeated in this file" : repeated + " repeated in this file");
     if (planned.unresolved) bits.push(planned.unresolved === 1 ? "1 pick still open" : planned.unresolved + " picks still open");
     if (state.notice) bits.push(state.notice);
-    return bits.join(". ") + ".";
+    const clean = bits.map(bit => String(bit).replace(/\.+$/, "").trim()).filter(Boolean);
+    return clean.join(". ") + ".";
   }
 
   function thumb(card) {
