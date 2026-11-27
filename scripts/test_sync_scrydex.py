@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import sync_scrydex as sync
@@ -960,6 +960,9 @@ class WorkflowGuardTests(unittest.TestCase):
         self.assertLess(checkout, mixed)
         self.assertLess(mixed, sync_call)
         self.assertIn("git add data/scrydex.json data/scrydex-usage.json data/fx.json", text)
+        self.assertIn("if [ -f data/price-history.json ]; then", text)
+        self.assertLess(text.index("git add data/scrydex.json"), text.index("if [ -f data/price-history.json ]"))
+        self.assertIn("data/price-history.json", text[text.index("for ledger in"):text.index("git checkout --theirs")])
         self.assertIn("git pull --rebase origin main", text)
         self.assertIn('git checkout --theirs -- "$ledger"', text)
         self.assertIn("GITHUB_REF", text)
@@ -1043,6 +1046,232 @@ class CacheWriteTests(unittest.TestCase):
             path = Path(tmp) / "scrydex.json"
             sync.write_cache({"source": "Scrydex", "cards": {"base1-4": {"history": []}}}, path)
             self.assertEqual(json.loads(path.read_text())["cards"]["base1-4"]["history"], [])
+
+
+class PriceHistoryProjectionTests(unittest.TestCase):
+    """The compact file is a view of history rows the sync already stored."""
+
+    def _row(self, day, price, variant="holofoil"):
+        return {"d": day, "v": variant, "m": price}
+
+    def test_steps_round_and_drop_unchanged_days(self):
+        payload = sync.project_price_history({
+            "generated_at": "2026-11-03T00:00:00Z",
+            "cards": {
+                "base1-4": {
+                    "history": [
+                        self._row("2026/11/01", 10),
+                        self._row("2026/11/02", 10),
+                        self._row("2026/11/03", 11.234),
+                        self._row("2026/11/03", 0),
+                        self._row("2026/11/03", float("nan")),
+                        {"d": "2026/11/03", "v": "holofoil", "m": "nope"},
+                    ]
+                }
+            },
+        })
+        packed = payload["cards"]["base1-4"]["holofoil"]
+        self.assertEqual(packed, [20261101, 1000, 2, 123])
+        self.assertEqual(payload["days"], 90)
+        self.assertEqual(payload["source"], "Scrydex cache")
+        self.assertNotIn("sv1-1", payload["cards"])
+
+    def test_rolls_off_days_older_than_the_window(self):
+        newest = date(2026, 11, 26)
+        old = newest - timedelta(days=91)
+        edge = newest - timedelta(days=90)
+        payload = sync.project_price_history({
+            "cards": {
+                "base1-4": {
+                    "history": [
+                        self._row(old.isoformat(), 4),
+                        self._row(edge.isoformat(), 5),
+                        self._row(newest.isoformat(), 6),
+                    ]
+                }
+            }
+        })
+        packed = payload["cards"]["base1-4"]["holofoil"]
+        self.assertEqual(packed[0], int(edge.strftime("%Y%m%d")))
+        self.assertNotIn(int(old.strftime("%Y%m%d")), packed)
+        self.assertLessEqual((newest - edge).days, 90)
+
+    def test_unknown_gap_is_a_negative_day_delta(self):
+        payload = sync.project_price_history({
+            "cards": {
+                "ex1-1": {
+                    "missing": False,
+                    "history": [
+                        self._row("2026-11-01", 8),
+                        self._row("2026-11-05", 8),
+                    ],
+                }
+            }
+        })
+        self.assertEqual(payload["cards"]["ex1-1"]["holofoil"], [20261101, 800, -4, 0])
+
+    def test_flat_days_before_a_gap_stay_in_the_series(self):
+        payload = sync.project_price_history({
+            "cards": {
+                "base1-4": {
+                    "history": [
+                        self._row("2026-08-28", 10),
+                        self._row("2026-08-29", 10),
+                        self._row("2026-08-30", 10),
+                        self._row("2026-09-02", 10),
+                    ]
+                }
+            }
+        })
+        self.assertEqual(
+            payload["cards"]["base1-4"]["holofoil"],
+            [20260828, 1000, 2, 0, -3, 0],
+        )
+
+    def test_missing_cards_and_empty_history_are_omitted(self):
+        payload = sync.project_price_history({
+            "cards": {
+                "gone": {"missing": True, "history": [self._row("2026/11/01", 9)]},
+                "empty": {"history": []},
+                "blank": {"history": [self._row("nope", 9), self._row("2026/11/01", 0)]},
+            }
+        })
+        self.assertEqual(payload["cards"], {})
+
+    def test_sync_records_history_it_already_fetched(self):
+        """A refresh writes the compact file and does not add a history request."""
+        calls = []
+
+        def fake(url, headers):
+            calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "price_history" in url:
+                return 200, {
+                    "count": 2,
+                    "total_count": 2,
+                    "data": [
+                        {"date": "2026-10-01", "prices": [{
+                            "type": "raw", "condition": "NM", "currency": "USD",
+                            "market": 10, "variant": "holofoil",
+                        }]},
+                        {"date": "2026-10-02", "prices": [{
+                            "type": "raw", "condition": "NM", "currency": "USD",
+                            "market": 12.5, "variant": "holofoil",
+                        }, {
+                            "type": "graded", "condition": "NM", "currency": "USD",
+                            "market": 90, "variant": "holofoil", "company": "PSA", "grade": "10",
+                        }]},
+                    ],
+                }
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cache = root / "scrydex.json"
+            usage = root / "scrydex-usage.json"
+            seed = root / "seed.txt"
+            seed.write_text("A base1-4\n", encoding="utf-8")
+            saved = (sync.CACHE_PATH, sync.USAGE_PATH, sync.SEED_PATH, sync.request_json, sync.time.sleep)
+            env_names = (
+                "SCRYDEX_API_KEY", "SCRYDEX_TEAM_ID", "SCRYDEX_MONTHLY_CAP",
+                "SCRYDEX_STORE_RESERVE", "SCRYDEX_RUN_CAP", "SCRYDEX_RUN_CARD_CAP",
+            )
+            saved_env = {name: os.environ.get(name) for name in env_names}
+            os.environ["SCRYDEX_API_KEY"] = "super-secret-value"
+            os.environ["SCRYDEX_TEAM_ID"] = "team-secret-value"
+            os.environ["SCRYDEX_MONTHLY_CAP"] = "15000"
+            os.environ["SCRYDEX_STORE_RESERVE"] = "15000"
+            os.environ["SCRYDEX_RUN_CAP"] = "500"
+            os.environ["SCRYDEX_RUN_CARD_CAP"] = "100"
+            sync.CACHE_PATH = cache
+            sync.USAGE_PATH = usage
+            sync.SEED_PATH = seed
+            sync.request_json = fake
+            sync.time.sleep = lambda *_args, **_kwargs: None
+            try:
+                code = sync.sync(datetime(2026, 10, 17, tzinfo=timezone.utc))
+            finally:
+                sync.CACHE_PATH, sync.USAGE_PATH, sync.SEED_PATH, sync.request_json, sync.time.sleep = saved
+                for name, value in saved_env.items():
+                    if value is None:
+                        os.environ.pop(name, None)
+                    else:
+                        os.environ[name] = value
+            self.assertEqual(code, 0)
+            history_calls = [url for url in calls if "price_history" in url]
+            self.assertEqual(len(history_calls), 1)
+            self.assertEqual(sum(1 for url in calls if url.endswith("/usage")), 1)
+            path = cache.with_name("price-history.json")
+            self.assertTrue(path.exists())
+            packed = json.loads(path.read_text(encoding="utf-8"))["cards"]["base1-4"]["holofoil"]
+            self.assertEqual(packed, [20261001, 1000, 1, 250])
+            self.assertNotIn(9000, packed)
+
+    def test_history_write_failure_still_saves_cache_and_usage(self):
+        """A broken history file must not skip the ledger or the cache."""
+        calls = []
+
+        def fake(url, headers):
+            calls.append(url)
+            if url.endswith("/usage"):
+                return 200, {"credits_remaining": 50000}
+            if "price_history" in url:
+                return 200, {
+                    "count": 1,
+                    "total_count": 1,
+                    "data": [{"date": "2026-10-01", "prices": [{
+                        "type": "raw", "condition": "NM", "currency": "USD",
+                        "market": 10, "variant": "holofoil",
+                    }]}],
+                }
+            return 200, {"data": {"name": "Card", "variants": []}}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cache = root / "scrydex.json"
+            usage = root / "scrydex-usage.json"
+            seed = root / "seed.txt"
+            seed.write_text("A base1-4\n", encoding="utf-8")
+            saved = (sync.CACHE_PATH, sync.USAGE_PATH, sync.SEED_PATH, sync.request_json, sync.time.sleep, sync.write_price_history)
+            env_names = (
+                "SCRYDEX_API_KEY", "SCRYDEX_TEAM_ID", "SCRYDEX_MONTHLY_CAP",
+                "SCRYDEX_STORE_RESERVE", "SCRYDEX_RUN_CAP", "SCRYDEX_RUN_CARD_CAP",
+            )
+            saved_env = {name: os.environ.get(name) for name in env_names}
+            os.environ["SCRYDEX_API_KEY"] = "super-secret-value"
+            os.environ["SCRYDEX_TEAM_ID"] = "team-secret-value"
+            os.environ["SCRYDEX_MONTHLY_CAP"] = "15000"
+            os.environ["SCRYDEX_STORE_RESERVE"] = "15000"
+            os.environ["SCRYDEX_RUN_CAP"] = "500"
+            os.environ["SCRYDEX_RUN_CARD_CAP"] = "100"
+            sync.CACHE_PATH = cache
+            sync.USAGE_PATH = usage
+            sync.SEED_PATH = seed
+            sync.request_json = fake
+            sync.time.sleep = lambda *_args, **_kwargs: None
+
+            def boom(*_args, **_kwargs):
+                raise OSError("disk full")
+
+            sync.write_price_history = boom
+            try:
+                code = sync.sync(datetime(2026, 10, 17, tzinfo=timezone.utc))
+            finally:
+                (
+                    sync.CACHE_PATH, sync.USAGE_PATH, sync.SEED_PATH,
+                    sync.request_json, sync.time.sleep, sync.write_price_history,
+                ) = saved
+                for name, value in saved_env.items():
+                    if value is None:
+                        os.environ.pop(name, None)
+                    else:
+                        os.environ[name] = value
+            self.assertEqual(code, 0)
+            self.assertTrue(cache.exists())
+            ledger = json.loads(usage.read_text(encoding="utf-8"))
+            self.assertGreater(sync.month_credits(ledger, "2026-10"), 0)
+            self.assertEqual(sum(1 for url in calls if "price_history" in url), 1)
 
 
 class PaceTests(unittest.TestCase):

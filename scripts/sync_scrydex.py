@@ -56,6 +56,11 @@ Catalog ids from TCGdex are mapped before the request (sv03-223 becomes
 sv3-223). The record is stored under the catalog id. Secrets are read from
 the environment and sent only as headers. They are never printed.
 
+data/price-history.json is rebuilt from the history rows already stored
+on each card after those rows are written. That file is a rolling 90-day
+view, rounded to cents, with unchanged days dropped. Building it does not
+call Scrydex and does not change the credit spend.
+
 HTTP 402 on a card lookup, on price history, or on /account/v1/usage
 is a hard stop. Credits already spent are recorded, cards refreshed
 earlier in the run are written, and the process exits nonzero. The
@@ -85,13 +90,15 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SEED_PATH = ROOT / "data" / "scrydex-seed.txt"
 CACHE_PATH = ROOT / "data" / "scrydex.json"
 USAGE_PATH = ROOT / "data" / "scrydex-usage.json"
+# Sibling of the cache. Tests that point CACHE_PATH at a temp file get
+# the compact history beside it, not in the repo.
 DEMAND_PATH = ROOT / "data" / "price-demand.json"
 API = "https://api.scrydex.com/pokemon/v1/cards"
 USAGE_API = "https://api.scrydex.com/account/v1/usage"
@@ -981,6 +988,145 @@ def preserve_illustrator(record: dict, previous) -> dict:
     return record
 
 
+def price_history_path(cache_path: Path | None = None) -> Path:
+    cache_path = CACHE_PATH if cache_path is None else cache_path
+    return cache_path.with_name("price-history.json")
+
+
+def _parse_history_day(value):
+    if not isinstance(value, str):
+        return None
+    match = re.match(r"(\d{4})[/-](\d{1,2})[/-](\d{1,2})", value)
+    if not match:
+        return None
+    year, month, day = (int(match.group(index)) for index in (1, 2, 3))
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
+def _history_cents(value):
+    number = as_float(value)
+    if number is None or number <= 0:
+        return None
+    rounded = round(number, 2)
+    if rounded < 0.01:
+        return None
+    cents = int(round(rounded * 100))
+    return cents if cents >= 1 else None
+
+
+def _compress_series(points: list[tuple[date, int]]) -> list[int]:
+    """Pack observed days as [yyyymmdd, cents, dayDelta, centDelta, ...].
+
+    A positive dayDelta is a fully observed stretch, so a later reader can
+    carry the price across it. A negative dayDelta is a gap with no saved
+    print, and must not be drawn as a flat line. The last day is kept even
+    when the price did not change, so the series still has an end date.
+    """
+    if not points:
+        return []
+    packed = [int(points[0][0].strftime("%Y%m%d")), points[0][1]]
+    emitted_day, emitted_cents = points[0]
+    prev_day = points[0][0]
+    observed = True
+    last_index = len(points) - 1
+    for index, (day, cents) in enumerate(points[1:], start=1):
+        if (day - prev_day).days != 1:
+            # A flat run that ends the day before a gap still happened.
+            # Emit that last observed day, or the gap swallows it.
+            if observed and prev_day != emitted_day:
+                held = (prev_day - emitted_day).days
+                if held > 0:
+                    packed.append(held)
+                    packed.append(0)
+                    emitted_day = prev_day
+            observed = False
+        same = cents == emitted_cents
+        if same and observed and index != last_index:
+            prev_day = day
+            continue
+        delta_days = (day - emitted_day).days
+        if delta_days <= 0:
+            prev_day = day
+            observed = True
+            continue
+        packed.append(delta_days if observed else -delta_days)
+        packed.append(cents - emitted_cents)
+        emitted_day = day
+        emitted_cents = cents
+        prev_day = day
+        observed = True
+    return packed
+
+
+def _variant_points(rows: list, variant: str, keep_days: int) -> list[tuple[date, int]]:
+    by_day: dict[date, int] = {}
+    for row in rows:
+        if not isinstance(row, dict) or row.get("v") != variant:
+            continue
+        day = _parse_history_day(row.get("d"))
+        cents = _history_cents(row.get("m"))
+        if day is None or cents is None:
+            continue
+        by_day[day] = cents
+    if not by_day:
+        return []
+    newest = max(by_day)
+    cutoff = newest - timedelta(days=keep_days)
+    return [(day, by_day[day]) for day in sorted(by_day) if day >= cutoff]
+
+
+def project_price_history(cache: dict) -> dict:
+    """Rolling per-card history from prices already stored on the cache.
+
+    No network. Reads each card's saved raw near-mint rows, keeps 90 days
+    ending on that series' newest day, rounds to cents, and step-compresses.
+    """
+    cards_out: dict[str, dict[str, list[int]]] = {}
+    source_cards = cache.get("cards") if isinstance(cache, dict) else None
+    if not isinstance(source_cards, dict):
+        source_cards = {}
+    for card_id in sorted(source_cards):
+        if not isinstance(card_id, str):
+            continue
+        rec = source_cards[card_id]
+        if not isinstance(rec, dict) or rec.get("missing"):
+            continue
+        rows = rec.get("history")
+        if not isinstance(rows, list) or not rows:
+            continue
+        names = sorted({
+            row.get("v")
+            for row in rows
+            if isinstance(row, dict) and isinstance(row.get("v"), str) and row.get("v")
+        })
+        series: dict[str, list[int]] = {}
+        for variant in names:
+            packed = _compress_series(_variant_points(rows, variant, HISTORY_DAYS))
+            if len(packed) >= 2:
+                series[variant] = packed
+        if series:
+            cards_out[card_id] = series
+    generated = cache.get("generated_at") if isinstance(cache, dict) else None
+    return {
+        "v": 1,
+        "source": "Scrydex cache",
+        "generated_at": generated if isinstance(generated, str) else None,
+        "days": HISTORY_DAYS,
+        "cards": cards_out,
+    }
+
+
+def write_price_history(payload: dict, path: Path | None = None) -> None:
+    path = price_history_path() if path is None else path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
 def write_cache(cache: dict, path: Path | None = None) -> None:
     path = CACHE_PATH if path is None else path
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1267,6 +1413,16 @@ def sync(now: datetime | None = None) -> int:
             cache["history_days"] = HISTORY_DAYS
             cache["cards"] = cards
             write_cache(cache)
+            # The history file is a projection of the cache just written.
+            # A failure here must not skip the credit ledger or the cache
+            # commit, or the next run would spend the pace again.
+            try:
+                write_price_history(project_price_history(cache))
+            except Exception as exc:
+                print(
+                    f"::warning::Could not write {price_history_path().name}: {exc}. "
+                    "The price cache and the credit ledger are still saved."
+                )
             print(f"Wrote {CACHE_PATH.name} ({refreshed} card(s) updated).")
         if card_credits or check_credits:
             write_usage(usage)

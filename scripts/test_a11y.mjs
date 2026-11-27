@@ -10,8 +10,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sw = readFileSync(resolve(root, "sw.js"), "utf8");
-if (!/const VERSION = "bh-23"/.test(sw)) {
-  console.error("service worker VERSION is not bh-23");
+if (!/const VERSION = "bh-24"/.test(sw)) {
+  console.error("service worker VERSION is not bh-24");
   process.exit(1);
 }
 

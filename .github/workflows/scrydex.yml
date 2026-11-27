@@ -100,6 +100,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/scrydex.json data/scrydex-usage.json data/fx.json
+          # The history file is derived. A missing file must not block the
+          # cache and the ledger from being committed.
+          if [ -f data/price-history.json ]; then
+            git add data/price-history.json
+          fi
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -122,7 +127,7 @@ jobs:
             # conflicts, keep this run's copy so the credits just spent are
             # not dropped when the push races the Daily Drop job.
             if ! git pull --rebase origin main; then
-              for ledger in data/scrydex-usage.json data/scrydex.json data/fx.json; do
+              for ledger in data/scrydex-usage.json data/scrydex.json data/fx.json data/price-history.json; do
                 if git ls-files -u -- "$ledger" | grep -q .; then
                   git checkout --theirs -- "$ledger"
                   git add -- "$ledger"
