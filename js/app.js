@@ -168,6 +168,9 @@ let deckTopSeen = false;
 let variantChoice = new Map();
 let chartRange = "90d";
 let historyPicked = false;
+let historyGate = null;
+let priceHistoryFile = null;
+let priceHistoryReady = false;
 let compareGrade = "";
 let reserved = new Set();
 let pendingSwipes = [];
@@ -7013,37 +7016,290 @@ function bindWorth(story){
   input.addEventListener("change", paint);
   input.addEventListener("wheel", event => { if (document.activeElement === input) event.preventDefault(); }, { passive:false });
 }
-function historySection(view, series, move30, move90, svg, scrubId){
-  const quiet = series.pendingFx ? "Checking the dollar rate…" : "Not enough price history";
-  const head = `<section class="price-block" aria-label="Price history"><p class="eyebrow">Price history</p>`;
-  if (!series.points || series.points.length < 2) return head + `<p class="quiet">${esc(quiet)}</p></section>`;
-  const buttons = `<div class="rangebar"><div class="ranges" role="group" aria-label="30 day and 90 day change">${rangeButton(30, move30, view.days === 30)}${rangeButton(90, move90, view.days === 90)}</div></div>`;
-  if (!view.ok || !svg) return head + buttons + `<p class="quiet">${esc(quiet)}</p></section>`;
-  const caption = [series.note, historyCaption(view)].filter(Boolean).join(" ");
-  return head + buttons + `<div class="chart-wrap">${svg}<p class="scrub" id="${scrubId}" aria-live="polite">${esc(caption)}</p></div></section>`;
+function loadPriceHistory(){
+  const script = window.BinderPriceHistory ? Promise.resolve() : loadScript("js/price-history.js");
+  return script.then(() => fetch("data/price-history.json", { cache:"no-cache", priority:"low" })).then(res => {
+    if (!res || !res.ok) return null;
+    return res.json();
+  }).then(file => {
+    priceHistoryFile = file && file.cards ? file : null;
+    priceHistoryReady = true;
+    refreshHistorySlot();
+    return priceHistoryFile;
+  }).catch(() => {
+    priceHistoryReady = true;
+    priceHistoryFile = null;
+    refreshHistorySlot();
+    return null;
+  });
+}
+function ensurePriceHistory(){
+  if (historyGate) return historyGate;
+  historyGate = new Promise(resolve => {
+    const go = () => resolve(loadPriceHistory());
+    const img = deck && deck.querySelector(".card img");
+    if (!profilePinned && img && !img.complete) {
+      img.addEventListener("load", go, { once:true });
+      img.addEventListener("error", go, { once:true });
+      return;
+    }
+    go();
+  });
+  return historyGate;
+}
+function cardForHistory(id){
+  if (!id) return null;
+  if (profileCard && profileCard.id === id) return cardCache.get(id) || profileCard;
+  const top = typeof currentTop === "function" ? currentTop() : null;
+  if (top && top.id === id) return top;
+  return cardCache.get(id) || null;
+}
+function historyVariantName(card, entry){
+  const names = entry && typeof entry === "object" ? Object.keys(entry) : [];
+  if (!names.length || !card) return "";
+  const variant = selectedVariant(card);
+  if (variant) {
+    const name = chosenVariant(names, variant.key);
+    return name && entry[name] ? name : "";
+  }
+  if (names.length === 1) return names[0];
+  return "";
+}
+function historyModel(card){
+  const moves = { "7d":null, "30d":null, "90d":null };
+  const blank = { status:"none", tracking:false, drawn:[], points:[], moves, active:"", low:null, high:null, since:0, summary:"" };
+  if (!card) return blank;
+  if (!priceHistoryReady || !window.BinderPriceHistory) return Object.assign({}, blank, { status:"pending" });
+  if (!priceHistoryFile) return Object.assign({}, blank, { status:"error" });
+  const entry = Object.prototype.hasOwnProperty.call(priceHistoryFile.cards, card.id) ? priceHistoryFile.cards[card.id] : null;
+  const name = historyVariantName(card, entry);
+  const packed = entry && name ? entry[name] : null;
+  const points = packed ? BinderPriceHistory.unpack(packed) : [];
+  return BinderPriceHistory.present(points, {
+    picked:historyPicked,
+    range:chartRange,
+    money:n => money(n, "USD") || ""
+  });
+}
+function chipFace(id, move){
+  if (!move) return id;
+  if (move.dir === "flat") return id + " – 0%";
+  const arrow = move.dir === "down" ? "↓" : "↑";
+  return id + " " + arrow + " " + move.shown.toFixed(1) + "%";
+}
+function chipLabel(id, move){
+  const days = id === "90d" ? "90 day" : id === "30d" ? "30 day" : "7 day";
+  if (!move) return days + " change unavailable";
+  if (move.dir === "flat") return days + " change, unchanged";
+  const word = move.dir === "down" ? "down" : "up";
+  return days + " change, " + word + " " + move.shown.toFixed(1) + " percent";
+}
+function historyChips(model){
+  const buttons = ["7d", "30d", "90d"].map(id => {
+    const move = model.moves ? model.moves[id] : null;
+    const tone = move ? "move " + move.dir : "";
+    const pressed = model.active === id;
+    return `<button type="button" class="${tone}" data-range="${id}" aria-pressed="${pressed ? "true" : "false"}" aria-label="${esc(chipLabel(id, move))}">${esc(chipFace(id, move))}</button>`;
+  }).join("");
+  return `<div class="rangebar"><div class="ranges history-chips" role="group" aria-label="7 day, 30 day, and 90 day change">${buttons}</div></div>`;
+}
+function sparkStroke(model){
+  const move = model.active && model.moves ? model.moves[model.active] : null;
+  if (!move || move.dir === "flat") return "#146f96";
+  return move.dir === "down" ? "#8d4a4a" : "#5d6b45";
+}
+function sparkSvg(points, label, stroke){
+  if (!points || points.length < 2) return "";
+  if (!points.every(p => p && typeof p.value === "number" && p.value >= 0.01 && p.t > 0 && Number.isFinite(p.value))) return "";
+  const vals = points.map(p => p.value);
+  let min = Math.min(...vals), max = Math.max(...vals);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0.01 || max < 0.01) return "";
+  const realMin = min, realMax = max;
+  if (max === min) { min = min * 0.92; max = max * 1.08; }
+  if (!(max > min)) return "";
+  const w = 360, h = 96, padL = 52, padR = 10, padT = 16, padB = 22;
+  const t0 = points[0].t, t1 = points[points.length - 1].t;
+  if (!(t1 > t0)) return "";
+  const xOf = t => padL + (t - t0) / (t1 - t0) * (w - padL - padR);
+  const yOf = v => padT + (1 - (v - min) / (max - min)) * (h - padT - padB);
+  const baseY = (h - padB).toFixed(1);
+  let d = "";
+  let guides = "";
+  const fills = [];
+  let run = [];
+  const flush = () => {
+    if (run.length < 2) { run = []; return; }
+    const top = run.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join("");
+    const last = run[run.length - 1], first = run[0];
+    fills.push(top + "L" + last.x + "," + baseY + "L" + first.x + "," + baseY + "Z");
+    run = [];
+  };
+  points.forEach((p, i) => {
+    const x = xOf(p.t).toFixed(1);
+    const y = yOf(p.value).toFixed(1);
+    if (!Number.isFinite(Number(x)) || !Number.isFinite(Number(y))) return;
+    if (i === 0 || p.bridge === "gap") {
+      flush();
+      if (i > 0 && p.bridge === "gap") {
+        const prev = points[i - 1];
+        const x0 = xOf(prev.t).toFixed(1);
+        const y0 = yOf(prev.value).toFixed(1);
+        guides += `<line x1="${x0}" y1="${y0}" x2="${x}" y2="${y}" stroke="#8a9184" stroke-width="1.5" stroke-dasharray="3 4"/>`;
+      }
+      d += "M" + x + "," + y;
+      run.push({ x, y });
+      return;
+    }
+    const prev = points[i - 1];
+    const yPrev = yOf(prev.value).toFixed(1);
+    d += "H" + x + "V" + y;
+    run.push({ x, y:yPrev });
+    if (y !== yPrev) run.push({ x, y });
+  });
+  flush();
+  if (!d || d.indexOf("NaN") !== -1) return "";
+  const line = stroke || "#146f96";
+  const fill = fills.length ? `<path d="${fills.join("")}" fill="#E4E7DA" stroke="none"/>` : "";
+  const dots = points.filter((p, i) => points.length <= 8 || i === points.length - 1 || p.bridge === "gap" || (points[i + 1] && points[i + 1].bridge === "gap"));
+  const circles = dots.map(p => {
+    const cx = xOf(p.t).toFixed(1), cy = yOf(p.value).toFixed(1);
+    if (cx === "NaN" || cy === "NaN") return "";
+    return `<circle cx="${cx}" cy="${cy}" r="${p === points[points.length - 1] ? "4" : "3"}" fill="${line}"/>`;
+  }).join("");
+  const hi = compactMoney(realMax, "USD");
+  const lo = realMin === realMax ? "" : compactMoney(realMin, "USD");
+  const leftLabel = window.BinderPriceHistory ? BinderPriceHistory.shortDate(t0) : "";
+  const rightLabel = window.BinderPriceHistory ? BinderPriceHistory.shortDate(t1) : "";
+  const axis = `${leftLabel ? `<text x="${padL}" y="${h - 6}" text-anchor="start" fill="#404241" font-size="11">${esc(leftLabel)}</text>` : ""}${rightLabel ? `<text x="${w - padR}" y="${h - 6}" text-anchor="end" fill="#404241" font-size="11">${esc(rightLabel)}</text>` : ""}`;
+  const aria = label || "Price history";
+  return `<svg class="chart sparkline" tabindex="0" role="img" aria-label="${esc(aria)}" viewBox="0 0 ${w} ${h}" data-t0="${t0}" data-t1="${t1}" data-pad-l="${padL}" data-pad-r="${padR}" data-w="${w}"><line x1="${padL}" x2="${w - padR}" y1="${baseY}" y2="${baseY}" stroke="#C4C8BE" stroke-width="1.5"/>${fill}${guides}<path d="${d}" fill="none" stroke="${line}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>${circles}${hi ? `<text x="4" y="13" fill="#404241" font-size="11">${esc(hi)}</text>` : ""}${lo ? `<text x="4" y="${h - padB}" fill="#404241" font-size="11">${esc(lo)}</text>` : ""}${axis}</svg>`;
+}
+function historyMarkup(card, model){
+  const scrubId = model.scrubId || "scrub";
+  const euro = settings.currency === "EUR" ? `<p class="fine">This chart stays in US dollars.</p>` : "";
+  if (!model || model.status === "pending") {
+    return `<section class="price-block history" aria-busy="true" aria-label="Price history"><p class="eyebrow">Price history</p><p class="quiet" role="status">Checking saved prices…</p></section>`;
+  }
+  if (model.status === "error") {
+    return `<section class="price-block history" aria-label="Price history"><p class="eyebrow">Price history</p><p class="quiet">Saved prices didn't load.</p></section>`;
+  }
+  const chips = historyChips(model);
+  if (model.status === "none" || !model.drawn.length) {
+    return `<section class="price-block history" aria-label="Price history"><p class="eyebrow">Price history</p>${chips}<p class="history-note">No saved prices for this printing yet.</p>${euro}</section>`;
+  }
+  const since = model.since && window.BinderPriceHistory ? BinderPriceHistory.pretty(model.since) : "";
+  const tracking = model.tracking && since && model.drawn.length >= 2 ? `<p class="history-note">Tracking since ${esc(since)}</p>` : "";
+  const low = model.low ? money(model.low, "USD") : "";
+  const high = model.high ? money(model.high, "USD") : "";
+  let range = "";
+  if (low && high && model.drawn.length >= 2) {
+    range = low === high ? `<p class="history-range">Flat at ${esc(low)}</p>` : `<p class="history-range">Low ${esc(low)} · High ${esc(high)}</p>`;
+  }
+  const summary = model.summary || (since ? "Tracking since " + since : "Price history");
+  const first = model.drawn[0];
+  const last = model.drawn[model.drawn.length - 1];
+  const spanText = first && last && window.BinderPriceHistory
+    ? BinderPriceHistory.shortDate(first.t) + " – " + BinderPriceHistory.shortDate(last.t)
+    : "";
+  let figure = "";
+  if (model.drawn.length >= 2) {
+    const svg = sparkSvg(model.drawn, summary, sparkStroke(model));
+    if (svg) {
+      figure = `<div class="chart-wrap history-chart">${svg}<p class="sr-only">${esc(summary)}. Focus the chart and use the arrow keys for one day.</p><p class="scrub" id="${scrubId}" aria-live="polite">${esc(spanText || summary)}</p></div>`;
+    }
+  }
+  if (!figure && since) {
+    const price = model.drawn[0] ? money(model.drawn[0].value, "USD") : "";
+    const line = price ? "Tracking since " + since + " · " + price : "Tracking since " + since;
+    figure = `<div class="chart-wrap history-chart tracking-only"><p class="history-callout">${esc(line)}</p><p class="scrub" id="${scrubId}" aria-live="polite">${esc(summary || line)}</p></div>`;
+  }
+  return `<section class="price-block history" aria-label="Price history"><p class="eyebrow">Price history</p>${chips}${tracking}${range}${figure}${euro}</section>`;
+}
+function bindHistory(slot){
+  if (!slot) return;
+  const cardId = slot.getAttribute("data-card");
+  const card = cardForHistory(cardId);
+  const model = card ? historyModel(card) : { drawn:[] };
+  slot.querySelectorAll("[data-range]").forEach(btn => btn.onclick = () => {
+    historyPicked = true;
+    chartRange = btn.dataset.range;
+    const againCard = cardForHistory(cardId) || card;
+    if (profilePinned && againCard) renderProfile(cardCache.get(cardId) || againCard);
+    else if (againCard) { summaryId = ""; renderSummary(againCard); summaryId = cardId; }
+    const again = profileEl.querySelector('[data-range="' + chartRange + '"]');
+    if (again) again.focus();
+  });
+  const svg = slot.querySelector(".chart");
+  const scrub = slot.querySelector(".scrub");
+  if (svg) bindChart(svg, model.drawn, "USD", scrub);
+}
+function refreshHistorySlot(){
+  ["historySlot", "summaryHistory"].forEach(id => {
+    const slot = document.getElementById(id);
+    if (!slot) return;
+    const cardId = slot.getAttribute("data-card");
+    const card = cardForHistory(cardId);
+    if (!card) return;
+    const focusRange = document.activeElement && slot.contains(document.activeElement) && document.activeElement.dataset ? document.activeElement.dataset.range : "";
+    const model = historyModel(card);
+    model.scrubId = id === "summaryHistory" ? "summaryScrub" : "scrub";
+    slot.innerHTML = historyMarkup(card, model);
+    bindHistory(slot);
+    if (focusRange) {
+      const again = slot.querySelector('[data-range="' + focusRange + '"]');
+      if (again) again.focus();
+    }
+  });
+}
+function historyBlock(card, slotId, scrubId){
+  const model = historyModel(card);
+  model.scrubId = scrubId;
+  const drawn = model.drawn && model.drawn.length >= 2 ? model.drawn : [];
+  return {
+    html:`<div id="${slotId}" data-card="${esc(card.id)}">${historyMarkup(card, model)}</div>`,
+    series:{ points:drawn, currency:"USD", note:model.summary || "" },
+    drawn
+  };
 }
 function priceStory(card, opts){
   const queued = !!(opts && opts.queued);
   const summary = !!(opts && opts.summary);
   const variant = selectedVariant(card);
   const shown = printingMoney(card, variant);
-  const rawSeries = priceSeries(card);
-  const thinTrend = rawSeries.source === "trend" && !rawSeries.pendingFx && trendIsThin(rawSeries.points);
-  const series = thinTrend ? { points:[], source:"", currency:rawSeries.currency || "USD", note:"", pendingFx:!!rawSeries.pendingFx } : rawSeries;
-  const move30 = windowMove(series.points, 30, 30, 45);
-  const move90 = windowMove(series.points, 90, 75, 100);
-  const view = historyView(series.points);
-  const stroke = lineStroke(view.days === 30 ? move30 : move90);
-  const aria = historyAria(view, series.currency || "USD", move30, move90);
-  const svg = view.ok ? chartSvg(view.points, null, series.currency, aria, stroke) : "";
   const facts = gradeFacts(card);
   const graded = buildGraded(card, facts, queued);
   const banner = scanBanner(card);
   const scrubId = summary ? "summaryScrub" : "scrub";
+  const slotId = summary ? "summaryHistory" : "historySlot";
+  const history = historyBlock(card, slotId, scrubId);
   const thumbId = opts && opts.thumbId;
   const thumb = thumbId ? `<button class="thumb" id="${thumbId}" type="button" aria-label="Look at ${esc(card.name || "this card")} up close"></button>` : "";
-  const html = `<section class="price-hero" aria-label="Raw ungraded market price"><div class="phead hero-row">${marketBlock(card, variant, shown)}${thumb}</div></section>${banner ? `<p class="note">${esc(banner)}</p>` : ""}${graded.html}${historySection(view, series, move30, move90, svg, scrubId)}`;
-  return { html, series, windowed:view.ok ? view.points : [], scrubId, variant, worth:graded.worth };
+  const html = `<section class="price-hero" aria-label="Raw ungraded market price"><div class="phead hero-row">${marketBlock(card, variant, shown)}${thumb}</div></section>${banner ? `<p class="note">${esc(banner)}</p>` : ""}${history.html}${graded.html}`;
+  return { html, series:history.series, windowed:history.drawn, scrubId, variant, worth:graded.worth };
+}
+function chartIndex(svgEl, points, clientX){
+  const rect = svgEl.getBoundingClientRect();
+  if (!(rect.width > 0) || !points || points.length < 2) return 0;
+  const ratio = (clientX - rect.left) / rect.width;
+  const t0 = Number(svgEl.dataset.t0);
+  const t1 = Number(svgEl.dataset.t1);
+  const padL = Number(svgEl.dataset.padL);
+  const padR = Number(svgEl.dataset.padR);
+  const width = Number(svgEl.dataset.w);
+  if (!(t1 > t0) || !(width > 0)) return Math.round(Math.max(0, Math.min(1, ratio)) * (points.length - 1));
+  const plotL = padL / width;
+  const plotR = (width - padR) / width;
+  let local = (ratio - plotL) / ((plotR - plotL) || 1);
+  if (!Number.isFinite(local)) local = 0;
+  local = Math.max(0, Math.min(1, local));
+  const t = t0 + local * (t1 - t0);
+  let best = 0;
+  let dist = Infinity;
+  for (let i = 0; i < points.length; i++) {
+    const gap = Math.abs(points[i].t - t);
+    if (gap < dist) { dist = gap; best = i; }
+  }
+  return best;
 }
 function bindChart(svgEl, points, currency, scrub){
   if (!svgEl || !points || points.length < 2) return;
@@ -7054,14 +7310,13 @@ function bindChart(svgEl, points, currency, scrub){
     if (!point || !(point.value > 0)) return;
     const text = priceText(point.value, currency);
     if (!text || text === "—") return;
-    scrub.textContent = (point.label || "") + " · " + text;
+    const when = window.BinderPriceHistory && point.t ? BinderPriceHistory.pretty(point.t) : (point.label || "");
+    if (!when) return;
+    scrub.textContent = when + " · " + text;
     svgEl.dataset.index = String(i);
   };
   svgEl.addEventListener("pointermove", e => {
-    const rect = svgEl.getBoundingClientRect();
-    if (!(rect.width > 0)) return;
-    const x = (e.clientX - rect.left) / rect.width;
-    show(Math.round(x * (points.length - 1)));
+    show(chartIndex(svgEl, points, e.clientX));
   });
   svgEl.addEventListener("keydown", e => {
     const current = Number(svgEl.dataset.index || points.length - 1);
@@ -7075,16 +7330,8 @@ function bindChart(svgEl, points, currency, scrub){
   });
 }
 function bindPriceStory(story, rerender){
-  profileEl.querySelectorAll("[data-range]").forEach(btn => btn.onclick = () => {
-    historyPicked = true;
-    chartRange = btn.dataset.range;
-    rerender();
-    const again = profileEl.querySelector('[data-range="' + chartRange + '"]');
-    if (again) again.focus();
-  });
-  const svgEl = profileEl.querySelector(".chart");
-  const scrub = document.getElementById(story.scrubId);
-  if (svgEl) bindChart(svgEl, story.windowed, story.series.currency, scrub);
+  const slot = document.getElementById(story.scrubId === "summaryScrub" ? "summaryHistory" : "historySlot");
+  if (slot) bindHistory(slot);
   const ranges = profileEl.querySelector(".ranges");
   if (ranges) {
     const fade = () => {
@@ -7233,6 +7480,7 @@ function renderSummary(card){
     focusVariant(key);
   });
   bindPriceStory(story, () => { summaryId = ""; renderSummary(card); summaryId = card.id; });
+  ensurePriceHistory();
   bindProfileBrowse(card);
   const full = document.getElementById("openFullProfile");
   if (full) full.onclick = () => openProfile(card);
@@ -7262,6 +7510,7 @@ function openProfile(card){
     hydrate(card).then(repaintGem).catch(() => repaintGem(null));
   }
   profilePinned = true;
+  ensurePriceHistory();
   syncReadingWide();
   pinnedTopId = (currentTop() && currentTop().id) || "";
   summaryId = "";
@@ -7364,7 +7613,7 @@ function renderProfile(card){
       </div>
       <div class="shoplinks"><p class="eyebrow">Check prices on</p><div class="links">${buyLinks(card).map(l => `<a class="buy-btn" href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label.replace(/^View on /, ""))} ↗</a>`).join("")}</div></div>
       ${card.flavor ? `<p class="fine">${esc(card.flavor)}</p>` : ""}
-      <p class="fine">The big price is today's raw TCGplayer market. The graded ladder uses cached Scrydex prices for this printing, and the 30-day and 90-day changes use that same saved history. Worth grading? subtracts a fee you can edit. Prices are estimates, not advice. Buy links are not affiliate links yet.</p>
+      <p class="fine">The big price is today's raw TCGplayer market. The chart and the 7-day, 30-day, and 90-day changes use saved near-mint prices for this printing. Worth grading? subtracts a fee you can edit. Prices are estimates, not advice. Buy links are not affiliate links yet.</p>
       <button class="chip" id="copyLink" type="button">Copy link</button>
     </div>
   </div>`;
