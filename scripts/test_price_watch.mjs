@@ -100,6 +100,12 @@ const week = Watch.move({ points: weekPoints, windowMove: History.windowMove });
 assert.equal(week.basis, "7d");
 assert.equal(week.dir, "down");
 assert.ok(week.pct >= 3);
+assert.match(Watch.spoken(week), /over the last 7 days/);
+assert.doesNotMatch(Watch.spoken(week), /since you saved/);
+assert.match(Watch.badgeHtml(week), /over the last 7 days/);
+assert.doesNotMatch(Watch.badgeHtml(week), /since you saved/);
+assert.match(Watch.spoken(saved), /since you saved it/);
+assert.match(Watch.spoken(nearest), /since you saved it/);
 
 const short = [point(12, 20), point(14, 10)];
 assert.equal(Watch.move({ points: short, windowMove: History.windowMove }), null, "no 7-day baseline stays blank");
@@ -153,5 +159,62 @@ assert.equal(fromHistory.dir, "down");
 assert.equal(fromHistory.latest, 24);
 assert.match(Watch.badgeHtml(fromHistory), /▼ \$16\.00 \(−40%\)/);
 assert.doesNotMatch(Watch.badgeHtml(fromHistory), /NaN|undefined|\$0\.00\b|\$0(?!\.?\d)/);
+
+assert.equal(Watch.forget(memory, "sv10-229"), true);
+assert.equal(Watch.read(memory)["sv10-229"], undefined);
+assert.equal(Watch.read(memory)["base1-44"].at, t0, "unsaving one card leaves the others");
+assert.equal(Watch.forget(memory, "missing-card"), true);
+assert.equal(Watch.forget({ getItem() { return "{"; }, setItem() { throw new Error("wrote corrupt"); } }, "sv10-229"), false);
+memory.bag["bh.pricewatch.v1"] = "{";
+assert.deepEqual(Watch.read(memory), {});
+
+const historyFile = JSON.parse(readFileSync(resolve(root, "data/price-history.json"), "utf8"));
+const realIds = ["base1-4", "base1-15", "sv03.5-199", "swsh12-186"];
+realIds.forEach(id => {
+  const entry = historyFile.cards[id];
+  assert.ok(entry && typeof entry === "object", id + " is in price history");
+  const name = Object.keys(entry)[0];
+  const points = History.unpack(entry[name]);
+  assert.ok(points.length >= 2, id + " " + name + " unpacks");
+  points.forEach(point => {
+    assert.ok(point.value >= 0.01, id + " prices stay positive");
+  });
+  const latest = points[points.length - 1].value;
+  const savedPrice = Math.round(latest * 1.2 * 100) / 100;
+  const dropped = Watch.move({ points, savedPrice, savedAt: points[0].t });
+  if (savedPrice > latest) {
+    const raw = (savedPrice - latest) / savedPrice * 100;
+    const shown = Math.round(raw * 10) / 10;
+    if (shown >= 3 && Math.abs(latest - savedPrice) >= 0.01) {
+      assert.equal(dropped && dropped.dir, "down", id + " saved-price drop");
+      assert.equal(dropped.basis, "saved");
+      assert.equal(dropped.latest, Math.round(latest * 100) / 100);
+      assert.match(Watch.spoken(dropped), /since you saved it/);
+      assert.doesNotMatch(Watch.badgeHtml(dropped), /NaN|undefined|\$0\.00/);
+    }
+  }
+  const mid = points[Math.floor(points.length / 2)];
+  const near = Watch.move({ points, savedAt: mid.t + 2 * 3600000 });
+  if (near) {
+    assert.equal(near.basis, "nearest");
+    assert.ok(near.baseline >= 0.01 && near.latest >= 0.01);
+    assert.match(Watch.spoken(near), /since you saved it/);
+  }
+  const weekMove = Watch.move({ points, windowMove: History.windowMove });
+  if (weekMove) {
+    assert.equal(weekMove.basis, "7d");
+    assert.ok(weekMove.pct >= 3);
+    assert.match(Watch.spoken(weekMove), /over the last 7 days/);
+    assert.doesNotMatch(Watch.spoken(weekMove), /since you saved/);
+    assert.doesNotMatch(Watch.badgeHtml(weekMove), /since you saved/);
+  }
+  assert.equal(Watch.move({ points, savedPrice: 0 }), null);
+  assert.equal(Watch.move({ points, savedPrice: -5 }), null);
+  assert.equal(Watch.move({ points: [], savedPrice: latest }), null);
+});
+
+assert.match(app, /over the last 7 days/);
+assert.doesNotMatch(app, /\$\{esc\(since\)\} since you saved them/);
+assert.match(app, /forgetWatch/);
 
 console.log("price watch math ok");

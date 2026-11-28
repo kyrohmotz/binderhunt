@@ -3194,6 +3194,7 @@ function removeFromBinder(binder, id){
 function removeFromWish(id){
   wish = wish.filter(c => c.id !== id);
   saveWish();
+  forgetWatch(id);
   announce("Removed from your wishlist. Binders that include it are unchanged.");
 }
 
@@ -3567,8 +3568,8 @@ function renderBinderSide(){
     const drops = wish.map(c => ({ c, d: priceDrop(c) })).filter(x => x.d).sort((x, y) => y.d.pct - x.d.pct).slice(0, 4);
     const top = wish.map(c => ({ c, v: usdOf(c) })).filter(x => x.v > 0).sort((x, y) => y.v - x.v).slice(0, 3);
     const val = valueOf(wish);
-    const since = watchCountText(wish);
-    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Your hunt</p><h2 class="pname" id="profileTitle">${wish.length ? wish.length === 1 ? "1 card saved" : wish.length + " cards saved" : "Nothing saved yet"}</h2>${val ? `<p class="market-price">${esc(priceText(val, "USD"))}</p><p class="fine">What your wishlist costs at today's raw prices.</p>` : `<p class="fine">Swipe right on a card in Hunt and it lands on your wishlist.</p>`}${since ? `<p class="fine">${esc(since)} since you saved them.</p>` : ""}
+    const since = watchSinceLine(wish);
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Your hunt</p><h2 class="pname" id="profileTitle">${wish.length ? wish.length === 1 ? "1 card saved" : wish.length + " cards saved" : "Nothing saved yet"}</h2>${val ? `<p class="market-price">${esc(priceText(val, "USD"))}</p><p class="fine">What your wishlist costs at today's raw prices.</p>` : `<p class="fine">Swipe right on a card in Hunt and it lands on your wishlist.</p>`}${since ? `<p class="fine">${esc(since)}</p>` : ""}
       ${drops.length ? `<h3 class="side-h">Cheaper than ${DROP_WINDOW_DAYS} days ago</h3><div class="side-cards">${drops.map(x => mini(x.c, `<span class="drop-badge">↓${esc(String(x.d.shown))}%</span>`)).join("")}</div>` : ""}
       ${top.length ? `<h3 class="side-h">Biggest hunts</h3><div class="side-cards">${top.map(x => mini(x.c, esc(priceText(x.v, "USD")))).join("")}</div>` : ""}
     </div>`;
@@ -3685,8 +3686,14 @@ function paintRail(){
     mark.textContent = "Dropped " + dropped;
     mark.hidden = false;
   } else if (mark) mark.remove();
-  const wishName = "Wishlist " + wish.length + (wish.length === 1 ? " card" : " cards") + (watchLabel ? ", " + watchLabel : "") + (dropped ? " Dropped " + dropped : "");
-  wishBtn.setAttribute("aria-label", wishName);
+  let cardsNote = wishBtn.querySelector(".watch-sr");
+  if (!cardsNote) {
+    cardsNote = document.createElement("span");
+    cardsNote.className = "sr-only watch-sr";
+    wishBtn.append(cardsNote);
+  }
+  cardsNote.textContent = wish.length === 1 ? "1 card" : wish.length + " cards";
+  wishBtn.removeAttribute("aria-label");
   host.replaceChildren();
   const binders = (binderState && binderState.binders) || [];
   if (!binders.length) {
@@ -5578,9 +5585,9 @@ function paintWatchShelf(root){
   section.setAttribute("aria-labelledby", "watchShelfTitle");
   const head = document.createElement("div");
   head.className = "shelf-head";
-  head.innerHTML = `<h2 class="shelf-title" id="watchShelfTitle">Price watch</h2><p class="fine">Since you saved them. Biggest drops first.</p>`;
+  head.innerHTML = `<h2 class="shelf-title" id="watchShelfTitle">Price watch</h2><p class="fine">${esc(watchShelfBlurb(rows))}</p>`;
   section.append(head);
-  paintWatchList(section, rows, "Wishlist price changes since you saved, biggest drops first");
+  paintWatchList(section, rows, watchListLabel(rows, false));
   const slot = root.querySelector(":scope > .wish-slot");
   if (slot && slot.nextSibling) root.insertBefore(section, slot.nextSibling);
   else if (slot) root.append(section);
@@ -5600,9 +5607,9 @@ function renderWishWatch(root){
   title.textContent = "Price drops";
   const note = document.createElement("p");
   note.className = "fine";
-  note.textContent = rows.length ? "Biggest drops since you saved them." : "No wishlist cards have dropped since you saved them.";
+  note.textContent = watchDropsBlurb(rows);
   wrap.append(tools, title, note);
-  if (rows.length) paintWatchList(wrap, rows, "Wishlist price drops, biggest first");
+  if (rows.length) paintWatchList(wrap, rows, watchListLabel(rows, true));
   else {
     const empty = document.createElement("p");
     empty.className = "empty-state watch-empty";
@@ -6717,6 +6724,64 @@ function watchCountText(list){
   if (!window.BinderPriceWatch) return "";
   return BinderPriceWatch.countLabel(watchDropCount(list));
 }
+function moveIs7d(move){
+  return !!(move && move.basis === "7d");
+}
+function rowsUse7d(rows){
+  return (rows || []).some(row => moveIs7d(row && row.move));
+}
+function watchDropRows(list){
+  if (!window.BinderPriceWatch) return [];
+  return BinderPriceWatch.dropping((list || []).map(card => ({ card, move: watchMove(card) })));
+}
+function watchSinceLine(list){
+  const label = watchCountText(list);
+  if (!label) return "";
+  const drops = watchDropRows(list);
+  const week = drops.filter(row => moveIs7d(row.move)).length;
+  if (!week) return label + " since you saved them.";
+  if (week === drops.length) return label + " over the last 7 days.";
+  return label + ".";
+}
+function watchShelfBlurb(rows){
+  if (!rowsUse7d(rows)) return "Since you saved them. Biggest drops first.";
+  const week = rows.filter(row => moveIs7d(row.move)).length;
+  if (week === rows.length) return "Over the last 7 days, because the save day isn't on this device. Biggest drops first.";
+  return "Biggest drops first. Last 7 days is used when the save day isn't on this device.";
+}
+function watchDropsBlurb(rows){
+  if (!rows || !rows.length) return "No wishlist cards have dropped enough to show.";
+  if (!rowsUse7d(rows)) return "Biggest drops since you saved them.";
+  if (rows.every(row => moveIs7d(row.move))) return "Biggest drops over the last 7 days. The save day isn't on this device.";
+  return "Biggest drops first. Last 7 days is used when the save day isn't on this device.";
+}
+function watchListLabel(rows, dropsOnly){
+  const week = rowsUse7d(rows);
+  if (dropsOnly) {
+    return week
+      ? "Wishlist price drops, biggest first. Last 7 days is used when the save day isn't on this device."
+      : "Wishlist price drops, biggest first";
+  }
+  return week
+    ? "Wishlist price changes, biggest drops first. Last 7 days is used when the save day isn't on this device."
+    : "Wishlist price changes since you saved, biggest drops first";
+}
+function forgetWatch(id){
+  const clean = cleanId(String(id || ""));
+  if (!clean) return;
+  try {
+    if (window.BinderPriceWatch && typeof BinderPriceWatch.forget === "function") {
+      BinderPriceWatch.forget(localStorage, clean);
+      return;
+    }
+    const raw = JSON.parse(localStorage.getItem("bh.pricewatch.v1") || "null");
+    if (!raw || !raw.cards || typeof raw.cards !== "object" || Array.isArray(raw.cards)) return;
+    if (!Object.prototype.hasOwnProperty.call(raw.cards, clean)) return;
+    if (!/^[a-z0-9._-]+$/i.test(clean)) return;
+    delete raw.cards[clean];
+    localStorage.setItem("bh.pricewatch.v1", JSON.stringify({ v: 1, cards: raw.cards }));
+  } catch (e) {}
+}
 function rememberWatch(card){
   const id = card && cleanId(String(card.id || ""));
   if (!id) return;
@@ -6740,10 +6805,8 @@ function watchRow(card, move){
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "watch-row";
-  const meta = [card.set, card.number ? "#" + card.number : ""].filter(Boolean).join(" · ");
-  const quiet = window.BinderPriceWatch ? BinderPriceWatch.spoken(move) : "";
+  const meta = [card.set, card.number ? "#" + card.number : "", move && move.basis === "7d" ? "Last 7 days" : ""].filter(Boolean).join(" · ");
   const name = card.name || "Card";
-  btn.setAttribute("aria-label", [name, meta, quiet].filter(Boolean).join(", "));
   const art = document.createElement("span");
   art.className = "watch-art";
   art.setAttribute("aria-hidden", "true");

@@ -152,11 +152,18 @@
     return String(value == null ? "" : value).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
   }
 
+  function whenPhrase(row) {
+    // A 7-day move is only the fallback when the save day is unknown.
+    // Calling that "since you saved it" would describe a different price.
+    if (row && row.basis === "7d") return "over the last 7 days";
+    return "since you saved it";
+  }
+
   function spoken(row) {
     if (!row || (row.dir !== "down" && row.dir !== "up") || !row.money || !row.pctText) return "";
     const word = row.dir === "down" ? "Down" : "Up";
     const pct = row.pctText.replace("%", "");
-    const text = word + " " + row.money + ", " + pct + " percent, since you saved it";
+    const text = word + " " + row.money + ", " + pct + " percent, " + whenPhrase(row);
     if (/NaN|undefined/.test(text) || /\$0\.00\b|\$0(?!\.?\d)/.test(text)) return "";
     return text;
   }
@@ -168,7 +175,7 @@
     const arrow = row.dir === "down" ? "▼" : "▲";
     const face = arrow + " " + row.money + " (" + sign + row.pctText + ")";
     if (/NaN|undefined/.test(face) || /\$0\.00\b|\$0(?!\.?\d)/.test(face)) return "";
-    return `<span class="watch-badge ${row.dir}"><span aria-hidden="true">${esc(face)}</span><span class="sr-only">${esc(quiet)}</span></span>`;
+    return `<span class="watch-badge ${row.dir}"><span>${esc(face)}</span><span class="sr-only">${esc(quiet)}</span></span>`;
   }
 
   function read(storage) {
@@ -218,6 +225,23 @@
     return write(storage, cards);
   }
 
+  function forget(storage, id) {
+    const clean = cleanId(id);
+    if (!clean || !storage || typeof storage.getItem !== "function" || typeof storage.setItem !== "function") return false;
+    let raw = null;
+    try { raw = JSON.parse(storage.getItem(KEY) || "null"); }
+    catch (e) { return false; }
+    if (!raw || !raw.cards || typeof raw.cards !== "object" || Array.isArray(raw.cards)) return true;
+    if (!Object.prototype.hasOwnProperty.call(raw.cards, clean)) return true;
+    delete raw.cards[clean];
+    try {
+      storage.setItem(KEY, JSON.stringify({ v: 1, cards: raw.cards }));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   return {
     KEY,
     MIN_PCT,
@@ -232,6 +256,7 @@
     spoken,
     badgeHtml,
     read,
-    remember
+    remember,
+    forget
   };
 });
