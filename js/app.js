@@ -178,6 +178,8 @@ let swipeBusy = false;
 let audioCtx = null;
 let setView = null;
 let binderView = null;
+let wishWatch = false;
+let watchRendering = false;
 let dealsFrom = "shelf";
 let dealsOpenedAt = 0;
 let dealsToken = 0;
@@ -3161,6 +3163,7 @@ function addWish(card){
   noteDemand(card.id);
   saveWish();
   logEvent("save", card.id);
+  rememberWatch(card);
   return true;
 }
 function addToBinder(binder, card){
@@ -3524,7 +3527,7 @@ function renderSetSide(){
   profileEl.innerHTML = `<div class="profile-scroll" data-side="sets"><p class="eyebrow">Set</p><h2 class="pname" id="profileTitle">${esc(stats.name)}</h2><div class="side-progress">${ringMarkup(stats.saved, stats.total)}<div><p class="market-price">${esc(count)}</p><p class="fine">${esc(fine)}</p></div></div>${stats.release ? `<p class="fine">${esc(stats.release)}</p>` : ""}</div>`;
 }
 function binderSideKey(){
-  if (!binderView) return "shelf:" + wish.length + ":" + binderState.binders.length + ":" + ownedIds.size;
+  if (!binderView) return "shelf:" + wish.length + ":" + binderState.binders.length + ":" + ownedIds.size + ":" + watchDropCount(wish);
   if (binderView.kind === "wish") return "wish:" + wish.length + ":" + ownedIds.size;
   if (binderView.kind === "movers") return "movers";
   if (binderView.kind === "plan") return "plan";
@@ -3564,7 +3567,8 @@ function renderBinderSide(){
     const drops = wish.map(c => ({ c, d: priceDrop(c) })).filter(x => x.d).sort((x, y) => y.d.pct - x.d.pct).slice(0, 4);
     const top = wish.map(c => ({ c, v: usdOf(c) })).filter(x => x.v > 0).sort((x, y) => y.v - x.v).slice(0, 3);
     const val = valueOf(wish);
-    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Your hunt</p><h2 class="pname" id="profileTitle">${wish.length ? wish.length === 1 ? "1 card saved" : wish.length + " cards saved" : "Nothing saved yet"}</h2>${val ? `<p class="market-price">${esc(priceText(val, "USD"))}</p><p class="fine">What your wishlist costs at today's raw prices.</p>` : `<p class="fine">Swipe right on a card in Hunt and it lands on your wishlist.</p>`}
+    const since = watchCountText(wish);
+    profileEl.innerHTML = `<div class="profile-scroll" data-side="binders"><p class="eyebrow">Your hunt</p><h2 class="pname" id="profileTitle">${wish.length ? wish.length === 1 ? "1 card saved" : wish.length + " cards saved" : "Nothing saved yet"}</h2>${val ? `<p class="market-price">${esc(priceText(val, "USD"))}</p><p class="fine">What your wishlist costs at today's raw prices.</p>` : `<p class="fine">Swipe right on a card in Hunt and it lands on your wishlist.</p>`}${since ? `<p class="fine">${esc(since)} since you saved them.</p>` : ""}
       ${drops.length ? `<h3 class="side-h">Cheaper than ${DROP_WINDOW_DAYS} days ago</h3><div class="side-cards">${drops.map(x => mini(x.c, `<span class="drop-badge">↓${esc(String(x.d.shown))}%</span>`)).join("")}</div>` : ""}
       ${top.length ? `<h3 class="side-h">Biggest hunts</h3><div class="side-cards">${top.map(x => mini(x.c, esc(priceText(x.v, "USD")))).join("")}</div>` : ""}
     </div>`;
@@ -3659,6 +3663,17 @@ function paintRail(){
   const wishBtn = document.getElementById("railWish");
   if (!count || !host || !wishBtn) return;
   count.textContent = String(wish.length);
+  const watchLabel = watchCountText(wish);
+  let note = wishBtn.querySelector(".watch-note");
+  const copy = wishBtn.querySelector(":scope > span");
+  if (watchLabel && copy) {
+    if (!note) {
+      note = document.createElement("span");
+      note.className = "fine watch-note";
+      copy.append(note);
+    }
+    note.textContent = watchLabel;
+  } else if (note) note.remove();
   const dropped = droppedCount(wish);
   let mark = wishBtn.querySelector(".drop-badge");
   if (dropped) {
@@ -3670,7 +3685,7 @@ function paintRail(){
     mark.textContent = "Dropped " + dropped;
     mark.hidden = false;
   } else if (mark) mark.remove();
-  const wishName = "Wishlist " + wish.length + (wish.length === 1 ? " card" : " cards") + (dropped ? " Dropped " + dropped : "");
+  const wishName = "Wishlist " + wish.length + (wish.length === 1 ? " card" : " cards") + (watchLabel ? ", " + watchLabel : "") + (dropped ? " Dropped " + dropped : "");
   wishBtn.setAttribute("aria-label", wishName);
   host.replaceChildren();
   const binders = (binderState && binderState.binders) || [];
@@ -5250,6 +5265,12 @@ function openPlan(){
 }
 function renderBinders(){
   const root = document.getElementById("bindersScroll");
+  watchRendering = true;
+  try { renderBindersBody(root); }
+  finally { watchRendering = false; }
+  ensurePriceWatch().catch(() => {});
+}
+function renderBindersBody(root){
   if (binderView && binderView.kind === "deals") { renderDeals(root); return; }
   if (binderView && binderView.kind === "movers") { renderMovers(root); return; }
   if (binderView && binderView.kind === "plan") { renderPlan(root); return; }
@@ -5261,7 +5282,8 @@ function renderBinders(){
   const dropped = droppedCount(wish);
   const cardsWord = n => n + (n === 1 ? " card" : " cards");
   const wishMeta = wish.length ? cardsWord(wish.length) + (total ? " · " + priceText(total, "USD") : "") : "Nothing saved yet";
-  const wishSub = wish.length ? (wantedN ? wantedN + " still to find" : "You have every card") + (ownedN ? " · " + ownedN + " got" : "") : "Swipe right on a card and it lands here.";
+  const watchLabel = watchCountText(wish);
+  const wishSub = (wish.length ? (wantedN ? wantedN + " still to find" : "You have every card") + (ownedN ? " · " + ownedN + " got" : "") : "Swipe right on a card and it lands here.") + (watchLabel ? " · " + watchLabel : "");
   root.innerHTML = `<div class="wish-slot"><button class="wish-row" id="openWish" type="button">${peekMarkup(wish, "wish-peek")}<span class="wish-copy"><span class="eyebrow">All saved cards</span><b>Wishlist</b><span class="wish-meta">${esc(wishMeta)}</span><span class="fine">${esc(wishSub)}</span></span>${droppedCountMarkup(dropped)}<span class="wish-go" aria-hidden="true">Open →</span></button><button class="chip wish-share" id="shareWish" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button></div>
     <button class="deals-row" id="openDeals" type="button"><span class="deals-copy"><span class="eyebrow">Price alerts</span><b>Deals</b><span class="fine">Cards at your target, or down since you saved one.</span></span><span class="deals-badge" data-deals-count hidden aria-hidden="true"></span></button>
     <button class="movers-row" id="openMovers" type="button"><span class="deals-copy"><span class="eyebrow">Cached market</span><b>Market movers</b><span class="fine">Risers and fallers over 7 and 30 days.</span></span></button>
@@ -5270,6 +5292,7 @@ function renderBinders(){
     <div class="shelf-head"><h2 class="shelf-title">Your binders</h2><p class="fine">Right-swipe always lands on your wishlist. A themed binder is another home for the same card.</p></div>
     <div class="shelf-scene"><div class="shelf" id="shelf"></div></div>`;
   const shelf = document.getElementById("shelf");
+  paintWatchShelf(root);
   binderState.binders.forEach(b => {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -5547,8 +5570,67 @@ function binderSpread(root){
   if (!w) return true;
   return w >= 640;
 }
+function paintWatchShelf(root){
+  const rows = watchRows(wish);
+  if (!rows.length || !root) return;
+  const section = document.createElement("section");
+  section.className = "watch-shelf";
+  section.setAttribute("aria-labelledby", "watchShelfTitle");
+  const head = document.createElement("div");
+  head.className = "shelf-head";
+  head.innerHTML = `<h2 class="shelf-title" id="watchShelfTitle">Price watch</h2><p class="fine">Since you saved them. Biggest drops first.</p>`;
+  section.append(head);
+  paintWatchList(section, rows, "Wishlist price changes since you saved, biggest drops first");
+  const slot = root.querySelector(":scope > .wish-slot");
+  if (slot && slot.nextSibling) root.insertBefore(section, slot.nextSibling);
+  else if (slot) root.append(section);
+  else root.prepend(section);
+}
+function renderWishWatch(root){
+  root.classList.add("reading");
+  const rows = window.BinderPriceWatch ? BinderPriceWatch.dropping(wish.map(card => ({ card, move: watchMove(card) }))) : [];
+  root.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.className = "watch-wrap";
+  const tools = document.createElement("div");
+  tools.className = "booktools";
+  tools.innerHTML = `<button class="chip" id="backBinders" type="button">All binders</button><button class="chip" id="watchDrops" type="button" aria-pressed="true">Price drops</button><button class="chip" id="openDeals" type="button">Deals</button><button class="chip" id="copyList" type="button">Copy list</button><button class="chip" id="shareCollection" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button>`;
+  const title = document.createElement("h2");
+  title.id = "watchListTitle";
+  title.textContent = "Price drops";
+  const note = document.createElement("p");
+  note.className = "fine";
+  note.textContent = rows.length ? "Biggest drops since you saved them." : "No wishlist cards have dropped since you saved them.";
+  wrap.append(tools, title, note);
+  if (rows.length) paintWatchList(wrap, rows, "Wishlist price drops, biggest first");
+  else {
+    const empty = document.createElement("p");
+    empty.className = "empty-state watch-empty";
+    empty.append(document.createTextNode("Nothing has dropped far enough to show. "));
+    empty.insertAdjacentHTML("beforeend", toad());
+    wrap.append(empty);
+  }
+  root.append(wrap);
+  document.getElementById("backBinders").onclick = () => { binderView = null; wishWatch = false; renderBinders(); };
+  document.getElementById("watchDrops").onclick = () => {
+    wishWatch = false;
+    renderBinders();
+    const again = document.getElementById("watchDrops");
+    if (again) again.focus();
+  };
+  document.getElementById("openDeals").onclick = () => openDeals("wish");
+  document.getElementById("copyList").onclick = async () => {
+    const text = "Wishlist\n" + wish.map(c => [c.name, c.set, c.number ? "#" + c.number : "", ownedIds.has(c.id) ? "owned" : "wanted", priceText(usdOf(c), "USD")].filter(Boolean).join(" — ")).join("\n");
+    try { await navigator.clipboard.writeText(text); announce("List copied."); }
+    catch (err) { announce("List ready. Clipboard was blocked."); }
+  };
+  const share = document.getElementById("shareCollection");
+  if (share && window.BinderShare) share.onclick = () => BinderShare.openCollection({ kind:"wish", name:"Wishlist", color:"#E4E7DA", cards:wish, ownedIds });
+  paintContext();
+}
 function renderCollection(root){
   const wishMode = binderView.kind === "wish";
+  if (wishMode && wishWatch) { renderWishWatch(root); return; }
   const binder = wishMode ? null : binderState.binders.find(b => b.id === binderView.id);
   if (!wishMode && !binder) { binderView = null; renderBinders(); return; }
   root.classList.add("reading");
@@ -5566,7 +5648,7 @@ function renderCollection(root){
   const tools = document.createElement("div");
   tools.className = "booktools";
   tools.innerHTML = `<button class="chip" id="backBinders" type="button">All binders</button>` +
-    (wishMode ? `<button class="chip" id="openDeals" type="button">Deals</button><button class="chip" id="copyList" type="button">Copy list</button><button class="chip" id="shareCollection" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button>`
+    (wishMode ? `<button class="chip" id="watchDrops" type="button" aria-pressed="false">Price drops</button><button class="chip" id="openDeals" type="button">Deals</button><button class="chip" id="copyList" type="button">Copy list</button><button class="chip" id="shareCollection" type="button" aria-haspopup="dialog" aria-label="Share wishlist">Share</button>`
       : `<button class="chip" id="fillFrom" type="button">Fill from wishlist</button><button class="chip" id="discover" type="button">Swipe to discover</button><button class="chip" id="switchBinder" type="button">Switch</button><button class="chip" id="renameBinder" type="button">Rename</button><button class="chip" id="recolorBinder" type="button">Cover</button><button class="chip danger" id="deleteBinder" type="button">Delete</button><button class="chip" id="copyList" type="button">Copy list</button><button class="chip" id="shareCollection" type="button" aria-haspopup="dialog">Share</button>`);
   const stage = document.createElement("div");
   stage.className = "bookstage";
@@ -6122,7 +6204,9 @@ function renderCollection(root){
   book.addEventListener("pointerleave", () => {
     book.querySelectorAll(".sleeve.tilting").forEach(node => node.classList.remove("tilting"));
   });
-  document.getElementById("backBinders").onclick = () => { binderView = null; renderBinders(); };
+  document.getElementById("backBinders").onclick = () => { binderView = null; wishWatch = false; renderBinders(); };
+  const watchDrops = document.getElementById("watchDrops");
+  if (watchDrops) watchDrops.onclick = () => { wishWatch = true; renderBinders(); const again = document.getElementById("watchDrops"); if (again) again.focus(); };
   const openDealsBtn = document.getElementById("openDeals");
   if (openDealsBtn) openDealsBtn.onclick = () => openDeals("wish");
   document.getElementById("copyList").onclick = async () => {
@@ -6567,6 +6651,118 @@ function scryHistory(card){
   const name = chosenVariant(names, variant.key);
   if (!name) return [];
   return (rec.history || []).filter(row => row && row.v === name && pos(row.m)).map(row => ({ t:parseDay(row.d), label:String(row.d).slice(0, 10), value:pos(row.m) })).filter(p => p.t && p.value).sort((a, b) => a.t - b.t);
+}
+let watchAssets = null;
+function ensurePriceWatch(){
+  if (window.BinderPriceWatch && priceHistoryReady) return Promise.resolve();
+  if (watchAssets) return watchAssets;
+  const had = !!window.BinderPriceWatch;
+  watchAssets = (had ? Promise.resolve() : loadScript("js/price-watch.js")).then(() => {
+    return typeof ensurePriceHistory === "function" ? ensurePriceHistory() : null;
+  }).then(() => {
+    if (!had) refreshWatchSurfaces();
+  }).catch(err => {
+    watchAssets = null;
+    throw err;
+  });
+  return watchAssets;
+}
+function watchPointsFor(card){
+  if (!card || !card.id || !priceHistoryReady || !priceHistoryFile || !window.BinderPriceHistory) return [];
+  const cards = priceHistoryFile.cards;
+  if (!cards || !Object.prototype.hasOwnProperty.call(cards, card.id)) return [];
+  const entry = cards[card.id];
+  const name = historyVariantName(card, entry);
+  const packed = entry && name ? entry[name] : null;
+  return packed ? BinderPriceHistory.unpack(packed) : [];
+}
+function saveStamp(id){
+  const events = (logState && logState.events) || [];
+  for (let i = events.length - 1; i >= 0; i--) {
+    const row = events[i];
+    if (!row || row.k !== "save" || row.id !== id || !/^\d{4}-\d{2}-\d{2}$/.test(row.t || "")) continue;
+    const t = Date.parse(row.t + "T00:00:00Z");
+    if (Number.isFinite(t) && t > 0) return t;
+  }
+  return 0;
+}
+function watchRecord(id){
+  if (!id || !window.BinderPriceWatch) return null;
+  try { return BinderPriceWatch.read(localStorage)[id] || null; }
+  catch (e) { return null; }
+}
+function watchMove(card){
+  if (!card || !card.id || !window.BinderPriceWatch || !window.BinderPriceHistory) return null;
+  const rec = watchRecord(card.id);
+  const savedAt = rec && rec.at ? rec.at : saveStamp(card.id);
+  try {
+    return BinderPriceWatch.move({
+      points: watchPointsFor(card),
+      savedPrice: rec && rec.price != null ? rec.price : null,
+      savedAt,
+      windowMove: BinderPriceHistory.windowMove
+    });
+  } catch (e) { return null; }
+}
+function watchRows(list){
+  if (!window.BinderPriceWatch) return [];
+  const rows = (list || []).map(card => ({ card, move: watchMove(card) }));
+  return BinderPriceWatch.ordered(rows);
+}
+function watchDropCount(list){
+  if (!window.BinderPriceWatch) return 0;
+  return BinderPriceWatch.dropping((list || []).map(card => ({ card, move: watchMove(card) }))).length;
+}
+function watchCountText(list){
+  if (!window.BinderPriceWatch) return "";
+  return BinderPriceWatch.countLabel(watchDropCount(list));
+}
+function rememberWatch(card){
+  const id = card && cleanId(String(card.id || ""));
+  if (!id) return;
+  ensurePriceWatch().then(() => {
+    if (!window.BinderPriceWatch || !wish.some(c => c && c.id === id)) return;
+    const points = watchPointsFor(card);
+    const last = points.length ? points[points.length - 1] : null;
+    BinderPriceWatch.remember(localStorage, id, { price: last ? last.value : null, at: Date.now() });
+    refreshWatchSurfaces();
+  }).catch(() => {});
+}
+function refreshWatchSurfaces(){
+  if (typeof paintRail === "function") paintRail();
+  if (tab !== "binders" || watchRendering) return;
+  if (binderView && !(binderView.kind === "wish" && wishWatch)) return;
+  sideKey = "";
+  renderBinders();
+}
+function watchRow(card, move){
+  const li = document.createElement("li");
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "watch-row";
+  const meta = [card.set, card.number ? "#" + card.number : ""].filter(Boolean).join(" · ");
+  const quiet = window.BinderPriceWatch ? BinderPriceWatch.spoken(move) : "";
+  const name = card.name || "Card";
+  btn.setAttribute("aria-label", [name, meta, quiet].filter(Boolean).join(", "));
+  const art = document.createElement("span");
+  art.className = "watch-art";
+  art.setAttribute("aria-hidden", "true");
+  btn.innerHTML = `<span class="watch-copy"><b>${esc(name)}</b>${meta ? `<span class="fine">${esc(meta)}</span>` : ""}</span>${BinderPriceWatch.badgeHtml(move)}`;
+  btn.prepend(art);
+  paintArt(art, card, { priority:"low", lazy:true });
+  const img = art.querySelector("img");
+  if (img) img.alt = "";
+  btn.onclick = () => openProfile(card);
+  li.append(btn);
+  return li;
+}
+function paintWatchList(host, rows, label){
+  const list = document.createElement("ul");
+  list.className = "watch-list";
+  list.setAttribute("aria-label", label);
+  rows.forEach(row => { if (row && row.card && row.move) list.append(watchRow(row.card, row.move)); });
+  host.append(list);
+  return list;
 }
 // Price-drop badge. Uses only the cached Scrydex raw near-mint USD history
 // already stored for the card (data/scrydex.json keeps about 90 days). This
@@ -7106,11 +7302,13 @@ function loadPriceHistory(){
     priceHistoryFile = file && file.cards ? file : null;
     priceHistoryReady = true;
     refreshHistorySlot();
+    refreshWatchSurfaces();
     return priceHistoryFile;
   }).catch(() => {
     priceHistoryReady = true;
     priceHistoryFile = null;
     refreshHistorySlot();
+    refreshWatchSurfaces();
     return null;
   });
 }
