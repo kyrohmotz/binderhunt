@@ -14067,13 +14067,23 @@
     },
     "2026-11-29": {
       "id": "swsh10.5-018",
-      "price": 10.47,
+      "price": 10.79,
       "variant": "holofoil",
       "printing": "Holofoil",
       "alts": 1,
       "source": "tcgplayer",
       "eur": 9.37,
-      "at": "2026-11-27T17:51:29Z"
+      "at": "2026-11-28T16:38:19Z"
+    },
+    "2026-11-30": {
+      "id": "ex1-8",
+      "price": 11.58,
+      "variant": "reverse-holofoil",
+      "printing": "Reverse Holofoil",
+      "alts": 2,
+      "source": "tcgplayer",
+      "eur": 7.81,
+      "at": "2026-11-28T16:38:20Z"
     }
   }
 }
