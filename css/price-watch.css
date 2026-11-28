@@ -1,0 +1,36 @@
+/* Price watch on wishlist and shelf lists. The open binder pages stay as they are. */
+
+.watch-shelf{min-width:0;max-width:100%;margin:4px 0 8px;padding-bottom:8px}
+.watch-shelf .shelf-title{margin:8px 2px 0}
+.watch-shelf .fine{margin:2px 2px 8px}
+.watch-wrap{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;gap:8px}
+.watch-wrap h2{margin:0 2px;font-size:22px}
+.watch-wrap .fine{margin:0 2px}
+.watch-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;min-width:0;max-width:100%}
+.watch-wrap .watch-list{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px}
+.watch-list li{min-width:0;max-width:100%}
+.watch-row{display:grid;grid-template-columns:48px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;max-width:100%;min-height:44px;text-align:left;background:#fff;border:2.5px solid var(--ink);border-radius:16px;padding:8px 10px;box-shadow:2px 2px 0 var(--ink);color:var(--ink);scroll-margin-bottom:16px}
+.watch-row:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.watch-art{width:48px;height:66px;overflow:hidden;border-radius:6px;border:1.5px solid var(--ink);background:var(--paper-2);display:block}
+.watch-art img{width:100%;height:100%;object-fit:cover;display:block}
+.watch-art .cardback{width:100%;height:100%;min-height:0;border:0;box-shadow:none;border-radius:0}
+.watch-copy{min-width:0}
+.watch-copy b{display:block;font-family:var(--display);font-weight:700;font-size:16px;line-height:1.2;overflow-wrap:anywhere}
+.watch-copy .fine{display:block;white-space:normal;overflow-wrap:anywhere}
+.watch-badge{display:inline-flex;align-items:center;flex:none;max-width:100%;border:2px solid var(--ink);border-radius:999px;padding:3px 8px;font-family:var(--display);font-weight:700;font-size:13px;line-height:1.2;white-space:nowrap;box-shadow:2px 2px 0 var(--ink);font-variant-numeric:tabular-nums;color:var(--ink)}
+.watch-badge.down{background:var(--green)}
+.watch-badge.up{background:var(--rose)}
+.watch-count{font-weight:800}
+.rail-wish .fine.watch-note{display:block;white-space:normal;overflow:visible;text-overflow:clip;font-size:12px;line-height:1.25}
+#bindersScroll .wish-row .watch-count{white-space:normal}
+.watch-empty{margin:8px 0}
+#watchDrops[aria-pressed="true"]{background:var(--green)}
+
+@media (max-width:420px){
+  .watch-row{grid-template-columns:44px minmax(0,1fr);grid-template-areas:"art copy" "art badge";column-gap:10px;row-gap:6px}
+  .watch-art{grid-area:art;width:44px;height:60px}
+  .watch-copy{grid-area:copy}
+  .watch-badge{grid-area:badge;justify-self:start}
+  .watch-copy b{font-size:15px}
+  .watch-badge{font-size:12px;padding:3px 7px}
+}
